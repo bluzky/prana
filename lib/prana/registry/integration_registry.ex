@@ -8,32 +8,7 @@ defmodule Prana.IntegrationRegistry do
 
   require Logger
 
-  defstruct [:integrations, :config]
-
-  @type integration_definition :: %{
-          name: String.t(),
-          display_name: String.t(),
-          description: String.t(),
-          version: String.t(),
-          category: String.t(),
-          actions: %{String.t() => action_definition()}
-        }
-
-  @type action_definition :: %{
-          name: String.t(),
-          display_name: String.t(),
-          description: String.t(),
-          module: atom(),
-          function: atom(),
-          input_ports: [String.t()],
-          output_ports: [String.t()],
-          default_success_port: String.t(),
-          default_error_port: String.t(),
-          input_schema: map() | nil,
-          output_schema: map() | nil,
-          examples: [map()],
-          metadata: map()
-        }
+  defstruct [:integrations]
 
   # Client API
 
@@ -49,13 +24,6 @@ defmodule Prana.IntegrationRegistry do
   end
 
   @doc """
-  Register an integration with explicit definition
-  """
-  def register_integration(integration_name, definition) when is_binary(integration_name) do
-    GenServer.call(__MODULE__, {:register_integration_def, integration_name, definition})
-  end
-
-  @doc """
   Get an action definition by integration and action name
   """
   def get_action(integration_name, action_name) do
@@ -67,13 +35,6 @@ defmodule Prana.IntegrationRegistry do
   """
   def list_integrations do
     GenServer.call(__MODULE__, :list_integrations)
-  end
-
-  @doc """
-  List all actions for a specific integration
-  """
-  def list_actions(integration_name) do
-    GenServer.call(__MODULE__, {:list_actions, integration_name})
   end
 
   @doc """
@@ -114,12 +75,9 @@ defmodule Prana.IntegrationRegistry do
   # GenServer callbacks
 
   @impl GenServer
-  def init(opts) do
-    config = Keyword.get(opts, :config, %{})
-
+  def init(_opts) do
     state = %__MODULE__{
-      integrations: %{},
-      config: config
+      integrations: %{}
     }
 
     Logger.info("Started Prana Integration Registry")
@@ -129,17 +87,6 @@ defmodule Prana.IntegrationRegistry do
   @impl GenServer
   def handle_call({:register_integration, module}, _from, state) do
     case register_integration_module(module, state) do
-      {:ok, new_state} ->
-        {:reply, :ok, new_state}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
-  end
-
-  @impl GenServer
-  def handle_call({:register_integration_def, name, definition}, _from, state) do
-    case register_integration_definition(name, definition, state) do
       {:ok, new_state} ->
         {:reply, :ok, new_state}
 
@@ -159,7 +106,7 @@ defmodule Prana.IntegrationRegistry do
     result =
       case Map.get(state.integrations, integration_name) do
         nil -> {:error, :not_found}
-        integration -> {:ok, integration}
+        %Prana.Integration{} = integration -> {:ok, integration}
       end
 
     {:reply, result, state}
@@ -168,42 +115,18 @@ defmodule Prana.IntegrationRegistry do
   @impl GenServer
   def handle_call(:list_integrations, _from, state) do
     integrations =
-      Enum.map(state.integrations, fn {name, definition} ->
+      Enum.map(state.integrations, fn {_name, %Prana.Integration{} = integration} ->
         %{
-          name: name,
-          display_name: definition.display_name,
-          description: definition.description,
-          category: definition.category,
-          version: definition.version,
-          action_count: map_size(definition.actions)
+          name: integration.name,
+          display_name: integration.display_name,
+          description: integration.description,
+          category: integration.category,
+          version: integration.version,
+          action_count: map_size(integration.actions)
         }
       end)
 
     {:reply, integrations, state}
-  end
-
-  @impl GenServer
-  def handle_call({:list_actions, integration_name}, _from, state) do
-    actions =
-      case Map.get(state.integrations, integration_name) do
-        nil ->
-          []
-
-        integration ->
-          Enum.map(integration.actions, fn {_name, action_def} ->
-            %{
-              name: action_def.name,
-              display_name: action_def.display_name,
-              description: action_def.description,
-              input_ports: action_def.input_ports,
-              output_ports: action_def.output_ports,
-              default_success_port: action_def.default_success_port,
-              default_error_port: action_def.default_error_port
-            }
-          end)
-      end
-
-    {:reply, actions, state}
   end
 
   @impl GenServer
@@ -227,27 +150,12 @@ defmodule Prana.IntegrationRegistry do
       total_integrations: map_size(state.integrations),
       total_actions:
         state.integrations
-        |> Enum.map(fn {_name, def} -> map_size(def.actions) end)
+        |> Enum.map(fn {_name, %Prana.Integration{actions: actions}} -> map_size(actions) end)
         |> Enum.sum(),
       integrations_by_category:
         state.integrations
-        |> Enum.group_by(fn {_name, def} -> def.category end)
+        |> Enum.group_by(fn {_name, %Prana.Integration{category: category}} -> category end)
         |> Map.new(fn {category, integrations} -> {category, length(integrations)} end)
-
-      # Private functions
-
-      # Check if module implements the Integration behavior
-
-      # Validate and normalize the definition
-      # Initialize the integration if it supports init
-      # Override name with the provided one
-      # Convert list to map
-      # Ensure all required fields are present with defaults
-
-      # Validate required fields
-      # Validate that module and function exist
-
-      # Public helper functions
     }
 
     {:reply, {:ok, stats}, state}
@@ -256,8 +164,8 @@ defmodule Prana.IntegrationRegistry do
   @impl GenServer
   def handle_call(:health_check, _from, state) do
     results =
-      Map.new(state.integrations, fn {name, definition} ->
-        case check_integration_health(definition) do
+      Map.new(state.integrations, fn {name, %Prana.Integration{} = integration} ->
+        case check_integration_health(integration) do
           :ok -> {name, :ok}
           {:error, reason} -> {name, {:error, reason}}
         end
@@ -273,66 +181,25 @@ defmodule Prana.IntegrationRegistry do
     {:reply, {overall_health, results}, state}
   end
 
-  # Additional GenServer handlers
-
-  @impl GenServer
-  def handle_call({:reload_integration, integration_name}, _from, state) do
-    case Map.get(state.integrations, integration_name) do
-      nil ->
-        {:reply, {:error, :not_found}, state}
-
-      definition when is_map(definition) and not is_nil(definition.module) ->
-        # Re-register the module
-        case register_integration_module(definition.module, state) do
-          {:ok, new_state} ->
-            Logger.info("Reloaded integration: #{integration_name}")
-            {:reply, :ok, new_state}
-
-          {:error, reason} ->
-            {:reply, {:error, reason}, state}
-        end
-
-      _definition ->
-        {:reply, {:error, "Integration was not registered from a module"}, state}
-    end
-  end
-
-  @impl GenServer
-  def handle_call(:get_all_actions, _from, state) do
-    all_actions =
-      Enum.flat_map(state.integrations, fn {integration_name, definition} ->
-        Enum.map(definition.actions, fn {_action_name, action_def} ->
-          Map.put(action_def, :integration_name, integration_name)
-        end)
-      end)
-
-    {:reply, all_actions, state}
-  end
+  # Private functions
 
   defp register_integration_module(module, state) do
     if function_exported?(module, :definition, 0) do
-      definition = module.definition()
+      integration = module.definition()
 
-      case validate_and_normalize_definition(definition, module) do
-        {:ok, normalized_def} ->
-          case maybe_init_integration(module, state.config) do
-            :ok ->
-              new_integrations = Map.put(state.integrations, normalized_def.name, normalized_def)
-              new_state = %{state | integrations: new_integrations}
+      case integration do
+        %Prana.Integration{} = integration ->
+          new_integrations = Map.put(state.integrations, integration.name, integration)
+          new_state = %{state | integrations: new_integrations}
 
-              Logger.info(
-                "Registered integration: #{normalized_def.name} (#{module}) with #{map_size(normalized_def.actions)} actions"
-              )
+          Logger.info(
+            "Registered integration: #{integration.name} (#{module}) with #{map_size(integration.actions)} actions"
+          )
 
-              {:ok, new_state}
+          {:ok, new_state}
 
-            {:error, reason} ->
-              Logger.error("Failed to initialize integration #{module}: #{inspect(reason)}")
-              {:error, "Integration initialization failed: #{reason}"}
-          end
-
-        {:error, reason} ->
-          {:error, reason}
+        _ ->
+          {:error, "Module #{module} definition/0 must return %Prana.Integration{} struct"}
       end
     else
       {:error, "Module #{module} does not implement Prana.Behaviour.Integration"}
@@ -343,180 +210,25 @@ defmodule Prana.IntegrationRegistry do
       {:error, "Registration failed: #{inspect(error)}"}
   end
 
-  defp register_integration_definition(name, definition, state) do
-    case validate_and_normalize_definition(definition, nil) do
-      {:ok, normalized_def} ->
-        final_def = %{normalized_def | name: name}
-
-        new_integrations = Map.put(state.integrations, name, final_def)
-        new_state = %{state | integrations: new_integrations}
-
-        Logger.info("Registered integration definition: #{name} with #{map_size(final_def.actions)} actions")
-        {:ok, new_state}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp validate_and_normalize_definition(definition, module) do
-    with :ok <- validate_required_fields(definition),
-         {:ok, normalized_actions} <- validate_and_normalize_actions(definition.actions, module) do
-      normalized_def = %{
-        name: definition.name,
-        display_name: Map.get(definition, :display_name, definition.name),
-        description: Map.get(definition, :description, ""),
-        version: Map.get(definition, :version, "1.0.0"),
-        category: Map.get(definition, :category, "custom"),
-        actions: normalized_actions,
-        module: module,
-        metadata: Map.get(definition, :metadata, %{})
-      }
-
-      {:ok, normalized_def}
-    end
-  end
-
-  defp validate_required_fields(definition) do
-    required_fields = [:name, :actions]
-
-    missing_fields =
-      Enum.reject(required_fields, fn field ->
-        Map.has_key?(definition, field) && definition[field] != nil
-      end)
-
-    if Enum.empty?(missing_fields) do
-      :ok
-    else
-      {:error, "Missing required fields: #{inspect(missing_fields)}"}
-    end
-  end
-
-  defp validate_and_normalize_actions(actions, module) when is_list(actions) do
-    action_map =
-      Map.new(actions, fn action ->
-        action_name = action[:name] || action["name"]
-        {action_name, action}
-      end)
-
-    validate_and_normalize_actions(action_map, module)
-  end
-
-  defp validate_and_normalize_actions(actions, module) when is_map(actions) do
-    normalized_actions =
-      Map.new(actions, fn {action_name, action_def} ->
-        case normalize_action_definition(action_def, module) do
-          {:ok, normalized_action} -> {action_name, normalized_action}
-          {:error, reason} -> throw({:error, "Invalid action #{action_name}: #{reason}"})
-        end
-      end)
-
-    {:ok, normalized_actions}
-  catch
-    {:error, reason} -> {:error, reason}
-  end
-
-  defp normalize_action_definition(action_def, module) do
-    normalized = %{
-      name: get_field(action_def, :name),
-      display_name: get_field(action_def, :display_name, get_field(action_def, :name)),
-      description: get_field(action_def, :description, ""),
-      module: get_field(action_def, :module, module),
-      function: get_field(action_def, :function),
-      input_ports: get_field(action_def, :input_ports, ["input"]),
-      output_ports: get_field(action_def, :output_ports, ["success", "error"]),
-      default_success_port: get_field(action_def, :default_success_port, "success"),
-      default_error_port: get_field(action_def, :default_error_port, "error"),
-      input_schema: get_field(action_def, :input_schema),
-      output_schema: get_field(action_def, :output_schema),
-      examples: get_field(action_def, :examples, []),
-      metadata: get_field(action_def, :metadata, %{})
-    }
-
-    case validate_action_required_fields(normalized) do
-      :ok -> {:ok, normalized}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp get_field(map, key, default \\ nil) do
-    Map.get(map, key) || Map.get(map, to_string(key)) || default
-  end
-
-  defp validate_action_required_fields(action) do
-    required_fields = [:name, :module, :function]
-
-    missing_fields =
-      Enum.reject(required_fields, fn field ->
-        value = Map.get(action, field)
-        value && value != ""
-      end)
-
-    if Enum.empty?(missing_fields) do
-      if function_exported?(action.module, action.function, 1) do
-        :ok
-      else
-        {:error, "Function #{action.module}.#{action.function}/1 does not exist"}
-      end
-    else
-      {:error, "Missing required fields: #{inspect(missing_fields)}"}
-    end
-  end
-
-  defp maybe_init_integration(module, config) do
-    if function_exported?(module, :init_integration, 1) do
-      integration_config = Map.get(config, module, %{})
-
-      case module.init_integration(integration_config) do
-        {:ok, _state} -> :ok
-        {:error, reason} -> {:error, reason}
-        _ -> {:error, "Integration init returned unexpected value"}
-      end
-    else
-      :ok
-    end
-  end
-
   defp get_action_from_state(state, integration_name, action_name) do
-    case get_in(state.integrations, [integration_name, :actions, action_name]) do
+    case get_in(state.integrations, [integration_name, Access.key(:actions), action_name]) do
+      %Prana.Action{} = action -> {:ok, action}
       nil -> {:error, :not_found}
-      action -> {:ok, action}
     end
   end
 
-  defp check_integration_health(definition) do
-    if definition.module && function_exported?(definition.module, :health_check, 0) do
-      try do
-        definition.module.health_check()
-      rescue
-        error -> {:error, "Health check failed: #{inspect(error)}"}
-      end
-    else
+  defp check_integration_health(%Prana.Integration{actions: actions}) do
+    # Check if all action functions exist
+    invalid_actions =
+      Enum.reject(actions, fn {_name, %Prana.Action{module: module, function: function}} ->
+        function_exported?(module, function, 1)
+      end)
+
+    if Enum.empty?(invalid_actions) do
       :ok
+    else
+      action_names = Enum.map(invalid_actions, fn {name, _action} -> name end)
+      {:error, "Actions with missing functions: #{inspect(action_names)}"}
     end
-  end
-
-  @doc """
-  Reload an integration (useful for development)
-  """
-  def reload_integration(integration_name) do
-    GenServer.call(__MODULE__, {:reload_integration, integration_name})
-  end
-
-  @doc """
-  Validate an integration definition without registering it
-  """
-  def validate_integration_definition(definition) do
-    case validate_and_normalize_definition(definition, nil) do
-      {:ok, _normalized} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @doc """
-  Get all actions across all integrations (for UI/discovery)
-  """
-  def get_all_actions do
-    GenServer.call(__MODULE__, :get_all_actions)
   end
 end
