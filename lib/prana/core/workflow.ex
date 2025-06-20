@@ -2,30 +2,29 @@ defmodule Prana.Workflow do
   @moduledoc """
   Represents a complete workflow with nodes and connections
   """
-  
-  @type status :: :draft | :active | :paused | :archived
+
   @type t :: %__MODULE__{
-    id: String.t(),
-    name: String.t(),
-    description: String.t() | nil,
-    version: integer(),
-    status: status(),
-    tags: [String.t()],
-    nodes: [Prana.Node.t()],
-    connections: [Prana.Connection.t()],
-    variables: map(),
-    settings: Prana.WorkflowSettings.t(),
-    metadata: map(),
-    created_at: DateTime.t(),
-    updated_at: DateTime.t(),
-    created_by: String.t() | nil,
-    organization_id: String.t() | nil
-  }
+          id: String.t(),
+          name: String.t(),
+          description: String.t() | nil,
+          version: integer(),
+          nodes: [Prana.Node.t()],
+          connections: [Prana.Connection.t()],
+          variables: map(),
+          settings: Prana.WorkflowSettings.t(),
+          metadata: map()
+        }
 
   defstruct [
-    :id, :name, :description, :version, :status, :tags,
-    :nodes, :connections, :variables, :settings, :metadata,
-    :created_at, :updated_at, :created_by, :organization_id
+    :id,
+    :name,
+    :description,
+    :version,
+    :nodes,
+    :connections,
+    :variables,
+    :settings,
+    :metadata
   ]
 
   @doc """
@@ -37,37 +36,28 @@ defmodule Prana.Workflow do
       name: name,
       description: description,
       version: 1,
-      status: :draft,
-      tags: [],
       nodes: [],
       connections: [],
       variables: %{},
       settings: %Prana.WorkflowSettings{},
-      metadata: %{},
-      created_at: DateTime.utc_now(),
-      updated_at: DateTime.utc_now(),
-      created_by: nil,
-      organization_id: nil
+      metadata: %{}
     }
   end
 
   @doc """
-  Adds a node to the workflow
+  Loads a workflow from a map
   """
-  def add_node(%__MODULE__{} = workflow, %Prana.Node{} = node) do
-    %{workflow | 
-      nodes: workflow.nodes ++ [node],
-      updated_at: DateTime.utc_now()
-    }
-  end
-
-  @doc """
-  Adds a connection to the workflow
-  """
-  def add_connection(%__MODULE__{} = workflow, %Prana.Connection{} = connection) do
-    %{workflow | 
-      connections: workflow.connections ++ [connection],
-      updated_at: DateTime.utc_now()
+  def from_map(data) when is_map(data) do
+    %__MODULE__{
+      id: Map.get(data, "id") || Map.get(data, :id),
+      name: Map.get(data, "name") || Map.get(data, :name),
+      description: Map.get(data, "description") || Map.get(data, :description),
+      version: Map.get(data, "version") || Map.get(data, :version) || 1,
+      nodes: parse_nodes(Map.get(data, "nodes") || Map.get(data, :nodes) || []),
+      connections: parse_connections(Map.get(data, "connections") || Map.get(data, :connections) || []),
+      variables: Map.get(data, "variables") || Map.get(data, :variables) || %{},
+      settings: parse_settings(Map.get(data, "settings") || Map.get(data, :settings) || %{}),
+      metadata: Map.get(data, "metadata") || Map.get(data, :metadata) || %{}
     }
   end
 
@@ -94,6 +84,43 @@ defmodule Prana.Workflow do
   end
 
   @doc """
+  Gets a node by custom ID
+  """
+  def get_node_by_custom_id(%__MODULE__{nodes: nodes}, custom_id) do
+    Enum.find(nodes, &(&1.custom_id == custom_id))
+  end
+
+  @doc """
+  Adds a node to the workflow with custom_id uniqueness validation
+  """
+  def add_node(%__MODULE__{nodes: nodes} = workflow, %Prana.Node{} = node) do
+    case Enum.find(nodes, &(&1.custom_id == node.custom_id)) do
+      nil ->
+        {:ok, %{workflow | nodes: nodes ++ [node]}}
+
+      existing_node ->
+        {:error, "Node with custom_id '#{node.custom_id}' already exists: '#{existing_node.name}'"}
+    end
+  end
+
+  @doc """
+  Adds a node to the workflow, raising on duplicate custom_id
+  """
+  def add_node!(%__MODULE__{} = workflow, %Prana.Node{} = node) do
+    case add_node(workflow, node) do
+      {:ok, updated_workflow} -> updated_workflow
+      {:error, reason} -> raise ArgumentError, reason
+    end
+  end
+
+  @doc """
+  Adds a connection to the workflow
+  """
+  def add_connection(%__MODULE__{connections: connections} = workflow, %Prana.Connection{} = connection) do
+    {:ok, %{workflow | connections: connections ++ [connection]}}
+  end
+
+  @doc """
   Validates workflow structure
   """
   def valid?(%__MODULE__{} = workflow) do
@@ -107,12 +134,33 @@ defmodule Prana.Workflow do
   end
 
   # Private functions
-  
+
   defp generate_id do
-    :crypto.strong_rand_bytes(16) |> Base.encode64() |> binary_part(0, 16)
+    16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
+  end
+
+  defp parse_nodes(nodes) when is_list(nodes) do
+    Enum.map(nodes, &Prana.Node.from_map/1)
+  end
+
+  defp parse_connections(connections) when is_list(connections) do
+    Enum.map(connections, &Prana.Connection.from_map/1)
+  end
+
+  defp parse_settings(settings) when is_map(settings) do
+    struct(Prana.WorkflowSettings, settings)
   end
 
   defp validate_nodes(nodes) do
+    with :ok <- validate_node_structure(nodes),
+         :ok <- validate_custom_id_uniqueness(nodes) do
+      :ok
+    else
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_node_structure(nodes) do
     if Enum.all?(nodes, &Prana.Node.valid?/1) do
       :ok
     else
@@ -120,13 +168,25 @@ defmodule Prana.Workflow do
     end
   end
 
+  defp validate_custom_id_uniqueness(nodes) do
+    custom_ids = Enum.map(nodes, & &1.custom_id)
+    unique_custom_ids = Enum.uniq(custom_ids)
+
+    if length(custom_ids) == length(unique_custom_ids) do
+      :ok
+    else
+      duplicates = custom_ids -- unique_custom_ids
+      {:error, "Duplicate custom_id values found: #{inspect(duplicates)}"}
+    end
+  end
+
   defp validate_connections(connections, nodes) do
     node_ids = MapSet.new(nodes, & &1.id)
-    
-    invalid_connections = 
+
+    invalid_connections =
       Enum.reject(connections, fn conn ->
-        MapSet.member?(node_ids, conn.from_node_id) && 
-        MapSet.member?(node_ids, conn.to_node_id)
+        MapSet.member?(node_ids, conn.from_node_id) &&
+          MapSet.member?(node_ids, conn.to_node_id)
       end)
 
     if Enum.empty?(invalid_connections) do

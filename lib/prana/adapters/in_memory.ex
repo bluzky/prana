@@ -13,9 +13,7 @@ defmodule Prana.Adapters.InMemory do
     :workflows, 
     :executions, 
     :node_executions, 
-    :execution_logs, 
-    :suspended_executions,
-    :execution_relationships
+    :suspended_executions
   ]
 
   # Client API
@@ -130,24 +128,6 @@ defmodule Prana.Adapters.InMemory do
     {:ok, node_executions}
   end
 
-  # Log operations
-  @impl Prana.Behaviour.StorageAdapter
-  def create_log(log) do
-    :ets.insert(:execution_logs, {log.id, log})
-    {:ok, log}
-  end
-
-  @impl Prana.Behaviour.StorageAdapter
-  def get_logs(execution_id) do
-    logs = 
-      :ets.tab2list(:execution_logs)
-      |> Enum.map(fn {_id, log} -> log end)
-      |> Enum.filter(&(&1.execution_id == execution_id))
-      |> Enum.sort_by(& &1.timestamp, {:asc, DateTime})
-    
-    {:ok, logs}
-  end
-
   # State management
   @impl Prana.Behaviour.StorageAdapter
   def suspend_execution(execution_id, resume_token) do
@@ -177,25 +157,6 @@ defmodule Prana.Adapters.InMemory do
       end)
     
     {:ok, suspended}
-  end
-
-  # Execution relationships
-  @impl Prana.Behaviour.StorageAdapter
-  def create_execution_relationship(relationship) do
-    :ets.insert(:execution_relationships, {relationship.id, relationship})
-    {:ok, relationship}
-  end
-
-  @impl Prana.Behaviour.StorageAdapter
-  def get_execution_relationships(execution_id) do
-    relationships = 
-      :ets.tab2list(:execution_relationships)
-      |> Enum.map(fn {_id, relationship} -> relationship end)
-      |> Enum.filter(fn rel -> 
-        rel.parent_execution_id == execution_id || rel.child_execution_id == execution_id
-      end)
-    
-    {:ok, relationships}
   end
 
   @impl Prana.Behaviour.StorageAdapter

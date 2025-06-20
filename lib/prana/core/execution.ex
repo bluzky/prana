@@ -12,6 +12,7 @@ defmodule Prana.Execution do
     workflow_version: integer(),
     parent_execution_id: String.t() | nil,
     root_execution_id: String.t() | nil,
+    trigger_node_id: String.t() | nil,
     execution_mode: execution_mode(),
     status: status(),
     trigger_type: String.t(),
@@ -25,24 +26,20 @@ defmodule Prana.Execution do
     resume_token: String.t() | nil,
     started_at: DateTime.t() | nil,
     completed_at: DateTime.t() | nil,
-    created_at: DateTime.t(),
-    created_by: String.t() | nil,
-    organization_id: String.t() | nil,
     metadata: map()
   }
 
   defstruct [
     :id, :workflow_id, :workflow_version, :parent_execution_id, :root_execution_id,
-    :execution_mode, :status, :trigger_type, :trigger_data, :input_data,
+    :trigger_node_id, :execution_mode, :status, :trigger_type, :trigger_data, :input_data,
     :output_data, :context_data, :error_data, :node_executions,
-    :webhook_callback_url, :resume_token, :started_at, :completed_at,
-    :created_at, :created_by, :organization_id, metadata: %{}
+    :webhook_callback_url, :resume_token, :started_at, :completed_at, metadata: %{}
   ]
 
   @doc """
   Creates a new execution
   """
-  def new(workflow_id, workflow_version, trigger_type, input_data) do
+  def new(workflow_id, workflow_version, trigger_type, input_data, trigger_node_id \\ nil) do
     execution_id = generate_id()
     
     %__MODULE__{
@@ -51,6 +48,7 @@ defmodule Prana.Execution do
       workflow_version: workflow_version,
       parent_execution_id: nil,
       root_execution_id: execution_id,
+      trigger_node_id: trigger_node_id,
       execution_mode: :async,
       status: :pending,
       trigger_type: trigger_type,
@@ -64,9 +62,6 @@ defmodule Prana.Execution do
       resume_token: nil,
       started_at: nil,
       completed_at: nil,
-      created_at: DateTime.utc_now(),
-      created_by: nil,
-      organization_id: nil,
       metadata: %{}
     }
   end
