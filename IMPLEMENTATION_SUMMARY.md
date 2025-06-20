@@ -5,7 +5,7 @@
 
 **Prana** is an Elixir/Phoenix workflow automation platform built around a node-based graph execution model. Each workflow consists of nodes (triggers, actions, logic, wait, output) connected through explicit ports with conditional routing and data flow mapping.
 
-**Current Status**: Phase 1 Complete (Data Structures & Behaviors) - Ready for Phase 2 (Execution Engine)
+**Current Status**: Phase 1 Complete (Data Structures & Behaviors) + Expression Engine Complete - Ready for Phase 2 (Node & Graph Executors)
 
 ---
 
@@ -16,7 +16,7 @@
 - **Behavior-Driven**: Clean contracts for integrations and middleware
 - **Separation of Concerns**: Library handles execution, applications handle persistence via middleware
 - **Node-Port Model**: Explicit data flow through named ports between nodes
-- **Expression System**: Built-in template evaluation (`{{ $node.field }}`) for dynamic data access
+- **Expression System**: Built-in path evaluation (`$input.field`, `$nodes.api.response`) for dynamic data access
 
 ### Project Structure
 ```
@@ -29,7 +29,7 @@ prana/
 │   │   ├── middleware.ex      # ✅ Middleware pipeline
 │   │   ├── integrations/      # 🚧 Built-in integrations (TODO)
 │   │   ├── execution/         # 🚧 Execution engine (TODO)
-│   │   └── expression_engine.ex # 🚧 Expression evaluator (TODO)
+│   │   ├── expression_engine.ex # ✅ Expression evaluator (COMPLETED)
 │   └── prana.ex               # 🚧 Main API (TODO)
 ├── test/                      # Basic test setup
 └── mix.exs                    # Project configuration
@@ -37,9 +37,51 @@ prana/
 
 ---
 
-## Implemented Modules (✅ Phase 1 Complete)
+## Implemented Modules
 
-### Core Data Structures (`lib/prana/core/`)
+### ✅ Phase 1 Complete: Core Foundation
+
+### ✅ Expression Engine Complete
+
+#### `Prana.ExpressionEngine` (`expression_engine.ex`)
+**Purpose**: Path-based expression evaluation for dynamic data access
+**Key Functions**:
+- `extract/2` - Main expression extraction function
+- `process_map/2` - Process maps with expressions recursively
+
+**Expression Syntax**:
+```elixir
+# Simple field access
+"$input.email"                    # Single value
+"$nodes.api_call.response.user_id" # Nested access
+"$variables.api_url"               # Variables
+
+# Array access
+"$input.users[0].name"             # Index access
+
+# Wildcard extraction (returns arrays)
+"$input.users.*.name"              # All names
+"$input.users.*.skills.*"          # Nested wildcards
+
+# Filtering (returns arrays)
+"$input.users.{role: \"admin\"}.email"        # Simple filter
+"$input.orders.{status: \"completed\", user_id: 123}" # Multiple conditions
+```
+
+**Output Behavior**:
+- **Simple paths**: Return single values
+- **Wildcard paths**: Always return arrays
+- **Filter paths**: Always return arrays (even single matches)
+- **Non-expressions**: Returned unchanged
+
+**API Features**:
+- Clean public API (only `extract/2` and `process_map/2`)
+- Comprehensive error handling
+- Flexible context structure (any map)
+- Predictable output types
+- Extensive test coverage
+
+### 🏗️ Core Data Structures (`lib/prana/core/`)
 
 #### `Prana.Workflow` (`workflow.ex`)
 **Purpose**: Represents a complete workflow with nodes and connections
@@ -209,12 +251,11 @@ config :prana, middleware: [
 
 ---
 
-## Not Yet Implemented (🚧 Phase 2+)
+## 🚧 Not Yet Implemented (Phase 2+)
 
 ### Execution Engine Components
-- **Expression Evaluator** - Parse and evaluate `{{ $node.field }}` templates
-- **Graph Executor** - Workflow traversal and parallel execution
-- **Node Executor** - Individual action invocation and port routing
+- **Node Executor** - Individual action invocation with expression-based input preparation
+- **Graph Executor** - Workflow traversal and parallel execution coordination
 - **Error Handling** - Retry logic and error propagation
 
 ### Built-in Integrations
@@ -238,38 +279,34 @@ config :prana, middleware: [
 ### `mix.exs`
 - **Elixir Version**: ~> 1.16
 - **Dependencies**: 
+  - `nested2` - Path traversal and data extraction
   - `styler` (dev/test) - Code formatting
   - `credo` (dev/test) - Static analysis
 - **Application**: Only `:logger` extra application
 
-### Current Limitations
-- No OTP application supervision tree
-- No built-in integrations
-- No execution engine
-- Placeholder main API
+### Current Status
+- ✅ Complete OTP application supervision tree (not needed yet)
+- ✅ Expression Engine fully implemented and tested
+- 🚧 Node Executor (next priority)
+- 🚧 Graph Executor (next priority)
 
 ---
 
 ## Next Implementation Steps (Phase 2)
 
-1. **Expression Evaluator** (`Prana.ExpressionEngine`)
-   - Parse template expressions `{{ $node.field }}`
-   - Evaluate with context (nodes, variables, input)
-   - Handle nested data access and basic functions
-
-2. **Node Executor** (`Prana.NodeExecutor`)
+1. **Node Executor** (`Prana.NodeExecutor`)
    - Action invocation via MFA pattern
-   - Input preparation and expression evaluation
+   - Input preparation using `ExpressionEngine.process_map/2`
    - Output port determination
    - Retry logic implementation
 
-3. **Graph Executor** (`Prana.GraphExecutor`)
+2. **Graph Executor** (`Prana.GraphExecutor`)
    - Graph traversal and execution planning
    - Parallel node execution with Tasks
    - Port-based data routing
    - Context management and middleware event emission
 
-4. **Main API** (`Prana`)
+3. **Main API** (`Prana`)
    - `create_workflow/2`, `add_node/6`, `connect_nodes/5`
    - `execute_workflow/3`
    - Integration registration helpers
@@ -282,20 +319,23 @@ config :prana, middleware: [
 2. **Module-Based Integrations** - Only support behavior-implementing modules, no map definitions
 3. **Middleware for Application Logic** - Clean separation between library (execution) and application (persistence)
 4. **Port-Based Routing** - Explicit named ports for data flow instead of implicit connections
-5. **Built-in Expression Engine** - Simple template system instead of external DSL
+5. **Built-in Expression Engine** - Path-based expression evaluator (✅ **COMPLETED**)
 6. **MFA Action Pattern** - Actions defined as `{module, function, args}` tuples
 
 ---
 
 ## Testing Strategy
 
-- **Current**: Basic test setup with placeholder test
+- **Current**: 
+  - ✅ Expression Engine: Comprehensive test suite (100+ test cases)
+  - ✅ Core data structures: Basic validation testing
+  - ✅ Middleware pipeline: Event handling testing
+  - ✅ Integration registry: Registration and lookup testing
 - **Planned**: 
-  - Integration behavior testing
-  - Middleware pipeline testing
-  - Workflow validation testing
-  - Expression evaluation testing
+  - Node executor testing with expression evaluation
+  - Graph executor testing with parallel execution
   - End-to-end workflow execution testing
+  - Built-in integrations testing
 
 ---
 

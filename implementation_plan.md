@@ -47,12 +47,16 @@
 
 ## 3. Core Engine Components
 
-### 3.1 Expression Evaluator
-- [ ] `Prana.ExpressionEngine` - Built-in template expression engine
-  - [ ] Parse template expressions `{{ $node.field }}`
-  - [ ] Evaluate with context (nodes, variables, input)
-  - [ ] Handle nested data access
-  - [ ] Basic error handling
+### 3.1 Expression Evaluator (✅ COMPLETED)
+- [x] `Prana.ExpressionEngine` - Built-in path expression engine
+  - [x] Parse path expressions `$input.field`, `$nodes.api.response`
+  - [x] Evaluate with flexible context (any map structure)
+  - [x] Handle nested data access and array indexing
+  - [x] Wildcard extraction (`$input.users.*.name`)
+  - [x] Array filtering (`$input.users.{role: "admin"}.email`)
+  - [x] Predictable output types (single values vs arrays)
+  - [x] Comprehensive error handling and validation
+  - [x] Clean public API (`extract/2`, `process_map/2`)
 
 ### 3.2 Graph Executor
 - [ ] `Prana.GraphExecutor` - Core workflow execution engine
@@ -240,12 +244,12 @@ prana/
 2. [x] Core behaviors (Integration, Middleware)
 3. [x] Integration registry (simplified)
 4. [x] Middleware system
+5. [x] Expression engine (path-based expressions)
 
-### Phase 2: Execution Engine
-1. Expression evaluator (built-in)
-2. Node executor
-3. Graph executor
-4. Basic error handling
+### Phase 2: Execution Engine (🚧 IN PROGRESS)
+1. [ ] Node executor (use expression engine for input preparation)
+2. [ ] Graph executor (orchestrate workflow execution)
+3. [ ] Basic error handling and retry logic
 
 ### Phase 3: Built-in Integrations
 1. HTTP integration
@@ -275,9 +279,9 @@ prana/
 - **Single Integration Registration**: Only module-based, no map definitions
 
 ### 🎯 Focus Areas for Phase 2
-- **Built-in Expression Engine**: Simple template evaluator
-- **Execution Engine**: Core workflow execution logic
-- **Middleware Integration**: Emit events during execution
+- **Node Executor**: Action invocation with expression-based input preparation
+- **Graph Executor**: Workflow traversal and parallel execution coordination
+- **Middleware Integration**: Emit lifecycle events during execution
 - **Error Handling**: Robust error management and recovery
 
 ### 📋 Deferred to Applications
