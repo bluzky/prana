@@ -24,3 +24,8 @@ prana-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+
+.tags
+
+.ctags.d

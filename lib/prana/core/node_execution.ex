@@ -2,30 +2,39 @@ defmodule Prana.NodeExecution do
   @moduledoc """
   Represents execution state of an individual node
   """
-  
+
   @type status :: :pending | :running | :completed | :failed | :skipped | :suspended
-  
+
   @type t :: %__MODULE__{
-    id: String.t(),
-    execution_id: String.t(),
-    node_id: String.t(),
-    status: status(),
-    input_data: map(),
-    output_data: map() | nil,
-    output_port: String.t() | nil,
-    error_data: map() | nil,
-    retry_count: integer(),
-    started_at: DateTime.t() | nil,
-    completed_at: DateTime.t() | nil,
-    duration_ms: integer() | nil,
-    logs: [Prana.ExecutionLog.t()],
-    metadata: map()
-  }
+          id: String.t(),
+          execution_id: String.t(),
+          node_id: String.t(),
+          status: status(),
+          input_data: map(),
+          output_data: map() | nil,
+          output_port: String.t() | nil,
+          error_data: map() | nil,
+          retry_count: integer(),
+          started_at: DateTime.t() | nil,
+          completed_at: DateTime.t() | nil,
+          duration_ms: integer() | nil,
+          metadata: map()
+        }
 
   defstruct [
-    :id, :execution_id, :node_id, :status, :input_data, :output_data,
-    :output_port, :error_data, :started_at, :completed_at, 
-    :duration_ms, retry_count: 0, logs: [], metadata: %{}
+    :id,
+    :execution_id,
+    :node_id,
+    :status,
+    :input_data,
+    :output_data,
+    :output_port,
+    :error_data,
+    :started_at,
+    :completed_at,
+    :duration_ms,
+    retry_count: 0,
+    metadata: %{}
   ]
 
   @doc """
@@ -45,7 +54,6 @@ defmodule Prana.NodeExecution do
       started_at: nil,
       completed_at: nil,
       duration_ms: nil,
-      logs: [],
       metadata: %{}
     }
   end
@@ -54,10 +62,7 @@ defmodule Prana.NodeExecution do
   Marks node execution as started
   """
   def start(%__MODULE__{} = node_execution) do
-    %{node_execution | 
-      status: :running, 
-      started_at: DateTime.utc_now()
-    }
+    %{node_execution | status: :running, started_at: DateTime.utc_now()}
   end
 
   @doc """
@@ -65,13 +70,14 @@ defmodule Prana.NodeExecution do
   """
   def complete(%__MODULE__{} = node_execution, output_data, output_port) do
     duration = calculate_duration(node_execution.started_at)
-    
-    %{node_execution |
-      status: :completed,
-      output_data: output_data,
-      output_port: output_port,
-      completed_at: DateTime.utc_now(),
-      duration_ms: duration
+
+    %{
+      node_execution
+      | status: :completed,
+        output_data: output_data,
+        output_port: output_port,
+        completed_at: DateTime.utc_now(),
+        duration_ms: duration
     }
   end
 
@@ -80,13 +86,14 @@ defmodule Prana.NodeExecution do
   """
   def fail(%__MODULE__{} = node_execution, error_data, error_port \\ "error") do
     duration = calculate_duration(node_execution.started_at)
-    
-    %{node_execution |
-      status: :failed,
-      error_data: error_data,
-      output_port: error_port,
-      completed_at: DateTime.utc_now(),
-      duration_ms: duration
+
+    %{
+      node_execution
+      | status: :failed,
+        error_data: error_data,
+        output_port: error_port,
+        completed_at: DateTime.utc_now(),
+        duration_ms: duration
     }
   end
 
@@ -97,19 +104,13 @@ defmodule Prana.NodeExecution do
     %{node_execution | retry_count: node_execution.retry_count + 1}
   end
 
-  @doc """
-  Adds a log entry
-  """
-  def add_log(%__MODULE__{} = node_execution, %Prana.ExecutionLog{} = log) do
-    %{node_execution | logs: node_execution.logs ++ [log]}
-  end
-
   defp calculate_duration(nil), do: nil
+
   defp calculate_duration(started_at) do
     DateTime.diff(DateTime.utc_now(), started_at, :millisecond)
   end
 
   defp generate_id do
-    :crypto.strong_rand_bytes(16) |> Base.encode64() |> binary_part(0, 16)
+    16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
   end
 end
