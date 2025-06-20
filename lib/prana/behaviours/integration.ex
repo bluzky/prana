@@ -1,44 +1,58 @@
 defmodule Prana.Behaviour.Integration do
   @moduledoc """
-  Behavior for integrations. Each integration can provide multiple actions
-  and manages its own configuration and lifecycle.
-  """
+  Behavior for integrations. Each integration provides multiple actions
+  and defines their capabilities.
 
-  @type config :: map()
-  @type integration_definition :: map()
-  @type action_definition :: map()
+  ## Example Implementation
+
+      defmodule MyApp.SlackIntegration do
+        @behaviour Prana.Behaviour.Integration
+
+        @impl Prana.Behaviour.Integration
+        def definition do
+          %Prana.Integration{
+            name: "slack",
+            display_name: "Slack",
+            description: "Send messages to Slack channels",
+            version: "1.0.0",
+            category: "communication",
+            actions: %{
+              "send_message" => %Prana.Action{
+                name: "send_message",
+                display_name: "Send Message",
+                description: "Send a message to a Slack channel",
+                module: __MODULE__,
+                function: :send_message,
+                input_ports: ["input"],
+                output_ports: ["success", "error"],
+                default_success_port: "success",
+                default_error_port: "error"
+              }
+            }
+          }
+        end
+
+        # Action implementation
+        def send_message(input) do
+          # Implementation here...
+          {:ok, %{message_id: "123", timestamp: DateTime.utc_now()}}
+        end
+      end
+
+  ## Registration
+
+      Prana.IntegrationRegistry.register_integration(MyApp.SlackIntegration)
+
+  """
 
   @doc """
-  Return the integration definition including all actions
+  Returns the complete integration definition.
+  
+  Action functions should return:
+  - `{:ok, output}` - Success with default success port
+  - `{:ok, output, port}` - Success with explicit port
+  - `{:error, error}` - Error with default error port
+  - `{:error, error, port}` - Error with explicit port
   """
-  @callback definition() :: integration_definition()
-
-  @doc """
-  Initialize the integration with its configuration.
-  Called once when the integration is registered.
-  """
-  @callback init_integration(config()) :: {:ok, state :: any()} | {:error, reason :: any()}
-
-  @doc """
-  Validate the integration's configuration.
-  Called before init to ensure configuration is valid.
-  """
-  @callback validate_config(config()) :: :ok | {:error, reason :: any()}
-
-  @doc """
-  Get all action definitions provided by this integration
-  """
-  @callback list_actions() :: [action_definition()]
-
-  @doc """
-  Get a specific action definition by name
-  """
-  @callback get_action(String.t()) :: {:ok, action_definition()} | {:error, :not_found}
-
-  @doc """
-  Health check for the integration
-  """
-  @callback health_check() :: :ok | {:error, reason :: any()}
-
-  @optional_callbacks [init_integration: 1, validate_config: 1, list_actions: 0, get_action: 1, health_check: 0]
+  @callback definition() :: Prana.Integration.t()
 end
