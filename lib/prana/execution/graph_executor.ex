@@ -15,7 +15,7 @@ defmodule Prana.GraphExecutor do
   alias Prana.{Workflow, Node, Connection, Execution, ExecutionContext, NodeExecution}
   alias Prana.{NodeExecutor, Middleware, ExpressionEngine}
   alias Prana.GraphExecutor.Helpers
-  alias Prana.{RetryHandler, ExecutionPlanner, ExecutionPlan}
+  alias Prana.{RetryHandler, WorkflowCompiler, ExecutionGraph}
 
   require Logger
 
@@ -53,11 +53,11 @@ defmodule Prana.GraphExecutor do
     # 3. Emit workflow started event
     emit_workflow_event(:execution_started, context, %{input_data: input_data, trigger_node_id: trigger_node_id})
 
-    # 4. Plan execution with specified trigger node
-    case ExecutionPlanner.plan_execution(workflow, trigger_node_id) do
-      {:ok, plan} ->
+    # 4. Compile workflow with specified trigger node
+    case WorkflowCompiler.compile(workflow, trigger_node_id) do
+      {:ok, execution_graph} ->
         # 5. Execute main workflow loop
-        execute_workflow_loop(plan, context)
+        execute_workflow_loop(execution_graph, context)
 
       {:error, reason} ->
         emit_workflow_event(:execution_failed, context, %{error: reason})
@@ -88,8 +88,8 @@ defmodule Prana.GraphExecutor do
       context = Helpers.rebuild_execution_context(execution)
       workflow = Helpers.get_workflow_definition(execution.workflow_id, execution.workflow_version)
 
-      case ExecutionPlanner.plan_execution(workflow, nil) do
-        {:ok, plan} -> continue_workflow_execution(plan, context)
+      case WorkflowCompiler.compile(workflow, nil) do
+        {:ok, execution_graph} -> continue_workflow_execution(execution_graph, context)
         {:error, reason} -> {:error, reason}
       end
     else
@@ -101,42 +101,42 @@ defmodule Prana.GraphExecutor do
   # Main Execution Loop
   # ============================================================================
 
-  @spec execute_workflow_loop(ExecutionPlan.t(), ExecutionContext.t()) :: execution_result()
-  defp execute_workflow_loop(%ExecutionPlan{} = plan, %ExecutionContext{} = context) do
-    case find_ready_nodes(plan, context) do
+  @spec execute_workflow_loop(ExecutionGraph.t(), ExecutionContext.t()) :: execution_result()
+  defp execute_workflow_loop(%ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
+    case find_ready_nodes(execution_graph, context) do
       [] ->
         # No more nodes ready to execute
-        check_workflow_completion(plan, context)
+        check_workflow_completion(execution_graph, context)
 
       ready_nodes ->
         # Execute batch of ready nodes
         case execute_nodes_batch(ready_nodes, context) do
           {:ok, node_executions, updated_context} ->
             # Route outputs and continue
-            routed_context = route_batch_outputs(node_executions, plan, updated_context)
-            execute_workflow_loop(plan, routed_context)
+            routed_context = route_batch_outputs(node_executions, execution_graph, updated_context)
+            execute_workflow_loop(execution_graph, routed_context)
 
           {:partial_success, successes, failures, updated_context} ->
             # Handle partial success
-            case Helpers.handle_batch_failures(failures, plan, updated_context) do
+            case Helpers.handle_batch_failures(failures, execution_graph, updated_context) do
               {:continue, recovery_context} ->
-                routed_context = route_batch_outputs(successes, plan, recovery_context)
-                execute_workflow_loop(plan, routed_context)
+                routed_context = route_batch_outputs(successes, execution_graph, recovery_context)
+                execute_workflow_loop(execution_graph, routed_context)
 
               {:retry, retry_context, retry_nodes} ->
                 # Handle retries for failed nodes
-                case execute_retry_batch(retry_nodes, plan, retry_context) do
+                case execute_retry_batch(retry_nodes, execution_graph, retry_context) do
                   {:ok, retry_successes, final_context} ->
                     # Combine original successes with retry successes
                     all_successes = successes ++ retry_successes
-                    routed_context = route_batch_outputs(all_successes, plan, final_context)
-                    execute_workflow_loop(plan, routed_context)
+                    routed_context = route_batch_outputs(all_successes, execution_graph, final_context)
+                    execute_workflow_loop(execution_graph, routed_context)
 
                   {:partial_success, retry_successes, final_failures, final_context} ->
                     # Some retries succeeded, others failed permanently
                     all_successes = successes ++ retry_successes
-                    routed_context = route_batch_outputs(all_successes, plan, final_context)
-                    execute_workflow_loop(plan, routed_context)
+                    routed_context = route_batch_outputs(all_successes, execution_graph, final_context)
+                    execute_workflow_loop(execution_graph, routed_context)
 
                   {:error, reason} ->
                     emit_workflow_event(:execution_failed, retry_context, %{error: reason})
@@ -163,10 +163,10 @@ defmodule Prana.GraphExecutor do
   # Ready Node Detection
   # ============================================================================
 
-  @spec find_ready_nodes(ExecutionPlan.t(), ExecutionContext.t()) :: [Node.t()]
-  defp find_ready_nodes(%ExecutionPlan{} = plan, %ExecutionContext{} = context) do
-    ExecutionPlanner.find_ready_nodes(
-      plan, 
+  @spec find_ready_nodes(ExecutionGraph.t(), ExecutionContext.t()) :: [Node.t()]
+  defp find_ready_nodes(%ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
+    WorkflowCompiler.find_ready_nodes(
+      execution_graph, 
       context.completed_nodes, 
       context.failed_nodes, 
       context.pending_nodes
@@ -284,11 +284,11 @@ defmodule Prana.GraphExecutor do
   # Retry Execution
   # ============================================================================
 
-  @spec execute_retry_batch([{Node.t(), NodeExecution.t()}], ExecutionPlan.t(), ExecutionContext.t()) ::
+  @spec execute_retry_batch([{Node.t(), NodeExecution.t()}], ExecutionGraph.t(), ExecutionContext.t()) ::
           {:ok, [NodeExecution.t()], ExecutionContext.t()}
           | {:partial_success, [NodeExecution.t()], [NodeExecution.t()], ExecutionContext.t()}
           | {:error, term()}
-  defp execute_retry_batch(retry_nodes, %ExecutionPlan{} = plan, %ExecutionContext{} = context) do
+  defp execute_retry_batch(retry_nodes, %ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
     # Emit retry batch started event
     emit_batch_event(:retry_batch_started, context, %{
       retry_count: length(retry_nodes),
@@ -394,17 +394,17 @@ defmodule Prana.GraphExecutor do
   # Output Routing & Data Flow
   # ============================================================================
 
-  @spec route_batch_outputs([NodeExecution.t()], ExecutionPlan.t(), ExecutionContext.t()) :: ExecutionContext.t()
-  defp route_batch_outputs(node_executions, %ExecutionPlan{} = plan, %ExecutionContext{} = context) do
+  @spec route_batch_outputs([NodeExecution.t()], ExecutionGraph.t(), ExecutionContext.t()) :: ExecutionContext.t()
+  defp route_batch_outputs(node_executions, %ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
     Enum.reduce(node_executions, context, fn node_execution, acc_context ->
-      route_node_output(node_execution, plan, acc_context)
+      route_node_output(node_execution, execution_graph, acc_context)
     end)
   end
 
-  @spec route_node_output(NodeExecution.t(), ExecutionPlan.t(), ExecutionContext.t()) :: ExecutionContext.t()
-  defp route_node_output(%NodeExecution{status: :completed} = node_execution, %ExecutionPlan{} = plan, context) do
+  @spec route_node_output(NodeExecution.t(), ExecutionGraph.t(), ExecutionContext.t()) :: ExecutionContext.t()
+  defp route_node_output(%NodeExecution{status: :completed} = node_execution, %ExecutionGraph{} = execution_graph, context) do
     # Find outgoing connections from this node's output port
-    connections = Map.get(plan.connection_map, {node_execution.node_id, node_execution.output_port}, [])
+    connections = Map.get(execution_graph.connection_map, {node_execution.node_id, node_execution.output_port}, [])
 
     # Route data through each valid connection
     Enum.reduce(connections, context, fn connection, acc_context ->
@@ -412,7 +412,7 @@ defmodule Prana.GraphExecutor do
     end)
   end
 
-  defp route_node_output(%NodeExecution{status: :failed}, _plan, context) do
+  defp route_node_output(%NodeExecution{status: :failed}, _execution_graph, context) do
     # Failed nodes don't route data
     context
   end
@@ -528,9 +528,9 @@ defmodule Prana.GraphExecutor do
     max_node_timeout * 1000
   end
 
-  @spec check_workflow_completion(ExecutionPlan.t(), ExecutionContext.t()) :: execution_result()
-  defp check_workflow_completion(%ExecutionPlan{} = plan, %ExecutionContext{} = context) do
-    total_nodes = plan.total_nodes
+  @spec check_workflow_completion(ExecutionGraph.t(), ExecutionContext.t()) :: execution_result()
+  defp check_workflow_completion(%ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
+    total_nodes = execution_graph.total_nodes
     completed_count = MapSet.size(context.completed_nodes)
     failed_count = MapSet.size(context.failed_nodes)
 
@@ -629,6 +629,6 @@ defmodule Prana.GraphExecutor do
   # Placeholder Functions (To Be Implemented)
   # ============================================================================
 
-  defp continue_workflow_execution(_plan, _context), do: {:ok, %ExecutionContext{}}
+  defp continue_workflow_execution(_execution_graph, _context), do: {:ok, %ExecutionContext{}}
   defp evaluate_single_condition(_condition, _context), do: true
 end

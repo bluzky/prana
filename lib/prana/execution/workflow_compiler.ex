@@ -1,33 +1,40 @@
-defmodule Prana.ExecutionPlanner do
+defmodule Prana.WorkflowCompiler do
   @moduledoc """
-  Handles execution planning for workflows, including trigger node selection,
-  graph pruning, and dependency analysis.
+  Compiles raw workflows into optimized execution graphs.
+  
+  Transforms workflow definitions by:
+  - Selecting trigger nodes and validating structure
+  - Pruning unreachable nodes via graph traversal
+  - Building dependency graphs for execution ordering
+  - Creating O(1) lookup maps for performance
+  
+  The output ExecutionGraph is ready for efficient execution by GraphExecutor.
   """
 
-  alias Prana.{Workflow, Node, Connection, ExecutionPlan}
+  alias Prana.{Workflow, Node, Connection, ExecutionGraph}
 
   @doc """
-  Plan execution starting from a specific trigger node.
+  Compile workflow into an optimized execution graph.
   
   ## Parameters
   - `workflow` - Complete workflow definition
   - `trigger_node_id` - ID of the specific trigger node to start from
   
   ## Returns
-  - `{:ok, plan}` - Execution plan with pruned graph
-  - `{:error, reason}` - Planning failed
+  - `{:ok, execution_graph}` - Compiled execution graph
+  - `{:error, reason}` - Compilation failed
   """
-  @spec plan_execution(Workflow.t(), String.t() | nil) :: {:ok, ExecutionPlan.t()} | {:error, term()}
-  def plan_execution(%Workflow{} = workflow, trigger_node_id \\ nil) do
+  @spec compile(Workflow.t(), String.t() | nil) :: {:ok, ExecutionGraph.t()} | {:error, term()}
+  def compile(%Workflow{} = workflow, trigger_node_id \\ nil) do
     with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_id),
          {:ok, reachable_nodes} <- find_reachable_nodes(workflow, trigger_node),
-         pruned_workflow <- prune_workflow(workflow, reachable_nodes),
-         dependency_graph <- build_dependency_graph(pruned_workflow),
-         connection_map <- build_connection_map(pruned_workflow),
-         node_map <- build_node_map(pruned_workflow) do
+         compiled_workflow <- prune_workflow(workflow, reachable_nodes),
+         dependency_graph <- build_dependency_graph(compiled_workflow),
+         connection_map <- build_connection_map(compiled_workflow),
+         node_map <- build_node_map(compiled_workflow) do
       
-      plan = %ExecutionPlan{
-        workflow: pruned_workflow,
+      execution_graph = %ExecutionGraph{
+        workflow: compiled_workflow,
         trigger_node: trigger_node,
         dependency_graph: dependency_graph,
         connection_map: connection_map,
@@ -35,10 +42,21 @@ defmodule Prana.ExecutionPlanner do
         total_nodes: length(reachable_nodes)
       }
       
-      {:ok, plan}
+      {:ok, execution_graph}
     else
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  @doc """
+  Find nodes that are ready for execution based on dependency satisfaction.
+  """
+  @spec find_ready_nodes(ExecutionGraph.t(), MapSet.t(), MapSet.t(), MapSet.t()) :: [Node.t()]
+  def find_ready_nodes(%ExecutionGraph{} = graph, completed_nodes, failed_nodes, pending_nodes) do
+    graph.workflow.nodes
+    |> Enum.reject(&node_executed?(&1.id, completed_nodes, failed_nodes))
+    |> Enum.reject(&node_pending?(&1.id, pending_nodes))
+    |> Enum.filter(&dependencies_satisfied?(graph, &1, completed_nodes))
   end
 
   # ============================================================================
@@ -130,7 +148,7 @@ defmodule Prana.ExecutionPlanner do
     |> Enum.uniq()
   end
 
-  # Create a pruned workflow containing only reachable nodes and their connections.
+  # Create a compiled workflow containing only reachable nodes and their connections.
   @spec prune_workflow(Workflow.t(), [Node.t()]) :: Workflow.t()
   defp prune_workflow(%Workflow{} = workflow, reachable_nodes) do
     reachable_node_ids = MapSet.new(reachable_nodes, & &1.id)
@@ -143,7 +161,7 @@ defmodule Prana.ExecutionPlanner do
         MapSet.member?(reachable_node_ids, conn.to_node_id)
       end)
     
-    # Create new workflow with pruned nodes and connections
+    # Create new workflow with compiled nodes and connections
     %{workflow | 
       nodes: reachable_nodes,
       connections: reachable_connections
@@ -166,36 +184,7 @@ defmodule Prana.ExecutionPlanner do
     end)
   end
 
-  @doc """
-  Build connection map for fast lookup of outgoing connections.
-  
-  The connection map is a performance optimization that allows O(1) lookup
-  of all connections from a specific node and port, instead of O(n) search
-  through all connections.
-  
-  ## Example
-  
-      # Instead of searching through all connections:
-      workflow.connections 
-      |> Enum.filter(fn conn -> 
-        conn.from_node_id == \"node_1\" && conn.from_port == \"success\" 
-      end)
-      
-      # We can do O(1) lookup:
-      connection_map[{\"node_1\", \"success\"}]
-      
-  ## Returns
-  
-  A map where:
-  - Keys are tuples of `{from_node_id, from_port}`  
-  - Values are lists of connections originating from that node/port
-  
-      %{
-        {\"node_1\", \"success\"} => [connection1, connection2],
-        {\"node_2\", \"error\"} => [connection3],
-        {\"node_3\", \"success\"} => [connection4]
-      }
-  """
+  # Build connection map for fast lookup of outgoing connections.
   @spec build_connection_map(Workflow.t()) :: map()
   defp build_connection_map(%Workflow{connections: connections}) do
     Enum.group_by(connections, fn conn ->
@@ -210,88 +199,8 @@ defmodule Prana.ExecutionPlanner do
   end
 
   # ============================================================================
-  # Validation
+  # Helper Functions
   # ============================================================================
-
-  @doc """
-  Validate that the execution plan is valid and can be executed.
-  """
-  @spec validate_plan(ExecutionPlan.t()) :: :ok | {:error, term()}
-  def validate_plan(%ExecutionPlan{} = plan) do
-    with :ok <- validate_has_trigger_node(plan),
-         :ok <- validate_has_nodes(plan),
-         :ok <- validate_no_cycles(plan),
-         :ok <- validate_connections(plan) do
-      :ok
-    else
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @spec validate_has_trigger_node(ExecutionPlan.t()) :: :ok | {:error, term()}
-  defp validate_has_trigger_node(%ExecutionPlan{trigger_node: nil}) do
-    {:error, :no_trigger_node}
-  end
-  defp validate_has_trigger_node(%ExecutionPlan{trigger_node: %Node{type: :trigger}}) do
-    :ok
-  end
-  defp validate_has_trigger_node(%ExecutionPlan{trigger_node: %Node{type: other_type}}) do
-    {:error, {:invalid_trigger_node_type, other_type}}
-  end
-
-  @spec validate_has_nodes(ExecutionPlan.t()) :: :ok | {:error, term()}
-  defp validate_has_nodes(%ExecutionPlan{workflow: %Workflow{nodes: []}}) do
-    {:error, :no_nodes_in_plan}
-  end
-  defp validate_has_nodes(%ExecutionPlan{workflow: %Workflow{nodes: nodes}}) when length(nodes) > 0 do
-    :ok
-  end
-
-  @spec validate_no_cycles(ExecutionPlan.t()) :: :ok | {:error, term()}
-  defp validate_no_cycles(%ExecutionPlan{} = plan) do
-    case detect_cycles(plan) do
-      [] -> :ok
-      cycles -> {:error, {:cycles_detected, cycles}}
-    end
-  end
-
-  @spec validate_connections(ExecutionPlan.t()) :: :ok | {:error, term()}
-  defp validate_connections(%ExecutionPlan{workflow: workflow}) do
-    node_ids = MapSet.new(workflow.nodes, & &1.id)
-    
-    invalid_connections = 
-      Enum.reject(workflow.connections, fn conn ->
-        MapSet.member?(node_ids, conn.from_node_id) and
-        MapSet.member?(node_ids, conn.to_node_id)
-      end)
-    
-    case invalid_connections do
-      [] -> :ok
-      invalid -> {:error, {:invalid_connections, invalid}}
-    end
-  end
-
-  @spec detect_cycles(ExecutionPlan.t()) :: [list()]
-  defp detect_cycles(%ExecutionPlan{} = _plan) do
-    # Simplified cycle detection - real implementation would use DFS
-    # with color coding to detect back edges
-    []
-  end
-
-  # ============================================================================
-  # Ready Node Detection
-  # ============================================================================
-
-  @doc """
-  Find nodes that are ready for execution based on dependency satisfaction.
-  """
-  @spec find_ready_nodes(ExecutionPlan.t(), MapSet.t(), MapSet.t(), MapSet.t()) :: [Node.t()]
-  def find_ready_nodes(%ExecutionPlan{} = plan, completed_nodes, failed_nodes, pending_nodes) do
-    plan.workflow.nodes
-    |> Enum.reject(&node_executed?(&1.id, completed_nodes, failed_nodes))
-    |> Enum.reject(&node_pending?(&1.id, pending_nodes))
-    |> Enum.filter(&dependencies_satisfied?(plan, &1, completed_nodes))
-  end
 
   @spec node_executed?(String.t(), MapSet.t(), MapSet.t()) :: boolean()
   defp node_executed?(node_id, completed_nodes, failed_nodes) do
@@ -303,9 +212,9 @@ defmodule Prana.ExecutionPlanner do
     MapSet.member?(pending_nodes, node_id)
   end
 
-  @spec dependencies_satisfied?(ExecutionPlan.t(), Node.t(), MapSet.t()) :: boolean()
-  defp dependencies_satisfied?(%ExecutionPlan{} = plan, %Node{} = node, completed_nodes) do
-    dependencies = Map.get(plan.dependency_graph, node.id, [])
+  @spec dependencies_satisfied?(ExecutionGraph.t(), Node.t(), MapSet.t()) :: boolean()
+  defp dependencies_satisfied?(%ExecutionGraph{} = graph, %Node{} = node, completed_nodes) do
+    dependencies = Map.get(graph.dependency_graph, node.id, [])
     
     Enum.all?(dependencies, fn dep_node_id ->
       MapSet.member?(completed_nodes, dep_node_id)

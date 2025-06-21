@@ -5,7 +5,7 @@ defmodule Prana.GraphExecutor.Helpers do
 
   alias Prana.Execution
   alias Prana.ExecutionContext
-  alias Prana.ExecutionPlan
+  alias Prana.ExecutionGraph
   alias Prana.RetryHandler
   alias Prana.Node
   alias Prana.NodeExecution
@@ -207,19 +207,19 @@ defmodule Prana.GraphExecutor.Helpers do
   @doc """
   Handle batch failures according to error handling strategy.
   """
-  @spec handle_batch_failures([NodeExecution.t()], ExecutionPlan.t(), ExecutionContext.t()) ::
+  @spec handle_batch_failures([NodeExecution.t()], ExecutionGraph.t(), ExecutionContext.t()) ::
           {:continue, ExecutionContext.t()}
           | {:retry, ExecutionContext.t(), [{Node.t(), NodeExecution.t()}]}
           | {:stop, term()}
           | {:suspend, ExecutionContext.t(), String.t()}
-  def handle_batch_failures(failed_executions, %ExecutionPlan{} = plan, %ExecutionContext{} = context) do
+  def handle_batch_failures(failed_executions, %ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
     # Separate retryable and non-retryable failures
-    {retryable_failures, permanent_failures} = separate_retryable_failures(failed_executions, plan)
+    {retryable_failures, permanent_failures} = separate_retryable_failures(failed_executions, execution_graph)
 
     # Analyze failure types and determine strategy
-    failure_analysis = analyze_failures(failed_executions, plan)
+    failure_analysis = analyze_failures(failed_executions, execution_graph)
 
-    case determine_recovery_strategy(failure_analysis, plan, context) do
+    case determine_recovery_strategy(failure_analysis, execution_graph, context) do
       {:retry, retry_nodes} when length(retry_nodes) > 0 ->
         # Some nodes can be retried
         recovery_context = apply_failure_recovery(permanent_failures, context)
@@ -241,8 +241,8 @@ defmodule Prana.GraphExecutor.Helpers do
     end
   end
 
-  @spec analyze_failures([NodeExecution.t()], ExecutionPlan.t()) :: map()
-  defp analyze_failures(failed_executions, %ExecutionPlan{} = plan) do
+  @spec analyze_failures([NodeExecution.t()], ExecutionGraph.t()) :: map()
+  defp analyze_failures(failed_executions, %ExecutionGraph{} = execution_graph) do
     failure_types =
       Enum.group_by(failed_executions, fn execution ->
         get_in(execution.error_data, ["type"]) || "unknown"
@@ -250,13 +250,13 @@ defmodule Prana.GraphExecutor.Helpers do
 
     critical_nodes =
       Enum.filter(failed_executions, fn execution ->
-        node = Map.get(plan.node_map, execution.node_id)
+        node = Map.get(execution_graph.node_map, execution.node_id)
         node && is_critical_node?(node)
       end)
 
     retryable_nodes =
       Enum.filter(failed_executions, fn execution ->
-        node = Map.get(plan.node_map, execution.node_id)
+        node = Map.get(execution_graph.node_map, execution.node_id)
         node && can_retry_node?(node, execution)
       end)
 
@@ -265,23 +265,23 @@ defmodule Prana.GraphExecutor.Helpers do
       failure_types: failure_types,
       critical_failures: critical_nodes,
       retryable_failures: retryable_nodes,
-      failure_rate: length(failed_executions) / plan.total_nodes
+      failure_rate: length(failed_executions) / execution_graph.total_nodes
     }
   end
 
-  @spec separate_retryable_failures([NodeExecution.t()], ExecutionPlan.t()) ::
+  @spec separate_retryable_failures([NodeExecution.t()], ExecutionGraph.t()) ::
           {[{Node.t(), NodeExecution.t()}], [NodeExecution.t()]}
-  defp separate_retryable_failures(failed_executions, %ExecutionPlan{} = plan) do
+  defp separate_retryable_failures(failed_executions, %ExecutionGraph{} = execution_graph) do
     failed_executions
     |> Enum.split_with(fn execution ->
-      node = Map.get(plan.node_map, execution.node_id)
+      node = Map.get(execution_graph.node_map, execution.node_id)
       node && RetryHandler.should_retry?(node, execution)
     end)
     |> then(fn {retryable_executions, permanent_executions} ->
       # Convert retryable executions to {node, execution} tuples
       retryable_with_nodes =
         Enum.map(retryable_executions, fn execution ->
-          node = Map.get(plan.node_map, execution.node_id)
+          node = Map.get(execution_graph.node_map, execution.node_id)
           {node, execution}
         end)
 
@@ -289,27 +289,27 @@ defmodule Prana.GraphExecutor.Helpers do
     end)
   end
 
-  @spec determine_recovery_strategy(map(), ExecutionPlan.t(), ExecutionContext.t()) ::
+  @spec determine_recovery_strategy(map(), ExecutionGraph.t(), ExecutionContext.t()) ::
           :continue | {:stop, term()} | {:suspend, String.t()} | {:retry, [{Node.t(), NodeExecution.t()}]}
-  defp determine_recovery_strategy(%{failure_rate: rate} = analysis, _plan, _context) when rate >= 0.5 do
+  defp determine_recovery_strategy(%{failure_rate: rate} = analysis, _execution_graph, _context) when rate >= 0.5 do
     # High failure rate - stop workflow
     {:stop, {:high_failure_rate, analysis}}
   end
 
-  defp determine_recovery_strategy(%{critical_failures: critical} = analysis, _plan, _context)
+  defp determine_recovery_strategy(%{critical_failures: critical} = analysis, _execution_graph, _context)
        when length(critical) > 0 do
     # Critical node failures - stop workflow
     {:stop, {:critical_node_failure, analysis}}
   end
 
-  defp determine_recovery_strategy(%{retryable_failures: retryable} = _analysis, plan, _context)
+  defp determine_recovery_strategy(%{retryable_failures: retryable} = _analysis, execution_graph, _context)
        when length(retryable) > 0 do
     # Has retryable failures - prepare retry list
-    {retry_nodes, _permanent} = separate_retryable_failures(retryable, plan)
+    {retry_nodes, _permanent} = separate_retryable_failures(retryable, execution_graph)
     {:retry, retry_nodes}
   end
 
-  defp determine_recovery_strategy(_analysis, _plan, _context) do
+  defp determine_recovery_strategy(_analysis, _execution_graph, _context) do
     # Non-critical failures - continue
     :continue
   end
