@@ -45,14 +45,11 @@ defmodule Prana.ExecutionPlanner do
   # Trigger Node Selection
   # ============================================================================
 
-  @doc """
-  Get the trigger node to start execution from.
-  
-  If trigger_node_id is provided, uses that specific node.
-  If not provided, finds the first trigger node in the workflow.
-  """
+  # Get the trigger node to start execution from.
+  # If trigger_node_id is provided, uses that specific node.
+  # If not provided, finds the first trigger node in the workflow.
   @spec get_trigger_node(Workflow.t(), String.t() | nil) :: {:ok, Node.t()} | {:error, term()}
-  def get_trigger_node(%Workflow{} = workflow, nil) do
+  defp get_trigger_node(%Workflow{} = workflow, nil) do
     # No specific trigger provided, find first trigger node
     case find_trigger_nodes(workflow) do
       [] -> 
@@ -68,7 +65,7 @@ defmodule Prana.ExecutionPlanner do
     end
   end
   
-  def get_trigger_node(%Workflow{} = workflow, trigger_node_id) when is_binary(trigger_node_id) do
+  defp get_trigger_node(%Workflow{} = workflow, trigger_node_id) when is_binary(trigger_node_id) do
     case Workflow.get_node_by_id(workflow, trigger_node_id) do
       nil -> 
         {:error, {:trigger_node_not_found, trigger_node_id}}
@@ -90,13 +87,10 @@ defmodule Prana.ExecutionPlanner do
   # Graph Traversal & Pruning
   # ============================================================================
 
-  @doc """
-  Find all nodes reachable from the trigger node using graph traversal.
-  
-  This removes any nodes that are not connected to the execution path.
-  """
+  # Find all nodes reachable from the trigger node using graph traversal.
+  # This removes any nodes that are not connected to the execution path.
   @spec find_reachable_nodes(Workflow.t(), Node.t()) :: {:ok, [Node.t()]} | {:error, term()}
-  def find_reachable_nodes(%Workflow{} = workflow, %Node{} = trigger_node) do
+  defp find_reachable_nodes(%Workflow{} = workflow, %Node{} = trigger_node) do
     # Use breadth-first search to find all reachable nodes
     visited = MapSet.new()
     queue = [trigger_node.id]
@@ -136,11 +130,9 @@ defmodule Prana.ExecutionPlanner do
     |> Enum.uniq()
   end
 
-  @doc """
-  Create a pruned workflow containing only reachable nodes and their connections.
-  """
+  # Create a pruned workflow containing only reachable nodes and their connections.
   @spec prune_workflow(Workflow.t(), [Node.t()]) :: Workflow.t()
-  def prune_workflow(%Workflow{} = workflow, reachable_nodes) do
+  defp prune_workflow(%Workflow{} = workflow, reachable_nodes) do
     reachable_node_ids = MapSet.new(reachable_nodes, & &1.id)
     
     # Filter connections to only include those between reachable nodes
@@ -162,14 +154,11 @@ defmodule Prana.ExecutionPlanner do
   # Graph Analysis
   # ============================================================================
 
-  @doc """
-  Build dependency graph showing which nodes depend on which other nodes.
-  
-  Returns a map where keys are node IDs and values are lists of node IDs 
-  that must complete before the key node can execute.
-  """
+  # Build dependency graph showing which nodes depend on which other nodes.
+  # Returns a map where keys are node IDs and values are lists of node IDs 
+  # that must complete before the key node can execute.
   @spec build_dependency_graph(Workflow.t()) :: map()
-  def build_dependency_graph(%Workflow{connections: connections}) do
+  defp build_dependency_graph(%Workflow{connections: connections}) do
     Enum.reduce(connections, %{}, fn conn, acc ->
       Map.update(acc, conn.to_node_id, [conn.from_node_id], fn deps ->
         Enum.uniq([conn.from_node_id | deps])
@@ -208,17 +197,15 @@ defmodule Prana.ExecutionPlanner do
       }
   """
   @spec build_connection_map(Workflow.t()) :: map()
-  def build_connection_map(%Workflow{connections: connections}) do
+  defp build_connection_map(%Workflow{connections: connections}) do
     Enum.group_by(connections, fn conn ->
       {conn.from_node_id, conn.from_port}
     end)
   end
 
-  @doc """
-  Build node map for fast lookup of nodes by ID.
-  """
+  # Build node map for fast lookup of nodes by ID.
   @spec build_node_map(Workflow.t()) :: map()
-  def build_node_map(%Workflow{nodes: nodes}) do
+  defp build_node_map(%Workflow{nodes: nodes}) do
     Map.new(nodes, fn node -> {node.id, node} end)
   end
 
