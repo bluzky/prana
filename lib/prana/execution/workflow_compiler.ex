@@ -1,25 +1,27 @@
 defmodule Prana.WorkflowCompiler do
   @moduledoc """
   Compiles raw workflows into optimized execution graphs.
-  
+
   Transforms workflow definitions by:
   - Selecting trigger nodes and validating structure
   - Pruning unreachable nodes via graph traversal
   - Building dependency graphs for execution ordering
   - Creating O(1) lookup maps for performance
-  
+
   The output ExecutionGraph is ready for efficient execution by GraphExecutor.
   """
 
-  alias Prana.{Workflow, Node, Connection, ExecutionGraph}
+  alias Prana.ExecutionGraph
+  alias Prana.Node
+  alias Prana.Workflow
 
   @doc """
   Compile workflow into an optimized execution graph.
-  
+
   ## Parameters
   - `workflow` - Complete workflow definition
   - `trigger_node_id` - ID of the specific trigger node to start from
-  
+
   ## Returns
   - `{:ok, execution_graph}` - Compiled execution graph
   - `{:error, reason}` - Compilation failed
@@ -27,12 +29,12 @@ defmodule Prana.WorkflowCompiler do
   @spec compile(Workflow.t(), String.t() | nil) :: {:ok, ExecutionGraph.t()} | {:error, term()}
   def compile(%Workflow{} = workflow, trigger_node_id \\ nil) do
     with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_id),
-         {:ok, reachable_nodes} <- find_reachable_nodes(workflow, trigger_node),
-         compiled_workflow <- prune_workflow(workflow, reachable_nodes),
-         dependency_graph <- build_dependency_graph(compiled_workflow),
-         connection_map <- build_connection_map(compiled_workflow),
-         node_map <- build_node_map(compiled_workflow) do
-      
+         {:ok, reachable_nodes} <- find_reachable_nodes(workflow, trigger_node) do
+      compiled_workflow = prune_workflow(workflow, reachable_nodes)
+      dependency_graph = build_dependency_graph(compiled_workflow)
+      connection_map = build_connection_map(compiled_workflow)
+      node_map = build_node_map(compiled_workflow)
+
       execution_graph = %ExecutionGraph{
         workflow: compiled_workflow,
         trigger_node: trigger_node,
@@ -41,10 +43,8 @@ defmodule Prana.WorkflowCompiler do
         node_map: node_map,
         total_nodes: length(reachable_nodes)
       }
-      
+
       {:ok, execution_graph}
-    else
-      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -70,28 +70,28 @@ defmodule Prana.WorkflowCompiler do
   defp get_trigger_node(%Workflow{} = workflow, nil) do
     # No specific trigger provided, find first trigger node
     case find_trigger_nodes(workflow) do
-      [] -> 
+      [] ->
         {:error, :no_trigger_nodes}
-        
-      [trigger_node | _] -> 
+
+      [trigger_node] ->
         {:ok, trigger_node}
-        
+
       trigger_nodes when length(trigger_nodes) > 1 ->
         # Multiple triggers found, need to specify which one
         trigger_names = Enum.map(trigger_nodes, & &1.name)
         {:error, {:multiple_triggers_found, trigger_names}}
     end
   end
-  
+
   defp get_trigger_node(%Workflow{} = workflow, trigger_node_id) when is_binary(trigger_node_id) do
     case Workflow.get_node_by_id(workflow, trigger_node_id) do
-      nil -> 
+      nil ->
         {:error, {:trigger_node_not_found, trigger_node_id}}
-        
-      %Node{type: :trigger} = node -> 
+
+      %Node{type: :trigger} = node ->
         {:ok, node}
-        
-      %Node{type: other_type} -> 
+
+      %Node{type: other_type} ->
         {:error, {:node_not_trigger, trigger_node_id, other_type}}
     end
   end
@@ -112,20 +112,19 @@ defmodule Prana.WorkflowCompiler do
     # Use breadth-first search to find all reachable nodes
     visited = MapSet.new()
     queue = [trigger_node.id]
-    
+
     reachable_node_ids = traverse_graph(workflow, queue, visited)
-    
+
     # Get actual node structs for reachable IDs
-    reachable_nodes = 
-      workflow.nodes
-      |> Enum.filter(fn node -> MapSet.member?(reachable_node_ids, node.id) end)
-    
+    reachable_nodes =
+      Enum.filter(workflow.nodes, fn node -> MapSet.member?(reachable_node_ids, node.id) end)
+
     {:ok, reachable_nodes}
   end
 
   @spec traverse_graph(Workflow.t(), [String.t()], MapSet.t()) :: MapSet.t()
   defp traverse_graph(_workflow, [], visited), do: visited
-  
+
   defp traverse_graph(%Workflow{} = workflow, [current_id | rest], visited) do
     if MapSet.member?(visited, current_id) do
       # Already visited this node
@@ -135,7 +134,7 @@ defmodule Prana.WorkflowCompiler do
       new_visited = MapSet.put(visited, current_id)
       connected_nodes = find_connected_nodes(workflow, current_id)
       new_queue = rest ++ connected_nodes
-      
+
       traverse_graph(workflow, new_queue, new_visited)
     end
   end
@@ -152,20 +151,15 @@ defmodule Prana.WorkflowCompiler do
   @spec prune_workflow(Workflow.t(), [Node.t()]) :: Workflow.t()
   defp prune_workflow(%Workflow{} = workflow, reachable_nodes) do
     reachable_node_ids = MapSet.new(reachable_nodes, & &1.id)
-    
+
     # Filter connections to only include those between reachable nodes
-    reachable_connections = 
-      workflow.connections
-      |> Enum.filter(fn conn ->
-        MapSet.member?(reachable_node_ids, conn.from_node_id) and
-        MapSet.member?(reachable_node_ids, conn.to_node_id)
+    reachable_connections =
+      Enum.filter(workflow.connections, fn conn ->
+        MapSet.member?(reachable_node_ids, conn.from_node_id) and MapSet.member?(reachable_node_ids, conn.to_node_id)
       end)
-    
+
     # Create new workflow with compiled nodes and connections
-    %{workflow | 
-      nodes: reachable_nodes,
-      connections: reachable_connections
-    }
+    %{workflow | nodes: reachable_nodes, connections: reachable_connections}
   end
 
   # ============================================================================
@@ -173,7 +167,7 @@ defmodule Prana.WorkflowCompiler do
   # ============================================================================
 
   # Build dependency graph showing which nodes depend on which other nodes.
-  # Returns a map where keys are node IDs and values are lists of node IDs 
+  # Returns a map where keys are node IDs and values are lists of node IDs
   # that must complete before the key node can execute.
   @spec build_dependency_graph(Workflow.t()) :: map()
   defp build_dependency_graph(%Workflow{connections: connections}) do
@@ -215,7 +209,7 @@ defmodule Prana.WorkflowCompiler do
   @spec dependencies_satisfied?(ExecutionGraph.t(), Node.t(), MapSet.t()) :: boolean()
   defp dependencies_satisfied?(%ExecutionGraph{} = graph, %Node{} = node, completed_nodes) do
     dependencies = Map.get(graph.dependency_graph, node.id, [])
-    
+
     Enum.all?(dependencies, fn dep_node_id ->
       MapSet.member?(completed_nodes, dep_node_id)
     end)
