@@ -84,14 +84,14 @@ defmodule Prana.NodeExecution do
   @doc """
   Marks node execution as failed
   """
-  def fail(%__MODULE__{} = node_execution, error_data, error_port \\ "error") do
+  def fail(%__MODULE__{} = node_execution, error_data) do
     duration = calculate_duration(node_execution.started_at)
 
     %{
       node_execution
       | status: :failed,
         error_data: error_data,
-        output_port: error_port,
+        output_port: nil,
         completed_at: DateTime.utc_now(),
         duration_ms: duration
     }

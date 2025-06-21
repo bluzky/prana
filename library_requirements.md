@@ -119,26 +119,43 @@
 
 ## 6. Expression System
 
-### 6.1 Built-in Template Expressions
+### 6.1 Built-in Path Expressions
 ```javascript
-// Access node data
-{{ $node.api_call.response.user_id }}
+// Simple field access
+$input.email
+$nodes.api_call.response.user_id
+$variables.api_url
 
-// Access variables
-{{ $variables.api_url }}
+// Array access
+$input.users[0].name
+$nodes.search_results.items[1].title
 
-// Access input data
-{{ $input.email }}
+// Wildcard extraction (returns arrays)
+$input.users.*.name
+$input.users.*.skills.*
 
-// Simple conditions (for logic nodes)
-{{ $node.http_request.status_code == 200 }}
+// Filtering (returns arrays)
+$input.users.{role: "admin"}.email
+$input.orders.{status: "completed", user_id: 123}.amount
+$input.users.{is_active: true, role: "admin"}
 ```
 
-### 6.2 Expression Context
-- **Node Outputs**: Access to upstream node results
-- **Pipeline Variables**: Shared variables across execution
-- **Input Data**: Access to pipeline input
-- **Basic Functions**: Simple string/number operations
+### 6.2 Expression Output Behavior
+- **Simple paths**: Return single values (string, number, boolean, object)
+- **Wildcard paths**: Always return arrays (even if empty or single item)
+- **Filter paths**: Always return arrays (even if empty or single match)
+- **Non-expressions**: Returned as-is without processing
+
+### 6.3 Filter Value Types
+- **Strings**: `{role: "admin"}` or `{role: 'user'}`
+- **Booleans**: `{is_active: true}`, `{is_verified: false}`
+- **Numbers**: `{age: 25}`, `{price: 29.99}`
+- **Unquoted**: `{status: pending}` (treated as string)
+
+### 6.4 Expression Context
+- **Flexible Context**: Simple map structure, no enforced schema
+- **Common Keys**: `"input"`, `"nodes"`, `"variables"` (by convention)
+- **Application-Defined**: Applications can use any context structure
 
 ## 7. Core Library Architecture
 
