@@ -5,8 +5,8 @@ defmodule Prana.GraphExecutor.Helpers do
 
   alias Prana.Execution
   alias Prana.ExecutionContext
-  alias Prana.GraphExecutor.ExecutionPlan
-  alias Prana.GraphExecutor.RetryHandler
+  alias Prana.ExecutionPlan
+  alias Prana.RetryHandler
   alias Prana.Node
   alias Prana.NodeExecution
   alias Prana.Workflow

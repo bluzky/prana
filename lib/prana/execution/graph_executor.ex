@@ -12,17 +12,10 @@ defmodule Prana.GraphExecutor do
   Uses Task-based parallel coordination and port-based data routing.
   """
 
-  alias Prana.Connection
-  alias Prana.Execution
-  alias Prana.ExecutionContext
-  alias Prana.ExpressionEngine
+  alias Prana.{Workflow, Node, Connection, Execution, ExecutionContext, NodeExecution}
+  alias Prana.{NodeExecutor, Middleware, ExpressionEngine}
   alias Prana.GraphExecutor.Helpers
-  alias Prana.GraphExecutor.RetryHandler
-  alias Prana.Middleware
-  alias Prana.Node
-  alias Prana.NodeExecution
-  alias Prana.NodeExecutor
-  alias Prana.Workflow
+  alias Prana.{RetryHandler, ExecutionPlanner, ExecutionPlan}
 
   require Logger
 
@@ -36,10 +29,11 @@ defmodule Prana.GraphExecutor do
   # ============================================================================
 
   @doc """
-  Execute a workflow with input data.
+  Execute a workflow starting from a specific trigger node.
 
   ## Parameters
   - `workflow` - Workflow definition to execute
+  - `trigger_node_id` - ID of the trigger node to start execution from
   - `input_data` - Initial input data for workflow
   - `opts` - Execution options (timeout, mode, etc.)
 
@@ -48,8 +42,8 @@ defmodule Prana.GraphExecutor do
   - `{:error, reason}` - Execution failed 
   - `{:suspended, context}` - Workflow suspended (waiting)
   """
-  @spec execute_workflow(Workflow.t(), map(), keyword()) :: execution_result()
-  def execute_workflow(%Workflow{} = workflow, input_data, opts \\ []) do
+  @spec execute_workflow(Workflow.t(), String.t(), map(), keyword()) :: execution_result()
+  def execute_workflow(%Workflow{} = workflow, trigger_node_id, input_data, opts \\ []) do
     # 1. Create execution instance
     execution = create_execution(workflow, input_data, opts)
 
@@ -57,10 +51,10 @@ defmodule Prana.GraphExecutor do
     context = ExecutionContext.new(workflow, execution)
 
     # 3. Emit workflow started event
-    emit_workflow_event(:execution_started, context, %{input_data: input_data})
+    emit_workflow_event(:execution_started, context, %{input_data: input_data, trigger_node_id: trigger_node_id})
 
-    # 4. Plan execution
-    case plan_execution(workflow) do
+    # 4. Plan execution with specified trigger node
+    case ExecutionPlanner.plan_execution(workflow, trigger_node_id) do
       {:ok, plan} ->
         # 5. Execute main workflow loop
         execute_workflow_loop(plan, context)
@@ -72,13 +66,13 @@ defmodule Prana.GraphExecutor do
   end
 
   @doc """
-  Execute workflow asynchronously and return Task.
+  Execute workflow asynchronously starting from a specific trigger node.
   """
-  @spec execute_workflow_async(Workflow.t(), map(), keyword()) :: {:ok, Task.t()} | {:error, term()}
-  def execute_workflow_async(workflow, input_data, opts \\ []) do
+  @spec execute_workflow_async(Workflow.t(), String.t(), map(), keyword()) :: {:ok, Task.t()} | {:error, term()}
+  def execute_workflow_async(workflow, trigger_node_id, input_data, opts \\ []) do
     task =
       Task.async(fn ->
-        execute_workflow(workflow, input_data, opts)
+        execute_workflow(workflow, trigger_node_id, input_data, opts)
       end)
 
     {:ok, task}
@@ -94,87 +88,13 @@ defmodule Prana.GraphExecutor do
       context = Helpers.rebuild_execution_context(execution)
       workflow = Helpers.get_workflow_definition(execution.workflow_id, execution.workflow_version)
 
-      case plan_execution(workflow) do
+      case ExecutionPlanner.plan_execution(workflow, nil) do
         {:ok, plan} -> continue_workflow_execution(plan, context)
         {:error, reason} -> {:error, reason}
       end
     else
       {:error, :invalid_resume_token}
     end
-  end
-
-  # ============================================================================
-  # Execution Planning
-  # ============================================================================
-
-  defmodule ExecutionPlan do
-    @moduledoc """
-    Execution plan containing workflow analysis and execution strategy.
-    """
-
-    defstruct [
-      :workflow,
-      # Nodes with no incoming connections
-      :entry_nodes,
-      # Map of node_id -> [dependent_node_ids]
-      :dependency_graph,
-      # Map of {from_node, from_port} -> [connections]
-      :connection_map,
-      # Map of node_id -> node for quick lookup
-      :node_map,
-      :total_nodes
-    ]
-
-    @type t :: %__MODULE__{
-            workflow: Workflow.t(),
-            entry_nodes: [Node.t()],
-            dependency_graph: map(),
-            connection_map: map(),
-            node_map: map(),
-            total_nodes: integer()
-          }
-  end
-
-  @spec plan_execution(Workflow.t()) :: {:ok, ExecutionPlan.t()} | {:error, term()}
-  defp plan_execution(%Workflow{} = workflow) do
-    with :ok <- Helpers.validate_workflow_structure(workflow) do
-      entry_nodes = Workflow.get_entry_nodes(workflow)
-      dependency_graph = build_dependency_graph(workflow)
-      connection_map = build_connection_map(workflow)
-      node_map = build_node_map(workflow)
-
-      plan = %ExecutionPlan{
-        workflow: workflow,
-        entry_nodes: entry_nodes,
-        dependency_graph: dependency_graph,
-        connection_map: connection_map,
-        node_map: node_map,
-        total_nodes: length(workflow.nodes)
-      }
-
-      {:ok, plan}
-    end
-  end
-
-  @spec build_dependency_graph(Workflow.t()) :: map()
-  defp build_dependency_graph(%Workflow{connections: connections}) do
-    Enum.reduce(connections, %{}, fn conn, acc ->
-      Map.update(acc, conn.to_node_id, [conn.from_node_id], fn deps ->
-        Enum.uniq([conn.from_node_id | deps])
-      end)
-    end)
-  end
-
-  @spec build_connection_map(Workflow.t()) :: map()
-  defp build_connection_map(%Workflow{connections: connections}) do
-    Enum.group_by(connections, fn conn ->
-      {conn.from_node_id, conn.from_port}
-    end)
-  end
-
-  @spec build_node_map(Workflow.t()) :: map()
-  defp build_node_map(%Workflow{nodes: nodes}) do
-    Map.new(nodes, fn node -> {node.id, node} end)
   end
 
   # ============================================================================
@@ -245,61 +165,19 @@ defmodule Prana.GraphExecutor do
 
   @spec find_ready_nodes(ExecutionPlan.t(), ExecutionContext.t()) :: [Node.t()]
   defp find_ready_nodes(%ExecutionPlan{} = plan, %ExecutionContext{} = context) do
-    plan.workflow.nodes
-    |> Enum.reject(&node_executed?(context, &1.id))
-    |> Enum.reject(&node_pending?(context, &1.id))
-    |> Enum.filter(&dependencies_satisfied?(plan, context, &1))
+    ExecutionPlanner.find_ready_nodes(
+      plan, 
+      context.completed_nodes, 
+      context.failed_nodes, 
+      context.pending_nodes
+    )
   end
 
-  @spec node_executed?(ExecutionContext.t(), String.t()) :: boolean()
-  defp node_executed?(%ExecutionContext{} = context, node_id) do
-    MapSet.member?(context.completed_nodes, node_id) or
-      MapSet.member?(context.failed_nodes, node_id)
-  end
 
-  @spec node_pending?(ExecutionContext.t(), String.t()) :: boolean()
-  defp node_pending?(%ExecutionContext{} = context, node_id) do
-    MapSet.member?(context.pending_nodes, node_id)
-  end
 
-  @spec dependencies_satisfied?(ExecutionPlan.t(), ExecutionContext.t(), Node.t()) :: boolean()
-  defp dependencies_satisfied?(%ExecutionPlan{} = plan, %ExecutionContext{} = context, %Node{} = node) do
-    dependencies = Map.get(plan.dependency_graph, node.id, [])
-
-    Enum.all?(dependencies, fn dep_node_id ->
-      # Check if dependency is completed
-      completed = MapSet.member?(context.completed_nodes, dep_node_id)
-
-      if completed do
-        # Check if there's a valid connection path
-        has_valid_connection_path?(plan, context, dep_node_id, node.id)
-      else
-        false
-      end
-    end)
-  end
-
-  @spec has_valid_connection_path?(ExecutionPlan.t(), ExecutionContext.t(), String.t(), String.t()) :: boolean()
-  defp has_valid_connection_path?(%ExecutionPlan{} = plan, %ExecutionContext{} = context, from_node_id, to_node_id) do
-    # Get the output port that the from_node actually produced
-    from_node_output_port = get_node_output_port(context, from_node_id)
-
-    case from_node_output_port do
-      # Node failed or has no output port
-      nil ->
-        false
-
-      output_port ->
-        # Find connections from this node and port
-        connections = Map.get(plan.connection_map, {from_node_id, output_port}, [])
-
-        # Check if any connection leads to our target node with satisfied conditions
-        Enum.any?(connections, fn conn ->
-          conn.to_node_id == to_node_id and
-            evaluate_connection_conditions(conn.conditions, context)
-        end)
-    end
-  end
+  # ============================================================================
+  # Helper Functions for Connection Validation
+  # ============================================================================
 
   @spec get_node_output_port(ExecutionContext.t(), String.t()) :: String.t() | nil
   defp get_node_output_port(%ExecutionContext{} = context, node_id) do
