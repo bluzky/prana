@@ -59,7 +59,7 @@ defmodule Prana.Behaviour.Middleware do
 
   @doc """
   Handle a workflow event with the given data.
-  
+
   The middleware can:
   - Perform side effects (logging, persistence, notifications)
   - Transform the data before passing to next middleware
@@ -67,13 +67,13 @@ defmodule Prana.Behaviour.Middleware do
   - Handle errors and continue or halt the pipeline
 
   ## Parameters
-  
+
   - `event` - The workflow event being processed
   - `data` - The event data (execution, node, error info, etc.)
   - `next` - Function to call the next middleware in the pipeline
 
   ## Return Value
-  
+
   Should return the data (potentially transformed) that will be passed
   to the next middleware or returned as the final result.
   """

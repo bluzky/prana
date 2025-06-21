@@ -2,21 +2,27 @@ defmodule Prana.Connection do
   @moduledoc """
   Represents a connection between two nodes
   """
-  
+
   @type t :: %__MODULE__{
-    id: String.t(),
-    from_node_id: String.t(),
-    from_port: String.t(),
-    to_node_id: String.t(),
-    to_port: String.t(),
-    conditions: [Prana.Condition.t()],
-    data_mapping: map(),
-    metadata: map()
-  }
+          id: String.t(),
+          from_node_id: String.t(),
+          from_port: String.t(),
+          to_node_id: String.t(),
+          to_port: String.t(),
+          conditions: [Prana.Condition.t()],
+          data_mapping: map(),
+          metadata: map()
+        }
 
   defstruct [
-    :id, :from_node_id, :from_port, :to_node_id, :to_port,
-    conditions: [], data_mapping: %{}, metadata: %{}
+    :id,
+    :from_node_id,
+    :from_port,
+    :to_node_id,
+    :to_port,
+    conditions: [],
+    data_mapping: %{},
+    metadata: %{}
   ]
 
   @doc """
@@ -56,8 +62,8 @@ defmodule Prana.Connection do
   """
   def valid?(%__MODULE__{} = connection) do
     required_fields = [:id, :from_node_id, :from_port, :to_node_id, :to_port]
-    
-    missing_fields = 
+
+    missing_fields =
       Enum.reject(required_fields, fn field ->
         value = Map.get(connection, field)
         value && value != ""
@@ -71,7 +77,7 @@ defmodule Prana.Connection do
   end
 
   defp generate_id do
-    :crypto.strong_rand_bytes(16) |> Base.encode64() |> binary_part(0, 16)
+    16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
   end
 
   defp parse_conditions(conditions) when is_list(conditions) do
