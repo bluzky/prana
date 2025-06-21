@@ -30,8 +30,8 @@ defmodule Prana.NodeExecutor do
   @spec execute_node(Node.t(), ExecutionContext.t(), keyword()) ::
           {:ok, NodeExecution.t(), ExecutionContext.t()} | {:error, term()}
   def execute_node(%Node{} = node, %ExecutionContext{} = context, _opts \\ []) do
-    # Create initial node execution
-    node_execution = NodeExecution.new("exec-id", node.id, %{})
+    # Create initial node execution with proper execution ID from context
+    node_execution = NodeExecution.new(context.execution_id, node.id, %{})
     node_execution = NodeExecution.start(node_execution)
 
     with {:ok, prepared_input} <- prepare_input(node, context),

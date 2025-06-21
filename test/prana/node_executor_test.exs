@@ -157,6 +157,99 @@ defmodule Prana.NodeExecutorTest do
   end
 
   describe "execute_node/3" do
+    test "uses proper execution ID from context" do
+      node = %Node{
+        id: "test-exec-id",
+        custom_id: "exec_id_test",
+        name: "Execution ID Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "success_action",
+        input_map: %{"test" => "data"},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      # Use a unique execution ID
+      unique_execution_id = "exec-" <> :crypto.strong_rand_bytes(8) |> Base.encode16()
+      
+      context = %ExecutionContext{
+        execution_id: unique_execution_id,
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+
+      # Verify the node execution has its own unique ID (different from execution_id)
+      assert is_binary(node_execution.id)
+      assert byte_size(node_execution.id) == 16  # Generated ID length
+      assert node_execution.id != unique_execution_id  # Node execution ID ≠ workflow execution ID
+      
+      # Verify the node execution is properly linked to the workflow execution
+      assert node_execution.execution_id == unique_execution_id
+      assert node_execution.node_id == "test-exec-id"
+      assert node_execution.status == :completed
+      
+      # Verify the execution ID is not hardcoded
+      refute node_execution.execution_id == "exec-id"
+    end
+
+    test "each node execution gets unique ID even within same workflow execution" do
+      node1 = %Node{
+        id: "test-node-1",
+        custom_id: "unique_test_1",
+        name: "Unique Test 1",
+        type: :action,
+        integration_name: "test",
+        action_name: "success_action",
+        input_map: %{"test" => "data1"},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      node2 = %Node{
+        id: "test-node-2",
+        custom_id: "unique_test_2",
+        name: "Unique Test 2",
+        type: :action,
+        integration_name: "test",
+        action_name: "success_action",
+        input_map: %{"test" => "data2"},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      # Same workflow execution ID for both nodes
+      shared_execution_id = "exec-" <> :crypto.strong_rand_bytes(8) |> Base.encode16()
+      
+      context = %ExecutionContext{
+        execution_id: shared_execution_id,
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      # Execute both nodes
+      assert {:ok, node_execution1, updated_context} = NodeExecutor.execute_node(node1, context)
+      assert {:ok, node_execution2, _final_context} = NodeExecutor.execute_node(node2, updated_context)
+
+      # Both node executions should have different unique IDs
+      assert node_execution1.id != node_execution2.id
+      assert is_binary(node_execution1.id)
+      assert is_binary(node_execution2.id)
+      assert byte_size(node_execution1.id) == 16
+      assert byte_size(node_execution2.id) == 16
+      
+      # But both should share the same workflow execution_id
+      assert node_execution1.execution_id == shared_execution_id
+      assert node_execution2.execution_id == shared_execution_id
+      
+      # And they should reference their respective nodes
+      assert node_execution1.node_id == "test-node-1"
+      assert node_execution2.node_id == "test-node-2"
+    end
     test "executes simple node successfully" do
       node = %Node{
         id: "test-1",
