@@ -44,7 +44,7 @@ defmodule Prana.ExpressionEngine do
 
   ## Error Handling
 
-  - Missing paths in simple expressions: `{:error, "Path not found: ..."}`
+  - Missing paths in simple expressions: `{:ok, nil}` (graceful handling)
   - No matches in filters/wildcards: `{:ok, []}` (empty array)
   - Invalid expressions: Various error messages
 
@@ -113,8 +113,8 @@ defmodule Prana.ExpressionEngine do
 
   ## Returns
 
-  - `{:ok, value}` - Successfully extracted value (single or array)
-  - `{:error, message}` - Path not found or other extraction error
+  - `{:ok, value}` - Successfully extracted value (single or array), or `nil` for missing paths
+  - `{:error, message}` - Invalid expression syntax or other extraction error
 
   ## Examples
 
@@ -138,11 +138,9 @@ defmodule Prana.ExpressionEngine do
   @spec extract(String.t(), map()) :: {:ok, any()} | {:error, String.t()}
   def extract(expression, context) when is_binary(expression) do
     if is_expression?(expression) do
-      case parse_and_extract(expression, context) do
-        {:ok, value} -> {:ok, value}
-        :error -> {:error, "Path not found: #{expression}"}
-        {:error, reason} -> {:error, reason}
-      end
+      # parse_and_extract now always returns {:ok, value} or {:error, reason}
+      # Missing paths return {:ok, nil}
+      parse_and_extract(expression, context)
     else
       # Return as-is if not an expression
       {:ok, expression}
@@ -260,8 +258,11 @@ defmodule Prana.ExpressionEngine do
       results = Nested.extract(context, path)
       {:ok, results}
     else
-      # Returns single value for simple paths
-      Nested.fetch(context, path)
+      # Returns single value for simple paths, nil if not found
+      case Nested.fetch(context, path) do
+        {:ok, value} -> {:ok, value}
+        :error -> {:ok, nil}  # ← Return nil instead of error for missing paths
+      end
     end
   end
 

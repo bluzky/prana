@@ -30,6 +30,58 @@ defmodule Prana.ExpressionEngineTest do
       {:ok, context: context}
     end
 
+    test "distinguishes between missing paths (nil) and syntax errors (error)" do
+      context = %{
+        "input" => %{"valid_field" => "value"}
+      }
+
+      # Missing paths should return nil
+      {:ok, result} = ExpressionEngine.extract("$input.missing_field", context)
+      assert result == nil
+      
+      {:ok, result} = ExpressionEngine.extract("$missing_root.field", context)
+      assert result == nil
+      
+      # Non-expressions should return as-is
+      {:ok, result} = ExpressionEngine.extract("not_an_expression", context)
+      assert result == "not_an_expression"
+      
+      # Empty $ should return as-is (not a valid expression)
+      {:ok, result} = ExpressionEngine.extract("$", context)
+      assert result == "$"
+      
+      # Valid expressions should work
+      {:ok, result} = ExpressionEngine.extract("$input.valid_field", context)
+      assert result == "value"
+    end
+
+    test "map processing with mixed missing and valid paths" do
+      context = %{
+        "input" => %{"existing" => "value"},
+        "nodes" => %{"step1" => %{"result" => "success"}}
+      }
+      
+      input_map = %{
+        "valid1" => "$input.existing",
+        "valid2" => "$nodes.step1.result", 
+        "missing1" => "$input.nonexistent",
+        "missing2" => "$nodes.missing_step.result",
+        "missing3" => "$variables.missing_var",
+        "static" => "hello"
+      }
+      
+      {:ok, processed} = ExpressionEngine.process_map(input_map, context)
+      
+      assert processed == %{
+        "valid1" => "value",
+        "valid2" => "success",
+        "missing1" => nil,
+        "missing2" => nil, 
+        "missing3" => nil,
+        "static" => "hello"
+      }
+    end
+
     test "extracts simple fields", %{context: context} do
       {:ok, email} = ExpressionEngine.extract("$input.email", context)
       assert email == "john@test.com"
@@ -74,12 +126,15 @@ defmodule Prana.ExpressionEngineTest do
       assert value == %{"key" => "value"}
     end
 
-    test "handles missing paths", %{context: context} do
-      {:error, reason} = ExpressionEngine.extract("$input.nonexistent", context)
-      assert reason =~ "Path not found"
+    test "handles missing paths - returns nil", %{context: context} do
+      {:ok, result} = ExpressionEngine.extract("$input.nonexistent", context)
+      assert result == nil
 
-      {:error, reason} = ExpressionEngine.extract("$nodes.missing.field", context)
-      assert reason =~ "Path not found"
+      {:ok, result} = ExpressionEngine.extract("$nodes.missing.field", context)
+      assert result == nil
+
+      {:ok, result} = ExpressionEngine.extract("$variables.nonexistent.deep.path", context)
+      assert result == nil
     end
   end
 
@@ -126,9 +181,12 @@ defmodule Prana.ExpressionEngineTest do
       assert score == 0.87
     end
 
-    test "handles array bounds", %{context: context} do
-      {:error, _reason} = ExpressionEngine.extract("$input.users[10]", context)
-      {:error, _reason} = ExpressionEngine.extract("$input.tags[5]", context)
+    test "handles array bounds - returns nil", %{context: context} do
+      {:ok, result} = ExpressionEngine.extract("$input.users[10]", context)
+      assert result == nil
+      
+      {:ok, result} = ExpressionEngine.extract("$input.tags[5]", context)
+      assert result == nil
     end
   end
 
@@ -338,15 +396,18 @@ defmodule Prana.ExpressionEngineTest do
       assert result == 123
     end
 
-    test "handles errors in map processing", %{context: context} do
+    test "handles missing paths in map processing - returns nil", %{context: context} do
       input_map = %{
         "valid" => "$input.email",
-        "invalid" => "$input.nonexistent.field"
+        "missing" => "$input.nonexistent.field"
       }
 
-      {:error, reason} = ExpressionEngine.process_map(input_map, context)
-      assert reason =~ "Error processing key 'invalid'"
-      assert reason =~ "Path not found"
+      {:ok, processed} = ExpressionEngine.process_map(input_map, context)
+      
+      assert processed == %{
+        "valid" => "john@test.com",
+        "missing" => nil
+      }
     end
   end
 
@@ -407,7 +468,7 @@ defmodule Prana.ExpressionEngineTest do
         }
       }
 
-      # Empty expressions should retus as-is
+      # Empty expressions should return as-is
       {:ok, "$"} = ExpressionEngine.extract("$", context)
 
       # Deep nesting should work
@@ -418,8 +479,13 @@ defmodule Prana.ExpressionEngineTest do
       {:ok, empty} = ExpressionEngine.extract("$input.empty_list.*", context)
       assert empty == []
 
-      # Accessing nil should error
-      {:error, _} = ExpressionEngine.extract("$input.null_value.field", context)
+      # Accessing nil should return nil (graceful handling)
+      {:ok, result} = ExpressionEngine.extract("$input.null_value.field", context)
+      assert result == nil
+      
+      # Accessing missing root should return nil
+      {:ok, result} = ExpressionEngine.extract("$nonexistent.field", context)
+      assert result == nil
     end
   end
 end

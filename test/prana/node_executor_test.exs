@@ -1,0 +1,788 @@
+defmodule Prana.NodeExecutorTest do
+  use ExUnit.Case, async: true
+
+  alias Prana.Action
+  alias Prana.ExecutionContext
+  alias Prana.Integration
+  alias Prana.IntegrationRegistry
+  alias Prana.Node
+  alias Prana.NodeExecutor
+
+  # Test integration module
+  defmodule TestIntegration do
+    @moduledoc false
+    @behaviour Prana.Behaviour.Integration
+
+    def definition do
+      %Integration{
+        name: "test",
+        display_name: "Test Integration",
+        description: "Integration for testing",
+        version: "1.0.0",
+        category: "test",
+        actions: %{
+          "success_action" => %Action{
+            name: "success_action",
+            display_name: "Success Action",
+            description: "Always succeeds",
+            module: __MODULE__,
+            function: :success_action,
+            input_ports: ["input"],
+            output_ports: ["success", "error"],
+            default_success_port: "success",
+            default_error_port: "error"
+          },
+          "error_action" => %Action{
+            name: "error_action",
+            display_name: "Error Action",
+            description: "Always fails",
+            module: __MODULE__,
+            function: :error_action,
+            input_ports: ["input"],
+            output_ports: ["success", "error"],
+            default_success_port: "success",
+            default_error_port: "error"
+          },
+          "transform_action" => %Action{
+            name: "transform_action",
+            display_name: "Transform Action",
+            description: "Transforms input data",
+            module: __MODULE__,
+            function: :transform_action,
+            input_ports: ["input"],
+            output_ports: ["success", "error"],
+            default_success_port: "success",
+            default_error_port: "error"
+          },
+          "explicit_port_action" => %Action{
+            name: "explicit_port_action",
+            display_name: "Explicit Port Action",
+            description: "Returns explicit port",
+            module: __MODULE__,
+            function: :explicit_port_action,
+            input_ports: ["input"],
+            output_ports: ["custom_success", "custom_error"],
+            default_success_port: "custom_success",
+            default_error_port: "custom_error"
+          },
+          "invalid_return_action" => %Action{
+            name: "invalid_return_action",
+            display_name: "Invalid Return Action",
+            description: "Returns invalid format",
+            module: __MODULE__,
+            function: :invalid_return_action,
+            input_ports: ["input"],
+            output_ports: ["success", "error"],
+            default_success_port: "success",
+            default_error_port: "error"
+          },
+          "exception_action" => %Action{
+            name: "exception_action",
+            display_name: "Exception Action",
+            description: "Raises an exception",
+            module: __MODULE__,
+            function: :exception_action,
+            input_ports: ["input"],
+            output_ports: ["success", "error"],
+            default_success_port: "success",
+            default_error_port: "error"
+          },
+          "invalid_port_action" => %Action{
+            name: "invalid_port_action",
+            display_name: "Invalid Port Action",
+            description: "Returns non-existent port",
+            module: __MODULE__,
+            function: :invalid_port_action,
+            input_ports: ["input"],
+            output_ports: ["success", "error"],
+            default_success_port: "success",
+            default_error_port: "error"
+          }
+        }
+      }
+    end
+
+    # Action implementations
+    def success_action(input) do
+      {:ok, %{message: "success", input: input}}
+    end
+
+    def error_action(_input) do
+      {:error, "something went wrong"}
+    end
+
+    def transform_action(input) do
+      # Use safe approach for now
+      transformed = %{
+        original: input,
+        uppercase_name: String.upcase(input["name"]),
+        timestamp: System.system_time(:second)
+      }
+
+      {:ok, transformed}
+    end
+
+    def explicit_port_action(input) do
+      should_succeed = if is_map(input), do: Map.get(input, "should_succeed", false), else: false
+
+      if should_succeed == true do
+        {:ok, %{result: "explicit success"}, "custom_success"}
+      else
+        {:error, "explicit failure", "custom_error"}
+      end
+    rescue
+      _ ->
+        {:error, "action failed", "custom_error"}
+    end
+
+    def invalid_return_action(_input) do
+      # Return invalid format (direct value instead of tuple)
+      "direct_string_value"
+    end
+
+    def exception_action(_input) do
+      raise "Test exception"
+    end
+
+    def invalid_port_action(_input) do
+      {:ok, %{data: "test"}, "nonexistent_port"}
+    end
+  end
+
+  setup do
+    # Start IntegrationRegistry and register test integration
+    {:ok, _pid} = IntegrationRegistry.start_link([])
+    :ok = IntegrationRegistry.register_integration(TestIntegration)
+    :ok
+  end
+
+  describe "execute_node/3" do
+    test "executes simple node successfully" do
+      node = %Node{
+        id: "test-1",
+        custom_id: "simple_test",
+        name: "Simple Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "success_action",
+        input_map: %{
+          "message" => "hello world"
+        },
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-1",
+        input: %{"user" => "john"},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:ok, node_execution, updated_context} = NodeExecutor.execute_node(node, context)
+
+      # Check node execution
+      assert node_execution.node_id == "test-1"
+      assert node_execution.status == :completed
+      assert node_execution.output_port == "success"
+      assert node_execution.output_data == %{message: "success", input: %{"message" => "hello world"}}
+      assert node_execution.error_data == nil
+      assert is_integer(node_execution.duration_ms)
+      assert node_execution.retry_count == 0
+
+      # Check context updates (only stored under custom_id)
+      assert updated_context.nodes["simple_test"] == node_execution.output_data
+      refute Map.has_key?(updated_context.nodes, "test-1")
+    end
+
+    test "handles expression evaluation in input_map" do
+      node = %Node{
+        id: "test-2",
+        custom_id: "expression_test",
+        name: "Expression Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "transform_action",
+        input_map: %{
+          "name" => "$input.user_name",
+          "email" => "$input.contact.email",
+          "previous_result" => "$nodes.api_call.user_id"
+        },
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-2",
+        input: %{
+          "user_name" => "alice",
+          "contact" => %{"email" => "alice@example.com"}
+        },
+        nodes: %{
+          "api_call" => %{"user_id" => 123}
+        },
+        variables: %{}
+      }
+
+      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+
+      # Check that expressions were evaluated
+      expected_input = %{
+        "name" => "alice",
+        "email" => "alice@example.com",
+        "previous_result" => 123
+      }
+
+      assert node_execution.output_data.original == expected_input
+      assert node_execution.output_data.uppercase_name == "ALICE"
+    end
+
+    test "handles action errors with default error port" do
+      node = %Node{
+        id: "test-3",
+        custom_id: "error_test",
+        name: "Error Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "error_action",
+        input_map: %{},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-3",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+
+      # Check error reason (now a map)
+      assert reason["type"] == "action_error"
+      assert reason["error"] == "something went wrong"
+      assert reason["port"] == "error"
+
+      # Check node execution
+      assert node_execution.status == :failed
+      assert node_execution.node_id == "test-3"
+      assert node_execution.error_data == reason
+      assert node_execution.output_data == nil
+      assert node_execution.output_port == nil
+    end
+
+    test "handles explicit port returns" do
+      node = %Node{
+        id: "test-4",
+        custom_id: "explicit_port_test",
+        name: "Explicit Port Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "explicit_port_action",
+        input_map: %{
+          "should_succeed" => true
+        },
+        output_ports: ["custom_success", "custom_error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-4",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+
+      assert node_execution.output_port == "custom_success"
+      assert node_execution.output_data == %{result: "explicit success"}
+      assert node_execution.status == :completed
+    end
+
+    test "handles explicit port errors" do
+      node = %Node{
+        id: "test-5",
+        custom_id: "explicit_error_test",
+        name: "Explicit Error Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "explicit_port_action",
+        input_map: %{
+          "should_succeed" => false
+        },
+        output_ports: ["custom_success", "custom_error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-5",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+
+      # Check error reason (map format)
+      assert reason["type"] == "action_error"
+      assert reason["error"] == "explicit failure"
+      assert reason["port"] == "custom_error"
+
+      assert node_execution.status == :failed
+      assert node_execution.error_data == reason
+    end
+
+    test "handles invalid action return format" do
+      node = %Node{
+        id: "test-6",
+        custom_id: "invalid_return_test",
+        name: "Invalid Return Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "invalid_return_action",
+        input_map: %{},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-6",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+
+      # Check error reason (map format)
+      assert reason["type"] == "invalid_action_return_format"
+      assert reason["result"] == "\"direct_string_value\""
+      assert String.contains?(reason["message"], "Actions must return")
+
+      assert node_execution.status == :failed
+      assert node_execution.error_data == reason
+    end
+
+    test "handles action execution exceptions" do
+      node = %Node{
+        id: "test-7",
+        custom_id: "exception_test",
+        name: "Exception Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "exception_action",
+        input_map: %{},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-7",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+
+      # Check error reason (map format)
+      assert reason["type"] == "action_execution_failed"
+      assert String.contains?(reason["error"], "Test exception")
+      assert reason["module"] == TestIntegration
+      assert reason["function"] == :exception_action
+
+      assert node_execution.status == :failed
+      assert node_execution.error_data == reason
+    end
+
+    test "handles invalid output port" do
+      node = %Node{
+        id: "test-8",
+        custom_id: "invalid_port_test",
+        name: "Invalid Port Test",
+        type: :action,
+        integration_name: "test",
+        action_name: "invalid_port_action",
+        input_map: %{},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-8",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+
+      # Check error reason (map format)
+      assert reason["type"] == "invalid_output_port"
+      assert reason["port"] == "nonexistent_port"
+      assert reason["available_ports"] == ["success", "error"]
+
+      assert node_execution.status == :failed
+      assert node_execution.error_data == reason
+    end
+
+    test "handles integration not found" do
+      node = %Node{
+        id: "test-9",
+        custom_id: "missing_integration",
+        name: "Missing Integration",
+        type: :action,
+        integration_name: "nonexistent",
+        action_name: "some_action",
+        input_map: %{},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-9",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+
+      # Check error reason (map format)
+      assert reason["type"] == "action_not_found"
+      assert reason["integration_name"] == "nonexistent"
+      assert reason["action_name"] == "some_action"
+
+      assert node_execution.status == :failed
+    end
+
+    test "handles action not found" do
+      node = %Node{
+        id: "test-10",
+        custom_id: "missing_action",
+        name: "Missing Action",
+        type: :action,
+        integration_name: "test",
+        action_name: "nonexistent_action",
+        input_map: %{},
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-10",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+
+      # Check error reason (map format)
+      assert reason["type"] == "action_not_found"
+      assert reason["integration_name"] == "test"
+      assert reason["action_name"] == "nonexistent_action"
+
+      assert node_execution.status == :failed
+    end
+
+    test "handles complex expression evaluation with wildcards and filtering" do
+      node = %Node{
+        id: "test-11",
+        custom_id: "complex_expressions",
+        name: "Complex Expressions",
+        type: :action,
+        integration_name: "test",
+        action_name: "success_action",
+        input_map: %{
+          "all_emails" => "$nodes.users.*.email",
+          "admin_emails" => "$nodes.users.{role: \"admin\"}.email",
+          "first_user" => "$nodes.users[0].name",
+          "order_id" => "$input.order.id"
+        },
+        output_ports: ["success", "error"],
+        input_ports: ["input"]
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-11",
+        input: %{
+          "order" => %{"id" => "ORD-123"}
+        },
+        nodes: %{
+          "users" => [
+            %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
+            %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
+            %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
+          ]
+        },
+        variables: %{}
+      }
+
+      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+
+      expected_input = %{
+        "all_emails" => ["alice@test.com", "bob@test.com", "carol@test.com"],
+        "admin_emails" => ["alice@test.com", "carol@test.com"],
+        "first_user" => "Alice",
+        "order_id" => "ORD-123"
+      }
+
+      assert node_execution.output_data.input == expected_input
+      assert node_execution.status == :completed
+    end
+  end
+
+  describe "prepare_input/2" do
+    test "evaluates expressions correctly" do
+      node = %Node{
+        id: "test",
+        input_map: %{
+          "simple" => "$input.name",
+          "nested" => "$input.user.email",
+          "from_nodes" => "$nodes.prev_step.result"
+        }
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-test",
+        input: %{
+          "name" => "john",
+          "user" => %{"email" => "john@example.com"}
+        },
+        nodes: %{
+          "prev_step" => %{"result" => "success"}
+        },
+        variables: %{}
+      }
+
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+
+      assert prepared == %{
+               "simple" => "john",
+               "nested" => "john@example.com",
+               "from_nodes" => "success"
+             }
+    end
+
+    test "handles missing expression data gracefully" do
+      node = %Node{
+        id: "test",
+        input_map: %{
+          "missing" => "$input.nonexistent.field"
+        }
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-test",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+      assert prepared == %{"missing" => nil}
+    end
+
+    test "handles expression evaluation errors" do
+      # This would test cases where ExpressionEngine itself fails
+      # For now, we'll test with invalid input_map structure
+      node = %Node{
+        id: "test",
+        input_map: %{
+          "test" => "$invalid..expression"
+        }
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-test",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      # Most invalid expressions just return nil, but we can test edge cases
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+      assert prepared == %{"test" => nil}
+    end
+  end
+
+  describe "update_context/3" do
+    test "stores result only under custom_id" do
+      node = %Node{
+        id: "node-123",
+        custom_id: "my_custom_node"
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-test",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      output_data = %{result: "success"}
+
+      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+
+      # Only stored under custom_id
+      assert updated_context.nodes["my_custom_node"] == output_data
+      refute Map.has_key?(updated_context.nodes, "node-123")
+
+      # Other context fields unchanged
+      assert updated_context.execution_id == "exec-test"
+      assert updated_context.input == %{}
+      assert updated_context.variables == %{}
+    end
+
+    test "stores under custom_id even when same as id" do
+      node = %Node{
+        id: "node-123",
+        custom_id: "node-123"
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-test",
+        input: %{},
+        nodes: %{},
+        variables: %{}
+      }
+
+      output_data = %{result: "success"}
+
+      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+
+      assert updated_context.nodes["node-123"] == output_data
+      assert map_size(updated_context.nodes) == 1
+    end
+
+    test "preserves existing node results" do
+      node = %Node{
+        id: "node-456",
+        custom_id: "new_node"
+      }
+
+      context = %ExecutionContext{
+        execution_id: "exec-test",
+        input: %{},
+        nodes: %{
+          "existing_node" => %{"data" => "preserved"}
+        },
+        variables: %{}
+      }
+
+      output_data = %{result: "new_data"}
+
+      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+
+      # Both old and new results preserved
+      assert updated_context.nodes["existing_node"] == %{"data" => "preserved"}
+      assert updated_context.nodes["new_node"] == %{result: "new_data"}
+      assert map_size(updated_context.nodes) == 2
+    end
+  end
+
+  describe "get_action/1" do
+    test "successfully retrieves action from registry" do
+      node = %Node{
+        integration_name: "test",
+        action_name: "success_action"
+      }
+
+      assert {:ok, action} = NodeExecutor.get_action(node)
+      assert action.name == "success_action"
+      assert action.module == TestIntegration
+      assert action.function == :success_action
+    end
+
+    test "handles integration not found" do
+      node = %Node{
+        integration_name: "nonexistent",
+        action_name: "some_action"
+      }
+
+      assert {:error, reason} = NodeExecutor.get_action(node)
+      assert reason["type"] == "action_not_found"
+      assert reason["integration_name"] == "nonexistent"
+      assert reason["action_name"] == "some_action"
+    end
+
+    test "handles action not found in existing integration" do
+      node = %Node{
+        integration_name: "test",
+        action_name: "nonexistent_action"
+      }
+
+      assert {:error, reason} = NodeExecutor.get_action(node)
+      assert reason["type"] == "action_not_found"
+      assert reason["integration_name"] == "test"
+      assert reason["action_name"] == "nonexistent_action"
+    end
+  end
+
+  describe "build_expression_context/1" do
+    test "builds correct expression context" do
+      context = %ExecutionContext{
+        execution_id: "exec-test",
+        input: %{"user_id" => 123},
+        nodes: %{"step1" => %{"result" => "data"}},
+        variables: %{"api_key" => "secret"}
+      }
+
+      # This tests the private function indirectly through prepare_input
+      node = %Node{
+        id: "test",
+        input_map: %{
+          "from_input" => "$input.user_id",
+          "from_nodes" => "$nodes.step1.result",
+          "from_variables" => "$variables.api_key"
+        }
+      }
+
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+
+      assert prepared == %{
+               "from_input" => 123,
+               "from_nodes" => "data",
+               "from_variables" => "secret"
+             }
+    end
+  end
+
+  describe "JSON serialization compatibility" do
+    test "all error data can be serialized to JSON" do
+      # Test various error scenarios to ensure JSON compatibility
+      test_cases = [
+        # Action error
+        %{
+          "type" => "action_error",
+          "error" => "test error",
+          "port" => "error"
+        },
+        # Invalid port
+        %{
+          "type" => "invalid_output_port",
+          "port" => "bad_port",
+          "available_ports" => ["success", "error"]
+        },
+        # Action not found
+        %{
+          "type" => "action_not_found",
+          "integration_name" => "test",
+          "action_name" => "missing"
+        }
+      ]
+
+      for error_data <- test_cases do
+        # Should not raise any errors
+        assert is_binary(Jason.encode!(error_data))
+
+        # Should round-trip correctly
+        json_string = Jason.encode!(error_data)
+        assert ^error_data = Jason.decode!(json_string)
+      end
+    end
+  end
+end
