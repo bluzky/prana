@@ -261,7 +261,8 @@ defmodule Prana.ExpressionEngine do
       # Returns single value for simple paths, nil if not found
       case Nested.fetch(context, path) do
         {:ok, value} -> {:ok, value}
-        :error -> {:ok, nil}  # ← Return nil instead of error for missing paths
+        # ← Return nil instead of error for missing paths
+        :error -> {:ok, nil}
       end
     end
   end

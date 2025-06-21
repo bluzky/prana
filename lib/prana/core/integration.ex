@@ -1,9 +1,9 @@
 defmodule Prana.Integration do
   @moduledoc """
   Represents an integration definition with its metadata and available actions.
-  
+
   ## Example
-  
+
       %Prana.Integration{
         name: "slack",
         display_name: "Slack",
@@ -42,7 +42,7 @@ defmodule Prana.Integration do
           docs_url: "https://docs.myapp.com/integrations/slack"
         }
       }
-  
+
   """
 
   @type t :: %__MODULE__{

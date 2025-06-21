@@ -58,20 +58,25 @@ defmodule Prana.NodeExecutor do
 
     try do
       case ExpressionEngine.process_map(input_map, context_data) do
-        {:ok, processed_map} -> {:ok, processed_map}
-        {:error, reason} -> {:error, %{
-          "type" => "expression_evaluation_failed",
-          "reason" => reason,
-          "input_map" => input_map
-        }}
+        {:ok, processed_map} ->
+          {:ok, processed_map}
+
+        {:error, reason} ->
+          {:error,
+           %{
+             "type" => "expression_evaluation_failed",
+             "reason" => reason,
+             "input_map" => input_map
+           }}
       end
     rescue
       error ->
-        {:error, %{
-          "type" => "input_preparation_failed",
-          "error" => inspect(error),
-          "input_map" => input_map
-        }}
+        {:error,
+         %{
+           "type" => "input_preparation_failed",
+           "error" => inspect(error),
+           "input_map" => input_map
+         }}
     end
   end
 
@@ -81,16 +86,23 @@ defmodule Prana.NodeExecutor do
   @spec get_action(Node.t()) :: {:ok, Prana.Action.t()} | {:error, term()}
   def get_action(%Node{integration_name: integration_name, action_name: action_name}) do
     case IntegrationRegistry.get_action(integration_name, action_name) do
-      {:ok, action} -> {:ok, action}
-      {:error, :not_found} -> {:error, %{
-        "type" => "action_not_found",
-        "integration_name" => integration_name,
-        "action_name" => action_name
-      }}
-      {:error, reason} -> {:error, %{
-        "type" => "registry_error",
-        "reason" => reason
-      }}
+      {:ok, action} ->
+        {:ok, action}
+
+      {:error, :not_found} ->
+        {:error,
+         %{
+           "type" => "action_not_found",
+           "integration_name" => integration_name,
+           "action_name" => action_name
+         }}
+
+      {:error, reason} ->
+        {:error,
+         %{
+           "type" => "registry_error",
+           "reason" => reason
+         }}
     end
   end
 
@@ -103,28 +115,31 @@ defmodule Prana.NodeExecutor do
     process_action_result(result, action)
   rescue
     error ->
-      {:error, %{
-        "type" => "action_execution_failed",
-        "error" => inspect(error),
-        "module" => action.module,
-        "function" => action.function
-      }}
+      {:error,
+       %{
+         "type" => "action_execution_failed",
+         "error" => inspect(error),
+         "module" => action.module,
+         "function" => action.function
+       }}
   catch
     :exit, reason ->
-      {:error, %{
-        "type" => "action_exit",
-        "reason" => inspect(reason),
-        "module" => action.module,
-        "function" => action.function
-      }}
+      {:error,
+       %{
+         "type" => "action_exit",
+         "reason" => inspect(reason),
+         "module" => action.module,
+         "function" => action.function
+       }}
 
     :throw, value ->
-      {:error, %{
-        "type" => "action_throw",
-        "value" => inspect(value),
-        "module" => action.module,
-        "function" => action.function
-      }}
+      {:error,
+       %{
+         "type" => "action_throw",
+         "value" => inspect(value),
+         "module" => action.module,
+         "function" => action.function
+       }}
   end
 
   @doc """
@@ -139,27 +154,30 @@ defmodule Prana.NodeExecutor do
         if port in action.output_ports do
           {:ok, data, port}
         else
-          {:error, %{
-            "type" => "invalid_output_port",
-            "port" => port,
-            "available_ports" => action.output_ports
-          }}
+          {:error,
+           %{
+             "type" => "invalid_output_port",
+             "port" => port,
+             "available_ports" => action.output_ports
+           }}
         end
 
       # Explicit error with port: {:error, error, port}
       {:error, error, port} when is_binary(port) ->
         if port in action.output_ports do
-          {:error, %{
-            "type" => "action_error",
-            "error" => error,
-            "port" => port
-          }}
+          {:error,
+           %{
+             "type" => "action_error",
+             "error" => error,
+             "port" => port
+           }}
         else
-          {:error, %{
-            "type" => "invalid_output_port",
-            "port" => port,
-            "available_ports" => action.output_ports
-          }}
+          {:error,
+           %{
+             "type" => "invalid_output_port",
+             "port" => port,
+             "available_ports" => action.output_ports
+           }}
         end
 
       # Default success format: {:ok, data}
@@ -170,23 +188,24 @@ defmodule Prana.NodeExecutor do
       # Default error format: {:error, error}
       {:error, error} ->
         port = action.default_error_port || get_default_error_port(action)
-        {:error, %{
-          "type" => "action_error",
-          "error" => error,
-          "port" => port
-        }}
+
+        {:error,
+         %{
+           "type" => "action_error",
+           "error" => error,
+           "port" => port
+         }}
 
       # Invalid format - all actions must return tuples
       invalid_result ->
-        {:error, %{
-          "type" => "invalid_action_return_format",
-          "result" => inspect(invalid_result),
-          "message" => "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port}"
-        }}
+        {:error,
+         %{
+           "type" => "invalid_action_return_format",
+           "result" => inspect(invalid_result),
+           "message" => "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port}"
+         }}
     end
   end
-
-
 
   @doc """
   Update execution context with node results.

@@ -47,7 +47,7 @@ defmodule Prana.Behaviour.Integration do
 
   @doc """
   Returns the complete integration definition.
-  
+
   Action functions should return:
   - `{:ok, output}` - Success with default success port
   - `{:ok, output, port}` - Success with explicit port

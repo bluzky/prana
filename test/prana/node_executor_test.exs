@@ -171,8 +171,8 @@ defmodule Prana.NodeExecutorTest do
       }
 
       # Use a unique execution ID
-      unique_execution_id = "exec-" <> :crypto.strong_rand_bytes(8) |> Base.encode16()
-      
+      unique_execution_id = Base.encode16("exec-" <> :crypto.strong_rand_bytes(8))
+
       context = %ExecutionContext{
         execution_id: unique_execution_id,
         input: %{},
@@ -184,14 +184,16 @@ defmodule Prana.NodeExecutorTest do
 
       # Verify the node execution has its own unique ID (different from execution_id)
       assert is_binary(node_execution.id)
-      assert byte_size(node_execution.id) == 16  # Generated ID length
-      assert node_execution.id != unique_execution_id  # Node execution ID ≠ workflow execution ID
-      
+      # Generated ID length
+      assert byte_size(node_execution.id) == 16
+      # Node execution ID ≠ workflow execution ID
+      assert node_execution.id != unique_execution_id
+
       # Verify the node execution is properly linked to the workflow execution
       assert node_execution.execution_id == unique_execution_id
       assert node_execution.node_id == "test-exec-id"
       assert node_execution.status == :completed
-      
+
       # Verify the execution ID is not hardcoded
       refute node_execution.execution_id == "exec-id"
     end
@@ -222,8 +224,8 @@ defmodule Prana.NodeExecutorTest do
       }
 
       # Same workflow execution ID for both nodes
-      shared_execution_id = "exec-" <> :crypto.strong_rand_bytes(8) |> Base.encode16()
-      
+      shared_execution_id = Base.encode16("exec-" <> :crypto.strong_rand_bytes(8))
+
       context = %ExecutionContext{
         execution_id: shared_execution_id,
         input: %{},
@@ -241,15 +243,16 @@ defmodule Prana.NodeExecutorTest do
       assert is_binary(node_execution2.id)
       assert byte_size(node_execution1.id) == 16
       assert byte_size(node_execution2.id) == 16
-      
+
       # But both should share the same workflow execution_id
       assert node_execution1.execution_id == shared_execution_id
       assert node_execution2.execution_id == shared_execution_id
-      
+
       # And they should reference their respective nodes
       assert node_execution1.node_id == "test-node-1"
       assert node_execution2.node_id == "test-node-2"
     end
+
     test "executes simple node successfully" do
       node = %Node{
         id: "test-1",

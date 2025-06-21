@@ -2,9 +2,9 @@ defmodule Prana.Action do
   @moduledoc """
   Represents an action definition within an integration.
   Defines the action's metadata, execution details, and schema.
-  
+
   ## Example
-  
+
       %Prana.Action{
         name: "http_request",
         display_name: "HTTP Request",
@@ -57,7 +57,7 @@ defmodule Prana.Action do
           tags: ["http", "api", "request"]
         }
       }
-  
+
   """
 
   @type t :: %__MODULE__{
