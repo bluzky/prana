@@ -111,6 +111,86 @@ defmodule Prana.WorkflowCompilerTest do
     workflow
   end
 
+  defp create_diamond_dependency_workflow do
+    # trigger -> [process_a, process_b] -> final
+    # final depends on both process_a and process_b completing
+    workflow = Workflow.new("diamond_workflow", "Diamond dependency pattern")
+    
+    trigger = create_trigger_node("trigger", "Trigger")
+    process_a = create_action_node("process_a", "Process A")
+    process_b = create_action_node("process_b", "Process B")
+    final = create_action_node("final", "Final Node")
+
+    workflow =
+      workflow
+      |> Workflow.add_node!(trigger)
+      |> Workflow.add_node!(process_a)
+      |> Workflow.add_node!(process_b)
+      |> Workflow.add_node!(final)
+
+    # Create diamond pattern connections
+    conn1 = Connection.new(trigger.id, "success", process_a.id, "input")
+    conn2 = Connection.new(trigger.id, "success", process_b.id, "input") 
+    conn3 = Connection.new(process_a.id, "success", final.id, "input")
+    conn4 = Connection.new(process_b.id, "success", final.id, "input")
+
+    {:ok, workflow} = Workflow.add_connection(workflow, conn1)
+    {:ok, workflow} = Workflow.add_connection(workflow, conn2)
+    {:ok, workflow} = Workflow.add_connection(workflow, conn3)
+    {:ok, workflow} = Workflow.add_connection(workflow, conn4)
+    workflow
+  end
+
+  defp create_multi_port_workflow do
+    # webhook -> validate -> [save (success), error_log (error)]
+    workflow = Workflow.new("multi_port_workflow", "Multiple output ports")
+    
+    webhook = create_trigger_node("webhook", "Webhook")
+    validate = create_action_node("validate", "Validate")
+    save = create_action_node("save", "Save Data")
+    error_log = create_action_node("error_log", "Log Error")
+
+    workflow =
+      workflow
+      |> Workflow.add_node!(webhook)
+      |> Workflow.add_node!(validate)
+      |> Workflow.add_node!(save)
+      |> Workflow.add_node!(error_log)
+
+    # Connect success and error paths
+    conn1 = Connection.new(webhook.id, "success", validate.id, "input")
+    conn2 = Connection.new(validate.id, "success", save.id, "input")
+    conn3 = Connection.new(validate.id, "error", error_log.id, "input")
+
+    {:ok, workflow} = Workflow.add_connection(workflow, conn1)
+    {:ok, workflow} = Workflow.add_connection(workflow, conn2)
+    {:ok, workflow} = Workflow.add_connection(workflow, conn3)
+    workflow
+  end
+
+  defp create_terminal_node_workflow do
+    # webhook -> process -> output (no outgoing connections)
+    workflow = Workflow.new("terminal_workflow", "Workflow with terminal node")
+    
+    webhook = create_trigger_node("webhook", "Webhook")
+    process = create_action_node("process", "Process")
+    output = create_action_node("output", "Output")
+
+    workflow =
+      workflow
+      |> Workflow.add_node!(webhook)
+      |> Workflow.add_node!(process)
+      |> Workflow.add_node!(output)
+
+    # Output node has no outgoing connections
+    conn1 = Connection.new(webhook.id, "success", process.id, "input")
+    conn2 = Connection.new(process.id, "success", output.id, "input")
+
+    {:ok, workflow} = Workflow.add_connection(workflow, conn1)
+    {:ok, workflow} = Workflow.add_connection(workflow, conn2)
+    workflow
+  end
+
   # ============================================================================
   # Basic Compilation Tests
   # ============================================================================
@@ -350,6 +430,166 @@ defmodule Prana.WorkflowCompilerTest do
       workflow2 = create_parallel_workflow()
       {:ok, graph2} = WorkflowCompiler.compile(workflow2)
       assert graph2.total_nodes == 3
+    end
+  end
+
+  # ============================================================================
+  # Complex Dependency Tests
+  # ============================================================================
+
+  describe "complex dependencies" do
+    test "handles diamond dependency pattern" do
+      workflow = create_diamond_dependency_workflow()
+      {:ok, graph} = WorkflowCompiler.compile(workflow)
+
+      # Final node should depend on both process_a and process_b
+      final_node = Enum.find(workflow.nodes, &(&1.custom_id == "final"))
+      process_a_node = Enum.find(workflow.nodes, &(&1.custom_id == "process_a"))
+      process_b_node = Enum.find(workflow.nodes, &(&1.custom_id == "process_b"))
+      
+      final_deps = Map.get(graph.dependency_graph, final_node.id, [])
+      assert process_a_node.id in final_deps
+      assert process_b_node.id in final_deps
+      assert length(final_deps) == 2
+    end
+
+    test "waits for all dependencies in diamond pattern" do
+      workflow = create_diamond_dependency_workflow()
+      {:ok, graph} = WorkflowCompiler.compile(workflow)
+
+      trigger_node = Enum.find(workflow.nodes, &(&1.custom_id == "trigger"))
+      process_a_node = Enum.find(workflow.nodes, &(&1.custom_id == "process_a"))
+      process_b_node = Enum.find(workflow.nodes, &(&1.custom_id == "process_b"))
+
+      # Initially only trigger ready
+      ready = WorkflowCompiler.find_ready_nodes(graph, MapSet.new(), MapSet.new(), MapSet.new())
+      assert length(ready) == 1
+      assert hd(ready).custom_id == "trigger"
+
+      # After trigger completes, both process_a and process_b ready
+      completed = MapSet.new([trigger_node.id])
+      ready = WorkflowCompiler.find_ready_nodes(graph, completed, MapSet.new(), MapSet.new())
+      assert length(ready) == 2
+      ready_ids = Enum.map(ready, & &1.custom_id)
+      assert "process_a" in ready_ids
+      assert "process_b" in ready_ids
+
+      # After only process_a completes, final should NOT be ready yet
+      completed = MapSet.new([trigger_node.id, process_a_node.id])
+      ready = WorkflowCompiler.find_ready_nodes(graph, completed, MapSet.new(), MapSet.new())
+      ready_ids = Enum.map(ready, & &1.custom_id)
+      refute "final" in ready_ids
+
+      # After both process_a and process_b complete, final should be ready
+      completed = MapSet.new([trigger_node.id, process_a_node.id, process_b_node.id])
+      ready = WorkflowCompiler.find_ready_nodes(graph, completed, MapSet.new(), MapSet.new())
+      assert length(ready) == 1
+      assert hd(ready).custom_id == "final"
+    end
+
+    test "handles node with multiple dependencies correctly" do
+      workflow = create_diamond_dependency_workflow()
+      {:ok, graph} = WorkflowCompiler.compile(workflow)
+
+      # Verify dependency graph structure
+      trigger_node = Enum.find(workflow.nodes, &(&1.custom_id == "trigger"))
+      process_a_node = Enum.find(workflow.nodes, &(&1.custom_id == "process_a"))
+      process_b_node = Enum.find(workflow.nodes, &(&1.custom_id == "process_b"))
+      final_node = Enum.find(workflow.nodes, &(&1.custom_id == "final"))
+
+      # Process nodes should depend only on trigger
+      assert graph.dependency_graph[process_a_node.id] == [trigger_node.id]
+      assert graph.dependency_graph[process_b_node.id] == [trigger_node.id]
+      
+      # Final node should depend on both process nodes
+      final_deps = graph.dependency_graph[final_node.id]
+      assert length(final_deps) == 2
+      assert process_a_node.id in final_deps
+      assert process_b_node.id in final_deps
+    end
+  end
+
+  # ============================================================================
+  # Connection Map Edge Cases
+  # ============================================================================
+
+  describe "connection map edge cases" do
+    test "handles nodes with multiple output ports" do
+      workflow = create_multi_port_workflow()
+      {:ok, graph} = WorkflowCompiler.compile(workflow)
+
+      validate_node = Enum.find(workflow.nodes, &(&1.custom_id == "validate"))
+      
+      # Validate should have both success and error connections
+      success_key = {validate_node.id, "success"}
+      error_key = {validate_node.id, "error"}
+      
+      assert Map.has_key?(graph.connection_map, success_key)
+      assert Map.has_key?(graph.connection_map, error_key)
+      
+      success_connections = graph.connection_map[success_key]
+      error_connections = graph.connection_map[error_key]
+      
+      assert length(success_connections) == 1
+      assert length(error_connections) == 1
+      
+      # Verify they point to correct targets
+      save_node = Enum.find(workflow.nodes, &(&1.custom_id == "save"))
+      error_log_node = Enum.find(workflow.nodes, &(&1.custom_id == "error_log"))
+      
+      assert hd(success_connections).to_node_id == save_node.id
+      assert hd(error_connections).to_node_id == error_log_node.id
+    end
+
+    test "handles nodes with no outgoing connections" do
+      workflow = create_terminal_node_workflow()
+      {:ok, graph} = WorkflowCompiler.compile(workflow)
+
+      output_node = Enum.find(workflow.nodes, &(&1.custom_id == "output"))
+      
+      # Output node should have no connections in the map
+      success_key = {output_node.id, "success"}
+      error_key = {output_node.id, "error"}
+      
+      refute Map.has_key?(graph.connection_map, success_key)
+      refute Map.has_key?(graph.connection_map, error_key)
+      
+      # Should still be in node map though
+      assert Map.has_key?(graph.node_map, output_node.id)
+    end
+
+    test "handles non-existent port lookups gracefully" do
+      workflow = create_simple_workflow()
+      {:ok, graph} = WorkflowCompiler.compile(workflow)
+
+      webhook_node = Enum.find(workflow.nodes, &(&1.custom_id == "webhook"))
+      
+      # Non-existent ports should return empty lists
+      invalid_key = {webhook_node.id, "invalid_port"}
+      connections = Map.get(graph.connection_map, invalid_key, [])
+      assert length(connections) == 0
+    end
+
+    test "groups connections correctly by source node and port" do
+      workflow = create_parallel_workflow()
+      {:ok, graph} = WorkflowCompiler.compile(workflow)
+
+      webhook_node = Enum.find(workflow.nodes, &(&1.custom_id == "webhook"))
+      email_node = Enum.find(workflow.nodes, &(&1.custom_id == "email"))
+      log_node = Enum.find(workflow.nodes, &(&1.custom_id == "log"))
+      
+      # Webhook success port should have 2 connections
+      success_key = {webhook_node.id, "success"}
+      connections = graph.connection_map[success_key]
+      assert length(connections) == 2
+      
+      # Verify target nodes
+      target_ids = Enum.map(connections, & &1.to_node_id)
+      assert email_node.id in target_ids
+      assert log_node.id in target_ids
+      
+      # Each target should only appear once
+      assert length(Enum.uniq(target_ids)) == 2
     end
   end
 end
