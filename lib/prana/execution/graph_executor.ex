@@ -3,7 +3,7 @@ defmodule Prana.GraphExecutor do
   GraphExecutor Phase 1: Core Execution (Sync/Fire-and-Forget Only)
 
   Orchestrates workflow execution using pre-compiled ExecutionGraphs from WorkflowCompiler.
-  Handles parallel node execution, port-based data routing, context management, and
+  Handles sequential node execution, port-based data routing, context management, and
   sub-workflow execution in sync and fire-and-forget modes.
 
   ## Primary API
@@ -22,7 +22,7 @@ defmodule Prana.GraphExecutor do
   ## Core Features
 
   - Graph execution orchestration with dependency-based ordering
-  - Parallel execution of independent nodes using Tasks
+  - Sequential execution of nodes (both chains and branches)
   - Port-based data routing between nodes
   - Context management with node result storage
   - Sub-workflow support (sync and fire-and-forget modes)
@@ -120,7 +120,7 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Find ready nodes and execute them in parallel
+  # Find ready nodes and execute them sequentially
   defp find_and_execute_ready_nodes(execution, execution_graph, execution_context) do
     ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, execution_context)
 
@@ -183,10 +183,10 @@ defmodule Prana.GraphExecutor do
   end
 
   @doc """
-  Execute a batch of nodes in parallel using Tasks.
+  Execute a batch of nodes sequentially.
 
   Each node is executed using NodeExecutor.execute_node/3. Nodes are executed
-  concurrently where possible, with proper error handling and task coordination.
+  one after another in sequence, with proper error handling and execution tracking.
 
   ## Parameters
 
@@ -205,25 +205,52 @@ defmodule Prana.GraphExecutor do
     if Enum.empty?(ready_nodes) do
       {:ok, []}
     else
-      # Execute nodes in parallel using async tasks
-      tasks =
-        Enum.map(ready_nodes, fn node ->
-          Task.async(fn ->
-            execute_single_node_with_events(node, execution_graph, execution_context)
-          end)
-        end)
-
-      # Wait for all tasks to complete and collect results
-      try do
-        node_executions = Task.await_many(tasks, :infinity)
-        {:ok, node_executions}
-      rescue
-        error ->
-          # Clean up any remaining tasks
-          Enum.each(tasks, &Task.shutdown(&1, :brutal_kill))
-          {:error, %{type: "parallel_execution_failed", message: Exception.message(error)}}
-      end
+      # Execute nodes sequentially, one after another
+      execute_nodes_sequentially(ready_nodes, execution_graph, execution_context, [])
     end
+  end
+
+  # Execute nodes one by one in sequence
+  defp execute_nodes_sequentially([], _execution_graph, _execution_context, completed_executions) do
+    # All nodes completed successfully
+    {:ok, Enum.reverse(completed_executions)}
+  end
+
+  defp execute_nodes_sequentially([node | remaining_nodes], execution_graph, execution_context, completed_executions) do
+    case execute_single_node_with_events(node, execution_graph, execution_context) do
+      %NodeExecution{status: :completed} = node_execution ->
+        # Node completed successfully, continue with remaining nodes
+        updated_completed = [node_execution | completed_executions]
+        execute_nodes_sequentially(remaining_nodes, execution_graph, execution_context, updated_completed)
+
+      %NodeExecution{status: :failed} = node_execution ->
+        # Node failed, return error with all executions (including the failed one)
+        all_executions = Enum.reverse([node_execution | completed_executions])
+
+        {:error,
+         %{
+           type: "node_execution_failed",
+           message: "Node #{node.id} failed during sequential execution",
+           node_id: node.id,
+           node_executions: all_executions,
+           error_data: node_execution.error_data
+         }}
+
+      %NodeExecution{} = node_execution ->
+        # Node finished with other status (shouldn't happen, but handle gracefully)
+        updated_completed = [node_execution | completed_executions]
+        execute_nodes_sequentially(remaining_nodes, execution_graph, execution_context, updated_completed)
+    end
+  rescue
+    error ->
+      # Unexpected error during node execution
+      {:error,
+       %{
+         type: "sequential_execution_exception",
+         message: "Exception during sequential node execution: #{Exception.message(error)}",
+         node_id: node.id,
+         details: %{exception: error}
+       }}
   end
 
   # Execute a single node with middleware events
@@ -231,15 +258,17 @@ defmodule Prana.GraphExecutor do
     # Convert our simple map context to ExecutionContext struct
     # We need a temporary workflow and execution for the ExecutionContext
     temp_execution = Execution.new(execution_graph.workflow.id, 1, "temp", Map.get(execution_context, "input", %{}))
-    context_struct = ExecutionContext.new(execution_graph.workflow, temp_execution, %{
-      nodes: Map.get(execution_context, "nodes", %{}),
-      variables: Map.get(execution_context, "variables", %{})
-    })
-    
+
+    context_struct =
+      ExecutionContext.new(execution_graph.workflow, temp_execution, %{
+        nodes: Map.get(execution_context, "nodes", %{}),
+        variables: Map.get(execution_context, "variables", %{})
+      })
+
     # Create node execution and emit started event
     node_execution = NodeExecution.new(temp_execution.id, node.id, %{})
     node_execution = NodeExecution.start(node_execution)
-    
+
     Middleware.call(:node_started, %{node: node, node_execution: node_execution})
 
     # Execute the node

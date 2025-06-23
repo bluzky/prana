@@ -1,6 +1,6 @@
 defmodule Prana.TestSupport.TestIntegration do
   @moduledoc """
-  A simple test integration for testing purposes.
+  A simple test integration for testing purposes with failure simulation.
   """
 
   @behaviour Prana.Behaviour.Integration
@@ -19,7 +19,7 @@ defmodule Prana.TestSupport.TestIntegration do
         "simple_action" => %Action{
           name: "simple_action",
           display_name: "Simple Action",
-          description: "A simple test action",
+          description: "A simple test action that can succeed or fail",
           module: __MODULE__,
           function: :simple_action,
           input_ports: ["input"],
@@ -32,9 +32,25 @@ defmodule Prana.TestSupport.TestIntegration do
   end
 
   @doc """
-  Simple action implementation for testing
+  Simple action implementation for testing.
+  
+  Can be configured to fail by setting force_error: true in input.
   """
   def simple_action(input) do
-    {:ok, %{original_input: input, processed: true}}
+    if Map.get(input, "force_error", false) do
+      # Simulate a failure
+      {:error, %{
+        type: "test_error",
+        message: "Simulated test failure",
+        details: %{input: input}
+      }}
+    else
+      # Normal success case
+      {:ok, %{
+        original_input: input,
+        processed: true,
+        timestamp: DateTime.utc_now()
+      }}
+    end
   end
 end
