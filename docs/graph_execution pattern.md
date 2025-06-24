@@ -1,25 +1,22 @@
 # GraphExecutor - Execution Patterns & Plans
 
-**Version**: 2.1
+**Version**: 3.0
 **Date**: June 23, 2025
-**Purpose**: Document all possible workflow execution patterns supported by GraphExecutor with sequential execution
+**Purpose**: Document all possible workflow execution patterns supported by GraphExecutor with conditional branching
 
 ## Core Design Principles
 
-### Single Final Output
-- **Workflow Completion**: Workflows complete when ALL leaf nodes (nodes with no outgoing connections) finish
-- **Leaf Node Detection**: Compile-time validation prevents multiple separate output scenarios
-- **Conditional Completion**: Only wait for executed path's leaf nodes in conditional branching
-- **Failure Behavior**: If any leaf node fails, entire workflow fails immediately
-
-### Node Settings Architecture
-- **Flexible Configuration**: Each node has `settings` map for node-specific configuration
-- **Integration-Defined**: Settings schema determined by individual integrations
-- **No Core Schema**: Core system doesn't enforce settings structure
+### Conditional Execution Architecture
+- **Path-Based Routing**: Only nodes on active conditional paths execute
+- **Active Path Tracking**: Context tracks which conditional branches are active
+- **Exclusive Branch Execution**: IF/ELSE and Switch patterns ensure only one path executes
+- **Context-Aware Completion**: Workflows complete when no more ready nodes exist (not all possible nodes)
 
 ### Execution Context Tracking
 - **Executed Nodes**: Context includes `executed_nodes: ["A", "if_condition", "B3"]` for downstream access
+- **Active Paths**: Context tracks `active_paths: %{"node_id_port" => true}` for conditional filtering
 - **Path Awareness**: Nodes can determine execution path through context inspection
+- **Dynamic Completion**: Workflow completion based on active execution paths, not total node count
 
 ---
 
@@ -121,9 +118,13 @@ end
 
 **Execution Characteristics**:
 - ✅ Single path execution
-- ✅ Dynamic routing
+- ✅ Dynamic routing based on condition evaluation
+- ✅ Prevents both branches from executing
+- ✅ Context tracking of executed path
 - ✅ Flexible path destinations
 - ✅ Efficient resource usage
+
+**Implementation Status**: ✅ **Fully Supported**
 
 
 ---
@@ -153,10 +154,14 @@ end
 
 **Execution Characteristics**:
 - ✅ Multiple possible paths
-- ✅ Exclusive execution
+- ✅ Exclusive execution (only one case executes)
+- ✅ Named port routing (premium, standard, basic, default)
 - ✅ Flexible endpoint routing
+- ✅ Default fallback handling
 - ✅ Scalable branching
-- ⚠️ Complex testing requirements
+- ✅ Context tracking of executed case
+
+**Implementation Status**: ✅ **Fully Supported**
 
 
 ---
@@ -327,78 +332,66 @@ end
 
 ---
 
-## 7. Required Implementation Changes
+## 7. Implementation Progress
 
-### A. Core Data Structure Updates
+### ✅ **COMPLETED: Conditional Branching Implementation (Phase 3.2)**
 
-#### Node Structure Enhancement
+#### Core Conditional Features Implemented:
+- **✅ IF/ELSE Conditional Branching**: Single path execution based on condition evaluation
+- **✅ Switch/Case Multi-Branch Routing**: Named port routing (premium, standard, basic, default)
+- **✅ Active Path Tracking**: Context tracks `active_paths` to prevent both branches from executing
+- **✅ Executed Node Tracking**: Context includes `executed_nodes` for path-aware processing
+- **✅ Conditional Workflow Completion**: Workflows complete when no ready nodes exist (not all nodes)
+- **✅ Logic Integration**: Complete if_condition and switch actions with expression evaluation
+- **✅ Path-Based Node Filtering**: Only nodes on active conditional paths are considered ready
+- **✅ Context-Aware Data Routing**: Conditional paths marked active during data routing
+
+#### Integration Support:
+- **✅ Logic Integration**: `if_condition` and `switch` actions with expression evaluation
+- **✅ Manual Integration**: Test actions for workflow development
+- **🔄 Merge Integration**: Core pattern supported, merge action implementation pending
+
+#### Context Structure Enhancement:
 ```elixir
-%Prana.Node{
-  # ... existing fields
-  settings: map(),           # NEW: Flexible node-specific configuration
-  # Keep all existing fields unchanged
+# Enhanced execution context for conditional branching
+%{
+  "input" => map(),           # Initial workflow input
+  "variables" => map(),       # Workflow variables
+  "metadata" => map(),        # Execution metadata
+  "nodes" => map(),           # Node execution results
+  "executed_nodes" => list(), # Track execution order ✅ NEW
+  "active_paths" => map()     # Track conditional paths ✅ NEW
 }
 ```
 
-#### Execution Context Enhancement
-```elixir
-%Prana.ExecutionContext{
-  # ... existing fields
-  executed_nodes: [String.t()],  # NEW: Track execution order
-  # Keep other context fields unchanged
-}
-```
+### 🎯 **Current Capabilities**
 
-### B. GraphExecutor New Capabilities
+#### Conditional Execution Patterns:
+1. **✅ IF/ELSE Branching**: `A → Condition → (B OR C)` - Only one branch executes
+2. **✅ Switch/Case Routing**: `A → Switch → (premium OR standard OR basic OR default)`
+3. **✅ Path Prevention Logic**: Prevents both/all branches from executing simultaneously
+4. **✅ Dynamic Completion**: Workflow completes based on active paths, not total nodes
 
-#### Branch Coordination
-- **coordinate_parallel_branches/3**: Handle fork-join patterns with fail-fast
-- **handle_conditional_routing/3**: Route based on conditions, update context
-- **manage_merge_node_inputs/3**: Aggregate inputs for merge nodes
-- **detect_workflow_completion/2**: Check if all active leaf nodes complete
+#### Expression Support:
+- **✅ Simple Comparisons**: `age >= 18`, `status == "active"`
+- **✅ Field Access**: Direct field access from input context
+- **✅ Switch Value Matching**: String and numeric case matching
+- **🔄 Advanced Expressions**: Complex expressions via ExpressionEngine (future)
 
-#### Context Management
-- **track_execution_context/2**: Update executed_nodes list during execution
-- **provide_context_access/2**: Make context available to node expressions
+### 🔄 **Integration with Existing Features**
 
-### C. Required Core Integrations
+#### GraphExecutor Enhancements:
+- **✅ Enhanced `find_ready_nodes/3`**: Conditional path filtering
+- **✅ Updated `route_node_output/3`**: Active path marking
+- **✅ Modified `workflow_complete?/2`**: Ready node-based completion
+- **✅ Enhanced context management**: Execution tracking throughout workflow
 
-#### Core.Merge Integration
-```elixir
-%Prana.Integration{
-  name: "core",
-  actions: %{
-    "merge" => %Prana.Action{
-      name: "merge",
-      # Handles multi-input aggregation with configurable strategies
-    }
-  }
-}
-```
-
-#### Core.Condition Integration
-```elixir
-%Prana.Integration{
-  name: "core",
-  actions: %{
-    "if_condition" => %Prana.Action{},
-    "switch" => %Prana.Action{}
-    # Handle conditional routing logic
-  }
-}
-```
-
-#### Core.Wait Integration
-```elixir
-%Prana.Integration{
-  name: "core",
-  actions: %{
-    "wait_for_completion" => %Prana.Action{
-      # Handle async synchronization
-    }
-  }
-}
-```
+#### Test Coverage:
+- **✅ Comprehensive conditional branching tests**: IF/ELSE and Switch patterns
+- **✅ Path activation and filtering validation**: Prevents dual execution
+- **✅ Error handling and edge cases**: Failed conditions, missing expressions
+- **✅ Integration testing**: Logic and Manual integrations
+- **✅ Updated legacy tests**: All existing tests migrated to new context structure
 
 ---
 
@@ -473,6 +466,6 @@ end
 
 ---
 
-**Document Status**: ✅ **Phase 3.1 Complete - Sequential Execution Implemented**
-**Next Milestone**: Advanced Coordination Patterns (Phase 3.2)
+**Document Status**: ✅ **Phase 3.2 Complete - Conditional Branching Implemented**
+**Next Milestone**: Advanced Coordination Patterns (Phase 3.3)
 **Last Updated**: June 23, 2025
