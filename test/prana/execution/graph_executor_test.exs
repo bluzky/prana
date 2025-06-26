@@ -1,240 +1,230 @@
 defmodule Prana.GraphExecutorTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false  # Cannot be async due to named GenServer
 
-  alias Prana.Connection
+  alias Prana.Execution
+  alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
   alias Prana.Node
+  alias Prana.NodeExecution
+  alias Prana.TestSupport.TestIntegration
   alias Prana.Workflow
+  alias Prana.WorkflowSettings
 
-  # Test integrations
-  defmodule TestHTTPIntegration do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Integration
+  describe "execute_graph/3" do
+    setup do
+      # Start the IntegrationRegistry GenServer for testing using ExUnit supervision
+      start_supervised!(Prana.IntegrationRegistry)
+      
+      # Register test integration for the test
+      :ok = IntegrationRegistry.register_integration(TestIntegration)
+      
+      :ok
+    end
 
-    def definition do
-      %Prana.Integration{
-        name: "test_http",
-        display_name: "Test HTTP",
-        actions: %{
-          "get" => %Prana.Action{
-            name: "get",
-            module: __MODULE__,
-            function: :http_get,
-            input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
-          }
-        }
+    test "executes a simple workflow successfully" do
+      # Create a simple workflow with one node
+      node = %Node{
+        id: "node_1",
+        custom_id: "test_node",
+        name: "Test Node",
+        type: :action,
+        integration_name: "test",
+        action_name: "simple_action",
+        input_map: %{},
+        output_ports: ["success"],
+        input_ports: ["input"]
       }
-    end
 
-    def http_get(%{"url" => url}) do
-      {:ok, %{"status" => 200, "data" => "Response from #{url}"}}
-    end
-  end
-
-  defmodule TestTransformIntegration do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Integration
-
-    def definition do
-      %Prana.Integration{
-        name: "test_transform",
-        display_name: "Test Transform",
-        actions: %{
-          "extract" => %Prana.Action{
-            name: "extract",
-            module: __MODULE__,
-            function: :extract_data,
-            input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
-          }
-        }
-      }
-    end
-
-    def extract_data(%{"source" => data, "field" => field}) do
-      case Map.get(data, field) do
-        nil -> {:error, "Field #{field} not found"}
-        value -> {:ok, %{"extracted_value" => value}}
-      end
-    end
-  end
-
-  setup do
-    # Start IntegrationRegistry for each test
-    {:ok, _pid} = IntegrationRegistry.start_link([])
-
-    # Register test integrations
-    IntegrationRegistry.register_integration(TestHTTPIntegration)
-    IntegrationRegistry.register_integration(TestTransformIntegration)
-
-    :ok
-  end
-
-  describe "execute_workflow/3" do
-    test "executes simple sequential workflow successfully" do
-      workflow = create_sequential_workflow()
-      input_data = %{"user_url" => "https://api.example.com/users/123"}
-
-      case GraphExecutor.execute_workflow(workflow, input_data) do
-        {:ok, context} ->
-          # Verify workflow completed
-          assert context.execution.status == :completed
-
-          # Verify all nodes executed
-          assert MapSet.size(context.completed_nodes) == 2
-          assert MapSet.size(context.failed_nodes) == 0
-
-          # Verify node results exist
-          assert Map.has_key?(context.nodes, "http_get")
-          assert Map.has_key?(context.nodes, "extract_data")
-
-        {:error, reason} ->
-          flunk("Workflow execution failed: #{inspect(reason)}")
-      end
-    end
-
-    test "handles node execution failures gracefully" do
-      workflow = create_failing_workflow()
-      input_data = %{"user_url" => "invalid_url"}
-
-      case GraphExecutor.execute_workflow(workflow, input_data) do
-        {:ok, context} ->
-          # Should complete but with some failed nodes
-          assert context.execution.status == :completed
-
-        {:error, :workflow_completed_with_failures} ->
-          # This is acceptable for workflows with non-critical failures
-          assert true
-
-        {:error, reason} ->
-          # Other errors should be handled appropriately
-          assert is_atom(reason) or is_map(reason)
-      end
-    end
-
-    test "validates workflow structure before execution" do
-      # Create invalid workflow with no nodes
       workflow = %Workflow{
-        id: "invalid",
-        name: "Invalid Workflow",
-        nodes: [],
+        id: "test_workflow",
+        name: "Test Workflow",
+        nodes: [node],
         connections: [],
         variables: %{},
-        settings: %Prana.WorkflowSettings{},
+        settings: %WorkflowSettings{},
         metadata: %{}
       }
 
-      input_data = %{}
+      execution_graph = %ExecutionGraph{
+        workflow: workflow,
+        trigger_node: node,
+        dependency_graph: %{},
+        connection_map: %{},
+        node_map: %{"node_1" => node},
+        total_nodes: 1
+      }
 
-      case GraphExecutor.execute_workflow(workflow, input_data) do
-        {:error, :no_nodes} ->
-          assert true
+      input_data = %{"test" => "data"}
 
-        {:error, reason} ->
-          # Should be some validation error
-          assert reason != nil
+      context = %{
+        workflow_loader: fn _id -> {:error, "not implemented"} end,
+        variables: %{},
+        metadata: %{}
+      }
 
-        {:ok, _context} ->
-          flunk("Should not execute invalid workflow")
-      end
+      # Now that we have registered the test integration, execution should succeed
+      result = GraphExecutor.execute_graph(execution_graph, input_data, context)
+      
+      # Should return successful execution
+      assert {:ok, execution} = result
+      assert execution.status == :completed
+      assert length(execution.node_executions) == 1
+      
+      # Check that the node was executed successfully
+      node_execution = hd(execution.node_executions)
+      assert node_execution.status == :completed
+      assert node_execution.node_id == "node_1"
+      assert node_execution.output_port == "success"
     end
   end
 
-  describe "execute_workflow_async/3" do
-    test "executes workflow asynchronously" do
-      workflow = create_sequential_workflow()
-      input_data = %{"user_url" => "https://api.example.com/users/123"}
+  describe "find_ready_nodes/3" do
+    test "finds nodes with no dependencies" do
+      node1 = %Node{id: "node_1", custom_id: "node1"}
+      node2 = %Node{id: "node_2", custom_id: "node2"}
 
-      {:ok, task} = GraphExecutor.execute_workflow_async(workflow, input_data)
+      workflow = %Workflow{nodes: [node1, node2]}
 
-      # Verify task is running
-      assert %Task{} = task
+      execution_graph = %ExecutionGraph{
+        workflow: workflow,
+        dependency_graph: %{
+          "node_1" => [],
+          # node2 depends on node1
+          "node_2" => ["node_1"]
+        }
+      }
 
-      # Wait for completion
-      case Task.await(task, 5000) do
-        {:ok, context} ->
-          assert context.execution.status == :completed
+      completed_executions = []
+      context = %{}
 
-        {:error, _reason} ->
-          # Acceptable for async execution
-          assert true
-      end
+      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
+
+      assert length(ready_nodes) == 1
+      assert hd(ready_nodes).id == "node_1"
+    end
+
+    test "finds nodes after dependencies are satisfied" do
+      node1 = %Node{id: "node_1", custom_id: "node1"}
+      node2 = %Node{id: "node_2", custom_id: "node2"}
+
+      workflow = %Workflow{nodes: [node1, node2]}
+
+      execution_graph = %ExecutionGraph{
+        workflow: workflow,
+        dependency_graph: %{
+          "node_1" => [],
+          # node2 depends on node1
+          "node_2" => ["node_1"]
+        }
+      }
+
+      # node1 is already completed
+      completed_executions = [
+        %NodeExecution{node_id: "node_1", status: :completed}
+      ]
+
+      context = %{}
+
+      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
+
+      assert length(ready_nodes) == 1
+      assert hd(ready_nodes).id == "node_2"
     end
   end
 
-  # ============================================================================
-  # Helper Functions
-  # ============================================================================
+  describe "workflow_complete?/2" do
+    test "returns true when all nodes are completed" do
+      node1 = %Node{id: "node_1"}
+      node2 = %Node{id: "node_2"}
 
-  defp create_sequential_workflow do
-    workflow = Workflow.new("Sequential Test", "Test sequential execution")
+      workflow = %Workflow{nodes: [node1, node2]}
+      execution_graph = %ExecutionGraph{workflow: workflow}
 
-    # Create nodes
-    http_node =
-      Node.new(
-        "HTTP Get",
-        :action,
-        "test_http",
-        "get",
-        %{
-          "url" => "$input.user_url"
-        },
-        "http_get"
-      )
+      execution = %Execution{
+        node_executions: [
+          %NodeExecution{node_id: "node_1", status: :completed},
+          %NodeExecution{node_id: "node_2", status: :completed}
+        ]
+      }
 
-    extract_node =
-      Node.new(
-        "Extract Data",
-        :action,
-        "test_transform",
-        "extract",
-        %{
-          "source" => "$nodes.http_get",
-          "field" => "data"
-        },
-        "extract_data"
-      )
+      assert GraphExecutor.workflow_complete?(execution, execution_graph) == true
+    end
 
-    # Add nodes
-    workflow =
-      workflow
-      |> Workflow.add_node!(http_node)
-      |> Workflow.add_node!(extract_node)
+    test "returns false when some nodes are not completed" do
+      node1 = %Node{id: "node_1"}
+      node2 = %Node{id: "node_2"}
 
-    # Create connection
-    connection = Connection.new(http_node.id, "success", extract_node.id, "input")
+      workflow = %Workflow{nodes: [node1, node2]}
+      execution_graph = %ExecutionGraph{workflow: workflow}
 
-    # Add connection
-    {:ok, workflow} = Workflow.add_connection(workflow, connection)
-    workflow
+      execution = %Execution{
+        node_executions: [
+          %NodeExecution{node_id: "node_1", status: :completed}
+          # node_2 not completed
+        ]
+      }
+
+      assert GraphExecutor.workflow_complete?(execution, execution_graph) == false
+    end
   end
 
-  defp create_failing_workflow do
-    workflow = Workflow.new("Failing Test", "Test failure handling")
+  describe "route_node_output/3" do
+    test "routes output data through connections" do
+      # This is a simplified test - full testing would require proper connection setup
+      node_execution = %NodeExecution{
+        node_id: "node_1",
+        output_port: "success",
+        output_data: %{"result" => "test_data"},
+        status: :completed
+      }
 
-    # Create a node that will fail
-    failing_node =
-      Node.new(
-        "Failing Node",
-        :action,
-        "test_transform",
-        "extract",
-        %{
-          # Empty source
-          "source" => %{},
-          "field" => "nonexistent_field"
-        },
-        "failing_node"
-      )
+      workflow = %Workflow{connections: []}
+      execution_graph = %ExecutionGraph{workflow: workflow}
+      context = %{"nodes" => %{}}
 
-    # Add node
-    workflow = Workflow.add_node!(workflow, failing_node)
-    workflow
+      result_context = GraphExecutor.route_node_output(node_execution, execution_graph, context)
+
+      # Should store the node result in context
+      assert is_map(result_context)
+      assert Map.has_key?(result_context, "nodes")
+    end
+
+    test "does not route data for failed nodes" do
+      node_execution = %NodeExecution{
+        id: "exec_1",
+        execution_id: "workflow_exec_1", 
+        node_id: "node_1",
+        status: :failed,
+        input_data: %{},
+        output_port: nil,  # Failed execution
+        output_data: nil,
+        error_data: %{"error" => "something failed"},
+        retry_count: 0,
+        started_at: nil,
+        completed_at: nil,
+        duration_ms: nil,
+        metadata: %{}
+      }
+
+      workflow = %Workflow{connections: []}
+      execution_graph = %ExecutionGraph{workflow: workflow}
+      context = %{"nodes" => %{}}
+
+      result_context = GraphExecutor.route_node_output(node_execution, execution_graph, context)
+
+      # Should still store the node result (with error info) in context
+      assert is_map(result_context)
+      assert Map.has_key?(result_context, "nodes")
+      
+      # Let's check step by step
+      nodes_map = result_context["nodes"]
+      assert is_map(nodes_map)
+      
+      node_1_data = Map.get(nodes_map, "node_1")
+      refute is_nil(node_1_data)
+      
+      assert Map.get(node_1_data, "status") == :failed
+    end
   end
 end

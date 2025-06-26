@@ -76,16 +76,51 @@
   - [x] ExecutionGraph output with optimized data structures
   - [x] Renamed from ExecutionPlanner for accurate terminology
 
-### 3.4 Graph Executor (🚧 IN PROGRESS)
-- [ ] `Prana.GraphExecutor` - Core workflow execution engine
-  - [x] Basic execution loop structure implemented
+### 3.4 Graph Executor (🚧 IN PROGRESS - BROKEN INTO 4 PHASES)
+
+#### Phase 3.1: Core Execution (Sync/Fire-and-Forget) (🎯 CURRENT PRIORITY)
+- [ ] `Prana.GraphExecutor` - Core workflow execution engine (basic modes)
   - [x] WorkflowCompiler integration for ExecutionGraph consumption
-  - [x] Event emission framework via Middleware
-  - [x] Retry handling coordination
-  - [x] Batch execution patterns for parallel nodes
-  - [ ] **Completion detection logic needs refinement**
-  - [ ] **Comprehensive end-to-end testing**
-  - [ ] **Error handling edge cases**
+  - [ ] **Graph executor basic structure** (orchestrate workflow execution)
+  - [ ] **Parallel node execution coordination framework**
+  - [ ] **Middleware event emission during execution**
+  - [ ] **Sync sub-workflow execution** (parent waits for completion)
+  - [ ] **Fire-and-forget sub-workflow execution** (trigger and continue)
+  - [ ] **Execution progress tracking in Prana.Execution struct**
+  - [ ] **Port-based data routing between nodes**
+  - [ ] **Workflow completion detection**
+  - [ ] **Basic error handling and propagation**
+  - [ ] **End-to-end testing for sync/fire-and-forget workflows**
+
+#### Phase 3.2: Async Execution with Suspension/Resume (📋 TODO)
+- [ ] **Async sub-workflow execution** with suspension/resume
+  - [ ] **Workflow suspension mechanism** when async sub-workflows triggered
+  - [ ] **Resume workflow execution** from suspended state
+  - [ ] **Sub-workflow result merging** into main execution context
+  - [ ] **Suspended execution state management** via Execution struct
+  - [ ] **Application-controlled persistence** via middleware events
+  - [ ] **Multiple async sub-workflow coordination**
+  - [ ] **Nested async sub-workflow support**
+
+#### Phase 3.3: Retry and Timeout Mechanisms (📋 TODO)
+- [ ] **Node-level retry policies** implementation
+  - [ ] **Retry coordination** between GraphExecutor and NodeExecutor
+  - [ ] **Exponential backoff and retry limits**
+  - [ ] **Retry state tracking** in NodeExecution
+  - [ ] **Timeout handling** for individual nodes
+  - [ ] **Workflow-level timeout management**
+  - [ ] **Circuit breaker patterns** for resilience
+  - [ ] **Graceful degradation** on repeated failures
+
+#### Phase 3.4: Telemetry and Advanced Tracking (📋 TODO)
+- [ ] **Execution telemetry and metrics**
+  - [ ] **Performance monitoring** (execution duration, node timing)
+  - [ ] **Resource usage tracking** (memory, concurrent executions)
+  - [ ] **Execution statistics** (success/failure rates, retry counts)
+  - [ ] **Debug mode** with detailed execution logging
+  - [ ] **Execution profiling** for performance optimization
+  - [ ] **Health monitoring** integration
+  - [ ] **Advanced middleware events** for monitoring and analytics
 
 ## 4. Registry System (✅ COMPLETED - Simplified)
 
@@ -266,115 +301,3 @@ prana/
 │   └── prana_test.exs         # 📋 Basic module test
 └── mix.exs                    # Project configuration
 ```
-
-## Updated Implementation Priority
-
-### Phase 1: Foundation (✅ COMPLETED)
-1. [x] Data structures (Workflow, Node, Connection, etc.)
-2. [x] Core behaviors (Integration, Middleware)
-3. [x] Integration registry (simplified)
-4. [x] Middleware system
-5. [x] Expression engine (path-based expressions)
-
-### Phase 2: WorkflowCompiler + Node Execution (✅ COMPLETED)
-1. [x] WorkflowCompiler (renamed from ExecutionPlanner for accuracy)
-2. [x] Workflow compilation into ExecutionGraphs with optimization
-3. [x] Node executor with expression engine integration
-4. [x] Action invocation via MFA with comprehensive error handling
-5. [x] Context management and result storage
-6. [x] Comprehensive test coverage (100+ scenarios)
-7. [x] Clean public APIs with accurate naming
-
-### Phase 3: Graph Execution (🚧 CURRENT PRIORITY)
-1. [✓] Graph executor basic structure (orchestrate workflow execution)
-2. [✓] WorkflowCompiler integration for ExecutionGraph consumption
-3. [✓] Parallel node execution coordination framework
-4. [✓] Port-based data routing between nodes
-5. [✓] Middleware event emission during execution
-6. [ ] **Complete workflow completion detection**
-7. [ ] **End-to-end workflow execution testing**
-
-### Phase 4: Built-in Integrations
-1. [ ] HTTP integration
-2. [ ] Transform integration
-3. [ ] Logic integration
-4. [ ] Log integration
-5. [ ] Error handling and resilience components
-
-### Phase 5: Main API & Builder
-1. [ ] Main API module (`Prana`)
-2. [ ] Workflow builder with fluent interface
-3. [ ] Integration registration helpers
-4. [ ] Configuration management
-
-### Phase 6: Development Tools & Polish
-1. [ ] Validation tools
-2. [ ] Testing helpers
-3. [ ] Development utilities
-4. [ ] Example workflows
-5. [ ] Wait integration
-6. [ ] Application supervision
-
-## Recent Progress (June 21, 2025)
-
-### ✅ Major Milestone: Node Executor Complete
-- **Production Ready**: Node Executor with comprehensive test coverage
-- **Expression Integration**: Full integration with ExpressionEngine for input preparation
-- **Error Handling**: Structured error maps with JSON serialization
-- **Context Management**: Results stored under node custom_id for flexible access
-- **Action Support**: Multiple return formats (explicit/default ports)
-- **Bug Fix**: NodeExecution.fail/2 now properly sets output_port = nil
-
-### ✅ Major Milestone: Middleware System Complete
-- **Comprehensive Test Coverage**: 100+ test scenarios covering all middleware functionality
-- **Core Features Tested**: Pipeline execution, event handling, data transformation
-- **Error Resilience Tested**: Middleware failures, recovery, graceful degradation
-- **Integration Scenarios**: Realistic workflow simulation with multiple middleware
-- **Edge Cases Covered**: Complex data structures, long middleware chains
-- **Warning-Free Code**: Fixed all unused variable warnings
-
-### 🎯 Immediate Next Steps
-1. **Complete GraphExecutor** - Finish workflow completion detection logic
-2. **End-to-end testing** - Create comprehensive workflow execution tests  
-3. **Error handling refinement** - Handle edge cases in execution flow
-4. **Performance optimization** - Optimize parallel execution coordination
-5. **Integration validation** - Ensure WorkflowCompiler + GraphExecutor work seamlessly
-
-### 📊 Progress Summary
-- **Phase 1**: 100% Complete (Foundation)
-- **Phase 2**: 100% Complete (WorkflowCompiler + Node Execution)
-- **Phase 3**: ~85% Complete (GraphExecutor structure done, needs completion testing)
-- **Testing**: Comprehensive coverage for completed phases
-- **Overall**: ~70% Complete (2.85 of 4 core phases)
-
-## Key Achievements
-
-### ✅ Completed Simplifications
-- **Removed Storage Adapters**: Replaced with middleware for application control
-- **Removed Hook System**: Middleware provides better composability
-- **Simplified Integration Registry**: No complex validation/normalization
-- **Struct-Based Design**: Type safety with compile-time checking
-- **Single Integration Registration**: Only module-based, no map definitions
-
-### 🎯 Current Focus Areas
-- **Graph Executor**: Workflow traversal and parallel execution coordination
-- **Port-Based Routing**: Data flow between nodes based on output ports
-- **Middleware Integration**: Emit lifecycle events during execution
-- **End-to-End Testing**: Complete workflow execution scenarios
-
-### 📋 Deferred to Applications
-- **Persistence**: Applications handle via middleware
-- **External Coordination**: Applications manage via middleware
-- **Health Monitoring**: Basic registry health + application middleware
-- **Configuration Management**: Simple config + application-specific logic
-
-## Design Validation
-
-The Node Executor completion validates key design decisions:
-1. **Expression Engine Integration**: Seamless input preparation with dynamic data access
-2. **MFA Action Pattern**: Clean action invocation with proper error handling
-3. **Structured Error Handling**: JSON-serializable errors for application persistence
-4. **Port-Based Design**: Explicit output ports for flexible routing
-5. **Context Management**: Flexible storage under custom_id for graph coordination
-
-The foundation is solid and ready for Graph Executor implementation, which will bring together all completed components into a working workflow execution engine.

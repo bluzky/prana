@@ -1,634 +1,572 @@
 defmodule Prana.GraphExecutor do
   @moduledoc """
-  GraphExecutor orchestrates workflow execution using NodeExecutor as building block.
+  GraphExecutor Phase 1: Core Execution (Sync/Fire-and-Forget Only)
 
-  Handles core execution patterns:
-  1. Sequential execution 
-  2. Conditional branching
-  3. Fan-out/Fan-in parallel execution
-  4. Error routing
-  5. Wait/suspension
+  Orchestrates workflow execution using pre-compiled ExecutionGraphs from WorkflowCompiler.
+  Handles sequential node execution, port-based data routing, context management, and
+  sub-workflow execution in sync and fire-and-forget modes.
 
-  Uses Task-based parallel coordination and port-based data routing.
+  ## Primary API
+
+      execute_graph(execution_graph, input_data, context \\ %{})
+        :: {:ok, Execution.t()} | {:error, reason}
+
+  ## Required Context Structure
+
+      context = %{
+        workflow_loader: (workflow_id -> {:ok, ExecutionGraph.t()} | {:error, reason}),
+        variables: %{},     # optional
+        metadata: %{}       # optional
+      }
+
+  ## Core Features
+
+  - Graph execution orchestration with dependency-based ordering
+  - Sequential execution of nodes (both chains and branches)
+  - Port-based data routing between nodes
+  - Context management with node result storage
+  - Sub-workflow support (sync and fire-and-forget modes)
+  - Middleware event emission during execution
+  - Comprehensive error handling and propagation
+
+  ## Integration Points
+
+  - Uses `WorkflowCompiler` compiled ExecutionGraphs
+  - Uses `NodeExecutor.execute_node/3` for individual node execution
+  - Uses `ExpressionEngine.process_map/2` for input preparation
+  - Uses `Middleware.call/2` for lifecycle events
+  - Uses `ExecutionContext` for shared state management
   """
 
-  alias Prana.{Workflow, Node, Connection, Execution, ExecutionContext, NodeExecution}
-  alias Prana.{NodeExecutor, Middleware, ExpressionEngine}
-  alias Prana.GraphExecutor.Helpers
-  alias Prana.{RetryHandler, WorkflowCompiler, ExecutionGraph}
+  alias Prana.Execution
+  alias Prana.ExecutionContext
+  alias Prana.ExecutionGraph
+  alias Prana.ExpressionEngine
+  alias Prana.Middleware
+  alias Prana.Node
+  alias Prana.NodeExecution
+  alias Prana.NodeExecutor
 
   require Logger
 
-  @type execution_result ::
-          {:ok, ExecutionContext.t()}
-          | {:error, term()}
-          | {:suspended, ExecutionContext.t()}
-
-  # ============================================================================
-  # Public API
-  # ============================================================================
-
   @doc """
-  Execute a workflow starting from a specific trigger node.
+  Execute a workflow graph with the given input data and context.
 
   ## Parameters
-  - `workflow` - Workflow definition to execute
-  - `trigger_node_id` - ID of the trigger node to start execution from
-  - `input_data` - Initial input data for workflow
-  - `opts` - Execution options (timeout, mode, etc.)
+
+  - `execution_graph` - Pre-compiled ExecutionGraph from WorkflowCompiler
+  - `input_data` - Initial input data for the workflow
+  - `context` - Execution context with workflow_loader callback and optional variables/metadata
 
   ## Returns
-  - `{:ok, context}` - Successful completion
-  - `{:error, reason}` - Execution failed 
-  - `{:suspended, context}` - Workflow suspended (waiting)
+
+  - `{:ok, execution}` - Successful execution with final state
+  - `{:error, reason}` - Execution failed with error details
+
+  ## Examples
+
+      context = %{
+        workflow_loader: &MyApp.WorkflowLoader.load_workflow/1,
+        variables: %{api_url: "https://api.example.com"},
+        metadata: %{user_id: 123}
+      }
+
+      {:ok, execution} = GraphExecutor.execute_graph(graph, %{email: "user@example.com"}, context)
   """
-  @spec execute_workflow(Workflow.t(), String.t(), map(), keyword()) :: execution_result()
-  def execute_workflow(%Workflow{} = workflow, trigger_node_id, input_data, opts \\ []) do
-    # 1. Create execution instance
-    execution = create_execution(workflow, input_data, opts)
+  @spec execute_graph(ExecutionGraph.t(), map(), map()) :: {:ok, Execution.t()} | {:error, any()}
+  def execute_graph(%ExecutionGraph{} = execution_graph, input_data, context \\ %{}) do
+    # Create initial execution and context
+    execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", input_data)
+    execution = Execution.start(execution)
+    execution_context = create_initial_context(input_data, context)
 
-    # 2. Initialize context
-    context = ExecutionContext.new(workflow, execution)
+    # Emit execution started event
+    Middleware.call(:execution_started, %{execution: execution})
 
-    # 3. Emit workflow started event
-    emit_workflow_event(:execution_started, context, %{input_data: input_data, trigger_node_id: trigger_node_id})
+    try do
+      # Main execution loop
+      case execute_workflow_loop(execution, execution_graph, execution_context) do
+        {:ok, final_execution} ->
+          Middleware.call(:execution_completed, %{execution: final_execution})
+          {:ok, final_execution}
 
-    # 4. Compile workflow with specified trigger node
-    case WorkflowCompiler.compile(workflow, trigger_node_id) do
-      {:ok, execution_graph} ->
-        # 5. Execute main workflow loop
-        execute_workflow_loop(execution_graph, context)
-
-      {:error, reason} ->
-        emit_workflow_event(:execution_failed, context, %{error: reason})
+        {:error, reason} = error ->
+          failed_execution = Execution.fail(execution, reason)
+          Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
+          error
+      end
+    rescue
+      error ->
+        reason = %{type: "execution_exception", message: Exception.message(error), details: %{}}
+        failed_execution = Execution.fail(execution, reason)
+        Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
         {:error, reason}
     end
   end
 
-  @doc """
-  Execute workflow asynchronously starting from a specific trigger node.
-  """
-  @spec execute_workflow_async(Workflow.t(), String.t(), map(), keyword()) :: {:ok, Task.t()} | {:error, term()}
-  def execute_workflow_async(workflow, trigger_node_id, input_data, opts \\ []) do
-    task =
-      Task.async(fn ->
-        execute_workflow(workflow, trigger_node_id, input_data, opts)
-      end)
-
-    {:ok, task}
-  end
-
-  @doc """
-  Resume a suspended workflow execution.
-  """
-  @spec resume_workflow(Execution.t(), String.t()) :: execution_result()
-  def resume_workflow(%Execution{} = execution, resume_token) do
-    if execution.resume_token == resume_token do
-      # Reconstruct context and continue
-      context = Helpers.rebuild_execution_context(execution)
-      workflow = Helpers.get_workflow_definition(execution.workflow_id, execution.workflow_version)
-
-      case WorkflowCompiler.compile(workflow, nil) do
-        {:ok, execution_graph} -> continue_workflow_execution(execution_graph, context)
-        {:error, reason} -> {:error, reason}
-      end
+  # Main execution loop - continues until workflow is complete or error occurs
+  defp execute_workflow_loop(execution, execution_graph, execution_context) do
+    if workflow_complete?(execution, execution_graph) do
+      final_execution = Execution.complete(execution, %{})
+      {:ok, final_execution}
     else
-      {:error, :invalid_resume_token}
+      case find_and_execute_ready_nodes(execution, execution_graph, execution_context) do
+        {:ok, {updated_execution, updated_context}} ->
+          execute_workflow_loop(updated_execution, execution_graph, updated_context)
+
+        {:error, _reason} = error ->
+          error
+      end
     end
   end
 
-  # ============================================================================
-  # Main Execution Loop
-  # ============================================================================
+  # Find ready nodes and execute them sequentially
+  defp find_and_execute_ready_nodes(execution, execution_graph, execution_context) do
+    ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, execution_context)
 
-  @spec execute_workflow_loop(ExecutionGraph.t(), ExecutionContext.t()) :: execution_result()
-  defp execute_workflow_loop(%ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
-    case find_ready_nodes(execution_graph, context) do
-      [] ->
-        # No more nodes ready to execute
-        check_workflow_completion(execution_graph, context)
+    if Enum.empty?(ready_nodes) do
+      # No ready nodes but workflow not complete - likely an error condition
+      {:error, %{type: "execution_stalled", message: "No ready nodes found but workflow not complete"}}
+    else
+      case execute_nodes_batch(ready_nodes, execution_graph, execution_context) do
+        {:ok, node_executions} ->
+          # Update execution with completed node executions
+          updated_execution = update_execution_progress(execution, node_executions)
 
-      ready_nodes ->
-        # Execute batch of ready nodes
-        case execute_nodes_batch(ready_nodes, context) do
-          {:ok, node_executions, updated_context} ->
-            # Route outputs and continue
-            routed_context = route_batch_outputs(node_executions, execution_graph, updated_context)
-            execute_workflow_loop(execution_graph, routed_context)
+          # Route output data and update context
+          updated_context = route_batch_outputs(node_executions, execution_graph, execution_context)
 
-          {:partial_success, successes, failures, updated_context} ->
-            # Handle partial success
-            case Helpers.handle_batch_failures(failures, execution_graph, updated_context) do
-              {:continue, recovery_context} ->
-                routed_context = route_batch_outputs(successes, execution_graph, recovery_context)
-                execute_workflow_loop(execution_graph, routed_context)
+          {:ok, {updated_execution, updated_context}}
 
-              {:retry, retry_context, retry_nodes} ->
-                # Handle retries for failed nodes
-                case execute_retry_batch(retry_nodes, execution_graph, retry_context) do
-                  {:ok, retry_successes, final_context} ->
-                    # Combine original successes with retry successes
-                    all_successes = successes ++ retry_successes
-                    routed_context = route_batch_outputs(all_successes, execution_graph, final_context)
-                    execute_workflow_loop(execution_graph, routed_context)
-
-                  {:partial_success, retry_successes, final_failures, final_context} ->
-                    # Some retries succeeded, others failed permanently
-                    all_successes = successes ++ retry_successes
-                    routed_context = route_batch_outputs(all_successes, execution_graph, final_context)
-                    execute_workflow_loop(execution_graph, routed_context)
-
-                  {:error, reason} ->
-                    emit_workflow_event(:execution_failed, retry_context, %{error: reason})
-                    {:error, reason}
-                end
-
-              {:stop, reason} ->
-                emit_workflow_event(:execution_failed, updated_context, %{error: reason})
-                {:error, reason}
-
-              {:suspend, suspend_context, resume_token} ->
-                emit_workflow_event(:execution_suspended, suspend_context, %{resume_token: resume_token})
-                {:suspended, suspend_context}
-            end
-
-          {:error, reason} ->
-            emit_workflow_event(:execution_failed, context, %{error: reason})
-            {:error, reason}
-        end
+        {:error, _reason} = error ->
+          error
+      end
     end
   end
 
-  # ============================================================================
-  # Ready Node Detection
-  # ============================================================================
+  @doc """
+  Find nodes that are ready to execute based on their dependencies.
 
-  @spec find_ready_nodes(ExecutionGraph.t(), ExecutionContext.t()) :: [Node.t()]
-  defp find_ready_nodes(%ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
-    WorkflowCompiler.find_ready_nodes(
-      execution_graph, 
-      context.completed_nodes, 
-      context.failed_nodes, 
-      context.pending_nodes
-    )
+  A node is ready if:
+  1. It hasn't been executed yet (not in completed node executions)
+  2. All its input dependencies have been satisfied
+  3. It's reachable from completed nodes or is an entry node
+
+  ## Parameters
+
+  - `execution_graph` - The ExecutionGraph containing nodes and dependencies
+  - `completed_node_executions` - List of completed NodeExecution structs
+  - `execution_context` - Current execution context
+
+  ## Returns
+
+  List of Node structs that are ready for execution.
+  """
+  @spec find_ready_nodes(ExecutionGraph.t(), [NodeExecution.t()], map()) :: [Node.t()]
+  def find_ready_nodes(%ExecutionGraph{} = execution_graph, completed_node_executions, _execution_context) do
+    completed_node_ids = MapSet.new(completed_node_executions, & &1.node_id)
+
+    execution_graph.workflow.nodes
+    |> Enum.reject(fn node -> MapSet.member?(completed_node_ids, node.id) end)
+    |> Enum.filter(fn node ->
+      dependencies_satisfied?(node, execution_graph.dependency_graph, completed_node_ids)
+    end)
   end
 
+  # Check if all dependencies for a node are satisfied
+  defp dependencies_satisfied?(node, dependencies, completed_node_ids) do
+    node_dependencies = Map.get(dependencies, node.id, [])
 
-
-  # ============================================================================
-  # Helper Functions for Connection Validation
-  # ============================================================================
-
-  @spec get_node_output_port(ExecutionContext.t(), String.t()) :: String.t() | nil
-  defp get_node_output_port(%ExecutionContext{} = context, node_id) do
-    # Look up the output port from node execution results
-    get_in(context.metadata, [:node_outputs, node_id, :output_port])
+    Enum.all?(node_dependencies, fn dep_node_id ->
+      MapSet.member?(completed_node_ids, dep_node_id)
+    end)
   end
 
-  # ============================================================================
-  # Batch Node Execution
-  # ============================================================================
+  @doc """
+  Execute a batch of nodes sequentially.
 
-  @spec execute_nodes_batch([Node.t()], ExecutionContext.t()) ::
-          {:ok, [NodeExecution.t()], ExecutionContext.t()}
-          | {:partial_success, [NodeExecution.t()], [NodeExecution.t()], ExecutionContext.t()}
-          | {:error, term()}
-  defp execute_nodes_batch([node], %ExecutionContext{} = context) do
-    # Single node - execute directly without Task overhead
-    case execute_single_node_with_events(node, context) do
-      {:ok, node_execution, updated_context} ->
-        {:ok, [node_execution], updated_context}
+  Each node is executed using NodeExecutor.execute_node/3. Nodes are executed
+  one after another in sequence, with proper error handling and execution tracking.
 
-      {:error, {reason, failed_execution}} ->
-        {:partial_success, [], [failed_execution], context}
+  ## Parameters
+
+  - `ready_nodes` - List of Node structs ready for execution
+  - `execution_graph` - The ExecutionGraph for context
+  - `execution_context` - Current execution context
+
+  ## Returns
+
+  - `{:ok, node_executions}` - List of completed NodeExecution structs
+  - `{:error, reason}` - Execution failed
+  """
+  @spec execute_nodes_batch([Node.t()], ExecutionGraph.t(), map()) ::
+          {:ok, [NodeExecution.t()]} | {:error, any()}
+  def execute_nodes_batch(ready_nodes, execution_graph, execution_context) do
+    if Enum.empty?(ready_nodes) do
+      {:ok, []}
+    else
+      # Execute nodes sequentially, one after another
+      execute_nodes_sequentially(ready_nodes, execution_graph, execution_context, [])
     end
   end
 
-  defp execute_nodes_batch(nodes, %ExecutionContext{} = context) when length(nodes) > 1 do
-    # Multiple nodes - execute in parallel using Tasks
-    coordinate_parallel_execution(nodes, context)
+  # Execute nodes one by one in sequence
+  defp execute_nodes_sequentially([], _execution_graph, _execution_context, completed_executions) do
+    # All nodes completed successfully
+    {:ok, Enum.reverse(completed_executions)}
   end
 
-  @spec coordinate_parallel_execution([Node.t()], ExecutionContext.t()) ::
-          {:ok, [NodeExecution.t()], ExecutionContext.t()}
-          | {:partial_success, [NodeExecution.t()], [NodeExecution.t()], ExecutionContext.t()}
-          | {:error, term()}
-  defp coordinate_parallel_execution(nodes, %ExecutionContext{} = context) do
-    # Emit batch started event
-    emit_batch_event(:batch_execution_started, context, %{
-      node_count: length(nodes),
-      node_ids: Enum.map(nodes, & &1.id)
-    })
+  defp execute_nodes_sequentially([node | remaining_nodes], execution_graph, execution_context, completed_executions) do
+    case execute_single_node_with_events(node, execution_graph, execution_context) do
+      %NodeExecution{status: :completed} = node_execution ->
+        # Node completed successfully, continue with remaining nodes
+        updated_completed = [node_execution | completed_executions]
+        execute_nodes_sequentially(remaining_nodes, execution_graph, execution_context, updated_completed)
 
-    # Mark all nodes as pending
-    pending_context =
-      Enum.reduce(nodes, context, fn node, acc ->
-        ExecutionContext.mark_node_pending(acc, node.id)
-      end)
+      %NodeExecution{status: :failed} = node_execution ->
+        # Node failed, return error with all executions (including the failed one)
+        all_executions = Enum.reverse([node_execution | completed_executions])
 
-    # Start all node executions as supervised tasks
-    tasks =
-      Enum.map(nodes, fn node ->
-        Task.async(fn ->
-          execute_single_node_with_events(node, pending_context)
-        end)
-      end)
+        {:error,
+         %{
+           type: "node_execution_failed",
+           message: "Node #{node.id} failed during sequential execution",
+           node_id: node.id,
+           node_executions: all_executions,
+           error_data: node_execution.error_data
+         }}
 
-    # Wait for all tasks with timeout
-    timeout = get_batch_timeout(nodes, context)
-
-    case Task.yield_many(tasks, timeout) do
-      results when is_list(results) ->
-        Helpers.process_batch_results(results, nodes, pending_context)
-
-      :timeout ->
-        # Kill all tasks and return timeout error
-        Enum.each(tasks, &Task.shutdown(&1, :brutal_kill))
-        {:error, :batch_execution_timeout}
+      %NodeExecution{} = node_execution ->
+        # Node finished with other status (shouldn't happen, but handle gracefully)
+        updated_completed = [node_execution | completed_executions]
+        execute_nodes_sequentially(remaining_nodes, execution_graph, execution_context, updated_completed)
     end
+  rescue
+    error ->
+      # Unexpected error during node execution
+      {:error,
+       %{
+         type: "sequential_execution_exception",
+         message: "Exception during sequential node execution: #{Exception.message(error)}",
+         node_id: node.id,
+         details: %{exception: error}
+       }}
   end
 
-  @spec execute_single_node_with_events(Node.t(), ExecutionContext.t()) ::
-          {:ok, NodeExecution.t(), ExecutionContext.t()} | {:error, {term(), NodeExecution.t()}}
-  defp execute_single_node_with_events(%Node{} = node, %ExecutionContext{} = context) do
-    # Emit node started event
-    emit_node_event(:node_started, context, node, %{})
+  # Execute a single node with middleware events
+  defp execute_single_node_with_events(node, execution_graph, execution_context) do
+    # Convert our simple map context to ExecutionContext struct
+    # We need a temporary workflow and execution for the ExecutionContext
+    temp_execution = Execution.new(execution_graph.workflow.id, 1, "temp", Map.get(execution_context, "input", %{}))
 
-    # Execute using NodeExecutor
-    case NodeExecutor.execute_node(node, context, []) do
-      {:ok, node_execution, updated_context} ->
-        # Store node output info for dependency checking
-        output_context = store_node_output_info(updated_context, node.id, node_execution)
-
-        # Emit node completed event
-        emit_node_event(:node_completed, output_context, node, %{
-          output_data: node_execution.output_data,
-          output_port: node_execution.output_port,
-          duration_ms: node_execution.duration_ms
-        })
-
-        {:ok, node_execution, output_context}
-
-      {:error, {reason, failed_execution}} ->
-        # Emit node failed event
-        emit_node_event(:node_failed, context, node, %{
-          error_data: reason,
-          duration_ms: failed_execution.duration_ms
-        })
-
-        {:error, {reason, failed_execution}}
-    end
-  end
-
-  # ============================================================================
-  # Retry Execution
-  # ============================================================================
-
-  @spec execute_retry_batch([{Node.t(), NodeExecution.t()}], ExecutionGraph.t(), ExecutionContext.t()) ::
-          {:ok, [NodeExecution.t()], ExecutionContext.t()}
-          | {:partial_success, [NodeExecution.t()], [NodeExecution.t()], ExecutionContext.t()}
-          | {:error, term()}
-  defp execute_retry_batch(retry_nodes, %ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
-    # Emit retry batch started event
-    emit_batch_event(:retry_batch_started, context, %{
-      retry_count: length(retry_nodes),
-      retry_nodes: Enum.map(retry_nodes, fn {node, _} -> node.id end)
-    })
-
-    # Process each retry with proper delay
-    retry_results =
-      Enum.map(retry_nodes, fn {node, failed_execution} ->
-        execute_single_retry_with_delay(node, failed_execution, context)
-      end)
-
-    # Separate successes and failures
-    {successes, failures} =
-      Enum.split_with(retry_results, fn
-        {:ok, _node_execution, _context} -> true
-        {:error, _} -> false
-      end)
-
-    successful_executions = Enum.map(successes, fn {:ok, node_execution, _} -> node_execution end)
-    failed_executions = Enum.map(failures, fn {:error, {_, failed_execution}} -> failed_execution end)
-
-    # Update context with retry results
-    updated_context =
-      context
-      |> Helpers.update_context_with_successes(successful_executions)
-      |> Helpers.update_context_with_failures(failed_executions)
-
-    case {length(successful_executions), length(failed_executions)} do
-      {success_count, 0} when success_count > 0 ->
-        {:ok, successful_executions, updated_context}
-
-      {success_count, failure_count} when success_count > 0 and failure_count > 0 ->
-        {:partial_success, successful_executions, failed_executions, updated_context}
-
-      {0, failure_count} when failure_count > 0 ->
-        {:error, {:all_retries_failed, failed_executions}}
-
-      {0, 0} ->
-        {:error, :no_retry_results}
-    end
-  end
-
-  @spec execute_single_retry_with_delay(Node.t(), NodeExecution.t(), ExecutionContext.t()) ::
-          {:ok, NodeExecution.t(), ExecutionContext.t()} | {:error, {term(), NodeExecution.t()}}
-  defp execute_single_retry_with_delay(%Node{} = node, %NodeExecution{} = failed_execution, %ExecutionContext{} = context) do
-    # Calculate and apply retry delay
-    if node.retry_policy do
-      retry_delay = RetryHandler.calculate_retry_delay(node.retry_policy, failed_execution.retry_count)
-
-      # Emit retry delay event
-      emit_node_event(:node_retry_delay, context, node, %{
-        retry_count: failed_execution.retry_count + 1,
-        delay_ms: retry_delay
+    context_struct =
+      ExecutionContext.new(execution_graph.workflow, temp_execution, %{
+        nodes: Map.get(execution_context, "nodes", %{}),
+        variables: Map.get(execution_context, "variables", %{})
       })
 
-      # Apply delay
-      :timer.sleep(retry_delay)
-    end
+    # Create node execution and emit started event
+    node_execution = NodeExecution.new(temp_execution.id, node.id, %{})
+    node_execution = NodeExecution.start(node_execution)
 
-    # Create new execution for retry
-    retry_execution = RetryHandler.prepare_retry_execution(failed_execution)
+    Middleware.call(:node_started, %{node: node, node_execution: node_execution})
 
-    # Emit retry started event
-    emit_node_event(:node_retry_started, context, node, %{
-      retry_count: retry_execution.retry_count,
-      original_error: failed_execution.error_data
-    })
+    # Execute the node
+    case NodeExecutor.execute_node(node, context_struct, %{}) do
+      {:ok, result_node_execution, _updated_context} ->
+        Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
+        result_node_execution
 
-    # Execute retry using NodeExecutor
-    case NodeExecutor.execute_node(node, context, []) do
-      {:ok, completed_execution, updated_context} ->
-        # Update retry count in successful execution
-        final_execution = %{completed_execution | retry_count: retry_execution.retry_count}
-
-        # Store retry success info
-        retry_context = store_retry_success_info(updated_context, node.id, final_execution)
-
-        # Emit retry success event
-        emit_node_event(:node_retry_succeeded, retry_context, node, %{
-          retry_count: retry_execution.retry_count,
-          final_attempt: true
-        })
-
-        {:ok, final_execution, retry_context}
-
-      {:error, {reason, new_failed_execution}} ->
-        # Update retry count in failed execution
-        final_failed_execution = %{new_failed_execution | retry_count: retry_execution.retry_count}
-
-        # Emit retry failed event
-        emit_node_event(:node_retry_failed, context, node, %{
-          retry_count: retry_execution.retry_count,
-          error_data: reason,
-          will_retry_again: RetryHandler.should_retry?(node, final_failed_execution)
-        })
-
-        {:error, {reason, final_failed_execution}}
+      {:error, {_reason, error_node_execution}} ->
+        Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
+        error_node_execution
     end
   end
 
-  # ============================================================================
-  # Output Routing & Data Flow
-  # ============================================================================
+  @doc """
+  Route output data from completed nodes to dependent nodes based on ports.
 
-  @spec route_batch_outputs([NodeExecution.t()], ExecutionGraph.t(), ExecutionContext.t()) :: ExecutionContext.t()
-  defp route_batch_outputs(node_executions, %ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
-    Enum.reduce(node_executions, context, fn node_execution, acc_context ->
-      route_node_output(node_execution, execution_graph, acc_context)
-    end)
-  end
+  Uses ExecutionGraph.connections to determine data flow paths. For successful
+  node executions, routes output data to connected nodes. Failed nodes
+  (output_port = nil) do not route data.
 
-  @spec route_node_output(NodeExecution.t(), ExecutionGraph.t(), ExecutionContext.t()) :: ExecutionContext.t()
-  defp route_node_output(%NodeExecution{status: :completed} = node_execution, %ExecutionGraph{} = execution_graph, context) do
-    # Find outgoing connections from this node's output port
-    connections = Map.get(execution_graph.connection_map, {node_execution.node_id, node_execution.output_port}, [])
+  ## Parameters
 
-    # Route data through each valid connection
-    Enum.reduce(connections, context, fn connection, acc_context ->
-      route_connection_data(connection, node_execution, acc_context)
-    end)
-  end
+  - `node_execution` - Completed NodeExecution with output data and port
+  - `execution_graph` - ExecutionGraph containing connections
+  - `execution_context` - Current execution context to update
 
-  defp route_node_output(%NodeExecution{status: :failed}, _execution_graph, context) do
-    # Failed nodes don't route data
-    context
-  end
+  ## Returns
 
-  @spec route_connection_data(Connection.t(), NodeExecution.t(), ExecutionContext.t()) :: ExecutionContext.t()
-  defp route_connection_data(%Connection{} = connection, %NodeExecution{} = node_execution, %ExecutionContext{} = context) do
-    # 1. Check connection conditions
-    if evaluate_connection_conditions(connection.conditions, context) do
-      # 2. Apply data mapping
-      mapped_data =
-        apply_data_mapping(
-          node_execution.output_data,
-          connection.data_mapping,
-          context
+  Updated ExecutionContext with routed data.
+  """
+  @spec route_node_output(NodeExecution.t(), ExecutionGraph.t(), map()) :: map()
+  def route_node_output(%NodeExecution{} = node_execution, %ExecutionGraph{} = execution_graph, execution_context) do
+    # Only route output for successful executions (output_port is not nil)
+    if node_execution.output_port do
+      # Find connections from this node's output port
+      connections =
+        get_connections_from_node_port(
+          execution_graph.workflow.connections,
+          node_execution.node_id,
+          node_execution.output_port
         )
 
-      # 3. Store routed data for target node
-      store_routed_data(context, connection.to_node_id, connection.to_port, mapped_data)
+      # Route data through each connection
+      Enum.reduce(connections, execution_context, fn connection, acc_context ->
+        route_data_through_connection(node_execution, connection, acc_context)
+      end)
     else
-      # Conditions not met, skip routing
-      context
+      # Failed nodes don't route data, but store their result in context
+      store_node_result_in_context(node_execution, execution_context)
     end
   end
 
-  @spec apply_data_mapping(term(), map(), ExecutionContext.t()) :: term()
-  defp apply_data_mapping(output_data, data_mapping, %ExecutionContext{} = context) when map_size(data_mapping) == 0 do
-    # No mapping, pass through original data
-    output_data
-  end
-
-  defp apply_data_mapping(output_data, data_mapping, %ExecutionContext{} = context) do
-    # Build expression context
-    expression_context = %{
-      "output" => output_data,
-      "input" => context.input,
-      "nodes" => context.nodes,
-      "variables" => context.variables
-    }
-
-    # Process mapping expressions
-    case ExpressionEngine.process_map(data_mapping, expression_context) do
-      {:ok, mapped_data} -> mapped_data
-      # Fallback to original data
-      {:error, _reason} -> output_data
-    end
-  end
-
-  @spec evaluate_connection_conditions([Prana.Condition.t()], ExecutionContext.t()) :: boolean()
-  defp evaluate_connection_conditions([], _context), do: true
-
-  defp evaluate_connection_conditions(conditions, %ExecutionContext{} = context) do
-    # For now, assume all conditions must pass (AND logic)
-    expression_context = %{
-      "input" => context.input,
-      "nodes" => context.nodes,
-      "variables" => context.variables
-    }
-
-    Enum.all?(conditions, fn condition ->
-      evaluate_single_condition(condition, expression_context)
+  # Route output from multiple node executions
+  defp route_batch_outputs(node_executions, execution_graph, execution_context) do
+    Enum.reduce(node_executions, execution_context, fn node_execution, acc_context ->
+      updated_context = route_node_output(node_execution, execution_graph, acc_context)
+      store_node_result_in_context(node_execution, updated_context)
     end)
   end
 
-  # ============================================================================
-  # Helper Functions
-  # ============================================================================
-
-  @spec create_execution(Workflow.t(), map(), keyword()) :: Execution.t()
-  defp create_execution(%Workflow{} = workflow, input_data, opts) do
-    trigger_type = Keyword.get(opts, :trigger_type, "api")
-    trigger_node_id = Keyword.get(opts, :trigger_node_id)
-
-    workflow.id
-    |> Execution.new(workflow.version, trigger_type, input_data, trigger_node_id)
-    |> Execution.start()
+  # Get connections from a specific node and port
+  defp get_connections_from_node_port(connections, node_id, output_port) do
+    Enum.filter(connections, fn connection ->
+      connection.from_node_id == node_id and connection.from_port == output_port
+    end)
   end
 
-  @spec store_node_output_info(ExecutionContext.t(), String.t(), NodeExecution.t()) :: ExecutionContext.t()
-  defp store_node_output_info(%ExecutionContext{} = context, node_id, %NodeExecution{} = node_execution) do
-    output_info = %{
-      output_port: node_execution.output_port,
-      status: node_execution.status,
-      completed_at: node_execution.completed_at
-    }
-
-    metadata = Map.put(context.metadata, :node_outputs, %{})
-    updated_metadata = put_in(metadata, [:node_outputs, node_id], output_info)
-    %{context | metadata: updated_metadata}
-  end
-
-  @spec store_routed_data(ExecutionContext.t(), String.t(), String.t(), term()) :: ExecutionContext.t()
-  defp store_routed_data(%ExecutionContext{} = context, target_node_id, target_port, data) do
-    routed_key = "#{target_node_id}:#{target_port}"
-
+  # Route data through a single connection
+  defp route_data_through_connection(node_execution, connection, execution_context) do
+    # Apply data mapping if specified, otherwise pass output data directly
     routed_data =
-      context.metadata
-      |> Map.get(:routed_data, %{})
-      |> Map.put(routed_key, data)
+      if map_size(connection.data_mapping) > 0 do
+        apply_data_mapping(node_execution.output_data, connection.data_mapping, execution_context)
+      else
+        node_execution.output_data
+      end
 
-    updated_metadata = Map.put(context.metadata, :routed_data, routed_data)
-    %{context | metadata: updated_metadata}
+    # Store routed data in context for the target node
+    target_input_key = "#{connection.to_node_id}_#{connection.to_port}"
+    Map.put(execution_context, target_input_key, routed_data)
   end
 
-  @spec get_batch_timeout([Node.t()], ExecutionContext.t()) :: integer()
-  defp get_batch_timeout(nodes, _context) do
-    # Calculate timeout based on node timeout settings
-    max_node_timeout =
-      nodes
-      |> Enum.map(fn node -> node.timeout_seconds || 30 end)
-      |> Enum.max()
-
-    # Convert to milliseconds
-    max_node_timeout * 1000
+  # Apply data mapping using expression engine
+  defp apply_data_mapping(output_data, data_mapping, execution_context) do
+    # Create a temporary context for expression evaluation
+    temp_context = Map.put(execution_context, "output", output_data)
+    ExpressionEngine.process_map(data_mapping, temp_context)
   end
 
-  @spec check_workflow_completion(ExecutionGraph.t(), ExecutionContext.t()) :: execution_result()
-  defp check_workflow_completion(%ExecutionGraph{} = execution_graph, %ExecutionContext{} = context) do
-    total_nodes = execution_graph.total_nodes
-    completed_count = MapSet.size(context.completed_nodes)
-    failed_count = MapSet.size(context.failed_nodes)
+  # Store node execution result in context for $nodes.node_id access
+  defp store_node_result_in_context(node_execution, execution_context) do
+    # Get the node's custom_id for context storage
+    # Note: We need to look up the node from the graph to get custom_id
+    # For now, we'll use the node_id as fallback
+    node_key = node_execution.node_id
 
-    cond do
-      completed_count == total_nodes ->
-        # All nodes completed successfully
-        output_data = Helpers.extract_workflow_output(context)
-        final_execution = Execution.complete(context.execution, output_data)
-        final_context = %{context | execution: final_execution}
+    result_data =
+      if node_execution.status == :completed do
+        node_execution.output_data
+      else
+        %{"error" => node_execution.error_data, "status" => node_execution.status}
+      end
 
-        emit_workflow_event(:execution_completed, final_context, %{
-          output_data: output_data,
-          duration_ms: Execution.duration(final_execution)
-        })
+    # Update the nodes section of the context
+    nodes = Map.get(execution_context, "nodes", %{})
+    updated_nodes = Map.put(nodes, node_key, result_data)
+    Map.put(execution_context, "nodes", updated_nodes)
+  end
 
-        {:ok, final_context}
+  @doc """
+  Execute a sub-workflow synchronously - parent waits for completion.
 
-      completed_count + failed_count == total_nodes ->
-        # All nodes processed, but some failed
-        error_data = %{
-          completed_nodes: completed_count,
-          failed_nodes: failed_count,
-          failed_node_ids: MapSet.to_list(context.failed_nodes)
-        }
+  Loads the sub-workflow using the workflow_loader callback, executes it,
+  and merges the result back into the parent execution context.
 
-        final_execution = Execution.fail(context.execution, error_data)
-        final_context = %{context | execution: final_execution}
+  ## Parameters
 
-        emit_workflow_event(:execution_failed, final_context, %{error_data: error_data})
-        {:error, :workflow_completed_with_failures}
+  - `node` - Node requesting sub-workflow execution
+  - `context` - Current execution context with workflow_loader
 
-      true ->
-        # Workflow is stuck/deadlocked
-        error_data = %{
-          completed_nodes: completed_count,
-          failed_nodes: failed_count,
-          pending_nodes: MapSet.size(context.pending_nodes),
-          total_nodes: total_nodes
-        }
+  ## Returns
 
-        emit_workflow_event(:execution_failed, context, %{error_data: error_data})
-        {:error, :workflow_deadlock}
+  - `{:ok, updated_context}` - Sub-workflow completed successfully
+  - `{:error, reason}` - Sub-workflow failed or couldn't be loaded
+  """
+  @spec execute_sub_workflow_sync(Node.t(), map()) :: {:ok, map()} | {:error, any()}
+  def execute_sub_workflow_sync(%Node{} = node, context) do
+    workflow_id = Map.get(node.input_map, "workflow_id")
+
+    if workflow_id do
+      case load_sub_workflow(workflow_id, context) do
+        {:ok, sub_execution_graph} ->
+          # Prepare input data for sub-workflow
+          sub_input_data = Map.get(node.input_map, "input_data", %{})
+
+          # Execute sub-workflow
+          case execute_graph(sub_execution_graph, sub_input_data, context) do
+            {:ok, sub_execution} ->
+              # Merge sub-workflow results into parent context
+              # This is a simplified merge - real implementation might be more sophisticated
+              updated_context = merge_sub_workflow_results(context, sub_execution)
+              {:ok, updated_context}
+
+            {:error, _reason} = error ->
+              error
+          end
+
+        {:error, _reason} = error ->
+          error
+      end
+    else
+      {:error, %{type: "missing_workflow_id", message: "Sub-workflow node missing workflow_id"}}
     end
   end
 
-  # ============================================================================
-  # Event Emission
-  # ============================================================================
+  @doc """
+  Execute a sub-workflow in fire-and-forget mode - parent continues immediately.
 
-  @spec emit_workflow_event(atom(), ExecutionContext.t(), map()) :: term()
-  defp emit_workflow_event(event, %ExecutionContext{} = context, additional_data) do
-    event_data =
-      Map.merge(
-        %{execution_id: context.execution_id, workflow_id: context.workflow.id, workflow_name: context.workflow.name},
-        additional_data
-      )
+  Loads and triggers the sub-workflow execution but does not wait for completion.
+  The parent workflow continues executing immediately.
 
-    Middleware.call(event, event_data)
+  ## Parameters
+
+  - `node` - Node requesting sub-workflow execution
+  - `context` - Current execution context with workflow_loader
+
+  ## Returns
+
+  - `{:ok, context}` - Sub-workflow triggered successfully (not completed)
+  - `{:error, reason}` - Sub-workflow failed to trigger or couldn't be loaded
+  """
+  @spec execute_sub_workflow_fire_and_forget(Node.t(), map()) :: {:ok, map()} | {:error, any()}
+  def execute_sub_workflow_fire_and_forget(%Node{} = node, context) do
+    workflow_id = Map.get(node.input_map, "workflow_id")
+
+    if workflow_id do
+      case load_sub_workflow(workflow_id, context) do
+        {:ok, sub_execution_graph} ->
+          # Prepare input data for sub-workflow
+          sub_input_data = Map.get(node.input_map, "input_data", %{})
+
+          # Trigger sub-workflow asynchronously (fire-and-forget)
+          Task.start(fn ->
+            case execute_graph(sub_execution_graph, sub_input_data, context) do
+              {:ok, _sub_execution} ->
+                Logger.info("Fire-and-forget sub-workflow #{workflow_id} completed successfully")
+
+              {:error, reason} ->
+                Logger.warning("Fire-and-forget sub-workflow #{workflow_id} failed: #{inspect(reason)}")
+            end
+          end)
+
+          # Return immediately without waiting
+          {:ok, context}
+
+        {:error, _reason} = error ->
+          error
+      end
+    else
+      {:error, %{type: "missing_workflow_id", message: "Sub-workflow node missing workflow_id"}}
+    end
   end
 
-  @spec emit_node_event(atom(), ExecutionContext.t(), Node.t(), map()) :: term()
-  defp emit_node_event(event, %ExecutionContext{} = context, %Node{} = node, additional_data) do
-    event_data =
-      Map.merge(
-        %{execution_id: context.execution_id, node_id: node.id, node_name: node.name, node_type: node.type},
-        additional_data
-      )
+  # Load sub-workflow using the workflow_loader callback
+  defp load_sub_workflow(workflow_id, context) do
+    workflow_loader = Map.get(context, :workflow_loader)
 
-    Middleware.call(event, event_data)
+    if workflow_loader && is_function(workflow_loader, 1) do
+      try do
+        workflow_loader.(workflow_id)
+      rescue
+        error ->
+          {:error, %{type: "workflow_loader_error", message: Exception.message(error)}}
+      end
+    else
+      {:error, %{type: "missing_workflow_loader", message: "Context missing workflow_loader callback"}}
+    end
   end
 
-  @spec emit_batch_event(atom(), ExecutionContext.t(), map()) :: term()
-  defp emit_batch_event(event, %ExecutionContext{} = context, additional_data) do
-    event_data = Map.merge(%{execution_id: context.execution_id}, additional_data)
-
-    Middleware.call(event, event_data)
-  end
-
-  # ============================================================================
-  # Helper Functions
-  # ============================================================================
-
-  @spec store_retry_success_info(ExecutionContext.t(), String.t(), NodeExecution.t()) :: ExecutionContext.t()
-  defp store_retry_success_info(%ExecutionContext{} = context, node_id, %NodeExecution{} = execution) do
-    retry_info = %{
-      retry_count: execution.retry_count,
-      final_attempt: true,
-      success_on_retry: execution.retry_count > 0
+  # Merge sub-workflow execution results into parent context
+  defp merge_sub_workflow_results(parent_context, sub_execution) do
+    # Extract results from sub-execution and merge into parent
+    # This is a simplified implementation - real-world might be more sophisticated
+    sub_results = %{
+      status: sub_execution.status,
+      output_data: extract_final_output(sub_execution),
+      node_executions: length(sub_execution.node_executions)
     }
 
-    updated_metadata = put_in(context.metadata, [:retry_info, node_id], retry_info)
-    %{context | metadata: updated_metadata}
+    # Store sub-workflow results in parent context
+    Map.put(parent_context, "sub_workflow_result", sub_results)
   end
 
-  # ============================================================================
-  # Placeholder Functions (To Be Implemented)
-  # ============================================================================
+  # Extract final output from execution (simplified)
+  defp extract_final_output(execution) do
+    # In a real implementation, this might look for specific output nodes
+    # For now, we'll return basic execution info
+    %{
+      completed_at: execution.completed_at,
+      node_count: length(execution.node_executions)
+    }
+  end
 
-  defp continue_workflow_execution(_execution_graph, _context), do: {:ok, %ExecutionContext{}}
-  defp evaluate_single_condition(_condition, _context), do: true
+  @doc """
+  Update execution progress with completed node executions.
+
+  Adds the completed node executions to the main execution tracking
+  and updates execution statistics.
+
+  ## Parameters
+
+  - `execution` - Current Execution struct
+  - `completed_node_executions` - List of newly completed NodeExecution structs
+
+  ## Returns
+
+  Updated Execution struct with progress tracking.
+  """
+  @spec update_execution_progress(Execution.t(), [NodeExecution.t()]) :: Execution.t()
+  def update_execution_progress(%Execution{} = execution, completed_node_executions) do
+    updated_executions = execution.node_executions ++ completed_node_executions
+    %{execution | node_executions: updated_executions}
+  end
+
+  @doc """
+  Check if workflow execution is complete.
+
+  A workflow is complete when there are no more nodes ready to execute
+  and all reachable nodes have been processed.
+
+  ## Parameters
+
+  - `execution` - Current Execution struct
+  - `execution_graph` - ExecutionGraph with nodes and dependencies
+
+  ## Returns
+
+  Boolean indicating if workflow execution is complete.
+  """
+  @spec workflow_complete?(Execution.t(), ExecutionGraph.t()) :: boolean()
+  def workflow_complete?(%Execution{} = execution, %ExecutionGraph{} = execution_graph) do
+    completed_node_ids = MapSet.new(execution.node_executions, & &1.node_id)
+    reachable_node_ids = MapSet.new(execution_graph.workflow.nodes, & &1.id)
+
+    # Workflow is complete if all reachable nodes have been executed
+    MapSet.subset?(reachable_node_ids, completed_node_ids)
+  end
+
+  # Create initial execution context
+  defp create_initial_context(input_data, context) do
+    # Create a minimal context for expression evaluation
+    # We'll use a simple map structure since ExecutionContext expects workflow/execution
+    %{
+      "input" => input_data,
+      "variables" => Map.get(context, :variables, %{}),
+      "metadata" => Map.get(context, :metadata, %{}),
+      "nodes" => %{}
+    }
+  end
 end
