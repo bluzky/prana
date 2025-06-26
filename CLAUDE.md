@@ -31,7 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Design Principles
 - **Type Safety**: All data uses proper Elixir structs with compile-time checking
-- **Behavior-Driven**: Clean contracts for integrations and middleware  
+- **Behavior-Driven**: Clean contracts for integrations and middleware
 - **Node-Port Model**: Explicit data flow through named ports between nodes
 - **Expression System**: Built-in path evaluation (`$input.field`, `$nodes.api.response`) for dynamic data access
 - **MFA Action Pattern**: Actions defined as `{module, function, args}` tuples
@@ -90,7 +90,7 @@ The Graph Executor now supports advanced conditional branching:
 A → Condition → (B OR C) → different or convergent paths
 ```
 
-#### Switch/Case Routing  
+#### Switch/Case Routing
 ```elixir
 # Named port routing with exclusive execution
 A → Switch → (premium OR standard OR basic OR default)
@@ -109,7 +109,7 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 
 **Phase 3.1 (Core Execution)**:
 - ✅ Single trigger node execution (improved from multiple entry nodes)
-- ✅ Graph pruning - only reachable nodes from trigger execute  
+- ✅ Graph pruning - only reachable nodes from trigger execute
 - ✅ O(1) connection map lookups for performance
 - ✅ Sequential execution with fail-fast behavior
 - ✅ Sync and fire-and-forget sub-workflow execution
@@ -153,31 +153,12 @@ The docs show some inconsistency - `graph_execution pattern.md` section 8 shows 
 
 #### ✅ CURRENT STATUS (Phase 3.1 + 3.2 - COMPLETE)
 1. **Graph Executor Phase 3.1** - Core Execution (Sync/Fire-and-Forget) ✅ **COMPLETE**
-   - ✅ WorkflowCompiler integration for ExecutionGraph consumption  
-   - ✅ Sequential execution loop structure with fail-fast behavior
-   - ✅ Single trigger node execution (no longer multiple entry nodes)
-   - ✅ Graph pruning - only execute reachable nodes from trigger
-   - ✅ Performance optimization with O(1) connection map lookups
-   - ✅ Port-based data routing between nodes
-   - ✅ Middleware event emission during execution
-   - ✅ Sync sub-workflow execution (parent waits for completion)
-   - ✅ Fire-and-forget sub-workflow execution (trigger and continue)
-   - ✅ Execution progress tracking in Execution struct
-   - ✅ Dynamic workflow completion detection
 
 2. **Graph Executor Phase 3.2** - Conditional Branching ✅ **COMPLETE**
-   - ✅ IF/ELSE conditional branching with single path execution
-   - ✅ Switch/Case multi-branch routing (premium, standard, basic, default)
-   - ✅ Active path tracking to prevent both branches from executing
-   - ✅ Executed node tracking for path-aware processing
-   - ✅ Conditional workflow completion (based on active paths, not all nodes)
-   - ✅ Logic Integration with if_condition and switch actions
-   - ✅ Context-aware data routing with conditional path marking
-   - ✅ Comprehensive conditional branching test coverage
 
 #### 🎯 CURRENT PRIORITY (Phase 3.3 - Advanced Coordination)
 - **Enhanced Merge Integration**: Core merge action already exists in Logic integration, needs diamond pattern coordination
-- **Wait Integration**: Async synchronization and timeout handling for Wait patterns  
+- **Wait Integration**: Async synchronization and timeout handling for Wait patterns
 - **Advanced Coordination**: Complex execution patterns like Wait-for-All parallel
 - **Performance Optimization**: Monitor and optimize sequential vs parallel execution patterns
 
@@ -206,7 +187,7 @@ The docs show some inconsistency - `graph_execution pattern.md` section 8 shows 
 
 #### Important Context for Development
 - **Node Executor is production-ready** with 100+ comprehensive test scenarios
-- **Workflow Compiler** handles compilation from workflows to ExecutionGraphs with optimization  
+- **Workflow Compiler** handles compilation from workflows to ExecutionGraphs with optimization
 - **Graph Executor Phase 3.1** (Core Execution) ✅ **COMPLETE** - sequential execution, sync/fire-and-forget modes
 - **Graph Executor Phase 3.2** (Conditional Branching) ✅ **COMPLETE** - IF/ELSE, Switch patterns with path tracking
 - **Current focus** is Phase 3.3 (Merge + Wait integrations for diamond/coordination patterns)
@@ -234,7 +215,7 @@ defmodule MyApp.SlackIntegration do
   def definition do
     %Prana.Integration{
       name: "slack",
-      display_name: "Slack", 
+      display_name: "Slack",
       actions: %{
         "send_message" => %Prana.Action{
           name: "send_message",
@@ -257,7 +238,7 @@ end
 ```elixir
 defmodule MyApp.DatabaseMiddleware do
   @behaviour Prana.Behaviour.Middleware
-  
+
   def call(event, data, next) do
     # Handle event (e.g., persist to database)
     result = next.(data)
@@ -283,7 +264,7 @@ For detailed implementation context, refer to these documents:
 - **`implementation_plan.md`** - Detailed phase breakdown with current completion status
 - **`IMPLEMENTATION_SUMMARY.md`** - High-level project overview and architecture summary
 
-#### Graph Executor Specifics  
+#### Graph Executor Specifics
 - **`docs/graph_executor_requirement.md`** - Comprehensive GraphExecutor requirements (v1.2, June 23, 2025)
 - **`docs/graph_execution pattern.md`** - All execution patterns supported with conditional branching (v3.0)
 - **`docs/execution_planning_update.md`** - Performance improvements: single trigger, graph pruning, O(1) lookups
