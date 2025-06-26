@@ -200,8 +200,8 @@ defmodule Prana.GraphExecutor do
 
   # Check if a node is on an active conditional execution path
   defp node_on_active_conditional_path?(node, execution_graph, execution_context) do
-    # Get all incoming connections to this node
-    incoming_connections = get_incoming_connections_for_node(execution_graph.workflow.connections, node.id)
+    # Get all incoming connections to this node using optimized lookup
+    incoming_connections = get_incoming_connections_for_node(execution_graph, node.id)
     
     if Enum.empty?(incoming_connections) do
       # Entry/trigger nodes are always on active path
@@ -217,11 +217,20 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Get incoming connections for a specific node
-  defp get_incoming_connections_for_node(connections, node_id) do
-    Enum.filter(connections, fn conn ->
-      conn.to_node_id == node_id
-    end)
+  # Get incoming connections for a specific node using optimized lookup
+  defp get_incoming_connections_for_node(execution_graph, node_id) do
+    # Use reverse connection map if available, otherwise fall back to filtering
+    case Map.get(execution_graph, :reverse_connection_map) do
+      nil ->
+        # Fallback: filter all connections (less efficient but functional)
+        Enum.filter(execution_graph.workflow.connections, fn conn ->
+          conn.to_node_id == node_id
+        end)
+      
+      reverse_map ->
+        # Optimized: direct lookup
+        Map.get(reverse_map, node_id, [])
+    end
   end
 
   @doc """
@@ -346,10 +355,10 @@ defmodule Prana.GraphExecutor do
   def route_node_output(%NodeExecution{} = node_execution, %ExecutionGraph{} = execution_graph, execution_context) do
     # Only route output for successful executions (output_port is not nil)
     if node_execution.output_port do
-      # Find connections from this node's output port
+      # Find connections from this node's output port using O(1) lookup
       connections =
         get_connections_from_node_port(
-          execution_graph.workflow.connections,
+          execution_graph,
           node_execution.node_id,
           node_execution.output_port
         )
@@ -372,14 +381,12 @@ defmodule Prana.GraphExecutor do
     end)
   end
 
-  # Get connections from a specific node and port
-  defp get_connections_from_node_port(connections, node_id, output_port) do
-    Enum.filter(connections, fn connection ->
-      connection.from_node_id == node_id and connection.from_port == output_port
-    end)
+  # Get connections from a specific node and port using O(1) lookup
+  defp get_connections_from_node_port(execution_graph, node_id, output_port) do
+    Map.get(execution_graph.connection_map, {node_id, output_port}, [])
   end
 
-  # Route data through a single connection
+  # Route data through a single connection with optimized context updates
   defp route_data_through_connection(node_execution, connection, execution_context) do
     # Apply data mapping if specified, otherwise pass output data directly
     routed_data =
@@ -393,13 +400,12 @@ defmodule Prana.GraphExecutor do
     target_input_key = "#{connection.to_node_id}_#{connection.to_port}"
     
     # Mark this conditional path as active for branching logic
-    active_paths = Map.get(execution_context, "active_paths", %{})
     path_key = "#{connection.from_node_id}_#{connection.from_port}"
-    updated_active_paths = Map.put(active_paths, path_key, true)
     
+    # Batch context updates to reduce map copying
     execution_context
     |> Map.put(target_input_key, routed_data)
-    |> Map.put("active_paths", updated_active_paths)
+    |> Map.update("active_paths", %{path_key => true}, &Map.put(&1, path_key, true))
   end
 
   # Apply data mapping using expression engine
@@ -409,7 +415,7 @@ defmodule Prana.GraphExecutor do
     ExpressionEngine.process_map(data_mapping, temp_context)
   end
 
-  # Store node execution result in context for $nodes.node_id access
+  # Store node execution result in context for $nodes.node_id access with optimized updates
   defp store_node_result_in_context(node_execution, execution_context) do
     # Get the node's custom_id for context storage
     # Note: We need to look up the node from the graph to get custom_id
@@ -423,17 +429,10 @@ defmodule Prana.GraphExecutor do
         %{"error" => node_execution.error_data, "status" => node_execution.status}
       end
 
-    # Update the nodes section of the context
-    nodes = Map.get(execution_context, "nodes", %{})
-    updated_nodes = Map.put(nodes, node_key, result_data)
-    
-    # Track executed nodes for conditional branching
-    executed_nodes = Map.get(execution_context, "executed_nodes", [])
-    updated_executed_nodes = [node_execution.node_id | executed_nodes]
-    
+    # Batch context updates to reduce map copying
     execution_context
-    |> Map.put("nodes", updated_nodes)
-    |> Map.put("executed_nodes", updated_executed_nodes)
+    |> Map.update("nodes", %{node_key => result_data}, &Map.put(&1, node_key, result_data))
+    |> Map.update("executed_nodes", [node_execution.node_id], &[node_execution.node_id | &1])
   end
 
   @doc """
@@ -636,9 +635,9 @@ defmodule Prana.GraphExecutor do
     # mark the paths from that node as active
     Enum.reduce(node_executions, %{}, fn node_execution, acc_paths ->
       if node_execution.output_port do
-        # Find connections from this node's output port
+        # Find connections from this node's output port using O(1) lookup
         connections = get_connections_from_node_port(
-          execution_graph.workflow.connections,
+          execution_graph,
           node_execution.node_id,
           node_execution.output_port
         )
@@ -655,16 +654,6 @@ defmodule Prana.GraphExecutor do
     end)
   end
   
-  # Extract execution context from execution state for completion checking (legacy)
-  defp extract_execution_context(execution) do
-    # Build a minimal context from execution state
-    # In a real implementation, this might be stored in execution metadata
-    %{
-      "nodes" => extract_nodes_from_executions(execution.node_executions),
-      "executed_nodes" => Enum.map(execution.node_executions, & &1.node_id),
-      "active_paths" => %{} # This would need to be properly tracked
-    }
-  end
 
   # Extract node results from node executions
   defp extract_nodes_from_executions(node_executions) do

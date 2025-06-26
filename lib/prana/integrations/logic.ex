@@ -260,7 +260,7 @@ defmodule Prana.Integrations.Logic do
         
       # Simple string literal
       String.starts_with?(expr, "\"") and String.ends_with?(expr, "\"") ->
-        value = String.slice(expr, 1..-2)
+        value = String.slice(expr, 1..-2//-1)
         {:ok, value}
         
       # Simple field access like "age" (assumes it's in context)

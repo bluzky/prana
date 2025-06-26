@@ -33,6 +33,7 @@ defmodule Prana.WorkflowCompiler do
       compiled_workflow = prune_workflow(workflow, reachable_nodes)
       dependency_graph = build_dependency_graph(compiled_workflow)
       connection_map = build_connection_map(compiled_workflow)
+      reverse_connection_map = build_reverse_connection_map(compiled_workflow)
       node_map = build_node_map(compiled_workflow)
 
       execution_graph = %ExecutionGraph{
@@ -40,6 +41,7 @@ defmodule Prana.WorkflowCompiler do
         trigger_node: trigger_node,
         dependency_graph: dependency_graph,
         connection_map: connection_map,
+        reverse_connection_map: reverse_connection_map,
         node_map: node_map,
         total_nodes: length(reachable_nodes)
       }
@@ -184,6 +186,12 @@ defmodule Prana.WorkflowCompiler do
     Enum.group_by(connections, fn conn ->
       {conn.from_node_id, conn.from_port}
     end)
+  end
+
+  # Build reverse connection map for fast lookup of incoming connections.
+  @spec build_reverse_connection_map(Workflow.t()) :: map()
+  defp build_reverse_connection_map(%Workflow{connections: connections}) do
+    Enum.group_by(connections, fn conn -> conn.to_node_id end)
   end
 
   # Build node map for fast lookup of nodes by ID.

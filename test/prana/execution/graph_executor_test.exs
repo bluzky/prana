@@ -239,7 +239,11 @@ defmodule Prana.GraphExecutorTest do
       }
 
       workflow = %Workflow{connections: []}
-      execution_graph = %ExecutionGraph{workflow: workflow}
+      execution_graph = %ExecutionGraph{
+        workflow: workflow,
+        connection_map: %{},
+        reverse_connection_map: %{}
+      }
 
       # Updated context structure for conditional branching
       context = %{
@@ -279,7 +283,11 @@ defmodule Prana.GraphExecutorTest do
       }
 
       workflow = %Workflow{connections: []}
-      execution_graph = %ExecutionGraph{workflow: workflow}
+      execution_graph = %ExecutionGraph{
+        workflow: workflow,
+        connection_map: %{},
+        reverse_connection_map: %{}
+      }
 
       # Updated context structure for conditional branching
       context = %{

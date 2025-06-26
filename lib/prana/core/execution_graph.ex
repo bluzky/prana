@@ -48,6 +48,7 @@ defmodule Prana.ExecutionGraph do
     :trigger_node,        # The specific trigger node that started execution
     :dependency_graph,    # Map of node_id -> [prerequisite_node_ids]
     :connection_map,      # Map of {from_node, from_port} -> [connections]
+    :reverse_connection_map, # Map of to_node_id -> [incoming_connections] for O(1) lookup
     :node_map,           # Map of node_id -> node for quick lookup
     :total_nodes         # Total number of nodes in compiled workflow
   ]
@@ -57,6 +58,7 @@ defmodule Prana.ExecutionGraph do
     trigger_node: Node.t(),
     dependency_graph: map(),
     connection_map: map(),
+    reverse_connection_map: map(),
     node_map: map(),
     total_nodes: integer()
   }
