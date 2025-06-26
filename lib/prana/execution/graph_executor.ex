@@ -145,25 +145,26 @@ defmodule Prana.GraphExecutor do
   end
 
   @doc """
-  Find nodes that are ready to execute based on their dependencies.
+  Find nodes that are ready to execute based on their dependencies and conditional paths.
 
   A node is ready if:
   1. It hasn't been executed yet (not in completed node executions)
   2. All its input dependencies have been satisfied
   3. It's reachable from completed nodes or is an entry node
+  4. It's on an active conditional execution path (for conditional branching)
 
   ## Parameters
 
   - `execution_graph` - The ExecutionGraph containing nodes and dependencies
   - `completed_node_executions` - List of completed NodeExecution structs
-  - `execution_context` - Current execution context
+  - `execution_context` - Current execution context with conditional path tracking
 
   ## Returns
 
   List of Node structs that are ready for execution.
   """
   @spec find_ready_nodes(ExecutionGraph.t(), [NodeExecution.t()], map()) :: [Node.t()]
-  def find_ready_nodes(%ExecutionGraph{} = execution_graph, completed_node_executions, _execution_context) do
+  def find_ready_nodes(%ExecutionGraph{} = execution_graph, completed_node_executions, execution_context) do
     completed_node_ids = MapSet.new(completed_node_executions, & &1.node_id)
 
     execution_graph.workflow.nodes
@@ -171,6 +172,7 @@ defmodule Prana.GraphExecutor do
     |> Enum.filter(fn node ->
       dependencies_satisfied?(node, execution_graph.dependency_graph, completed_node_ids)
     end)
+    |> filter_conditional_branches(execution_graph, execution_context)
   end
 
   # Check if all dependencies for a node are satisfied
@@ -179,6 +181,46 @@ defmodule Prana.GraphExecutor do
 
     Enum.all?(node_dependencies, fn dep_node_id ->
       MapSet.member?(completed_node_ids, dep_node_id)
+    end)
+  end
+
+  # Filter nodes based on conditional branching logic
+  defp filter_conditional_branches(ready_nodes, execution_graph, execution_context) do
+    # Apply conditional filtering if context has active_paths
+    if is_map(execution_context) and Map.has_key?(execution_context, "active_paths") do
+      # Filter nodes that are on active conditional paths
+      Enum.filter(ready_nodes, fn node ->
+        node_on_active_conditional_path?(node, execution_graph, execution_context)
+      end)
+    else
+      # No conditional path tracking, return all ready nodes
+      ready_nodes
+    end
+  end
+
+  # Check if a node is on an active conditional execution path
+  defp node_on_active_conditional_path?(node, execution_graph, execution_context) do
+    # Get all incoming connections to this node
+    incoming_connections = get_incoming_connections_for_node(execution_graph.workflow.connections, node.id)
+    
+    if Enum.empty?(incoming_connections) do
+      # Entry/trigger nodes are always on active path
+      true
+    else
+      # Node is on active path if ANY incoming connection is from an active path
+      active_paths = Map.get(execution_context, "active_paths", %{})
+      
+      Enum.any?(incoming_connections, fn conn ->
+        path_key = "#{conn.from_node_id}_#{conn.from_port}"
+        Map.get(active_paths, path_key, false)
+      end)
+    end
+  end
+
+  # Get incoming connections for a specific node
+  defp get_incoming_connections_for_node(connections, node_id) do
+    Enum.filter(connections, fn conn ->
+      conn.to_node_id == node_id
     end)
   end
 
@@ -349,7 +391,15 @@ defmodule Prana.GraphExecutor do
 
     # Store routed data in context for the target node
     target_input_key = "#{connection.to_node_id}_#{connection.to_port}"
-    Map.put(execution_context, target_input_key, routed_data)
+    
+    # Mark this conditional path as active for branching logic
+    active_paths = Map.get(execution_context, "active_paths", %{})
+    path_key = "#{connection.from_node_id}_#{connection.from_port}"
+    updated_active_paths = Map.put(active_paths, path_key, true)
+    
+    execution_context
+    |> Map.put(target_input_key, routed_data)
+    |> Map.put("active_paths", updated_active_paths)
   end
 
   # Apply data mapping using expression engine
@@ -376,7 +426,14 @@ defmodule Prana.GraphExecutor do
     # Update the nodes section of the context
     nodes = Map.get(execution_context, "nodes", %{})
     updated_nodes = Map.put(nodes, node_key, result_data)
-    Map.put(execution_context, "nodes", updated_nodes)
+    
+    # Track executed nodes for conditional branching
+    executed_nodes = Map.get(execution_context, "executed_nodes", [])
+    updated_executed_nodes = [node_execution.node_id | executed_nodes]
+    
+    execution_context
+    |> Map.put("nodes", updated_nodes)
+    |> Map.put("executed_nodes", updated_executed_nodes)
   end
 
   @doc """
@@ -538,7 +595,9 @@ defmodule Prana.GraphExecutor do
   Check if workflow execution is complete.
 
   A workflow is complete when there are no more nodes ready to execute
-  and all reachable nodes have been processed.
+  and all nodes on executed conditional paths have been processed.
+  For conditional workflows, only nodes on active execution paths
+  need to be completed, not all reachable nodes.
 
   ## Parameters
 
@@ -551,11 +610,73 @@ defmodule Prana.GraphExecutor do
   """
   @spec workflow_complete?(Execution.t(), ExecutionGraph.t()) :: boolean()
   def workflow_complete?(%Execution{} = execution, %ExecutionGraph{} = execution_graph) do
-    completed_node_ids = MapSet.new(execution.node_executions, & &1.node_id)
-    reachable_node_ids = MapSet.new(execution_graph.workflow.nodes, & &1.id)
+    # Build execution context that properly tracks active paths
+    execution_context = build_execution_context_for_completion(execution, execution_graph)
+    ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, execution_context)
+    
+    # Workflow is complete if no more nodes are ready to execute
+    Enum.empty?(ready_nodes)
+  end
 
-    # Workflow is complete if all reachable nodes have been executed
-    MapSet.subset?(reachable_node_ids, completed_node_ids)
+  # Build execution context for completion checking with proper active path reconstruction
+  defp build_execution_context_for_completion(execution, execution_graph) do
+    # Build active paths by analyzing completed executions
+    active_paths = reconstruct_active_paths(execution.node_executions, execution_graph)
+    
+    %{
+      "nodes" => extract_nodes_from_executions(execution.node_executions),
+      "executed_nodes" => Enum.map(execution.node_executions, & &1.node_id),
+      "active_paths" => active_paths
+    }
+  end
+  
+  # Reconstruct active paths from completed node executions
+  defp reconstruct_active_paths(node_executions, execution_graph) do
+    # For each completed node execution that has an output_port,
+    # mark the paths from that node as active
+    Enum.reduce(node_executions, %{}, fn node_execution, acc_paths ->
+      if node_execution.output_port do
+        # Find connections from this node's output port
+        connections = get_connections_from_node_port(
+          execution_graph.workflow.connections,
+          node_execution.node_id,
+          node_execution.output_port
+        )
+        
+        # Mark each connection path as active
+        Enum.reduce(connections, acc_paths, fn connection, path_acc ->
+          path_key = "#{connection.from_node_id}_#{connection.from_port}"
+          Map.put(path_acc, path_key, true)
+        end)
+      else
+        # Failed executions don't create active paths
+        acc_paths
+      end
+    end)
+  end
+  
+  # Extract execution context from execution state for completion checking (legacy)
+  defp extract_execution_context(execution) do
+    # Build a minimal context from execution state
+    # In a real implementation, this might be stored in execution metadata
+    %{
+      "nodes" => extract_nodes_from_executions(execution.node_executions),
+      "executed_nodes" => Enum.map(execution.node_executions, & &1.node_id),
+      "active_paths" => %{} # This would need to be properly tracked
+    }
+  end
+
+  # Extract node results from node executions
+  defp extract_nodes_from_executions(node_executions) do
+    Enum.reduce(node_executions, %{}, fn node_exec, acc ->
+      result_data = if node_exec.status == :completed do
+        node_exec.output_data
+      else
+        %{"error" => node_exec.error_data, "status" => node_exec.status}
+      end
+      
+      Map.put(acc, node_exec.node_id, result_data)
+    end)
   end
 
   # Create initial execution context
@@ -566,7 +687,9 @@ defmodule Prana.GraphExecutor do
       "input" => input_data,
       "variables" => Map.get(context, :variables, %{}),
       "metadata" => Map.get(context, :metadata, %{}),
-      "nodes" => %{}
+      "nodes" => %{},
+      "executed_nodes" => [],
+      "active_paths" => %{}
     }
   end
 end

@@ -1,5 +1,6 @@
 defmodule Prana.GraphExecutorTest do
-  use ExUnit.Case, async: false  # Cannot be async due to named GenServer
+  # Cannot be async due to named GenServer
+  use ExUnit.Case, async: false
 
   alias Prana.Execution
   alias Prana.ExecutionGraph
@@ -15,10 +16,10 @@ defmodule Prana.GraphExecutorTest do
     setup do
       # Start the IntegrationRegistry GenServer for testing using ExUnit supervision
       start_supervised!(Prana.IntegrationRegistry)
-      
+
       # Register test integration for the test
       :ok = IntegrationRegistry.register_integration(TestIntegration)
-      
+
       :ok
     end
 
@@ -65,12 +66,12 @@ defmodule Prana.GraphExecutorTest do
 
       # Now that we have registered the test integration, execution should succeed
       result = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Should return successful execution
       assert {:ok, execution} = result
       assert execution.status == :completed
       assert length(execution.node_executions) == 1
-      
+
       # Check that the node was executed successfully
       node_execution = hd(execution.node_executions)
       assert node_execution.status == :completed
@@ -84,7 +85,7 @@ defmodule Prana.GraphExecutorTest do
       node1 = %Node{id: "node_1", custom_id: "node1"}
       node2 = %Node{id: "node_2", custom_id: "node2"}
 
-      workflow = %Workflow{nodes: [node1, node2]}
+      workflow = %Workflow{nodes: [node1, node2], connections: []}
 
       execution_graph = %ExecutionGraph{
         workflow: workflow,
@@ -96,7 +97,16 @@ defmodule Prana.GraphExecutorTest do
       }
 
       completed_executions = []
-      context = %{}
+
+      # Updated context structure for conditional branching
+      context = %{
+        "input" => %{},
+        "variables" => %{},
+        "metadata" => %{},
+        "nodes" => %{},
+        "executed_nodes" => [],
+        "active_paths" => %{}
+      }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
 
@@ -108,7 +118,7 @@ defmodule Prana.GraphExecutorTest do
       node1 = %Node{id: "node_1", custom_id: "node1"}
       node2 = %Node{id: "node_2", custom_id: "node2"}
 
-      workflow = %Workflow{nodes: [node1, node2]}
+      workflow = %Workflow{nodes: [node1, node2], connections: []}
 
       execution_graph = %ExecutionGraph{
         workflow: workflow,
@@ -124,7 +134,15 @@ defmodule Prana.GraphExecutorTest do
         %NodeExecution{node_id: "node_1", status: :completed}
       ]
 
-      context = %{}
+      # Updated context structure for conditional branching
+      context = %{
+        "input" => %{},
+        "variables" => %{},
+        "metadata" => %{},
+        "nodes" => %{"node_1" => %{"status" => "completed"}},
+        "executed_nodes" => ["node_1"],
+        "active_paths" => %{"node_1_success" => true}
+      }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
 
@@ -138,14 +156,34 @@ defmodule Prana.GraphExecutorTest do
       node1 = %Node{id: "node_1"}
       node2 = %Node{id: "node_2"}
 
-      workflow = %Workflow{nodes: [node1, node2]}
-      execution_graph = %ExecutionGraph{workflow: workflow}
+      workflow = %Workflow{nodes: [node1, node2], connections: []}
+
+      execution_graph = %ExecutionGraph{
+        workflow: workflow,
+        dependency_graph: %{
+          "node_1" => [],
+          "node_2" => []
+        },
+        connection_map: %{},
+        node_map: %{},
+        trigger_node: node1,
+        total_nodes: 2
+      }
 
       execution = %Execution{
+        id: "test_exec",
+        workflow_id: "test",
+        status: :running,
+        input_data: %{},
+        output_data: nil,
         node_executions: [
           %NodeExecution{node_id: "node_1", status: :completed},
           %NodeExecution{node_id: "node_2", status: :completed}
-        ]
+        ],
+        started_at: DateTime.utc_now(),
+        completed_at: nil,
+        error_data: nil,
+        metadata: %{}
       }
 
       assert GraphExecutor.workflow_complete?(execution, execution_graph) == true
@@ -155,14 +193,35 @@ defmodule Prana.GraphExecutorTest do
       node1 = %Node{id: "node_1"}
       node2 = %Node{id: "node_2"}
 
-      workflow = %Workflow{nodes: [node1, node2]}
-      execution_graph = %ExecutionGraph{workflow: workflow}
+      workflow = %Workflow{nodes: [node1, node2], connections: []}
+
+      execution_graph = %ExecutionGraph{
+        workflow: workflow,
+        dependency_graph: %{
+          "node_1" => [],
+          # node_2 depends on node_1
+          "node_2" => ["node_1"]
+        },
+        connection_map: %{},
+        node_map: %{},
+        trigger_node: node1,
+        total_nodes: 2
+      }
 
       execution = %Execution{
+        id: "test_exec",
+        workflow_id: "test",
+        status: :running,
+        input_data: %{},
+        output_data: nil,
         node_executions: [
           %NodeExecution{node_id: "node_1", status: :completed}
           # node_2 not completed
-        ]
+        ],
+        started_at: DateTime.utc_now(),
+        completed_at: nil,
+        error_data: nil,
+        metadata: %{}
       }
 
       assert GraphExecutor.workflow_complete?(execution, execution_graph) == false
@@ -181,23 +240,35 @@ defmodule Prana.GraphExecutorTest do
 
       workflow = %Workflow{connections: []}
       execution_graph = %ExecutionGraph{workflow: workflow}
-      context = %{"nodes" => %{}}
+
+      # Updated context structure for conditional branching
+      context = %{
+        "input" => %{},
+        "variables" => %{},
+        "metadata" => %{},
+        "nodes" => %{},
+        "executed_nodes" => [],
+        "active_paths" => %{}
+      }
 
       result_context = GraphExecutor.route_node_output(node_execution, execution_graph, context)
 
       # Should store the node result in context
       assert is_map(result_context)
       assert Map.has_key?(result_context, "nodes")
+      assert Map.has_key?(result_context, "executed_nodes")
+      assert Map.has_key?(result_context, "active_paths")
     end
 
     test "does not route data for failed nodes" do
       node_execution = %NodeExecution{
         id: "exec_1",
-        execution_id: "workflow_exec_1", 
+        execution_id: "workflow_exec_1",
         node_id: "node_1",
         status: :failed,
         input_data: %{},
-        output_port: nil,  # Failed execution
+        # Failed execution
+        output_port: nil,
         output_data: nil,
         error_data: %{"error" => "something failed"},
         retry_count: 0,
@@ -209,21 +280,30 @@ defmodule Prana.GraphExecutorTest do
 
       workflow = %Workflow{connections: []}
       execution_graph = %ExecutionGraph{workflow: workflow}
-      context = %{"nodes" => %{}}
+
+      # Updated context structure for conditional branching
+      context = %{
+        "input" => %{},
+        "variables" => %{},
+        "metadata" => %{},
+        "nodes" => %{},
+        "executed_nodes" => [],
+        "active_paths" => %{}
+      }
 
       result_context = GraphExecutor.route_node_output(node_execution, execution_graph, context)
 
       # Should still store the node result (with error info) in context
       assert is_map(result_context)
       assert Map.has_key?(result_context, "nodes")
-      
+
       # Let's check step by step
       nodes_map = result_context["nodes"]
       assert is_map(nodes_map)
-      
+
       node_1_data = Map.get(nodes_map, "node_1")
       refute is_nil(node_1_data)
-      
+
       assert Map.get(node_1_data, "status") == :failed
     end
   end
