@@ -15,73 +15,89 @@ defmodule Prana.Integrations.DataTest do
   end
 
   describe "merge/1" do
-    test "combine_objects strategy merges maps" do
+    test "append strategy collects inputs as array elements" do
       input_map = %{
-        "strategy" => "combine_objects",
-        "inputs" => [
-          %{"name" => "John", "age" => 30},
-          %{"city" => "NYC", "age" => 31}
-        ]
+        "strategy" => "append",
+        "input_a" => %{"name" => "John", "age" => 30},
+        "input_b" => %{"city" => "NYC", "status" => "active"}
+      }
+      
+      assert {:ok, result, "success"} = Data.merge(input_map)
+      assert result == [
+        %{"name" => "John", "age" => 30},
+        %{"city" => "NYC", "status" => "active"}
+      ]
+    end
+
+    test "merge strategy combines object inputs" do
+      input_map = %{
+        "strategy" => "merge",
+        "input_a" => %{"name" => "John", "age" => 30},
+        "input_b" => %{"city" => "NYC", "age" => 31}
       }
       
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == %{"name" => "John", "age" => 31, "city" => "NYC"}
     end
 
-    test "combine_arrays strategy flattens arrays" do
+    test "concat strategy flattens array inputs" do
       input_map = %{
-        "strategy" => "combine_arrays",
-        "inputs" => [
-          [1, 2, 3],
-          [4, 5],
-          %{"ignored" => "non-array"}
-        ]
+        "strategy" => "concat",
+        "input_a" => [1, 2, 3],
+        "input_b" => [4, 5]
       }
       
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == [1, 2, 3, 4, 5]
     end
 
-    test "last_wins strategy returns last input" do
+    test "defaults to append strategy" do
       input_map = %{
-        "strategy" => "last_wins",
-        "inputs" => [
-          %{"first" => true},
-          %{"second" => true},
-          %{"third" => true}
-        ]
+        "input_a" => %{"a" => 1},
+        "input_b" => %{"b" => 2}
       }
       
       assert {:ok, result, "success"} = Data.merge(input_map)
-      assert result == %{"third" => true}
+      assert result == [%{"a" => 1}, %{"b" => 2}]
     end
 
-    test "defaults to combine_objects strategy" do
+    test "merge strategy ignores non-map inputs" do
       input_map = %{
-        "inputs" => [
-          %{"a" => 1},
-          %{"b" => 2}
-        ]
+        "strategy" => "merge",
+        "input_a" => %{"name" => "John"},
+        "input_b" => "invalid_data"
       }
       
       assert {:ok, result, "success"} = Data.merge(input_map)
-      assert result == %{"a" => 1, "b" => 2}
+      assert result == %{"name" => "John"}
     end
 
-    test "handles empty inputs list" do
+    test "concat strategy ignores non-array inputs" do
       input_map = %{
-        "strategy" => "combine_objects",
-        "inputs" => []
+        "strategy" => "concat",
+        "input_a" => [1, 2, 3],
+        "input_b" => %{"invalid" => "data"}
       }
       
       assert {:ok, result, "success"} = Data.merge(input_map)
-      assert result == %{}
+      assert result == [1, 2, 3]
+    end
+
+    test "handles nil input ports gracefully" do
+      input_map = %{
+        "strategy" => "append",
+        "input_a" => %{"data" => "value"}
+        # input_b is nil/missing
+      }
+      
+      assert {:ok, result, "success"} = Data.merge(input_map)
+      assert result == [%{"data" => "value"}]
     end
 
     test "returns error for unknown strategy" do
       input_map = %{
         "strategy" => "unknown_strategy",
-        "inputs" => [%{"test" => true}]
+        "input_a" => %{"test" => true}
       }
       
       assert {:error, error, "error"} = Data.merge(input_map)

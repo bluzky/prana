@@ -79,19 +79,20 @@ The Data integration provides essential data manipulation capabilities for combi
 
 ##### Merge
 - **Action Name**: `merge`
-- **Description**: Combine data from multiple input sources
-- **Input Ports**: `["input"]`
+- **Description**: Combine data from multiple named input ports (diamond pattern coordination)
+- **Input Ports**: `["input_a", "input_b"]`
 - **Output Ports**: `["success", "error"]`
 
 **Input Parameters**:
-- `strategy`: Merge strategy (`"combine_objects"` | `"combine_arrays"` | `"last_wins"`)
-- `inputs`: List of data to merge
+- `strategy`: Merge strategy (`"append"` | `"merge"` | `"concat"`) - defaults to `"append"`
+- `input_a`: Data from first input port
+- `input_b`: Data from second input port
 
-**Merge Strategies**:
+**Merge Strategies (ADR-002)**:
 
-1. **combine_objects** (default): Merges maps using `Map.merge/2`, later maps override earlier ones
-2. **combine_arrays**: Filters to arrays and flattens them with `List.flatten/1`
-3. **last_wins**: Returns the last item from inputs list
+1. **append** (default): Collect all inputs as separate array elements `[input_a, input_b]`
+2. **merge**: Combine object inputs using `Map.merge/2`, ignores non-maps
+3. **concat**: Flatten and concatenate array inputs using `List.flatten/1`, ignores non-arrays
 
 **Returns**:
 - `{:ok, merged_data, "success"}` on successful merge
@@ -99,42 +100,34 @@ The Data integration provides essential data manipulation capabilities for combi
 
 **Examples**:
 
-*Combine Objects*:
+*Append Strategy (Default)*:
 ```elixir
 %{
-  "strategy" => "combine_objects",
-  "inputs" => [
-    %{"name" => "John", "age" => 30},
-    %{"city" => "NYC", "age" => 31}
-  ]
+  "strategy" => "append",
+  "input_a" => %{"name" => "John", "age" => 30},
+  "input_b" => %{"city" => "NYC", "status" => "active"}
+}
+# Result: [%{"name" => "John", "age" => 30}, %{"city" => "NYC", "status" => "active"}]
+```
+
+*Merge Strategy*:
+```elixir
+%{
+  "strategy" => "merge",
+  "input_a" => %{"name" => "John", "age" => 30},
+  "input_b" => %{"city" => "NYC", "age" => 31}
 }
 # Result: %{"name" => "John", "age" => 31, "city" => "NYC"}
 ```
 
-*Combine Arrays*:
+*Concat Strategy*:
 ```elixir
 %{
-  "strategy" => "combine_arrays",
-  "inputs" => [
-    [1, 2, 3],
-    [4, 5],
-    %{"ignored" => "non-array"}
-  ]
+  "strategy" => "concat",
+  "input_a" => [1, 2, 3],
+  "input_b" => [4, 5]
 }
 # Result: [1, 2, 3, 4, 5]
-```
-
-*Last Wins*:
-```elixir
-%{
-  "strategy" => "last_wins",
-  "inputs" => [
-    %{"first" => true},
-    %{"second" => true},
-    %{"third" => true}
-  ]
-}
-# Result: %{"third" => true}
 ```
 
 ### Manual Integration
