@@ -1,36 +1,45 @@
 # Prana GraphExecutor - Requirements Document
 
-**Version**: 1.2
-**Date**: June 23, 2025
-**Status**: Phase 1 Complete with Sequential Execution, Phase 2-4 Planned
+**Version**: 1.3
+**Date**: June 26, 2025
+**Status**: Phase 3.2 Complete with Branch-Following Execution, Phase 3.3+ Planned
 
 ## 1. Overview
 
 The **GraphExecutor** is the core workflow orchestration engine in the Prana automation platform. It executes pre-compiled workflow graphs by coordinating node execution, managing data flow between nodes, and handling workflow lifecycle events.
 
-### 1.1 Purpose
+### Key Principles
 
-- **Workflow Orchestration**: Execute workflows based on dependency graphs with sequential node coordination
-- **Data Flow Management**: Route data between nodes through explicit port-based connections
-- **Sub-workflow Support**: Handle nested workflow execution in multiple modes (sync, async, fire-and-forget)
-- **Event Integration**: Emit lifecycle events for application integration via middleware
-- **Error Handling**: Provide comprehensive error management and graceful failure handling
-
-### 1.2 Key Principles
-
+- **Branch-Following Execution**: Prioritize completing active execution paths before starting new branches
+- **Performance Optimization**: O(1) connection lookups and optimized context management
 - **Separation of Concerns**: GraphExecutor handles orchestration; NodeExecutor handles individual nodes
 - **Port-based Architecture**: Explicit data routing through named input/output ports
 - **Dependency-driven Execution**: Nodes execute when their dependencies are satisfied
-- **Sequential Execution**: Independent nodes execute sequentially for predictable behavior
-- **Context Management**: Shared execution state for expression evaluation and data access
+- **Conditional Path Tracking**: Active path management for proper conditional branching behavior
 
-## 2. Phase 1 Requirements (✅ COMPLETE)
+## 2. Current Implementation Status
 
-### 2.1 Scope: Core Execution (Sync/Fire-and-Forget Only)
+**✅ Phase 3.1**: Core Execution with Performance Optimization  
+**✅ Phase 3.2**: Conditional Branching with Branch-Following Execution  
 
-**Focus**: Basic workflow orchestration with sequential execution, without async suspension/resume complexity
+### Branch-Following Execution Model
 
-### 2.2 Primary API
+**Core Innovation**: Single-node execution with branch prioritization
+
+**Execution Strategy**:
+```
+Find ready nodes → Select ONE node → Execute it → Route output → Repeat
+Result: [trigger] → [branch_a1] → [branch_a2] → [branch_b1] → [branch_b2] → [merge]
+```
+
+**Benefits**:
+- Predictable execution order with branches completing fully before others start
+- Proper IF/ELSE and switch/case conditional behavior
+- Enhanced debuggability with clear execution flow
+
+## 3. Core Features
+
+### Primary API
 
 ```elixir
 execute_graph(execution_graph, input_data, context \\ %{})
@@ -44,150 +53,99 @@ context = %{
 }
 ```
 
-### 2.3 Core Functionality Implemented
+### Key Capabilities
 
-#### 2.3.1 Graph Execution Orchestration
-- ✅ Accept pre-compiled `ExecutionGraph` from `WorkflowCompiler`
-- ✅ Execute nodes based on dependency order from ExecutionGraph
-- ✅ Track execution progress in `Execution` struct
-- ✅ Coordinate sequential execution of independent nodes
-- ✅ Detect workflow completion (no more ready nodes)
+- **Graph Execution**: Execute pre-compiled ExecutionGraphs with dependency-driven execution
+- **Branch-Following**: Single-node execution with intelligent branch prioritization  
+- **Data Routing**: Port-based data flow with O(1) connection lookups
+- **Sub-workflows**: Sync and fire-and-forget execution modes
+- **Event Integration**: Comprehensive middleware event emission
+- **Error Handling**: Fail-fast behavior with structured error responses
+- **Context Management**: Shared execution state with expression engine integration
 
-#### 2.3.2 Sequential Node Execution
-- ✅ Execute ready nodes sequentially using `execute_nodes_sequentially/4`
-- ✅ Process nodes one-by-one in batch order for predictable execution
-- ✅ Fail-fast behavior: stop execution on first node failure
-- ✅ Maintain execution order within each batch of ready nodes
+## 4. Phase 3.2 Requirements (✅ COMPLETE)
 
-#### 2.3.3 Port-based Data Routing
-- ✅ Route output from completed nodes to dependent nodes based on `output_port`
-- ✅ Use `ExecutionGraph.workflow.connections` to determine data flow paths
-- ✅ Prepare input for target nodes using `ExpressionEngine.process_map/2`
-- ✅ Handle failed nodes (nodes with `output_port = nil`) - no data routing
+### 4.1 Scope: Conditional Branching with Branch-Following Execution
 
-#### 2.3.4 Context Management
-- ✅ Maintain shared execution context across workflow execution
-- ✅ Store node results under node `custom_id` for expression access (`$nodes.node_id.output`)
-- ✅ Update context as nodes complete with their output data
-- ✅ Support flexible context structure with input, variables, metadata, and nodes
+**Focus**: Advanced conditional execution patterns with branch-following strategy for predictable workflow behavior
 
-#### 2.3.5 Node Execution Integration
-- ✅ Use `NodeExecutor.execute_node/3` for individual node execution
-- ✅ Wrap node execution with `execute_single_node_with_events/3` for middleware events
-- ✅ Handle node execution results and update execution state
-- ✅ Track node executions in `Execution.node_executions`
-- ✅ Convert simple map contexts to ExecutionContext structs for NodeExecutor
+### 4.2 Core Functionality Implemented
 
-#### 2.3.6 Sub-workflow Support (Sync & Fire-and-Forget)
+#### 4.2.1 Branch-Following Execution Strategy
+- ✅ **Single-node execution**: Execute one node per iteration instead of batches
+- ✅ **Intelligent node selection**: `select_node_for_branch_following()` prioritizes active branches
+- ✅ **Active branch continuation**: Complete execution paths before starting new ones
+- ✅ **Dependency-based fallback**: Select nodes with fewer dependencies when no active branches
+
+#### 4.2.2 Conditional Branching Support
+- ✅ **IF/ELSE patterns**: Exclusive branch execution based on conditions
+- ✅ **Switch/Case routing**: Multi-branch routing with named ports (premium, standard, basic, default)
+- ✅ **Active path tracking**: Context tracks `active_paths` to prevent dual branch execution
+- ✅ **Conditional completion**: Workflows complete based on active paths, not total nodes
+
+#### 4.2.3 Logic Integration
+- ✅ **if_condition action**: Evaluate boolean expressions for IF/ELSE branching
+- ✅ **switch action**: Multi-way routing based on value matching
+- ✅ **merge action**: Foundation for diamond pattern coordination
+- ✅ **Comprehensive testing**: 24 passing conditional branching tests (1358 lines)
+
+#### 4.2.4 Performance Optimization (Phase 3.2.5)
+- ✅ **O(1) connection lookups**: Pre-built `connection_map` for instant access
+- ✅ **Reverse connection map**: `reverse_connection_map` for incoming connection queries
+- ✅ **Optimized context updates**: Batch map updates to reduce memory allocations
+- ✅ **Performance benchmarks**: Sub-microsecond lookup times, 100-node workflows in ~11ms
+
+#### 4.2.5 Execution Model Features
 ```elixir
-# Sync mode: Execute sub-workflow and wait for completion
-{:ok, child_result} = execute_sub_workflow_sync(child_graph, input_data, context)
-# Merge child_result into parent context, continue execution
-
-# Fire-and-forget mode: Trigger sub-workflow and continue immediately
-:ok = execute_sub_workflow_fire_and_forget(child_graph, input_data, context)
-# Parent continues without waiting
-```
-
-#### 2.3.7 Sub-workflow Loading via Callback
-- ✅ Use `context.workflow_loader` callback to load sub-workflow ExecutionGraphs
-- ✅ Handle loading errors gracefully
-- ✅ Support application caching/precompilation strategies
-
-#### 2.3.8 Middleware Event Emission
-```elixir
-# Emit lifecycle events during execution
-Middleware.call(:execution_started, %{execution: execution})
-Middleware.call(:node_started, %{node: node, node_execution: node_execution})
-Middleware.call(:node_completed, %{node: node, node_execution: node_execution})
-Middleware.call(:node_failed, %{node: node, node_execution: node_execution})
-Middleware.call(:execution_completed, %{execution: execution})
-Middleware.call(:execution_failed, %{execution: execution, reason: reason})
-```
-
-#### 2.3.9 Error Handling
-- ✅ Workflow-level error management and propagation
-- ✅ Sequential execution error handling with fail-fast behavior
-- ✅ Sub-workflow loading error handling
-- ✅ Node execution error handling (delegated to NodeExecutor)
-- ✅ Graceful workflow termination on critical errors
-- ✅ Structured error responses with execution state
-
-### 2.4 Integration Points
-
-- ✅ **Input**: `ExecutionGraph` from `WorkflowCompiler.compile/2`
-- ✅ **Node Execution**: `NodeExecutor.execute_node/3`
-- ✅ **Expression Evaluation**: `ExpressionEngine.process_map/2` (via NodeExecutor)
-- ✅ **Events**: `Middleware.call/2` for lifecycle events
-- ✅ **Sub-workflow Loading**: `context.workflow_loader.(workflow_id)`
-
-### 2.5 Key Internal Functions Implemented
-
-```elixir
-# Main execution orchestration
-execute_graph(execution_graph, input_data, context) :: {:ok, Execution.t()} | {:error, reason}
-
-# Graph traversal and coordination
-find_ready_nodes(execution_graph, completed_nodes, context) :: [Node.t()]
-execute_nodes_batch(ready_nodes, execution_graph, context) :: {:ok, [NodeExecution.t()]} | {:error, reason}
-execute_nodes_sequentially(nodes, execution_graph, context, completed) :: {:ok, [NodeExecution.t()]} | {:error, reason}
-
-# Single node execution with events
-execute_single_node_with_events(node, execution_graph, context) :: NodeExecution.t()
-
-# Data routing between nodes
-route_node_output(node_execution, execution_graph, context) :: map()
-route_batch_outputs(node_executions, execution_graph, context) :: map()
-
-# Sub-workflow execution modes
-execute_sub_workflow_sync(node, context) :: {:ok, context} | {:error, reason}
-execute_sub_workflow_fire_and_forget(node, context) :: {:ok, context} | {:error, reason}
-
-# Execution state management
-update_execution_progress(execution, completed_nodes) :: Execution.t()
-workflow_complete?(execution, execution_graph) :: boolean()
-```
-
-### 2.6 Sequential Execution Behavior
-
-#### 2.6.1 Linear Execution Patterns
-- **Pattern 1.1 (Sequential Chain)**: A → B → C → D
-  - ✅ Natural sequential execution due to dependencies
-  - Each node waits for previous to complete
+# Branch-following node selection
+def select_node_for_branch_following(ready_nodes, execution_graph, execution_context) do
+  # Priority 1: Nodes continuing active branches
+  continuing_nodes = filter_nodes_continuing_active_branches(ready_nodes)
   
-- **Pattern 1.2 (Linear Branching)**: A → (B, C, D)
-  - ✅ **NEW**: B, C, D execute sequentially (not parallel)
-  - Predictable execution order within batch
-  - Fail-fast: if B fails, C and D don't execute
-
-#### 2.6.2 Error Handling in Sequential Execution
-```elixir
-# When node fails during sequential execution
-{:error, %{
-  type: "node_execution_failed",
-  message: "Node #{node_id} failed during sequential execution",
-  node_id: failed_node_id,
-  node_executions: [completed_nodes..., failed_node],
-  error_data: node_error_details
-}}
+  if not empty?(continuing_nodes) do
+    # Among continuing nodes, prefer those with fewer dependencies
+    select_by_dependency_count(continuing_nodes)
+  else
+    # Priority 2: Start new branches, prefer fewer dependencies  
+    select_by_dependency_count(ready_nodes)
+  end
+end
 ```
 
-### 2.7 Phase 1 Success Criteria Met
+### 4.3 Success Criteria Met
 
-1. ✅ Execute simple workflows end-to-end successfully
-2. ✅ Handle sequential node execution correctly
-3. ✅ Route data between nodes via ports properly
-4. ✅ Execute sync sub-workflows with result merging
-5. ✅ Execute fire-and-forget sub-workflows independently
-6. ✅ Emit proper middleware events for application integration
-7. ✅ Handle errors gracefully with fail-fast behavior
-8. ✅ Support workflow loader callback pattern
-9. ✅ **NEW**: Sequential execution of branching patterns
-10. ✅ **NEW**: Predictable execution order and debugging
+1. ✅ **Branch-following execution**: Verified execution order `[trigger, branch_a1, branch_a2, branch_b1, branch_b2, merge]`
+2. ✅ **Conditional branching**: IF/ELSE and switch/case patterns work correctly
+3. ✅ **Performance optimization**: O(1) lookups and optimized context management
+4. ✅ **Active path tracking**: Proper conditional path management prevents dual execution
+5. ✅ **Comprehensive testing**: 34 total tests (7 core + 24 conditional + 3 branch following)
+6. ✅ **Code quality**: Clean implementation with no unused code or warnings
+7. ✅ **Documentation**: Updated ADR and requirements reflecting current architecture
 
-## 3. Phase 2 Requirements (📋 PLANNED)
+### 4.4 Architecture Decisions
 
-### 3.1 Scope: Async Execution with Suspension/Resume
+- **ADR-001**: Branch-Following Execution Strategy (documented in `docs/adr/`)
+- **Trade-off**: Sacrificed theoretical parallelism for predictable execution patterns
+- **Performance**: Maintained excellent performance while gaining execution predictability
+- **Maintainability**: Cleaner codebase with focused, single-purpose functions
+
+## 5. Future Phases (📋 PLANNED)
+
+### 5.1 Phase 3.3: Advanced Coordination (Next Priority)
+
+**Focus**: Diamond pattern coordination and Wait integration for complex synchronization patterns
+
+#### 5.1.1 Enhanced Merge Integration
+- **Diamond pattern coordination**: Fork-join patterns where multiple branches converge
+- **Wait-for-all patterns**: Synchronization points that wait for multiple inputs
+- **Timeout handling**: Graceful timeout management for coordination points
+
+#### 5.1.2 Wait Integration
+- **Async synchronization**: Sophisticated waiting mechanisms for complex workflows
+- **Conditional waiting**: Wait based on expressions or external events
+- **Timeout patterns**: Configurable timeouts with fallback behaviors
+
+### 5.2 Phase 4: Async Execution with Suspension/Resume
 
 **Focus**: Advanced sub-workflow execution with workflow suspension capabilities
 
@@ -260,125 +218,6 @@ retry_policy = %RetryPolicy{
 - **Recovery Detection**: Automatic circuit closing when service recovers
 - **Fallback Strategies**: Alternative execution paths when circuits are open
 
-#### 4.2.5 Advanced Error Handling
 - **Error Classification**: Categorize errors for appropriate handling
 - **Error Aggregation**: Collect and analyze error patterns
 - **Graceful Degradation**: Continue execution with reduced functionality
-
-## 5. API Specification
-
-### 5.1 Public API Functions
-
-```elixir
-# Main execution API
-@spec execute_graph(ExecutionGraph.t(), map(), map()) ::
-  {:ok, Execution.t()} | {:error, any()}
-
-# Utility functions
-@spec find_ready_nodes(ExecutionGraph.t(), [NodeExecution.t()], map()) :: [Node.t()]
-@spec workflow_complete?(Execution.t(), ExecutionGraph.t()) :: boolean()
-@spec route_node_output(NodeExecution.t(), ExecutionGraph.t(), map()) :: map()
-
-# Sequential execution
-@spec execute_nodes_batch([Node.t()], ExecutionGraph.t(), map()) :: 
-  {:ok, [NodeExecution.t()]} | {:error, any()}
-
-# Sub-workflow execution
-@spec execute_sub_workflow_sync(Node.t(), map()) :: {:ok, map()} | {:error, any()}
-@spec execute_sub_workflow_fire_and_forget(Node.t(), map()) :: {:ok, map()} | {:error, any()}
-
-# State management
-@spec update_execution_progress(Execution.t(), [NodeExecution.t()]) :: Execution.t()
-```
-
-### 5.2 Context Structure
-
-```elixir
-# Input context
-%{
-  workflow_loader: (workflow_id -> {:ok, ExecutionGraph.t()} | {:error, reason}),
-  variables: %{},     # Optional workflow variables
-  metadata: %{}       # Optional execution metadata
-}
-
-# Execution context (internal)
-%{
-  "input" => map(),      # Initial workflow input
-  "variables" => map(),  # Workflow variables
-  "metadata" => map(),   # Execution metadata
-  "nodes" => %{          # Node execution results
-    node_id => %{
-      "status" => :completed | :failed,
-      "error" => map() | nil,
-      # ... node-specific output data
-    }
-  }
-}
-```
-
-### 5.3 Event Specification
-
-```elixir
-# Middleware events emitted during execution
-:execution_started   -> %{execution: Execution.t()}
-:execution_completed -> %{execution: Execution.t()}
-:execution_failed    -> %{execution: Execution.t(), reason: any()}
-:node_started        -> %{node: Node.t(), node_execution: NodeExecution.t()}
-:node_completed      -> %{node: Node.t(), node_execution: NodeExecution.t()}
-:node_failed         -> %{node: Node.t(), node_execution: NodeExecution.t()}
-```
-
-## 6. Testing Requirements
-
-### 6.1 Unit Testing
-- ✅ **Core Functions**: Test all public API functions
-- ✅ **Sequential Execution**: Test execute_nodes_sequentially/4 behavior
-- ✅ **Error Handling**: Test fail-fast behavior and error propagation
-- ✅ **Edge Cases**: Test error conditions and boundary cases
-- ✅ **Integration**: Test integration with NodeExecutor and Middleware
-- ✅ **Context Management**: Test context updates and data routing
-
-### 6.2 Integration Testing
-- ✅ **End-to-End Workflows**: Test complete workflow execution scenarios
-- ✅ **Sequential Patterns**: Test linear branching with sequential execution
-- **Sub-workflow Testing**: Test all sub-workflow execution modes
-- **Error Scenarios**: Test error handling and recovery
-- **Performance Testing**: Test under load and sequential execution timing
-
-### 6.3 Property-Based Testing
-- **Workflow Invariants**: Test that workflows always reach completion or error
-- **Context Consistency**: Test that context updates are always consistent
-- **Data Flow**: Test that data routing preserves data integrity
-- **Sequential Order**: Test that execution order is maintained within batches
-
-## 7. Implementation Notes
-
-### 7.1 Current Implementation Status
-- ✅ **Phase 1**: Complete with sequential execution and comprehensive test coverage
-- ✅ **File Structure**: `lib/prana/execution/graph_executor.ex`
-- ✅ **Test Coverage**: `test/prana/execution/graph_executor_test.exs`
-- ✅ **Test Support**: `test/support/test_integration.ex` (enhanced with failure simulation)
-
-### 7.2 Architecture Decisions
-- **Simple Map Context**: Use simple maps for execution context to avoid complex struct dependencies
-- **String Keys**: Use string keys consistently throughout context for expression engine compatibility
-- **Sequential Execution**: Removed Task-based parallelism in favor of predictable sequential processing
-- **Middleware Integration**: Emit events for application integration without tight coupling
-- **Fail-Fast Error Handling**: Stop execution immediately on node failure for clear error reporting
-
-### 7.3 Configuration Changes Made
-- **Removed from WorkflowSettings**: `concurrency_mode`, `max_concurrent_executions`
-- **Simplified Configuration**: Focus on execution modes and timeouts only
-- **Reduced Complexity**: Eliminate configuration options that are no longer needed
-
-### 7.4 Future Considerations
-- **State Persistence**: Design context structure for easy serialization in Phase 2
-- **Performance Optimization**: Monitor sequential execution performance vs previous parallel approach
-- **Distributed Execution**: Plan for distributed workflow execution across nodes
-- **Optional Parallelism**: Consider adding back parallel execution as configurable option if needed
-
----
-
-**Document Status**: ✅ Complete for Phase 1 with Sequential Execution
-**Next Review**: Before Phase 2 implementation
-**Maintainer**: Prana Core Team

@@ -1,10 +1,10 @@
 defmodule Prana.GraphExecutor do
   @moduledoc """
-  GraphExecutor Phase 1: Core Execution (Sync/Fire-and-Forget Only)
+  GraphExecutor: Branch-Following Workflow Execution Engine
 
   Orchestrates workflow execution using pre-compiled ExecutionGraphs from WorkflowCompiler.
-  Handles sequential node execution, port-based data routing, context management, and
-  sub-workflow execution in sync and fire-and-forget modes.
+  Implements branch-following execution strategy that prioritizes completing active execution
+  paths before starting new branches, providing predictable and efficient workflow execution.
 
   ## Primary API
 
@@ -19,21 +19,32 @@ defmodule Prana.GraphExecutor do
         metadata: %{}       # optional
       }
 
+  ## Execution Model
+
+  **Branch-Following Strategy**: Executes one node at a time, prioritizing nodes that continue
+  active execution branches before starting new branches. This provides:
+
+  - **Predictable execution order**: Branches complete fully before others start
+  - **Efficient resource utilization**: Reduced contention between competing nodes
+  - **Enhanced conditional branching**: Proper IF/ELSE and switch/case behavior
+  - **Improved debuggability**: Clear execution flow for complex workflows
+
   ## Core Features
 
-  - Graph execution orchestration with dependency-based ordering
-  - Sequential execution of nodes (both chains and branches)
-  - Port-based data routing between nodes
-  - Context management with node result storage
+  - Branch-following execution with intelligent node selection
+  - O(1) connection lookups using pre-built optimization maps
+  - Port-based data routing with immediate output processing
+  - Context management with optimized batch updates
   - Sub-workflow support (sync and fire-and-forget modes)
+  - Conditional path tracking for IF/ELSE and switch patterns
   - Middleware event emission during execution
   - Comprehensive error handling and propagation
 
   ## Integration Points
 
-  - Uses `WorkflowCompiler` compiled ExecutionGraphs
+  - Uses `WorkflowCompiler` compiled ExecutionGraphs with optimization maps
   - Uses `NodeExecutor.execute_node/3` for individual node execution
-  - Uses `ExpressionEngine.process_map/2` for input preparation
+  - Uses `ExpressionEngine.process_map/2` for input preparation (via NodeExecutor)
   - Uses `Middleware.call/2` for lifecycle events
   - Uses `ExecutionContext` for shared state management
   """
@@ -120,7 +131,7 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Find ready nodes and execute them sequentially
+  # Find ready nodes and execute following branch-completion strategy
   defp find_and_execute_ready_nodes(execution, execution_graph, execution_context) do
     ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, execution_context)
 
@@ -128,20 +139,111 @@ defmodule Prana.GraphExecutor do
       # No ready nodes but workflow not complete - likely an error condition
       {:error, %{type: "execution_stalled", message: "No ready nodes found but workflow not complete"}}
     else
-      case execute_nodes_batch(ready_nodes, execution_graph, execution_context) do
-        {:ok, node_executions} ->
-          # Update execution with completed node executions
-          updated_execution = update_execution_progress(execution, node_executions)
+      # Select single node to execute, prioritizing branch completion
+      selected_node = select_node_for_branch_following(ready_nodes, execution_graph, execution_context)
+      
+      case execute_single_node_with_events(selected_node, execution_graph, execution_context) do
+        %NodeExecution{status: :completed} = node_execution ->
+          # Update execution with completed node execution
+          updated_execution = update_execution_progress(execution, [node_execution])
 
-          # Route output data and update context
-          updated_context = route_batch_outputs(node_executions, execution_graph, execution_context)
+          # Route output data and update context immediately
+          updated_context = route_node_output(node_execution, execution_graph, execution_context)
+          updated_context = store_node_result_in_context(node_execution, updated_context)
 
           {:ok, {updated_execution, updated_context}}
 
-        {:error, _reason} = error ->
-          error
+        %NodeExecution{status: :failed} = node_execution ->
+          # Node failed, return error
+          _updated_execution = update_execution_progress(execution, [node_execution])
+          _updated_context = store_node_result_in_context(node_execution, execution_context)
+
+          {:error,
+           %{
+             type: "node_execution_failed",
+             message: "Node #{selected_node.id} failed during execution",
+             node_id: selected_node.id,
+             node_execution: node_execution,
+             error_data: node_execution.error_data
+           }}
+
+        %NodeExecution{} = node_execution ->
+          # Node finished with other status
+          updated_execution = update_execution_progress(execution, [node_execution])
+          updated_context = store_node_result_in_context(node_execution, execution_context)
+          
+          {:ok, {updated_execution, updated_context}}
       end
     end
+  rescue
+    error ->
+      # Unexpected error during node execution
+      {:error,
+       %{
+         type: "execution_exception",
+         message: "Exception during node execution: #{Exception.message(error)}",
+         details: %{exception: error}
+       }}
+  end
+
+  @doc """
+  Select a single node for execution, prioritizing branch completion over batch execution.
+  
+  Strategy:
+  1. If there are nodes continuing active branches, prioritize those
+  2. Otherwise, select the first ready node to start a new branch
+  3. Prefer nodes with fewer dependencies (closer to completion)
+  
+  ## Parameters
+  
+  - `ready_nodes` - List of Node structs that are ready for execution
+  - `execution_graph` - The ExecutionGraph for connection analysis
+  - `execution_context` - Current execution context with active path tracking
+  
+  ## Returns
+  
+  Single Node struct selected for execution.
+  """
+  @spec select_node_for_branch_following([Node.t()], ExecutionGraph.t(), map()) :: Node.t()
+  def select_node_for_branch_following(ready_nodes, execution_graph, execution_context) do
+    active_paths = Map.get(execution_context, "active_paths", %{})
+    
+    # Strategy 1: Find nodes that continue active branches
+    continuing_nodes = Enum.filter(ready_nodes, fn node ->
+      node_continues_active_branch?(node, execution_graph, active_paths)
+    end)
+    
+    cond do
+      # Prioritize nodes continuing active branches
+      not Enum.empty?(continuing_nodes) ->
+        # Among continuing nodes, prefer those with fewer dependencies (closer to completion)
+        continuing_nodes
+        |> Enum.sort_by(fn node ->
+          dependency_count = length(Map.get(execution_graph.dependency_graph, node.id, []))
+          dependency_count
+        end)
+        |> List.first()
+      
+      # No continuing nodes, select any ready node (start new branch)
+      true ->
+        # Prefer nodes with fewer dependencies
+        ready_nodes
+        |> Enum.sort_by(fn node ->
+          dependency_count = length(Map.get(execution_graph.dependency_graph, node.id, []))
+          dependency_count
+        end)
+        |> List.first()
+    end
+  end
+  
+  # Check if a node continues an active branch (has incoming connection from active path)
+  defp node_continues_active_branch?(node, execution_graph, active_paths) do
+    incoming_connections = get_incoming_connections_for_node(execution_graph, node.id)
+    
+    Enum.any?(incoming_connections, fn conn ->
+      path_key = "#{conn.from_node_id}_#{conn.from_port}"
+      Map.get(active_paths, path_key, false)
+    end)
   end
 
   @doc """
@@ -200,8 +302,8 @@ defmodule Prana.GraphExecutor do
 
   # Check if a node is on an active conditional execution path
   defp node_on_active_conditional_path?(node, execution_graph, execution_context) do
-    # Get all incoming connections to this node
-    incoming_connections = get_incoming_connections_for_node(execution_graph.workflow.connections, node.id)
+    # Get all incoming connections to this node using optimized lookup
+    incoming_connections = get_incoming_connections_for_node(execution_graph, node.id)
     
     if Enum.empty?(incoming_connections) do
       # Entry/trigger nodes are always on active path
@@ -217,83 +319,22 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Get incoming connections for a specific node
-  defp get_incoming_connections_for_node(connections, node_id) do
-    Enum.filter(connections, fn conn ->
-      conn.to_node_id == node_id
-    end)
-  end
-
-  @doc """
-  Execute a batch of nodes sequentially.
-
-  Each node is executed using NodeExecutor.execute_node/3. Nodes are executed
-  one after another in sequence, with proper error handling and execution tracking.
-
-  ## Parameters
-
-  - `ready_nodes` - List of Node structs ready for execution
-  - `execution_graph` - The ExecutionGraph for context
-  - `execution_context` - Current execution context
-
-  ## Returns
-
-  - `{:ok, node_executions}` - List of completed NodeExecution structs
-  - `{:error, reason}` - Execution failed
-  """
-  @spec execute_nodes_batch([Node.t()], ExecutionGraph.t(), map()) ::
-          {:ok, [NodeExecution.t()]} | {:error, any()}
-  def execute_nodes_batch(ready_nodes, execution_graph, execution_context) do
-    if Enum.empty?(ready_nodes) do
-      {:ok, []}
-    else
-      # Execute nodes sequentially, one after another
-      execute_nodes_sequentially(ready_nodes, execution_graph, execution_context, [])
+  # Get incoming connections for a specific node using optimized lookup
+  defp get_incoming_connections_for_node(execution_graph, node_id) do
+    # Use reverse connection map if available, otherwise fall back to filtering
+    case Map.get(execution_graph, :reverse_connection_map) do
+      nil ->
+        # Fallback: filter all connections (less efficient but functional)
+        Enum.filter(execution_graph.workflow.connections, fn conn ->
+          conn.to_node_id == node_id
+        end)
+      
+      reverse_map ->
+        # Optimized: direct lookup
+        Map.get(reverse_map, node_id, [])
     end
   end
 
-  # Execute nodes one by one in sequence
-  defp execute_nodes_sequentially([], _execution_graph, _execution_context, completed_executions) do
-    # All nodes completed successfully
-    {:ok, Enum.reverse(completed_executions)}
-  end
-
-  defp execute_nodes_sequentially([node | remaining_nodes], execution_graph, execution_context, completed_executions) do
-    case execute_single_node_with_events(node, execution_graph, execution_context) do
-      %NodeExecution{status: :completed} = node_execution ->
-        # Node completed successfully, continue with remaining nodes
-        updated_completed = [node_execution | completed_executions]
-        execute_nodes_sequentially(remaining_nodes, execution_graph, execution_context, updated_completed)
-
-      %NodeExecution{status: :failed} = node_execution ->
-        # Node failed, return error with all executions (including the failed one)
-        all_executions = Enum.reverse([node_execution | completed_executions])
-
-        {:error,
-         %{
-           type: "node_execution_failed",
-           message: "Node #{node.id} failed during sequential execution",
-           node_id: node.id,
-           node_executions: all_executions,
-           error_data: node_execution.error_data
-         }}
-
-      %NodeExecution{} = node_execution ->
-        # Node finished with other status (shouldn't happen, but handle gracefully)
-        updated_completed = [node_execution | completed_executions]
-        execute_nodes_sequentially(remaining_nodes, execution_graph, execution_context, updated_completed)
-    end
-  rescue
-    error ->
-      # Unexpected error during node execution
-      {:error,
-       %{
-         type: "sequential_execution_exception",
-         message: "Exception during sequential node execution: #{Exception.message(error)}",
-         node_id: node.id,
-         details: %{exception: error}
-       }}
-  end
 
   # Execute a single node with middleware events
   defp execute_single_node_with_events(node, execution_graph, execution_context) do
@@ -346,10 +387,10 @@ defmodule Prana.GraphExecutor do
   def route_node_output(%NodeExecution{} = node_execution, %ExecutionGraph{} = execution_graph, execution_context) do
     # Only route output for successful executions (output_port is not nil)
     if node_execution.output_port do
-      # Find connections from this node's output port
+      # Find connections from this node's output port using O(1) lookup
       connections =
         get_connections_from_node_port(
-          execution_graph.workflow.connections,
+          execution_graph,
           node_execution.node_id,
           node_execution.output_port
         )
@@ -364,22 +405,13 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Route output from multiple node executions
-  defp route_batch_outputs(node_executions, execution_graph, execution_context) do
-    Enum.reduce(node_executions, execution_context, fn node_execution, acc_context ->
-      updated_context = route_node_output(node_execution, execution_graph, acc_context)
-      store_node_result_in_context(node_execution, updated_context)
-    end)
+
+  # Get connections from a specific node and port using O(1) lookup
+  defp get_connections_from_node_port(execution_graph, node_id, output_port) do
+    Map.get(execution_graph.connection_map, {node_id, output_port}, [])
   end
 
-  # Get connections from a specific node and port
-  defp get_connections_from_node_port(connections, node_id, output_port) do
-    Enum.filter(connections, fn connection ->
-      connection.from_node_id == node_id and connection.from_port == output_port
-    end)
-  end
-
-  # Route data through a single connection
+  # Route data through a single connection with optimized context updates
   defp route_data_through_connection(node_execution, connection, execution_context) do
     # Apply data mapping if specified, otherwise pass output data directly
     routed_data =
@@ -393,13 +425,12 @@ defmodule Prana.GraphExecutor do
     target_input_key = "#{connection.to_node_id}_#{connection.to_port}"
     
     # Mark this conditional path as active for branching logic
-    active_paths = Map.get(execution_context, "active_paths", %{})
     path_key = "#{connection.from_node_id}_#{connection.from_port}"
-    updated_active_paths = Map.put(active_paths, path_key, true)
     
+    # Batch context updates to reduce map copying
     execution_context
     |> Map.put(target_input_key, routed_data)
-    |> Map.put("active_paths", updated_active_paths)
+    |> Map.update("active_paths", %{path_key => true}, &Map.put(&1, path_key, true))
   end
 
   # Apply data mapping using expression engine
@@ -409,7 +440,7 @@ defmodule Prana.GraphExecutor do
     ExpressionEngine.process_map(data_mapping, temp_context)
   end
 
-  # Store node execution result in context for $nodes.node_id access
+  # Store node execution result in context for $nodes.node_id access with optimized updates
   defp store_node_result_in_context(node_execution, execution_context) do
     # Get the node's custom_id for context storage
     # Note: We need to look up the node from the graph to get custom_id
@@ -423,17 +454,10 @@ defmodule Prana.GraphExecutor do
         %{"error" => node_execution.error_data, "status" => node_execution.status}
       end
 
-    # Update the nodes section of the context
-    nodes = Map.get(execution_context, "nodes", %{})
-    updated_nodes = Map.put(nodes, node_key, result_data)
-    
-    # Track executed nodes for conditional branching
-    executed_nodes = Map.get(execution_context, "executed_nodes", [])
-    updated_executed_nodes = [node_execution.node_id | executed_nodes]
-    
+    # Batch context updates to reduce map copying
     execution_context
-    |> Map.put("nodes", updated_nodes)
-    |> Map.put("executed_nodes", updated_executed_nodes)
+    |> Map.update("nodes", %{node_key => result_data}, &Map.put(&1, node_key, result_data))
+    |> Map.update("executed_nodes", [node_execution.node_id], &[node_execution.node_id | &1])
   end
 
   @doc """
@@ -636,9 +660,9 @@ defmodule Prana.GraphExecutor do
     # mark the paths from that node as active
     Enum.reduce(node_executions, %{}, fn node_execution, acc_paths ->
       if node_execution.output_port do
-        # Find connections from this node's output port
+        # Find connections from this node's output port using O(1) lookup
         connections = get_connections_from_node_port(
-          execution_graph.workflow.connections,
+          execution_graph,
           node_execution.node_id,
           node_execution.output_port
         )
@@ -655,16 +679,6 @@ defmodule Prana.GraphExecutor do
     end)
   end
   
-  # Extract execution context from execution state for completion checking (legacy)
-  defp extract_execution_context(execution) do
-    # Build a minimal context from execution state
-    # In a real implementation, this might be stored in execution metadata
-    %{
-      "nodes" => extract_nodes_from_executions(execution.node_executions),
-      "executed_nodes" => Enum.map(execution.node_executions, & &1.node_id),
-      "active_paths" => %{} # This would need to be properly tracked
-    }
-  end
 
   # Extract node results from node executions
   defp extract_nodes_from_executions(node_executions) do
