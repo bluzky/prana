@@ -157,6 +157,10 @@ defmodule Prana.Integrations.Logic do
             # Try next case
             find_matching_condition_case(remaining_cases, input_map)
           end
+          
+        {:error, _reason} ->
+          # Expression evaluation failed for this case, skip and try next
+          find_matching_condition_case(remaining_cases, input_map)
       end
     else
       # Skip invalid case, try next
