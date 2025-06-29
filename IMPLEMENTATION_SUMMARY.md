@@ -198,13 +198,11 @@ prana/
 **Key Fields**:
 ```elixir
 %Prana.Connection{
-  id: String.t(),
-  from_node_id: String.t(),
+  from: String.t(),
   from_port: String.t(),           # "success", "error", "true", "false"
-  to_node_id: String.t(),
+  to: String.t(),
   to_port: String.t(),             # "input"
-  conditions: [Prana.Condition.t()],
-  data_mapping: map(),
+  mapping: map(),
   metadata: map()
 }
 ```

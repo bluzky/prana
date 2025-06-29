@@ -190,15 +190,15 @@ workflow = %Workflow{
   connections: [
     # Connect condition true branch to adult processing
     %Connection{
-      from_node_id: "age_check",
+      from: "age_check",
       from_port: "true",
-      to_node_id: "adult_processor"
+      to: "adult_processor"
     },
     # Connect condition false branch to minor processing  
     %Connection{
-      from_node_id: "age_check",
+      from: "age_check",
       from_port: "false", 
-      to_node_id: "minor_processor"
+      to: "minor_processor"
     }
   ]
 }

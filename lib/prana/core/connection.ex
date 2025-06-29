@@ -40,11 +40,11 @@ defmodule Prana.Connection do
   """
   def from_map(data) when is_map(data) do
     %__MODULE__{
-      from: Map.get(data, "from") || Map.get(data, :from) || Map.get(data, "from_node_id") || Map.get(data, :from_node_id),
+      from: Map.get(data, "from") || Map.get(data, :from),
       from_port: Map.get(data, "from_port") || Map.get(data, :from_port),
-      to: Map.get(data, "to") || Map.get(data, :to) || Map.get(data, "to_node_id") || Map.get(data, :to_node_id),
+      to: Map.get(data, "to") || Map.get(data, :to),
       to_port: Map.get(data, "to_port") || Map.get(data, :to_port) || "input",
-      mapping: Map.get(data, "mapping") || Map.get(data, :mapping) || Map.get(data, "data_mapping") || Map.get(data, :data_mapping) || %{},
+      mapping: Map.get(data, "mapping") || Map.get(data, :mapping) || %{},
       metadata: Map.get(data, "metadata") || Map.get(data, :metadata) || %{}
     }
   end
