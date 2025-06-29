@@ -537,8 +537,8 @@ defmodule Prana.WorkflowCompilerTest do
       save_node = Enum.find(workflow.nodes, &(&1.custom_id == "save"))
       error_log_node = Enum.find(workflow.nodes, &(&1.custom_id == "error_log"))
       
-      assert hd(success_connections).to_node_id == save_node.id
-      assert hd(error_connections).to_node_id == error_log_node.id
+      assert hd(success_connections).to == save_node.id
+      assert hd(error_connections).to == error_log_node.id
     end
 
     test "handles nodes with no outgoing connections" do
@@ -584,7 +584,7 @@ defmodule Prana.WorkflowCompilerTest do
       assert length(connections) == 2
       
       # Verify target nodes
-      target_ids = Enum.map(connections, & &1.to_node_id)
+      target_ids = Enum.map(connections, & &1.to)
       assert email_node.id in target_ids
       assert log_node.id in target_ids
       

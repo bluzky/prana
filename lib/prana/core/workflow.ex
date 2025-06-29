@@ -65,7 +65,7 @@ defmodule Prana.Workflow do
   Gets entry nodes (nodes with no incoming connections)
   """
   def get_entry_nodes(%__MODULE__{nodes: nodes, connections: connections}) do
-    target_node_ids = MapSet.new(connections, & &1.to_node_id)
+    target_node_ids = MapSet.new(connections, & &1.to)
     Enum.reject(nodes, &MapSet.member?(target_node_ids, &1.id))
   end
 
@@ -73,7 +73,7 @@ defmodule Prana.Workflow do
   Gets connections from a specific node and port
   """
   def get_connections_from(%__MODULE__{connections: connections}, node_id, port) do
-    Enum.filter(connections, &(&1.from_node_id == node_id && &1.from_port == port))
+    Enum.filter(connections, &(&1.from == node_id && &1.from_port == port))
   end
 
   @doc """
@@ -185,8 +185,8 @@ defmodule Prana.Workflow do
 
     invalid_connections =
       Enum.reject(connections, fn conn ->
-        MapSet.member?(node_ids, conn.from_node_id) &&
-          MapSet.member?(node_ids, conn.to_node_id)
+        MapSet.member?(node_ids, conn.from) &&
+          MapSet.member?(node_ids, conn.to)
       end)
 
     if Enum.empty?(invalid_connections) do

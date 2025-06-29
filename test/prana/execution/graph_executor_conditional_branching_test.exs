@@ -142,37 +142,31 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       connections: [
         # Start -> Age Check
         %Connection{
-          id: "start_to_check",
-          from_node_id: "start",
+          from: "start",
           from_port: "success",
-          to_node_id: "age_check",
+          to: "age_check",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Age Check -> Adult (true branch)
         %Connection{
-          id: "check_to_adult",
-          from_node_id: "age_check",
+          from: "age_check",
           from_port: "true",
-          to_node_id: "adult_process",
+          to: "adult_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Age Check -> Minor (false branch)
         %Connection{
-          id: "check_to_minor",
-          from_node_id: "age_check",
+          from: "age_check",
           from_port: "false",
-          to_node_id: "minor_process",
+          to: "minor_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         }
       ],
@@ -284,49 +278,41 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       connections: [
         # Start -> Switch
         %Connection{
-          id: "start_to_switch",
-          from_node_id: "start",
+          from: "start",
           from_port: "success",
-          to_node_id: "user_type_switch",
+          to: "user_type_switch",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Switch -> Premium
         %Connection{
-          id: "switch_to_premium",
-          from_node_id: "user_type_switch",
+          from: "user_type_switch",
           from_port: "premium",
-          to_node_id: "premium_process",
+          to: "premium_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Switch -> Standard
         %Connection{
-          id: "switch_to_standard",
-          from_node_id: "user_type_switch",
+          from: "user_type_switch",
           from_port: "standard",
-          to_node_id: "standard_process",
+          to: "standard_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Switch -> Basic
         %Connection{
-          id: "switch_to_basic",
-          from_node_id: "user_type_switch",
+          from: "user_type_switch",
           from_port: "basic",
-          to_node_id: "basic_process",
+          to: "basic_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         }
       ],
@@ -1314,33 +1300,27 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         ],
         connections: [
           %Connection{
-            id: "start_to_user_check",
-            from_node_id: "start",
+            from: "start",
             from_port: "success",
-            to_node_id: "user_type_check",
+            to: "user_type_check",
             to_port: "input",
-            conditions: [],
-            data_mapping: %{},
+            mapping: %{},
             metadata: %{}
           },
           %Connection{
-            id: "user_check_to_premium_age",
-            from_node_id: "user_type_check",
+            from: "user_type_check",
             from_port: "premium",
-            to_node_id: "premium_age_check",
+            to: "premium_age_check",
             to_port: "input",
-            conditions: [],
-            data_mapping: %{},
+            mapping: %{},
             metadata: %{}
           },
           %Connection{
-            id: "user_check_to_standard",
-            from_node_id: "user_type_check",
+            from: "user_type_check",
             from_port: "standard",
-            to_node_id: "standard_process",
+            to: "standard_process",
             to_port: "input",
-            conditions: [],
-            data_mapping: %{},
+            mapping: %{},
             metadata: %{}
           }
         ],

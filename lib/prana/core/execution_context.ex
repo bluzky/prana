@@ -142,7 +142,7 @@ defmodule Prana.ExecutionContext do
     else
       # Node is on active path if ANY incoming connection is from an active path
       Enum.any?(incoming_connections, fn conn ->
-        path_active?(context, conn.from_node_id, conn.from_port)
+        path_active?(context, conn.from, conn.from_port)
       end)
     end
   end
@@ -150,7 +150,7 @@ defmodule Prana.ExecutionContext do
   # Helper function to get incoming connections for a node
   defp get_incoming_connections(workflow, node_id) do
     Enum.filter(workflow.connections, fn conn ->
-      conn.to_node_id == node_id
+      conn.to == node_id
     end)
   end
 end

@@ -144,37 +144,37 @@ defmodule Prana.Execution.DiamondForkTest do
       connections: [
         # A → B
         %Connection{
-          from_node_id: "start",
+          from: "start",
           from_port: "success",
-          to_node_id: "branch_b",
+          to: "branch_b",
           to_port: "input"
         },
         # A → C
         %Connection{
-          from_node_id: "start",
+          from: "start",
           from_port: "success",
-          to_node_id: "branch_c",
+          to: "branch_c",
           to_port: "input"
         },
         # B → Merge
         %Connection{
-          from_node_id: "branch_b",
+          from: "branch_b",
           from_port: "success",
-          to_node_id: "merge",
+          to: "merge",
           to_port: "input_a"
         },
         # C → Merge
         %Connection{
-          from_node_id: "branch_c",
+          from: "branch_c",
           from_port: "success",
-          to_node_id: "merge",
+          to: "merge",
           to_port: "input_b"
         },
         # Merge → D
         %Connection{
-          from_node_id: "merge",
+          from: "merge",
           from_port: "success",
-          to_node_id: "final",
+          to: "final",
           to_port: "input"
         }
       ],
