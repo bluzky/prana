@@ -151,7 +151,7 @@ defmodule Prana.NodeExecutor do
     case result do
       # Explicit port format: {:ok, data, port}
       {:ok, data, port} when is_binary(port) ->
-        if port in action.output_ports do
+        if allows_dynamic_ports?(action) or port in action.output_ports do
           {:ok, data, port}
         else
           {:error,
@@ -164,7 +164,7 @@ defmodule Prana.NodeExecutor do
 
       # Explicit error with port: {:error, error, port}
       {:error, error, port} when is_binary(port) ->
-        if port in action.output_ports do
+        if allows_dynamic_ports?(action) or port in action.output_ports do
           {:error,
            %{
              "type" => "action_error",
@@ -251,4 +251,8 @@ defmodule Prana.NodeExecutor do
       true -> "error"
     end
   end
+
+  # Check if action allows dynamic output ports
+  defp allows_dynamic_ports?(%Prana.Action{output_ports: ["*"]}), do: true
+  defp allows_dynamic_ports?(_action), do: false
 end

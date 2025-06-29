@@ -41,31 +41,39 @@ The Logic integration provides conditional routing capabilities for workflow exe
 
 ##### Switch
 - **Action Name**: `switch`
-- **Description**: Multi-case routing based on expression evaluation
+- **Description**: Multi-case routing based on simple condition expressions
 - **Input Ports**: `["input"]`
-- **Output Ports**: `["premium", "standard", "basic", "default"]`
+- **Output Ports**: `["*"]` (Dynamic - supports any port name)
 
 **Input Parameters**:
-- `switch_expression`: Expression to evaluate (e.g., `"user_type"`)
-- `cases`: Map of case_value => {port_name, output_data}
-- `default_data`: Data for default case
+- `cases`: Array of condition objects for routing logic
+- `default_port`: Default port name (optional, defaults to `"default"`)
+- `default_data`: Optional default data (defaults to input_map)
+
+**Case Object Properties**:
+- `condition`: Expression to evaluate (e.g., `"$input.field"`)
+- `value`: Expected value to match against
+- `port`: Output port name (can be any custom name)
+- `data`: Optional output data (defaults to input_map)
 
 **Returns**:
 - `{:ok, data, port_name}` for matching case
-- `{:ok, default_data, "default"}` for no match
+- `{:ok, default_data, default_port}` for no match
 
 **Example**:
 ```elixir
 %{
-  "switch_expression" => "user_type",
-  "cases" => %{
-    "premium" => {"premium", %{"discount" => 0.2}},
-    "standard" => {"standard", %{"discount" => 0.1}},
-    "basic" => {"basic", %{"discount" => 0.0}}
-  },
-  "default_data" => %{"discount" => 0.0}
+  "cases" => [
+    %{"condition" => "$input.tier", "value" => "premium", "port" => "premium_port"},
+    %{"condition" => "$input.verified", "value" => true, "port" => "verified_port"},
+    %{"condition" => "$input.status", "value" => "active", "port" => "active_port", "data" => %{"priority" => "high"}}
+  ],
+  "default_port" => "default",
+  "default_data" => %{"message" => "no match"}
 }
 ```
+
+**Dynamic Port Names**: The switch action supports any custom port name (e.g., `"premium_port"`, `"verified_user"`, `"special_case"`). This allows for semantic, meaningful port names instead of generic numbered outputs.
 
 ### Data Integration
 
@@ -204,12 +212,12 @@ workflow = %Workflow{
   integration_name: "logic",
   action_name: "switch",
   input_map: %{
-    "switch_expression" => "subscription_tier",
-    "cases" => %{
-      "premium" => {"premium", %{"features" => ["all"]}},
-      "standard" => {"standard", %{"features" => ["basic", "advanced"]}},
-      "basic" => {"basic", %{"features" => ["basic"]}}
-    },
+    "cases" => [
+      %{"condition" => "$input.subscription_tier", "value" => "premium", "port" => "premium_users", "data" => %{"features" => ["all"]}},
+      %{"condition" => "$input.subscription_tier", "value" => "standard", "port" => "standard_users", "data" => %{"features" => ["basic", "advanced"]}},
+      %{"condition" => "$input.subscription_tier", "value" => "basic", "port" => "basic_users", "data" => %{"features" => ["basic"]}}
+    ],
+    "default_port" => "trial_users",
     "default_data" => %{"features" => ["trial"]}
   }
 }
@@ -236,18 +244,45 @@ defmodule MyApp.CustomIntegration do
           module: __MODULE__,
           function: :my_action,
           input_ports: ["input"],
-          output_ports: ["success", "error"]
+          output_ports: ["success", "error"]  # Fixed ports
+        },
+        "dynamic_action" => %Prana.Action{
+          name: "dynamic_action", 
+          module: __MODULE__,
+          function: :dynamic_action,
+          input_ports: ["input"],
+          output_ports: ["*"]  # Dynamic ports - any port name allowed
         }
       }
     }
   end
 
   def my_action(input_map) do
-    # Implementation
+    # Implementation with fixed ports
     {:ok, result, "success"}
+  end
+  
+  def dynamic_action(input_map) do
+    # Implementation with custom port names
+    port_name = determine_custom_port(input_map)
+    {:ok, result, port_name}
   end
 end
 ```
+
+### Dynamic Output Ports
+
+Actions can support dynamic output ports by using `["*"]` as the `output_ports` value. This allows the action to return any custom port name at runtime:
+
+**Benefits**:
+- **Semantic port names**: Use meaningful names like `"premium_users"` instead of `"output_1"`
+- **Flexible routing**: Support any number of output scenarios
+- **Self-documenting workflows**: Port names indicate their purpose
+
+**Usage**:
+- Set `output_ports: ["*"]` in action definition
+- Return `{:ok, data, "custom_port_name"}` from action function
+- Any port name will pass validation
 
 Register the integration with:
 ```elixir
