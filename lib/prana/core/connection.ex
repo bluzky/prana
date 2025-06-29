@@ -4,39 +4,33 @@ defmodule Prana.Connection do
   """
 
   @type t :: %__MODULE__{
-          id: String.t(),
-          from_node_id: String.t(),
+          from: String.t(),
           from_port: String.t(),
-          to_node_id: String.t(),
+          to: String.t(),
           to_port: String.t(),
-          conditions: [Prana.Condition.t()],
-          data_mapping: map(),
+          mapping: map(),
           metadata: map()
         }
 
   defstruct [
-    :id,
-    :from_node_id,
+    :from,
     :from_port,
-    :to_node_id,
+    :to,
     :to_port,
-    conditions: [],
-    data_mapping: %{},
+    mapping: %{},
     metadata: %{}
   ]
 
   @doc """
   Creates a new connection
   """
-  def new(from_node_id, from_port, to_node_id, to_port \\ "input") do
+  def new(from, from_port, to, to_port \\ "input") do
     %__MODULE__{
-      id: generate_id(),
-      from_node_id: from_node_id,
+      from: from,
       from_port: from_port,
-      to_node_id: to_node_id,
+      to: to,
       to_port: to_port,
-      conditions: [],
-      data_mapping: %{},
+      mapping: %{},
       metadata: %{}
     }
   end
@@ -46,13 +40,11 @@ defmodule Prana.Connection do
   """
   def from_map(data) when is_map(data) do
     %__MODULE__{
-      id: Map.get(data, "id") || Map.get(data, :id) || generate_id(),
-      from_node_id: Map.get(data, "from_node_id") || Map.get(data, :from_node_id),
+      from: Map.get(data, "from") || Map.get(data, :from),
       from_port: Map.get(data, "from_port") || Map.get(data, :from_port),
-      to_node_id: Map.get(data, "to_node_id") || Map.get(data, :to_node_id),
+      to: Map.get(data, "to") || Map.get(data, :to),
       to_port: Map.get(data, "to_port") || Map.get(data, :to_port) || "input",
-      conditions: parse_conditions(Map.get(data, "conditions") || Map.get(data, :conditions) || []),
-      data_mapping: Map.get(data, "data_mapping") || Map.get(data, :data_mapping) || %{},
+      mapping: Map.get(data, "mapping") || Map.get(data, :mapping) || %{},
       metadata: Map.get(data, "metadata") || Map.get(data, :metadata) || %{}
     }
   end
@@ -61,7 +53,7 @@ defmodule Prana.Connection do
   Validates a connection
   """
   def valid?(%__MODULE__{} = connection) do
-    required_fields = [:id, :from_node_id, :from_port, :to_node_id, :to_port]
+    required_fields = [:from, :from_port, :to, :to_port]
 
     missing_fields =
       Enum.reject(required_fields, fn field ->
@@ -76,15 +68,4 @@ defmodule Prana.Connection do
     end
   end
 
-  defp generate_id do
-    16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
-  end
-
-  defp parse_conditions(conditions) when is_list(conditions) do
-    Enum.map(conditions, &parse_condition/1)
-  end
-
-  defp parse_condition(condition) when is_map(condition) do
-    struct(Prana.Condition, condition)
-  end
 end

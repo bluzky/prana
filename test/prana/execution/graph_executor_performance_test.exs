@@ -72,12 +72,11 @@ defmodule Prana.GraphExecutorPerformanceTest do
         to_id = "node_#{i+1}"
         
         %Connection{
-          id: "conn_#{i}",
-          from_node_id: from_id,
+          from: from_id,
           from_port: "success",
-          to_node_id: to_id,
+          to: to_id,
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         }
       end)
       
@@ -156,12 +155,11 @@ defmodule Prana.GraphExecutorPerformanceTest do
       # Create connections from source to all targets
       connections = Enum.map(1..50, fn i ->
         %Connection{
-          id: "conn_#{i}",
-          from_node_id: "source",
+          from: "source",
           from_port: "success",
-          to_node_id: "target_#{i}",
+          to: "target_#{i}",
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         }
       end)
       
@@ -226,12 +224,11 @@ defmodule Prana.GraphExecutorPerformanceTest do
       # Create connections from all sources to target
       connections = Enum.map(1..30, fn i ->
         %Connection{
-          id: "conn_#{i}",
-          from_node_id: "source_#{i}",
+          from: "source_#{i}",
           from_port: "success", 
-          to_node_id: "target",
+          to: "target",
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         }
       end)
       
@@ -248,10 +245,10 @@ defmodule Prana.GraphExecutorPerformanceTest do
       # For this test, we'll manually create the execution graph to include all connections
       # since WorkflowCompiler prunes unreachable nodes
       connection_map = Enum.group_by(connections, fn conn ->
-        {conn.from_node_id, conn.from_port}
+        {conn.from, conn.from_port}
       end)
       
-      reverse_connection_map = Enum.group_by(connections, fn conn -> conn.to_node_id end)
+      reverse_connection_map = Enum.group_by(connections, fn conn -> conn.to end)
       
       node_map = Map.new([target_node | source_nodes], fn node -> {node.id, node} end)
       
@@ -308,12 +305,11 @@ defmodule Prana.GraphExecutorPerformanceTest do
       
       connections = [
         %Connection{
-          id: "conn_1",
-          from_node_id: "trigger",
+          from: "trigger",
           from_port: "success",
-          to_node_id: "action", 
+          to: "action", 
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         }
       ]
       

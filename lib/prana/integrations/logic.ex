@@ -12,6 +12,7 @@ defmodule Prana.Integrations.Logic do
 
   alias Prana.Action
   alias Prana.Integration
+  alias Prana.ExpressionEngine
 
   @doc """
   Returns the integration definition with all available actions
@@ -39,11 +40,11 @@ defmodule Prana.Integrations.Logic do
         "switch" => %Action{
           name: "switch",
           display_name: "Switch",
-          description: "Multi-case routing based on expression evaluation",
+          description: "Multi-case routing based on simple condition expressions",
           module: __MODULE__,
           function: :switch,
           input_ports: ["input"],
-          output_ports: ["premium", "standard", "basic", "default"],
+          output_ports: ["*"],
           default_success_port: "default",
           default_error_port: "default"
         }
@@ -86,49 +87,49 @@ defmodule Prana.Integrations.Logic do
   end
 
   @doc """
-  Switch action - multi-case routing based on expression value
+  Switch action - multi-case routing based on simple conditions
   
   Expected input_map:
-  - switch_expression: expression to evaluate (e.g., "user_type")
-  - cases: map of case_value => {port_name, output_data}
-  - default_data: data for default case
+  - cases: array of condition objects
+  - default_port: default port name (optional, defaults to "default")
+  - default_data: optional default data (defaults to input_map)
   
   Example:
   %{
-    "switch_expression" => "user_type",
-    "cases" => %{
-      "premium" => {"premium", %{"discount" => 0.2}},
-      "standard" => {"standard", %{"discount" => 0.1}},
-      "basic" => {"basic", %{"discount" => 0.0}}
-    },
-    "default_data" => %{"discount" => 0.0}
+    "cases" => [
+      %{"condition" => "$input.tier", "value" => "premium", "port" => "premium_port"},
+      %{"condition" => "$input.verified", "value" => true, "port" => "verified_port"},
+      %{"condition" => "$input.status", "value" => "active", "port" => "active_port", "data" => %{"priority" => "high"}}
+    ],
+    "default_port" => "default",
+    "default_data" => %{"message" => "no match"}
   }
+  
+  Case objects support:
+  - condition: expression to evaluate (e.g., "$input.field")
+  - value: expected value to match against
+  - port: output port name
+  - data: optional output data (defaults to input_map)
   
   Returns:
   - {:ok, data, port_name} for matching case
-  - {:ok, default_data, "default"} for no match
+  - {:ok, default_data, default_port} for no match
   """
   def switch(input_map) do
-    switch_expression = Map.get(input_map, "switch_expression")
-    cases = Map.get(input_map, "cases", %{})
+    cases = Map.get(input_map, "cases", [])
+    default_port = Map.get(input_map, "default_port", "default")
     default_data = Map.get(input_map, "default_data", input_map)
     
-    if switch_expression do
-      case evaluate_expression(switch_expression, input_map) do
-        {:ok, switch_value} ->
-          case find_matching_case(switch_value, cases) do
-            {:ok, {case_port, case_data}} ->
-              {:ok, case_data, case_port}
-              
-            :no_match ->
-              {:ok, default_data, "default"}
-          end
-          
-        {:error, reason} ->
-          {:error, %{type: "switch_evaluation_error", message: reason}, "default"}
-      end
-    else
-      {:error, %{type: "missing_switch_expression", message: "No switch expression specified"}, "default"}
+    # Try each case in order
+    case find_matching_condition_case(cases, input_map) do
+      {:ok, {case_port, case_data}} ->
+        {:ok, case_data, case_port}
+        
+      :no_match ->
+        {:ok, default_data, default_port}
+        
+      {:error, reason} ->
+        {:error, %{type: "condition_switch_error", message: reason}, default_port}
     end
   end
 
@@ -136,6 +137,41 @@ defmodule Prana.Integrations.Logic do
   # ============================================================================
   # Private Helper Functions
   # ============================================================================
+
+
+  # Find first matching condition case
+  defp find_matching_condition_case([], _input_map), do: :no_match
+  
+  defp find_matching_condition_case([case_config | remaining_cases], input_map) do
+    condition_expr = Map.get(case_config, "condition")
+    expected_value = Map.get(case_config, "value")
+    case_port = Map.get(case_config, "port", "default")
+    case_data = Map.get(case_config, "data", input_map)
+    
+    if condition_expr do
+      case evaluate_expression(condition_expr, input_map) do
+        {:ok, actual_value} ->
+          if values_match?(actual_value, expected_value) do
+            {:ok, {case_port, case_data}}
+          else
+            # Try next case
+            find_matching_condition_case(remaining_cases, input_map)
+          end
+          
+        {:error, _reason} ->
+          # Expression evaluation failed for this case, skip and try next
+          find_matching_condition_case(remaining_cases, input_map)
+      end
+    else
+      # Skip invalid case, try next
+      find_matching_condition_case(remaining_cases, input_map)
+    end
+  end
+
+  # Check if actual value matches expected value
+  defp values_match?(actual, expected) do
+    actual == expected or to_string(actual) == to_string(expected)
+  end
 
   # Evaluate a condition expression (simple boolean evaluation)
   defp evaluate_condition(condition, context) when is_binary(condition) do
@@ -250,44 +286,10 @@ defmodule Prana.Integrations.Logic do
     end
   end
 
-  # Evaluate general expression (placeholder for now)
+  # Evaluate expression using ExpressionEngine
   defp evaluate_expression(expression, context) do
-    # For now, just extract simple values
-    extract_value(expression, context)
+    ExpressionEngine.extract(expression, context)
   end
 
-  # Find matching case in switch cases
-  defp find_matching_case(switch_value, cases) do
-    case_entry = Enum.find(cases, fn {case_value, _case_config} ->
-      case_value == switch_value or to_string(case_value) == to_string(switch_value)
-    end)
-    
-    case case_entry do
-      {_case_value, {port_name, case_data}} ->
-        # New format: {port_name, case_data}
-        {:ok, {port_name, case_data}}
-        
-      {_case_value, case_data} when is_map(case_data) ->
-        # Legacy format: just case_data (auto-determine port)
-        case_port = determine_case_port(switch_value)
-        {:ok, {case_port, case_data}}
-        
-      nil ->
-        :no_match
-    end
-  end
-
-  # Determine which case port to use (legacy support)
-  defp determine_case_port(case_value) do
-    case case_value do
-      "premium" -> "premium"
-      "standard" -> "standard" 
-      "basic" -> "basic"
-      1 -> "premium"  # Backward compatibility
-      2 -> "standard"
-      3 -> "basic"
-      _ -> "default"
-    end
-  end
 
 end

@@ -144,8 +144,8 @@ defmodule Prana.WorkflowCompiler do
   @spec find_connected_nodes(Workflow.t(), String.t()) :: [String.t()]
   defp find_connected_nodes(%Workflow{connections: connections}, from_node_id) do
     connections
-    |> Enum.filter(fn conn -> conn.from_node_id == from_node_id end)
-    |> Enum.map(fn conn -> conn.to_node_id end)
+    |> Enum.filter(fn conn -> conn.from == from_node_id end)
+    |> Enum.map(fn conn -> conn.to end)
     |> Enum.uniq()
   end
 
@@ -157,7 +157,7 @@ defmodule Prana.WorkflowCompiler do
     # Filter connections to only include those between reachable nodes
     reachable_connections =
       Enum.filter(workflow.connections, fn conn ->
-        MapSet.member?(reachable_node_ids, conn.from_node_id) and MapSet.member?(reachable_node_ids, conn.to_node_id)
+        MapSet.member?(reachable_node_ids, conn.from) and MapSet.member?(reachable_node_ids, conn.to)
       end)
 
     # Create new workflow with compiled nodes and connections
@@ -174,8 +174,8 @@ defmodule Prana.WorkflowCompiler do
   @spec build_dependency_graph(Workflow.t()) :: map()
   defp build_dependency_graph(%Workflow{connections: connections}) do
     Enum.reduce(connections, %{}, fn conn, acc ->
-      Map.update(acc, conn.to_node_id, [conn.from_node_id], fn deps ->
-        Enum.uniq([conn.from_node_id | deps])
+      Map.update(acc, conn.to, [conn.from], fn deps ->
+        Enum.uniq([conn.from | deps])
       end)
     end)
   end
@@ -184,14 +184,14 @@ defmodule Prana.WorkflowCompiler do
   @spec build_connection_map(Workflow.t()) :: map()
   defp build_connection_map(%Workflow{connections: connections}) do
     Enum.group_by(connections, fn conn ->
-      {conn.from_node_id, conn.from_port}
+      {conn.from, conn.from_port}
     end)
   end
 
   # Build reverse connection map for fast lookup of incoming connections.
   @spec build_reverse_connection_map(Workflow.t()) :: map()
   defp build_reverse_connection_map(%Workflow{connections: connections}) do
-    Enum.group_by(connections, fn conn -> conn.to_node_id end)
+    Enum.group_by(connections, fn conn -> conn.to end)
   end
 
   # Build node map for fast lookup of nodes by ID.

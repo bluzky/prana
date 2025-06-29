@@ -60,7 +60,7 @@ defmodule Prana.Integrations.Data do
   def merge(input_map) do
     strategy = Map.get(input_map, "strategy", "append")
     
-    # Extract inputs from named ports or legacy inputs list
+    # Extract inputs from named ports
     inputs = extract_inputs_from_map(input_map)
     
     case merge_data_with_strategy(inputs, strategy) do

@@ -147,13 +147,13 @@ execution_graph = %ExecutionGraph{
 # Build connection map for fast lookup of outgoing connections
 defp build_connection_map(%Workflow{connections: connections}) do
   Enum.group_by(connections, fn conn ->
-    {conn.from_node_id, conn.from_port}
+    {conn.from, conn.from_port}
   end)
 end
 
 # Build reverse connection map for fast lookup of incoming connections
 defp build_reverse_connection_map(%Workflow{connections: connections}) do
-  Enum.group_by(connections, fn conn -> conn.to_node_id end)
+  Enum.group_by(connections, fn conn -> conn.to end)
 end
 
 # Build node map for fast lookup of nodes by ID
@@ -168,7 +168,7 @@ end
 ```elixir
 # Search through all connections for each lookup - SLOW
 connections = Enum.filter(workflow.connections, fn conn ->
-  conn.from_node_id == node_id and conn.from_port == port
+  conn.from == node_id and conn.from_port == port
 end)
 ```
 
@@ -194,7 +194,7 @@ defmodule Prana.ExecutionGraph do
     :trigger_node,          # The specific trigger node that started execution
     :dependency_graph,      # Map of node_id -> [prerequisite_node_ids]
     :connection_map,        # Map of {from_node, from_port} -> [connections]
-    :reverse_connection_map, # Map of to_node_id -> [incoming_connections]
+    :reverse_connection_map, # Map of to -> [incoming_connections]
     :node_map,             # Map of node_id -> node for quick lookup
     :total_nodes           # Total number of nodes in compiled workflow
   ]

@@ -241,7 +241,7 @@ defmodule Prana.GraphExecutor do
     incoming_connections = get_incoming_connections_for_node(execution_graph, node.id)
     
     Enum.any?(incoming_connections, fn conn ->
-      path_key = "#{conn.from_node_id}_#{conn.from_port}"
+      path_key = "#{conn.from}_#{conn.from_port}"
       Map.get(active_paths, path_key, false)
     end)
   end
@@ -313,7 +313,7 @@ defmodule Prana.GraphExecutor do
       active_paths = Map.get(execution_context, "active_paths", %{})
       
       Enum.any?(incoming_connections, fn conn ->
-        path_key = "#{conn.from_node_id}_#{conn.from_port}"
+        path_key = "#{conn.from}_#{conn.from_port}"
         Map.get(active_paths, path_key, false)
       end)
     end
@@ -326,7 +326,7 @@ defmodule Prana.GraphExecutor do
       nil ->
         # Fallback: filter all connections (less efficient but functional)
         Enum.filter(execution_graph.workflow.connections, fn conn ->
-          conn.to_node_id == node_id
+          conn.to == node_id
         end)
       
       reverse_map ->
@@ -415,17 +415,17 @@ defmodule Prana.GraphExecutor do
   defp route_data_through_connection(node_execution, connection, execution_context) do
     # Apply data mapping if specified, otherwise pass output data directly
     routed_data =
-      if map_size(connection.data_mapping) > 0 do
-        apply_data_mapping(node_execution.output_data, connection.data_mapping, execution_context)
+      if map_size(connection.mapping) > 0 do
+        apply_data_mapping(node_execution.output_data, connection.mapping, execution_context)
       else
         node_execution.output_data
       end
 
     # Store routed data in context for the target node
-    target_input_key = "#{connection.to_node_id}_#{connection.to_port}"
+    target_input_key = "#{connection.to}_#{connection.to_port}"
     
     # Mark this conditional path as active for branching logic
-    path_key = "#{connection.from_node_id}_#{connection.from_port}"
+    path_key = "#{connection.from}_#{connection.from_port}"
     
     # Batch context updates to reduce map copying
     execution_context
@@ -434,10 +434,10 @@ defmodule Prana.GraphExecutor do
   end
 
   # Apply data mapping using expression engine
-  defp apply_data_mapping(output_data, data_mapping, execution_context) do
+  defp apply_data_mapping(output_data, mapping, execution_context) do
     # Create a temporary context for expression evaluation
     temp_context = Map.put(execution_context, "output", output_data)
-    ExpressionEngine.process_map(data_mapping, temp_context)
+    ExpressionEngine.process_map(mapping, temp_context)
   end
 
   # Store node execution result in context for $nodes.node_id access with optimized updates
@@ -669,7 +669,7 @@ defmodule Prana.GraphExecutor do
         
         # Mark each connection path as active
         Enum.reduce(connections, acc_paths, fn connection, path_acc ->
-          path_key = "#{connection.from_node_id}_#{connection.from_port}"
+          path_key = "#{connection.from}_#{connection.from_port}"
           Map.put(path_acc, path_key, true)
         end)
       else

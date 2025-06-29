@@ -115,58 +115,52 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       connections = [
         # Trigger to both branch starts
         %Connection{
-          id: "trigger_to_a1",
-          from_node_id: "trigger",
+          from: "trigger",
           from_port: "success",
-          to_node_id: "branch_a1",
+          to: "branch_a1",
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         },
         %Connection{
-          id: "trigger_to_b1", 
-          from_node_id: "trigger",
+          from: "trigger",
           from_port: "success",
-          to_node_id: "branch_b1",
+          to: "branch_b1",
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         },
         
         # Branch A sequence
         %Connection{
-          id: "a1_to_a2",
-          from_node_id: "branch_a1",
+          from: "branch_a1",
           from_port: "success",
-          to_node_id: "branch_a2", 
+          to: "branch_a2", 
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         },
         
         # Branch B sequence  
         %Connection{
-          id: "b1_to_b2",
-          from_node_id: "branch_b1",
+          from: "branch_b1",
           from_port: "success",
-          to_node_id: "branch_b2",
+          to: "branch_b2",
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         },
         
         # Both branches to merge
         %Connection{
-          id: "a2_to_merge",
-          from_node_id: "branch_a2", 
+          from: "branch_a2", 
           from_port: "success",
-          to_node_id: "merge",
+          to: "merge",
           to_port: "input_a",
-          data_mapping: %{}
+          mapping: %{}
         },
         %Connection{
-          id: "b2_to_merge",
-          from_node_id: "branch_b2",
+          from: "branch_b2",
           from_port: "success", 
-          to_node_id: "merge",
+          to: "merge",
           to_port: "input_b",
-          data_mapping: %{}
+          mapping: %{}
         }
       ]
       
@@ -253,12 +247,11 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # Create mock execution graph with connections
       connections = [
         %Connection{
-          id: "start_to_continuing",
-          from_node_id: "start", 
+          from: "start", 
           from_port: "success",
-          to_node_id: "continuing",
+          to: "continuing",
           to_port: "input",
-          data_mapping: %{}
+          mapping: %{}
         }
       ]
       

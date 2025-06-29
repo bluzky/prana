@@ -142,37 +142,31 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       connections: [
         # Start -> Age Check
         %Connection{
-          id: "start_to_check",
-          from_node_id: "start",
+          from: "start",
           from_port: "success",
-          to_node_id: "age_check",
+          to: "age_check",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Age Check -> Adult (true branch)
         %Connection{
-          id: "check_to_adult",
-          from_node_id: "age_check",
+          from: "age_check",
           from_port: "true",
-          to_node_id: "adult_process",
+          to: "adult_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Age Check -> Minor (false branch)
         %Connection{
-          id: "check_to_minor",
-          from_node_id: "age_check",
+          from: "age_check",
           from_port: "false",
-          to_node_id: "minor_process",
+          to: "minor_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         }
       ],
@@ -284,49 +278,41 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       connections: [
         # Start -> Switch
         %Connection{
-          id: "start_to_switch",
-          from_node_id: "start",
+          from: "start",
           from_port: "success",
-          to_node_id: "user_type_switch",
+          to: "user_type_switch",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Switch -> Premium
         %Connection{
-          id: "switch_to_premium",
-          from_node_id: "user_type_switch",
+          from: "user_type_switch",
           from_port: "premium",
-          to_node_id: "premium_process",
+          to: "premium_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Switch -> Standard
         %Connection{
-          id: "switch_to_standard",
-          from_node_id: "user_type_switch",
+          from: "user_type_switch",
           from_port: "standard",
-          to_node_id: "standard_process",
+          to: "standard_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         },
 
         # Switch -> Basic
         %Connection{
-          id: "switch_to_basic",
-          from_node_id: "user_type_switch",
+          from: "user_type_switch",
           from_port: "basic",
-          to_node_id: "basic_process",
+          to: "basic_process",
           to_port: "input",
-          conditions: [],
-          data_mapping: %{},
+          mapping: %{},
           metadata: %{}
         }
       ],
@@ -963,62 +949,62 @@ defmodule Prana.Execution.ConditionalBranchingTest do
     test "switch action routes to correct ports" do
       # Test premium user
       premium_input = %{
-        "switch_expression" => "user_type",
         "user_type" => "premium",
-        "cases" => %{
-          "premium" => {"premium", %{"discount" => 0.2}},
-          "standard" => {"standard", %{"discount" => 0.1}},
-          "basic" => {"basic", %{"discount" => 0.0}}
-        },
-        "default_data" => %{"discount" => 0.0}
+        "cases" => [
+          %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
+          %{"condition" => "$input.user_type", "value" => "standard", "port" => "standard", "data" => %{"discount" => 0.1}},
+          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => 0.0}}
+        ],
+        "default_data" => %{"discount" => 0.0},
+        "input" => %{"user_type" => "premium"}
       }
 
       assert {:ok, %{"discount" => 0.2}, "premium"} = Logic.switch(premium_input)
 
       # Test standard user
       standard_input = %{
-        "switch_expression" => "user_type",
         "user_type" => "standard",
-        "cases" => %{
-          "premium" => {"premium", %{"discount" => 0.2}},
-          "standard" => {"standard", %{"discount" => 0.1}},
-          "basic" => {"basic", %{"discount" => 0.0}}
-        },
-        "default_data" => %{"discount" => 0.0}
+        "cases" => [
+          %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
+          %{"condition" => "$input.user_type", "value" => "standard", "port" => "standard", "data" => %{"discount" => 0.1}},
+          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => 0.0}}
+        ],
+        "default_data" => %{"discount" => 0.0},
+        "input" => %{"user_type" => "standard"}
       }
 
       assert {:ok, %{"discount" => 0.1}, "standard"} = Logic.switch(standard_input)
 
       # Test unknown user (default case)
       unknown_input = %{
-        "switch_expression" => "user_type",
         "user_type" => "enterprise",
-        "cases" => %{
-          "premium" => {"premium", %{"discount" => 0.2}},
-          "standard" => {"standard", %{"discount" => 0.1}},
-          "basic" => {"basic", %{"discount" => 0.0}}
-        },
-        "default_data" => %{"discount" => 0.0, "tier" => "unknown"}
+        "cases" => [
+          %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
+          %{"condition" => "$input.user_type", "value" => "standard", "port" => "standard", "data" => %{"discount" => 0.1}},
+          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => 0.0}}
+        ],
+        "default_data" => %{"discount" => 0.0, "tier" => "unknown"},
+        "input" => %{"user_type" => "enterprise"}
       }
 
       assert {:ok, %{"discount" => 0.0, "tier" => "unknown"}, "default"} = Logic.switch(unknown_input)
     end
 
-    test "switch action handles legacy format" do
-      # Test legacy format (backward compatibility)
-      legacy_input = %{
-        "switch_expression" => "plan_id",
+    test "switch action handles numeric values" do
+      # Test condition-based format with numeric values
+      numeric_input = %{
         "plan_id" => 1,
-        "cases" => %{
-          1 => %{"name" => "Premium Plan", "features" => ["feature1", "feature2"]},
-          2 => %{"name" => "Standard Plan", "features" => ["feature1"]},
-          3 => %{"name" => "Basic Plan", "features" => []}
-        },
-        "default_data" => %{"name" => "Unknown Plan", "features" => []}
+        "cases" => [
+          %{"condition" => "$input.plan_id", "value" => 1, "port" => "premium", "data" => %{"name" => "Premium Plan", "features" => ["feature1", "feature2"]}},
+          %{"condition" => "$input.plan_id", "value" => 2, "port" => "standard", "data" => %{"name" => "Standard Plan", "features" => ["feature1"]}},
+          %{"condition" => "$input.plan_id", "value" => 3, "port" => "basic", "data" => %{"name" => "Basic Plan", "features" => []}}
+        ],
+        "default_data" => %{"name" => "Unknown Plan", "features" => []},
+        "input" => %{"plan_id" => 1}
       }
 
       assert {:ok, %{"name" => "Premium Plan", "features" => ["feature1", "feature2"]}, "premium"} =
-               Logic.switch(legacy_input)
+               Logic.switch(numeric_input)
     end
 
     test "if_condition handles missing condition" do
@@ -1031,15 +1017,15 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       assert {:error, %{type: "missing_condition"}, "false"} = Logic.if_condition(invalid_input)
     end
 
-    test "switch handles missing switch expression" do
+    test "switch handles empty cases array" do
       invalid_input = %{
-        "cases" => %{
-          "premium" => {"premium", %{"discount" => 0.2}}
-        },
-        "default_data" => %{"discount" => 0.0}
+        "cases" => [],
+        "default_data" => %{"discount" => 0.0},
+        "default_port" => "default"
       }
 
-      assert {:error, %{type: "missing_switch_expression"}, "default"} = Logic.switch(invalid_input)
+      # Should use default when no cases match (empty cases)
+      assert {:ok, %{"discount" => 0.0}, "default"} = Logic.switch(invalid_input)
     end
   end
 
@@ -1213,20 +1199,20 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
   describe "performance and integration" do
     test "handles complex switch workflow with multiple branches" do
-      # Test workflow with many switch cases
+      # Test workflow with many switch cases using condition-based format
       complex_switch_input = %{
-        "switch_expression" => "status_code",
         "status_code" => 404,
-        "cases" => %{
-          200 => {"success", %{"message" => "OK"}},
-          201 => {"created", %{"message" => "Created"}},
-          400 => {"bad_request", %{"message" => "Bad Request"}},
-          401 => {"unauthorized", %{"message" => "Unauthorized"}},
-          403 => {"forbidden", %{"message" => "Forbidden"}},
-          404 => {"not_found", %{"message" => "Not Found"}},
-          500 => {"server_error", %{"message" => "Internal Server Error"}}
-        },
-        "default_data" => %{"message" => "Unknown Status"}
+        "cases" => [
+          %{"condition" => "$input.status_code", "value" => 200, "port" => "success", "data" => %{"message" => "OK"}},
+          %{"condition" => "$input.status_code", "value" => 201, "port" => "created", "data" => %{"message" => "Created"}},
+          %{"condition" => "$input.status_code", "value" => 400, "port" => "bad_request", "data" => %{"message" => "Bad Request"}},
+          %{"condition" => "$input.status_code", "value" => 401, "port" => "unauthorized", "data" => %{"message" => "Unauthorized"}},
+          %{"condition" => "$input.status_code", "value" => 403, "port" => "forbidden", "data" => %{"message" => "Forbidden"}},
+          %{"condition" => "$input.status_code", "value" => 404, "port" => "not_found", "data" => %{"message" => "Not Found"}},
+          %{"condition" => "$input.status_code", "value" => 500, "port" => "server_error", "data" => %{"message" => "Internal Server Error"}}
+        ],
+        "default_data" => %{"message" => "Unknown Status"},
+        "input" => %{"status_code" => 404}
       }
 
       assert {:ok, %{"message" => "Not Found"}, "not_found"} = Logic.switch(complex_switch_input)
@@ -1314,33 +1300,27 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         ],
         connections: [
           %Connection{
-            id: "start_to_user_check",
-            from_node_id: "start",
+            from: "start",
             from_port: "success",
-            to_node_id: "user_type_check",
+            to: "user_type_check",
             to_port: "input",
-            conditions: [],
-            data_mapping: %{},
+            mapping: %{},
             metadata: %{}
           },
           %Connection{
-            id: "user_check_to_premium_age",
-            from_node_id: "user_type_check",
+            from: "user_type_check",
             from_port: "premium",
-            to_node_id: "premium_age_check",
+            to: "premium_age_check",
             to_port: "input",
-            conditions: [],
-            data_mapping: %{},
+            mapping: %{},
             metadata: %{}
           },
           %Connection{
-            id: "user_check_to_standard",
-            from_node_id: "user_type_check",
+            from: "user_type_check",
             from_port: "standard",
-            to_node_id: "standard_process",
+            to: "standard_process",
             to_port: "input",
-            conditions: [],
-            data_mapping: %{},
+            mapping: %{},
             metadata: %{}
           }
         ],
