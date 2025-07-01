@@ -4,6 +4,50 @@ Prana includes several core integrations that provide essential workflow functio
 
 ## Core Integrations
 
+### Manual Integration
+
+**Purpose**: Testing and development utilities
+**Category**: Test
+**Module**: `Prana.Integrations.Manual`
+
+The Manual integration provides simple test actions for workflow development and testing scenarios.
+
+#### Actions
+
+##### Trigger
+- **Action Name**: `trigger`
+- **Description**: Simple trigger for testing workflows
+- **Input Ports**: `[]`
+- **Output Ports**: `["success"]`
+- **Usage**: Entry point for test workflows
+- **Returns**: Passes through input data unchanged
+
+##### Process Adult
+- **Action Name**: `process_adult`
+- **Description**: Process adult data with timestamp
+- **Input Ports**: `["input"]`
+- **Output Ports**: `["success"]`
+- **Returns**: Input data with `processed_as: "adult"` and timestamp
+
+**Example**:
+```elixir
+# Input: %{"user_id" => 123, "age" => 25}
+# Output: %{"user_id" => 123, "age" => 25, "processed_as" => "adult", "timestamp" => DateTime.utc_now()}
+```
+
+##### Process Minor
+- **Action Name**: `process_minor`
+- **Description**: Process minor data with timestamp
+- **Input Ports**: `["input"]`
+- **Output Ports**: `["success"]`
+- **Returns**: Input data with `processed_as: "minor"` and timestamp
+
+**Example**:
+```elixir
+# Input: %{"user_id" => 456, "age" => 16}
+# Output: %{"user_id" => 456, "age" => 16, "processed_as" => "minor", "timestamp" => DateTime.utc_now()}
+```
+
 ### Logic Integration
 
 **Purpose**: Conditional branching and control flow operations
@@ -138,153 +182,65 @@ The Data integration provides essential data manipulation capabilities for combi
 # Result: [1, 2, 3, 4, 5]
 ```
 
-### Manual Integration
+### Workflow Integration
 
-**Purpose**: Testing and development utilities
-**Category**: Test
-**Module**: `Prana.Integrations.Manual`
+**Purpose**: Sub-workflow orchestration and coordination
+**Category**: Coordination
+**Module**: `Prana.Integrations.Workflow`
 
-The Manual integration provides simple test actions for workflow development and testing scenarios.
+The Workflow integration provides sub-workflow execution capabilities with suspension/resume patterns for parent-child workflow coordination.
 
 #### Actions
 
-##### Trigger
-- **Action Name**: `trigger`
-- **Description**: Simple trigger for testing workflows
-- **Input Ports**: `[]`
-- **Output Ports**: `["success"]`
-
-##### Process Adult
-- **Action Name**: `process_adult`
-- **Description**: Process adult data (test action)
+##### Execute Workflow
+- **Action Name**: `execute_workflow`
+- **Description**: Execute a sub-workflow with synchronous or asynchronous coordination
 - **Input Ports**: `["input"]`
-- **Output Ports**: `["success"]`
+- **Output Ports**: `["success", "error", "timeout"]`
 
-##### Process Minor
-- **Action Name**: `process_minor`
-- **Description**: Process minor data (test action)
-- **Input Ports**: `["input"]`
-- **Output Ports**: `["success"]`
+**Input Parameters**:
+- `workflow_id`: The ID of the sub-workflow to execute (required)
+- `input_data`: Data to pass to the sub-workflow (optional, defaults to full input)
+- `execution_mode`: Execution mode - `"sync"` | `"async"` | `"fire_and_forget"` (optional, defaults to `"sync"`)
+- `timeout_ms`: Maximum time to wait for sub-workflow completion in milliseconds (optional, defaults to 5 minutes)
+- `failure_strategy`: How to handle sub-workflow failures - `"fail_parent"` | `"continue"` (optional, defaults to `"fail_parent"`)
 
-## Usage in Workflows
+**Execution Modes**:
 
-### Conditional Branching Example
+1. **Synchronous (`"sync"`)** - Default
+   - Parent workflow suspends until sub-workflow completes
+   - Returns: `{:suspend, :sub_workflow_sync, suspend_data}`
 
+2. **Asynchronous (`"async"`)**
+   - Parent workflow suspends, sub-workflow executes async
+   - Parent resumes when sub-workflow completes
+   - Returns: `{:suspend, :sub_workflow_async, suspend_data}`
+
+3. **Fire-and-Forget (`"fire_and_forget"`)**
+   - Parent workflow triggers sub-workflow and continues immediately
+   - Returns: `{:suspend, :sub_workflow_fire_forget, suspend_data}`
+
+**Examples**:
+
+*Synchronous Sub-workflow*:
 ```elixir
-# Diamond pattern: trigger → condition → (adult_path OR minor_path) → merge
-workflow = %Workflow{
-  nodes: [
-    %Node{
-      id: "age_check",
-      integration_name: "logic",
-      action_name: "if_condition",
-      input_map: %{"condition" => "age >= 18"}
-    },
-    %Node{
-      id: "merge_results",
-      integration_name: "data", 
-      action_name: "merge",
-      input_map: %{"strategy" => "combine_objects"}
-    }
-  ],
-  connections: [
-    # Connect condition true branch to adult processing
-    %Connection{
-      from: "age_check",
-      from_port: "true",
-      to: "adult_processor"
-    },
-    # Connect condition false branch to minor processing  
-    %Connection{
-      from: "age_check",
-      from_port: "false", 
-      to: "minor_processor"
-    }
-  ]
+%{
+  "workflow_id" => "user_verification",
+  "input_data" => %{"user_id" => 123, "document_type" => "passport"},
+  "execution_mode" => "sync",
+  "timeout_ms" => 600_000  # 10 minutes
 }
 ```
 
-### Switch Routing Example
-
+*Fire-and-Forget Notification*:
 ```elixir
-%Node{
-  id: "user_router",
-  integration_name: "logic",
-  action_name: "switch",
-  input_map: %{
-    "cases" => [
-      %{"condition" => "$input.subscription_tier", "value" => "premium", "port" => "premium_users", "data" => %{"features" => ["all"]}},
-      %{"condition" => "$input.subscription_tier", "value" => "standard", "port" => "standard_users", "data" => %{"features" => ["basic", "advanced"]}},
-      %{"condition" => "$input.subscription_tier", "value" => "basic", "port" => "basic_users", "data" => %{"features" => ["basic"]}}
-    ],
-    "default_port" => "trial_users",
-    "default_data" => %{"features" => ["trial"]}
-  }
+%{
+  "workflow_id" => "send_welcome_email",
+  "input_data" => %{"user_email" => "user@example.com"},
+  "execution_mode" => "fire_and_forget"
 }
 ```
 
-## Integration Development
+## Creating Custom Integrations
 
-To create custom integrations, implement the `Prana.Behaviour.Integration` behavior:
-
-```elixir
-defmodule MyApp.CustomIntegration do
-  @behaviour Prana.Behaviour.Integration
-
-  def definition do
-    %Prana.Integration{
-      name: "custom",
-      display_name: "Custom Integration",
-      description: "Custom workflow actions",
-      version: "1.0.0",
-      category: "custom",
-      actions: %{
-        "my_action" => %Prana.Action{
-          name: "my_action",
-          module: __MODULE__,
-          function: :my_action,
-          input_ports: ["input"],
-          output_ports: ["success", "error"]  # Fixed ports
-        },
-        "dynamic_action" => %Prana.Action{
-          name: "dynamic_action", 
-          module: __MODULE__,
-          function: :dynamic_action,
-          input_ports: ["input"],
-          output_ports: ["*"]  # Dynamic ports - any port name allowed
-        }
-      }
-    }
-  end
-
-  def my_action(input_map) do
-    # Implementation with fixed ports
-    {:ok, result, "success"}
-  end
-  
-  def dynamic_action(input_map) do
-    # Implementation with custom port names
-    port_name = determine_custom_port(input_map)
-    {:ok, result, port_name}
-  end
-end
-```
-
-### Dynamic Output Ports
-
-Actions can support dynamic output ports by using `["*"]` as the `output_ports` value. This allows the action to return any custom port name at runtime:
-
-**Benefits**:
-- **Semantic port names**: Use meaningful names like `"premium_users"` instead of `"output_1"`
-- **Flexible routing**: Support any number of output scenarios
-- **Self-documenting workflows**: Port names indicate their purpose
-
-**Usage**:
-- Set `output_ports: ["*"]` in action definition
-- Return `{:ok, data, "custom_port_name"}` from action function
-- Any port name will pass validation
-
-Register the integration with:
-```elixir
-Prana.IntegrationRegistry.register_integration(MyApp.CustomIntegration)
-```
+For information on creating custom integrations, see the [Writing Integrations Guide](guides/writing_integrations.md).

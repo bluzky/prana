@@ -202,7 +202,48 @@ defmodule Prana.NodeExecutor do
 
   @doc """
   Process different action return formats and determine output port.
+  
   Supports suspension for sub-workflow orchestration and other async patterns.
+  
+  ## Supported Return Formats
+  
+  ### Standard Returns
+  - `{:ok, data}` - Success with default success port
+  - `{:error, error}` - Error with default error port  
+  - `{:ok, data, port}` - Success with explicit port selection
+  - `{:error, error, port}` - Error with explicit port selection
+  
+  ### Suspension Returns
+  - `{:suspend, suspension_type, suspend_data}` - Pause execution for async coordination
+  
+  #### Built-in Suspension Types:
+  - `:sub_workflow_sync` - Synchronous sub-workflow execution
+  - `:sub_workflow_async` - Asynchronous sub-workflow execution  
+  - `:sub_workflow_fire_forget` - Fire-and-forget sub-workflow execution
+  
+  Custom suspension types are supported for domain-specific async patterns.
+  
+  ## Examples
+  
+      # Simple success
+      {:ok, %{user_id: 123}}
+      
+      # Explicit port routing
+      {:ok, result, "premium_path"}
+      
+      # Sub-workflow suspension
+      {:suspend, :sub_workflow_sync, %{
+        workflow_id: "child_workflow",
+        input_data: %{"user_id" => 123},
+        execution_mode: "sync",
+        timeout_ms: 300_000
+      }}
+      
+      # Custom suspension
+      {:suspend, :approval_required, %{
+        approval_id: "approval_123",
+        approver_email: "manager@company.com"
+      }}
   """
   @spec process_action_result(term(), Prana.Action.t()) ::
           {:ok, term(), String.t()} | {:error, term()} | {:suspend, atom(), term()}
