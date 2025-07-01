@@ -74,7 +74,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             type: :action,
             integration_name: "manual",
             action_name: "process_adult",
-            input_map: "$input"
+            input_map: %{"data" => "$input"}
           }
         ],
         connections: [
@@ -170,7 +170,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             type: :action,
             integration_name: "manual",
             action_name: "process_adult",
-            input_map: "$input"
+            input_map: %{"data" => "$input"}
           }
         ],
         connections: [

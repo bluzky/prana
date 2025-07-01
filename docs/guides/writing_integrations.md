@@ -111,6 +111,27 @@ The suspension system allows actions to pause workflow execution for async opera
 - **`suspension_type`**: Atom identifying the suspension type
 - **`suspend_data`**: Map containing data needed to resume the operation
 
+### Resume Data Handling
+
+When a suspended node is resumed, the resume data is processed to extract the actual output data. For sub-workflows, the resume data includes both the workflow output and metadata:
+
+```elixir
+# Resume data structure for sub-workflows
+resume_data = %{
+  "sub_workflow_output" => %{         # <- Actual workflow output (extracted)
+    "processed_user_id" => 456,
+    "status" => "completed"
+  },
+  "execution_time_ms" => 2500,        # <- Metadata (excluded from node output)
+  "workflow_id" => "user_processing"  # <- Metadata (excluded from node output)
+}
+
+# The node's output_data will contain only the sub_workflow_output:
+# %{"processed_user_id" => 456, "status" => "completed"}
+```
+
+For custom integrations, if your resume data follows this pattern, the default resume handling will work automatically. If you need custom resume logic, you can override the `resume_node/4` function in your integration module.
+
 ### Built-in Suspension Types
 
 #### Sub-workflow Coordination
@@ -244,27 +265,132 @@ end
 
 ## Input Processing
 
-### Expression Engine Integration
+### Enhanced Action Input
 
-Actions automatically receive processed input where expressions like `$input.field` and `$nodes.previous.result` are evaluated:
+Actions receive enriched input that combines both their explicitly mapped data AND full context access. This provides the best of both worlds: explicit data dependencies and flexible context access when needed.
+
+#### Input Structure
 
 ```elixir
-def send_notification(input) do
-  # input["user_email"] already contains the resolved value from "$input.user.email"
-  # input["api_key"] already contains the resolved value from "$variables.api_key"
-
-  result = send_email(
-    to: input["user_email"],
-    subject: input["subject"],
-    body: input["body"],
-    api_key: input["api_key"]
-  )
-
-  case result do
-    {:ok, message_id} -> {:ok, %{message_id: message_id}}
-    {:error, reason} -> {:error, reason}
+def my_action(enriched_input) do
+  # enriched_input contains:
+  # 1. Explicitly mapped data from the node's input_map
+  # 2. Full context access via prefixed keys
+  
+  # Explicitly mapped data (from node's input_map)
+  user_email = enriched_input["user_email"]      # From "$input.user.email"
+  api_key = enriched_input["api_key"]            # From "$variables.api_key" 
+  prev_result = enriched_input["previous_data"]  # From "$nodes.step1.result"
+  
+  # Full context access (always available)
+  full_input = enriched_input["$input"]      # Complete workflow input
+  all_nodes = enriched_input["$nodes"]       # All completed node results
+  variables = enriched_input["$variables"]   # All workflow variables
+  
+  # Use explicit data for primary logic
+  send_email(to: user_email, api_key: api_key)
+  
+  # Use context access for advanced scenarios
+  if enriched_input["$input"]["debug_mode"] do
+    log_debug_info(all_nodes)
   end
 end
+```
+
+#### Example Scenarios
+
+**Scenario 1: Using Explicit Mapping** (Recommended)
+```elixir
+# Node configuration
+%Node{
+  id: "send_email",
+  input_map: %{
+    "to" => "$input.user.email",
+    "subject" => "Welcome!",
+    "user_name" => "$input.user.name",
+    "api_key" => "$variables.email_api_key"
+  }
+}
+
+# Action receives
+def send_email(input) do
+  # Clean, explicit dependencies
+  to = input["to"]                    # "user@example.com"
+  subject = input["subject"]          # "Welcome!"
+  user_name = input["user_name"]      # "John"
+  api_key = input["api_key"]          # "key123"
+  
+  # Full context also available if needed
+  debug_mode = input["$input"]["debug_mode"]  # Optional debugging
+  
+  {:ok, %{message_id: "123", sent_to: to}}
+end
+```
+
+**Scenario 2: Using Context Access** (For dynamic scenarios)
+```elixir
+# Node with minimal mapping
+%Node{
+  id: "dynamic_processor",
+  input_map: %{
+    "operation_type" => "$input.operation"
+  }
+}
+
+# Action uses context for dynamic data access
+def dynamic_processor(input) do
+  operation = input["operation_type"]  # Explicit mapping
+  
+  case operation do
+    "user_data" ->
+      # Access specific user data from context
+      user_data = input["$input"]["user"]
+      {:ok, process_user(user_data)}
+      
+    "node_results" ->
+      # Access all previous node results
+      results = input["$nodes"]
+      {:ok, aggregate_results(results)}
+      
+    "variable_lookup" ->
+      # Access workflow variables dynamically
+      var_name = input["$input"]["variable_name"]
+      value = input["$variables"][var_name]
+      {:ok, %{variable: var_name, value: value}}
+  end
+end
+```
+
+### Context Structure
+
+The enriched input always includes these context keys:
+
+```elixir
+%{
+  # Your explicitly mapped data
+  "user_id" => 123,
+  "status" => "active",
+  
+  # Full context access (safe prefixed keys)
+  "$input" => %{
+    # Complete workflow input data
+    "user_id" => 123,
+    "user" => %{"name" => "John", "email" => "john@example.com"},
+    "settings" => %{"theme" => "dark"}
+  },
+  "$nodes" => %{
+    # Results from all completed nodes (keyed by custom_id)
+    "validation_step" => %{"valid" => true, "score" => 95},
+    "api_call" => %{"response" => %{"status" => "success"}},
+    "transform" => %{"processed_data" => [...]}
+  },
+  "$variables" => %{
+    # All workflow variables
+    "api_key" => "secret123",
+    "timeout_ms" => 5000,
+    "environment" => "production"
+  }
+}
 ```
 
 ### Input Validation

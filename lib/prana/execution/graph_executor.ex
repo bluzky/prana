@@ -130,24 +130,9 @@ defmodule Prana.GraphExecutor do
     if suspended_node_id do
       # Resume the suspended node execution using NodeExecutor
       case resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data, execution_context) do
-        {:ok, completed_node_execution, updated_executions} ->
-          # Node resumed successfully, continue with routing
-          # Update execution with completed node executions
-          resumed_execution = %{
-            suspended_execution
-            | status: :running,
-              node_executions: updated_executions,
-              resume_token: nil
-          }
-
-          # Handle context updates exactly like regular execution flow
-          # Get the suspended node to pass to store_node_result_in_context
-          suspended_node = Map.get(execution_graph.node_map, suspended_node_id)
-          updated_context = route_node_output(completed_node_execution, execution_graph, execution_context)
-          updated_context = store_node_result_in_context(completed_node_execution, updated_context, suspended_node)
-
-          # Continue execution from where it left off
-          execute_workflow_loop(resumed_execution, execution_graph, updated_context)
+        {:ok, {updated_execution, updated_context}} ->
+          # Node resumed successfully, continue execution (same pattern as main loop)
+          execute_workflow_loop(updated_execution, execution_graph, updated_context)
 
         {:error, reason} ->
           {:error, reason}
@@ -546,10 +531,6 @@ defmodule Prana.GraphExecutor do
 
     # Emit node starting event (NodeExecutor will create and manage NodeExecution)
     Middleware.call(:node_starting, %{node: node, execution: execution})
-
-    IO.inspect(">>>>>")
-    IO.inspect(node_input)
-    IO.inspect(orchestration_context)
 
     # Execute the node using ExecutionContext struct (atom keys)
     case NodeExecutor.execute_node(node, node_execution_context) do
@@ -993,7 +974,7 @@ defmodule Prana.GraphExecutor do
 
       # Call NodeExecutor to handle resume
       case NodeExecutor.resume_node(suspended_node, node_execution_context, suspended_node_execution, resume_data) do
-        {:ok, completed_node_execution, updated_context} ->
+        {:ok, completed_node_execution, _updated_context} ->
           # Update node_executions list with completed execution
           updated_executions =
             Enum.map(suspended_execution.node_executions, fn node_exec ->
@@ -1004,7 +985,19 @@ defmodule Prana.GraphExecutor do
               end
             end)
 
-          {:ok, completed_node_execution, updated_executions}
+          # Build complete execution and context like find_and_execute_ready_nodes does
+          updated_execution = %{
+            suspended_execution
+            | status: :running,
+              node_executions: updated_executions,
+              resume_token: nil
+          }
+
+          # Handle context updates exactly like regular execution flow
+          updated_context = route_node_output(completed_node_execution, execution_graph, execution_context)
+          updated_context = store_node_result_in_context(completed_node_execution, updated_context, suspended_node)
+
+          {:ok, {updated_execution, updated_context}}
 
         {:error, {reason, failed_node_execution}} ->
           {:error, %{type: "resume_failed", reason: reason, node_execution: failed_node_execution}}

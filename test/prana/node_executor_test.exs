@@ -288,7 +288,15 @@ defmodule Prana.NodeExecutorTest do
       assert node_execution.node_id == "test-1"
       assert node_execution.status == :completed
       assert node_execution.output_port == "success"
-      assert node_execution.output_data == %{message: "success", input: %{"message" => "hello world"}}
+      assert node_execution.output_data == %{
+        message: "success",
+        input: %{
+          "message" => "hello world",
+          "$input" => %{"user" => "john"},
+          "$nodes" => %{},
+          "$variables" => %{}
+        }
+      }
       assert node_execution.error_data == nil
       assert is_integer(node_execution.duration_ms)
       assert node_execution.retry_count == 0
@@ -336,7 +344,19 @@ defmodule Prana.NodeExecutorTest do
         "previous_result" => 123
       }
 
-      assert node_execution.output_data.original == expected_input
+      # The input passed to the action includes the context enrichment
+      expected_input_with_context = Map.merge(expected_input, %{
+        "$input" => %{
+          "user_name" => "alice",
+          "contact" => %{"email" => "alice@example.com"}
+        },
+        "$nodes" => %{
+          "api_call" => %{"user_id" => 123}
+        },
+        "$variables" => %{}
+      })
+      
+      assert node_execution.output_data.original == expected_input_with_context
       assert node_execution.output_data.uppercase_name == "ALICE"
     end
 
@@ -633,7 +653,22 @@ defmodule Prana.NodeExecutorTest do
         "order_id" => "ORD-123"
       }
 
-      assert node_execution.output_data.input == expected_input
+      # The input passed to the action includes the context enrichment
+      expected_input_with_context = Map.merge(expected_input, %{
+        "$input" => %{
+          "order" => %{"id" => "ORD-123"}
+        },
+        "$nodes" => %{
+          "users" => [
+            %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
+            %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
+            %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
+          ]
+        },
+        "$variables" => %{}
+      })
+      
+      assert node_execution.output_data.input == expected_input_with_context
       assert node_execution.status == :completed
     end
   end
@@ -666,7 +701,13 @@ defmodule Prana.NodeExecutorTest do
       assert prepared == %{
                "simple" => "john",
                "nested" => "john@example.com",
-               "from_nodes" => "success"
+               "from_nodes" => "success",
+               "$input" => %{
+                 "name" => "john",
+                 "user" => %{"email" => "john@example.com"}
+               },
+               "$nodes" => %{"prev_step" => %{"result" => "success"}},
+               "$variables" => %{}
              }
     end
 
@@ -686,7 +727,12 @@ defmodule Prana.NodeExecutorTest do
       }
 
       assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
-      assert prepared == %{"missing" => nil}
+      assert prepared == %{
+               "missing" => nil,
+               "$input" => %{},
+               "$nodes" => %{},
+               "$variables" => %{}
+             }
     end
 
     test "handles expression evaluation errors" do
@@ -708,7 +754,12 @@ defmodule Prana.NodeExecutorTest do
 
       # Most invalid expressions just return nil, but we can test edge cases
       assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
-      assert prepared == %{"test" => nil}
+      assert prepared == %{
+        "test" => nil,
+        "$input" => %{},
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
     end
   end
 
@@ -847,10 +898,13 @@ defmodule Prana.NodeExecutorTest do
       assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
 
       assert prepared == %{
-               "from_input" => 123,
-               "from_nodes" => "data",
-               "from_variables" => "secret"
-             }
+        "from_input" => 123,
+        "from_nodes" => "data",
+        "from_variables" => "secret",
+        "$input" => %{"user_id" => 123},
+        "$nodes" => %{"step1" => %{"result" => "data"}},
+        "$variables" => %{"api_key" => "secret"}
+      }
     end
   end
 

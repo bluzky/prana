@@ -37,7 +37,8 @@ defmodule Prana.NodeExecutor do
     node_execution = NodeExecution.start(node_execution)
 
     with {:ok, prepared_input} <- prepare_input(node, context),
-         {:ok, action} <- get_action(node) do
+         {:ok, action} <-
+           get_action(node) do
       case invoke_action(action, prepared_input) do
         {:ok, output_data, output_port} ->
           # Successful execution - complete the node
@@ -85,18 +86,19 @@ defmodule Prana.NodeExecutor do
   @spec resume_node(Node.t(), ExecutionContext.t(), NodeExecution.t(), map()) ::
           {:ok, NodeExecution.t(), ExecutionContext.t()}
           | {:error, {term(), NodeExecution.t()}}
-  def resume_node(
-        %Node{} = node,
-        %ExecutionContext{} = context,
-        %NodeExecution{} = suspended_node_execution,
-        resume_data
-      ) do
-    # Simple default implementation: complete the suspended node with resume data
-    # This provides a clean default behavior that integrations can override if needed
+  def resume_node(%Node{} = node, %ExecutionContext{} = context, %NodeExecution{} = suspended_node_execution, resume_data) do
+    # Extract actual output data from resume data structure
+    # For sub-workflows, resume_data contains metadata alongside the actual output
+    output_data =
+      case resume_data do
+        %{"sub_workflow_output" => output} -> output
+        # Use full resume data if no sub_workflow_output key
+        _ -> resume_data
+      end
 
-    case update_context(context, node, resume_data) do
+    case update_context(context, node, output_data) do
       {:ok, updated_context} ->
-        completed_execution = NodeExecution.complete(suspended_node_execution, resume_data, "success")
+        completed_execution = NodeExecution.complete(suspended_node_execution, output_data, "success")
         {:ok, completed_execution, updated_context}
 
       {:error, reason} ->
@@ -110,12 +112,22 @@ defmodule Prana.NodeExecutor do
   """
   @spec prepare_input(Node.t(), ExecutionContext.t()) :: {:ok, map()} | {:error, term()}
   def prepare_input(%Node{input_map: input_map}, %ExecutionContext{} = context) do
+    # Handle nil input_map by providing empty map
+    actual_input_map = input_map || %{}
     context_data = build_expression_context(context)
 
     try do
-      case ExpressionEngine.process_map(input_map, context_data) do
+      case ExpressionEngine.process_map(actual_input_map, context_data) do
         {:ok, processed_map} ->
-          {:ok, processed_map}
+          # Enrich input with full context access using prefixed keys to avoid conflicts
+          context_with_prefixed_keys = %{
+            "$input" => context_data["input"],
+            "$nodes" => context_data["nodes"], 
+            "$variables" => context_data["variables"]
+          }
+          
+          enriched_input = Map.merge(processed_map || %{}, context_with_prefixed_keys)
+          {:ok, enriched_input}
 
         {:error, reason} ->
           {:error,
@@ -200,35 +212,35 @@ defmodule Prana.NodeExecutor do
 
   @doc """
   Process different action return formats and determine output port.
-  
+
   Supports suspension for sub-workflow orchestration and other async patterns.
-  
+
   ## Supported Return Formats
-  
+
   ### Standard Returns
   - `{:ok, data}` - Success with default success port
-  - `{:error, error}` - Error with default error port  
+  - `{:error, error}` - Error with default error port
   - `{:ok, data, port}` - Success with explicit port selection
   - `{:error, error, port}` - Error with explicit port selection
-  
+
   ### Suspension Returns
   - `{:suspend, suspension_type, suspend_data}` - Pause execution for async coordination
-  
+
   #### Built-in Suspension Types:
   - `:sub_workflow_sync` - Synchronous sub-workflow execution
-  - `:sub_workflow_async` - Asynchronous sub-workflow execution  
+  - `:sub_workflow_async` - Asynchronous sub-workflow execution
   - `:sub_workflow_fire_forget` - Fire-and-forget sub-workflow execution
-  
+
   Custom suspension types are supported for domain-specific async patterns.
-  
+
   ## Examples
-  
+
       # Simple success
       {:ok, %{user_id: 123}}
-      
+
       # Explicit port routing
       {:ok, result, "premium_path"}
-      
+
       # Sub-workflow suspension
       {:suspend, :sub_workflow_sync, %{
         workflow_id: "child_workflow",
@@ -236,7 +248,7 @@ defmodule Prana.NodeExecutor do
         execution_mode: "sync",
         timeout_ms: 300_000
       }}
-      
+
       # Custom suspension
       {:suspend, :approval_required, %{
         approval_id: "approval_123",
