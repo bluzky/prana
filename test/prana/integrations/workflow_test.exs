@@ -1,5 +1,5 @@
 defmodule Prana.Integrations.WorkflowTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Prana.Integrations.Workflow
 
@@ -93,10 +93,14 @@ defmodule Prana.Integrations.WorkflowTest do
 
       assert {:suspend, :sub_workflow_sync, suspend_data} = result
       assert suspend_data.workflow_id == "simple_flow"
-      assert suspend_data.input_data == input_map  # defaults to full input
-      assert suspend_data.execution_mode == "sync"  # default
-      assert suspend_data.timeout_ms == 300_000  # default 5 minutes
-      assert suspend_data.failure_strategy == "fail_parent"  # default
+      # defaults to full input
+      assert suspend_data.input_data == input_map
+      # default
+      assert suspend_data.execution_mode == "sync"
+      # default 5 minutes
+      assert suspend_data.timeout_ms == 300_000
+      # default
+      assert suspend_data.failure_strategy == "fail_parent"
     end
 
     test "returns error for missing workflow_id" do
@@ -224,7 +228,7 @@ defmodule Prana.Integrations.WorkflowTest do
       result = Workflow.execute_workflow(input_map)
       assert {:suspend, :sub_workflow_sync, _} = result
 
-      # Test fire_and_forget mode  
+      # Test fire_and_forget mode
       input_map = %{
         "workflow_id" => "test_flow",
         "execution_mode" => "fire_and_forget"
@@ -246,7 +250,7 @@ defmodule Prana.Integrations.WorkflowTest do
       result = Workflow.execute_workflow(input_map)
 
       assert {:suspend, :sub_workflow_sync, suspend_data} = result
-      
+
       # Verify all configuration is preserved for middleware
       assert suspend_data.workflow_id == "detailed_flow"
       assert suspend_data.input_data == %{"config" => "test"}

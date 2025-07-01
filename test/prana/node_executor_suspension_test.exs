@@ -1,5 +1,5 @@
 defmodule Prana.NodeExecutorSuspensionTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Prana.Action
   alias Prana.ExecutionContext

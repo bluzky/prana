@@ -10,7 +10,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
   - Integration with Logic integration
   """
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Prana.Connection
   alias Prana.Execution

@@ -1,5 +1,5 @@
 defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Prana.Connection
   alias Prana.Execution

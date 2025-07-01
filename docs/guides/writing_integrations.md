@@ -73,7 +73,7 @@ end
 def my_action(input) do
   case input["operation_type"] do
     "create" -> {:ok, create_result, "created"}
-    "update" -> {:ok, update_result, "updated"} 
+    "update" -> {:ok, update_result, "updated"}
     "delete" -> {:ok, delete_result, "deleted"}
     invalid -> {:error, "Unknown operation", "invalid_input"}
   end
@@ -91,7 +91,7 @@ def execute_sub_workflow(input) do
     {:ok, workflow_data} ->
       # Return suspension tuple to pause execution
       {:suspend, :sub_workflow_sync, workflow_data}
-    
+
     {:error, reason} ->
       {:error, reason}
   end
@@ -153,7 +153,7 @@ You can define custom suspension types for domain-specific async patterns. These
 ```elixir
 def wait_for_approval(input) do
   approval_request = create_approval_request(input)
-  
+
   {:suspend, :approval_required, %{
     approval_id: approval_request.id,
     approver_email: input["approver"],
@@ -171,10 +171,10 @@ Create actions with multiple output ports for complex routing:
 ```elixir
 def classify_data(input) do
   confidence = calculate_confidence(input["data"])
-  
+
   cond do
     confidence > 0.9 -> {:ok, input["data"], "high_confidence"}
-    confidence > 0.7 -> {:ok, input["data"], "medium_confidence"} 
+    confidence > 0.7 -> {:ok, input["data"], "medium_confidence"}
     confidence > 0.5 -> {:ok, input["data"], "low_confidence"}
     true -> {:ok, input["data"], "manual_review"}
   end
@@ -213,16 +213,16 @@ end
 ```elixir
 def risky_operation(input) do
   case perform_operation(input) do
-    {:ok, result} -> 
+    {:ok, result} ->
       {:ok, result}
-    
-    {:error, :network_timeout} -> 
+
+    {:error, :network_timeout} ->
       {:error, %{type: "timeout", retryable: true}, "retry"}
-    
-    {:error, :invalid_credentials} -> 
+
+    {:error, :invalid_credentials} ->
       {:error, %{type: "auth_error", retryable: false}, "auth_failed"}
-    
-    {:error, reason} -> 
+
+    {:error, reason} ->
       {:error, %{type: "unknown", reason: reason}, "error"}
   end
 end
@@ -252,14 +252,14 @@ Actions automatically receive processed input where expressions like `$input.fie
 def send_notification(input) do
   # input["user_email"] already contains the resolved value from "$input.user.email"
   # input["api_key"] already contains the resolved value from "$variables.api_key"
-  
+
   result = send_email(
     to: input["user_email"],
     subject: input["subject"],
     body: input["body"],
     api_key: input["api_key"]
   )
-  
+
   case result do
     {:ok, message_id} -> {:ok, %{message_id: message_id}}
     {:error, reason} -> {:error, reason}
@@ -285,7 +285,7 @@ end
 defp validate_required_fields(input) do
   required = ["user_id", "action_type"]
   missing = required -- Map.keys(input)
-  
+
   if Enum.empty?(missing) do
     :ok
   else
@@ -308,21 +308,21 @@ end
 
 ```elixir
 defmodule MyApp.CustomIntegrationTest do
-  use ExUnit.Case, async: true
-  
+  use ExUnit.Case, async: false
+
   alias MyApp.CustomIntegration
 
   test "my_action processes input correctly" do
     input = %{"data" => "test"}
     result = CustomIntegration.my_action(input)
-    
+
     assert {:ok, %{result: "processed"}} = result
   end
 
   test "my_action handles suspension" do
     input = %{"operation" => "async_task"}
     result = CustomIntegration.my_action(input)
-    
+
     assert {:suspend, :custom_suspension, suspend_data} = result
     assert suspend_data.task_id
   end
@@ -345,10 +345,10 @@ test "integration works in workflow" do
       }
     ]
   }
-  
+
   {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "test_node")
   result = GraphExecutor.execute_graph(execution_graph, %{"user_data" => "test"}, %{})
-  
+
   assert {:ok, completed_execution} = result
 end
 ```
