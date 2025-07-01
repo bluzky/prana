@@ -80,13 +80,11 @@ defmodule Prana.NodeExecutor do
 
   ## Returns
   - `{:ok, node_execution, updated_context}` - Successfully resumed and completed
-  - `{:suspend, suspension_type, suspend_data, node_execution}` - Suspended again (for retry scenarios)
-  - `{:error, reason}` - Resume failed
+  - `{:error, {reason, failed_node_execution}}` - Resume failed
   """
   @spec resume_node(Node.t(), ExecutionContext.t(), NodeExecution.t(), map()) ::
           {:ok, NodeExecution.t(), ExecutionContext.t()}
-          | {:suspend, atom(), term(), NodeExecution.t()}
-          | {:error, term()}
+          | {:error, {term(), NodeExecution.t()}}
   def resume_node(
         %Node{} = node,
         %ExecutionContext{} = context,

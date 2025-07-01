@@ -547,7 +547,7 @@ defmodule Prana.GraphExecutor do
     Middleware.call(:node_starting, %{node: node, execution: execution})
 
     # Execute the node using ExecutionContext struct (atom keys)
-    case NodeExecutor.execute_node(node, node_execution_context, %{}) do
+    case NodeExecutor.execute_node(node, node_execution_context) do
       {:ok, result_node_execution, _updated_context} ->
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
         result_node_execution
@@ -1003,11 +1003,6 @@ defmodule Prana.GraphExecutor do
 
         {:error, {reason, failed_node_execution}} ->
           {:error, %{type: "resume_failed", reason: reason, node_execution: failed_node_execution}}
-
-        {:suspend, _suspension_type, _suspend_data, _updated_suspended_execution} ->
-          # Node suspended again - for future polling/retry scenarios
-          # For now, treat as error since resume should complete
-          {:error, %{type: "resume_suspended_again", message: "Node suspended again during resume"}}
       end
     else
       {:error, %{type: "suspended_node_not_found", node_id: suspended_node_id}}
