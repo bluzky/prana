@@ -14,7 +14,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
   setup do
     # Start registry and register integrations
-    start_supervised!(IntegrationRegistry)
+    {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
     # Ensure modules are loaded before registration
     Code.ensure_loaded!(Prana.Integrations.Workflow)
@@ -33,6 +33,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
     Application.put_env(:prana, :middleware, [
       __MODULE__.TestMiddleware
     ])
+
+    on_exit(fn ->
+      if Process.alive?(registry_pid) do
+        GenServer.stop(registry_pid)
+      end
+    end)
 
     :ok
   end
@@ -69,7 +75,8 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             custom_id: "output",
             type: :action,
             integration_name: "manual",
-            action_name: "process_adult"
+            action_name: "process_adult",
+            input_map: "$input"
           }
         ],
         connections: [
@@ -164,7 +171,8 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             custom_id: "output",
             type: :action,
             integration_name: "manual",
-            action_name: "process_adult"
+            action_name: "process_adult",
+            input_map: "$input"
           }
         ],
         connections: [

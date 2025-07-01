@@ -8,7 +8,6 @@ defmodule Prana.Connection do
           from_port: String.t(),
           to: String.t(),
           to_port: String.t(),
-          mapping: map(),
           metadata: map()
         }
 
@@ -17,7 +16,6 @@ defmodule Prana.Connection do
     :from_port,
     :to,
     :to_port,
-    mapping: %{},
     metadata: %{}
   ]
 
@@ -30,7 +28,6 @@ defmodule Prana.Connection do
       from_port: from_port,
       to: to,
       to_port: to_port,
-      mapping: %{},
       metadata: %{}
     }
   end
@@ -44,7 +41,6 @@ defmodule Prana.Connection do
       from_port: Map.get(data, "from_port") || Map.get(data, :from_port),
       to: Map.get(data, "to") || Map.get(data, :to),
       to_port: Map.get(data, "to_port") || Map.get(data, :to_port) || "input",
-      mapping: Map.get(data, "mapping") || Map.get(data, :mapping) || %{},
       metadata: Map.get(data, "metadata") || Map.get(data, :metadata) || %{}
     }
   end

@@ -52,7 +52,6 @@ defmodule Prana.GraphExecutor do
   alias Prana.Execution
   alias Prana.ExecutionContext
   alias Prana.ExecutionGraph
-  alias Prana.ExpressionEngine
   alias Prana.Middleware
   alias Prana.Node
   alias Prana.NodeExecution
@@ -509,13 +508,8 @@ defmodule Prana.GraphExecutor do
 
   # Route data through a single connection with optimized context updates
   defp route_data_through_connection(node_execution, connection, execution_context) do
-    # Apply data mapping if specified, otherwise pass output data directly
-    routed_data =
-      if map_size(connection.mapping) > 0 do
-        apply_data_mapping(node_execution.output_data, connection.mapping, execution_context)
-      else
-        node_execution.output_data
-      end
+    # Pass output data directly (no mapping needed - use Transform nodes instead)
+    routed_data = node_execution.output_data
 
     # Store routed data in context for the target node
     target_input_key = "#{connection.to}_#{connection.to_port}"
@@ -529,12 +523,6 @@ defmodule Prana.GraphExecutor do
     |> Map.update("active_paths", %{path_key => true}, &Map.put(&1, path_key, true))
   end
 
-  # Apply data mapping using expression engine
-  defp apply_data_mapping(output_data, mapping, execution_context) do
-    # Create a temporary context for expression evaluation
-    temp_context = Map.put(execution_context, "output", output_data)
-    ExpressionEngine.process_map(mapping, temp_context)
-  end
 
   # Store node execution result in context for $nodes.node_id access with optimized updates
   defp store_node_result_in_context(node_execution, execution_context) do
@@ -829,39 +817,25 @@ defmodule Prana.GraphExecutor do
     # Handle case where input_ports might be nil
     input_ports = node.input_ports || ["input"]  # Default to "input" port
     
-    # Debug: Log what we're looking for and what's in the context
-    require Logger
-    Logger.debug("Extracting input for node #{node.id}, input_ports: #{inspect(input_ports)}")
-    Logger.debug("Execution context keys: #{inspect(Map.keys(execution_context))}")
-    
     # Look for routed data using the connection target key format
     # For a node with input ports, check if data has been routed to any of its ports
     routed_data = 
       input_ports
       |> Enum.reduce(%{}, fn input_port, acc ->
         routed_data_key = "#{node.id}_#{input_port}"
-        Logger.debug("Looking for routed data key: #{routed_data_key}")
         
         case Map.get(execution_context, routed_data_key) do
-          nil -> 
-            Logger.debug("No data found for key: #{routed_data_key}")
-            acc
-          data when is_map(data) -> 
-            Logger.debug("Found map data for key #{routed_data_key}: #{inspect(data)}")
-            Map.merge(acc, data)
-          data -> 
-            Logger.debug("Found non-map data for key #{routed_data_key}: #{inspect(data)}")
-            Map.put(acc, input_port, data)
+          nil -> acc
+          data when is_map(data) -> Map.merge(acc, data)
+          data -> Map.put(acc, input_port, data)
         end
       end)
     
     case routed_data do
       empty when map_size(empty) == 0 ->
         # No routed data found, use workflow input (for trigger nodes)
-        Logger.debug("No routed data found, using workflow input: #{inspect(Map.get(execution_context, "input", %{}))}")
         Map.get(execution_context, "input", %{})
       _ ->
-        Logger.debug("Using routed data: #{inspect(routed_data)}")
         routed_data
     end
   end

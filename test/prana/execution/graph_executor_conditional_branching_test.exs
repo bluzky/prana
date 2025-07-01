@@ -146,7 +146,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           from_port: "success",
           to: "age_check",
           to_port: "input",
-          mapping: %{},
           metadata: %{}
         },
 
@@ -156,7 +155,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           from_port: "true",
           to: "adult_process",
           to_port: "input",
-          mapping: %{},
           metadata: %{}
         },
 
@@ -166,7 +164,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           from_port: "false",
           to: "minor_process",
           to_port: "input",
-          mapping: %{},
           metadata: %{}
         }
       ],
@@ -282,7 +279,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           from_port: "success",
           to: "user_type_switch",
           to_port: "input",
-          mapping: %{},
           metadata: %{}
         },
 
@@ -292,7 +288,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           from_port: "premium",
           to: "premium_process",
           to_port: "input",
-          mapping: %{},
           metadata: %{}
         },
 
@@ -302,7 +297,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           from_port: "standard",
           to: "standard_process",
           to_port: "input",
-          mapping: %{},
           metadata: %{}
         },
 
@@ -312,7 +306,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           from_port: "basic",
           to: "basic_process",
           to_port: "input",
-          mapping: %{},
           metadata: %{}
         }
       ],
@@ -1304,24 +1297,21 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             from_port: "success",
             to: "user_type_check",
             to_port: "input",
-            mapping: %{},
-            metadata: %{}
+              metadata: %{}
           },
           %Connection{
             from: "user_type_check",
             from_port: "premium",
             to: "premium_age_check",
             to_port: "input",
-            mapping: %{},
-            metadata: %{}
+              metadata: %{}
           },
           %Connection{
             from: "user_type_check",
             from_port: "standard",
             to: "standard_process",
             to_port: "input",
-            mapping: %{},
-            metadata: %{}
+              metadata: %{}
           }
         ],
         variables: %{},

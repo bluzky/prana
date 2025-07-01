@@ -11,20 +11,20 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
   setup do
     # Start registry for tests
-    start_supervised!(IntegrationRegistry)
-    
+    {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
+
     # Ensure modules are loaded before registration
     Code.ensure_loaded!(Prana.Integrations.Workflow)
     Code.ensure_loaded!(Prana.Integrations.Manual)
-    
+
     # Register integrations for testing
     :ok = IntegrationRegistry.register_integration(Prana.Integrations.Workflow)
     :ok = IntegrationRegistry.register_integration(Prana.Integrations.Manual)
-    
+
     # Create test workflow and execution context
     workflow = %Workflow{
       id: "test_workflow",
-      name: "Test Workflow", 
+      name: "Test Workflow",
       nodes: [],
       connections: []
     }
@@ -35,10 +35,17 @@ defmodule Prana.NodeExecutorSuspensionTest do
       status: :running
     }
 
-    context = ExecutionContext.new(workflow, execution, %{
-      nodes: %{},
-      variables: %{"api_url" => "https://api.test.com"}
-    })
+    context =
+      ExecutionContext.new(workflow, execution, %{
+        nodes: %{},
+        variables: %{"api_url" => "https://api.test.com"}
+      })
+
+    on_exit(fn ->
+      if Process.alive?(registry_pid) do
+        GenServer.stop(registry_pid)
+      end
+    end)
 
     {:ok, context: context}
   end
@@ -54,7 +61,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         input_map: %{
           "workflow_id" => "user_onboarding",
           "input_data" => %{"user_id" => "$variables.user_id"},
-          "wait_for_completion" => true,
+          "execution_mode" => "sync",
           "timeout_ms" => 300_000
         }
       }
@@ -64,12 +71,12 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, updated_context)
 
-      assert {:suspend, :sub_workflow, suspend_data, suspended_node_execution} = result
-      
+      assert {:suspend, :sub_workflow_sync, suspend_data, suspended_node_execution} = result
+
       # Verify suspension data
       assert suspend_data.workflow_id == "user_onboarding"
       assert suspend_data.input_data == %{"user_id" => 123}
-      assert suspend_data.wait_for_completion == true
+      assert suspend_data.execution_mode == "sync"
       assert suspend_data.timeout_ms == 300_000
       assert suspend_data.failure_strategy == "fail_parent"
       assert %DateTime{} = suspend_data.triggered_at
@@ -81,10 +88,10 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert suspended_node_execution.output_port == nil
       assert suspended_node_execution.completed_at == nil
       assert suspended_node_execution.duration_ms == nil
-      
+
       # Verify suspension metadata
       suspension_metadata = suspended_node_execution.metadata[:suspension_data]
-      assert suspension_metadata.type == :sub_workflow
+      assert suspension_metadata.type == :sub_workflow_sync
       assert suspension_metadata.data == suspend_data
       assert %DateTime{} = suspension_metadata.suspended_at
     end
@@ -92,42 +99,42 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "handles fire-and-forget sub-workflow execution", %{context: context} do
       node = %Node{
         id: "notification_node",
-        custom_id: "notification_node", 
+        custom_id: "notification_node",
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
         input_map: %{
           "workflow_id" => "notification_flow",
           "input_data" => %{"message" => "Hello World"},
-          "wait_for_completion" => false
+          "execution_mode" => "fire_and_forget"
         }
       }
 
       result = NodeExecutor.execute_node(node, context)
 
-      assert {:ok, completed_node_execution, updated_context} = result
-      
-      # Verify completed execution
-      assert completed_node_execution.node_id == "notification_node"
-      assert completed_node_execution.status == :completed
-      assert completed_node_execution.output_port == "success"
-      assert completed_node_execution.output_data.sub_workflow_triggered == true
-      assert completed_node_execution.output_data.workflow_id == "notification_flow"
-      assert %DateTime{} = completed_node_execution.completed_at
-      
-      # Verify context updated with node result
-      assert updated_context.nodes["notification_node"] == completed_node_execution.output_data
+      assert {:suspend, :sub_workflow_fire_forget, suspend_data, suspended_node_execution} = result
+
+      # Verify suspension data
+      assert suspend_data.workflow_id == "notification_flow"
+      assert suspend_data.input_data == %{"message" => "Hello World"}
+      assert suspend_data.execution_mode == "fire_and_forget"
+      assert %DateTime{} = suspend_data.triggered_at
+
+      # Verify suspended node execution
+      assert suspended_node_execution.node_id == "notification_node"
+      assert suspended_node_execution.status == :suspended
     end
 
     test "handles sub-workflow validation errors", %{context: context} do
       node = %Node{
         id: "invalid_node",
         custom_id: "invalid_node",
-        type: :action, 
+        type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
         input_map: %{
-          "workflow_id" => "",  # Invalid empty workflow_id
+          # Invalid empty workflow_id
+          "workflow_id" => "",
           "wait_for_completion" => true
         }
       }
@@ -135,13 +142,13 @@ defmodule Prana.NodeExecutorSuspensionTest do
       result = NodeExecutor.execute_node(node, context)
 
       assert {:error, {error_data, failed_node_execution}} = result
-      
+
       # Verify error details - the structure is nested under "error" with atom keys
-      assert error_data["type"] == "action_error" 
+      assert error_data["type"] == "action_error"
       assert error_data["error"].type == "sub_workflow_setup_error"
       assert error_data["error"].message == "workflow_id cannot be empty"
       assert error_data["port"] == "error"
-      
+
       # Verify failed node execution
       assert failed_node_execution.node_id == "invalid_node"
       assert failed_node_execution.status == :failed
@@ -154,7 +161,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         id: "expression_node",
         custom_id: "expression_node",
         type: :action,
-        integration_name: "workflow", 
+        integration_name: "workflow",
         action_name: "execute_workflow",
         input_map: %{
           "workflow_id" => "expression_flow",
@@ -168,8 +175,8 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, context)
 
-      assert {:suspend, :sub_workflow, suspend_data, _} = result
-      
+      assert {:suspend, :sub_workflow_sync, suspend_data, _} = result
+
       # Verify expressions were evaluated
       assert suspend_data.input_data["api_url"] == "https://api.test.com"
       assert suspend_data.input_data["static_value"] == "test"
@@ -177,11 +184,13 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
     test "handles complex nested expressions", %{context: context} do
       # Add complex data to context
-      complex_context = %{context | 
-        variables: Map.put(context.variables, "user", %{
-          "id" => 456,
-          "profile" => %{"name" => "Jane", "role" => "admin"}
-        })
+      complex_context = %{
+        context
+        | variables:
+            Map.put(context.variables, "user", %{
+              "id" => 456,
+              "profile" => %{"name" => "Jane", "role" => "admin"}
+            })
       }
 
       node = %Node{
@@ -189,7 +198,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         custom_id: "complex_node",
         type: :action,
         integration_name: "workflow",
-        action_name: "execute_workflow", 
+        action_name: "execute_workflow",
         input_map: %{
           "workflow_id" => "complex_flow",
           "input_data" => %{
@@ -203,8 +212,8 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, complex_context)
 
-      assert {:suspend, :sub_workflow, suspend_data, _} = result
-      
+      assert {:suspend, :sub_workflow_sync, suspend_data, _} = result
+
       # Verify complex expressions were evaluated correctly
       assert suspend_data.input_data["user_id"] == 456
       assert suspend_data.input_data["user_name"] == "Jane"
@@ -232,8 +241,8 @@ defmodule Prana.NodeExecutorSuspensionTest do
       result = NodeExecutor.execute_node(node, context)
 
       # Expression engine returns nil for non-existent references, so this will succeed with suspension
-      assert {:suspend, :sub_workflow, suspend_data, suspended_node_execution} = result
-      
+      assert {:suspend, :sub_workflow_sync, suspend_data, suspended_node_execution} = result
+
       # Verify that the invalid reference was handled gracefully (set to nil)
       assert suspend_data.input_data["invalid_reference"] == nil
       assert suspended_node_execution.status == :suspended
@@ -255,19 +264,19 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       # Record time before execution
       before_time = DateTime.utc_now()
-      
+
       result = NodeExecutor.execute_node(node, context)
 
-      assert {:suspend, :sub_workflow, _, suspended_node_execution} = result
-      
+      assert {:suspend, :sub_workflow_sync, _, suspended_node_execution} = result
+
       # Verify timing information
       assert %DateTime{} = suspended_node_execution.started_at
       assert DateTime.compare(suspended_node_execution.started_at, before_time) in [:gt, :eq]
-      
+
       # Suspended nodes should not have completion timing yet
       assert suspended_node_execution.completed_at == nil
       assert suspended_node_execution.duration_ms == nil
-      
+
       # But should have suspension timing in metadata
       suspension_metadata = suspended_node_execution.metadata[:suspension_data]
       assert %DateTime{} = suspension_metadata.suspended_at
@@ -285,11 +294,11 @@ defmodule Prana.NodeExecutorSuspensionTest do
       }
 
       suspend_data = %{workflow_id: "test", data: %{}}
-      result = {:suspend, :sub_workflow, suspend_data}
+      result = {:suspend, :sub_workflow_sync, suspend_data}
 
       processed = NodeExecutor.process_action_result(result, action)
 
-      assert {:suspend, :sub_workflow, ^suspend_data} = processed
+      assert {:suspend, :sub_workflow_sync, ^suspend_data} = processed
     end
 
     test "handles different suspension types" do
@@ -299,8 +308,15 @@ defmodule Prana.NodeExecutorSuspensionTest do
       }
 
       # Test different suspension types
-      suspension_types = [:sub_workflow, :external_event, :delay, :poll_until]
-      
+      suspension_types = [
+        :sub_workflow_sync,
+        :sub_workflow_async,
+        :sub_workflow_fire_forget,
+        :external_event,
+        :delay,
+        :poll_until
+      ]
+
       for suspension_type <- suspension_types do
         suspend_data = %{type: suspension_type, config: %{}}
         result = {:suspend, suspension_type, suspend_data}
