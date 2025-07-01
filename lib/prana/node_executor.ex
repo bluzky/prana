@@ -21,34 +21,17 @@ defmodule Prana.NodeExecutor do
   ## Parameters
   - `node` - The node to execute
   - `context` - Current execution context
-  - `opts` - Execution options (currently unused)
 
   ## Returns
   - `{:ok, node_execution, updated_context}` - Successful execution
   - `{:suspend, suspension_type, suspend_data, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
-  @spec execute_node(Node.t(), ExecutionContext.t(), keyword()) ::
-          {:ok, NodeExecution.t(), ExecutionContext.t()} | {:suspend, atom(), term(), NodeExecution.t()} | {:error, term()}
-
-  @doc """
-  Resume a suspended node execution with resume data.
-
-  ## Parameters
-  - `node` - The node definition
-  - `context` - Current execution context
-  - `suspended_node_execution` - The suspended NodeExecution to resume
-  - `resume_data` - Data to complete the suspended execution with
-  - `opts` - Execution options (currently unused)
-
-  ## Returns
-  - `{:ok, node_execution, updated_context}` - Successfully resumed and completed
-  - `{:suspend, suspension_type, suspend_data, node_execution}` - Suspended again (for retry scenarios)
-  - `{:error, reason}` - Resume failed
-  """
-  @spec resume_node(Node.t(), ExecutionContext.t(), NodeExecution.t(), map(), keyword()) ::
-          {:ok, NodeExecution.t(), ExecutionContext.t()} | {:suspend, atom(), term(), NodeExecution.t()} | {:error, term()}
-  def execute_node(%Node{} = node, %ExecutionContext{} = context, _opts \\ []) do
+  @spec execute_node(Node.t(), ExecutionContext.t()) ::
+          {:ok, NodeExecution.t(), ExecutionContext.t()}
+          | {:suspend, atom(), term(), NodeExecution.t()}
+          | {:error, term()}
+  def execute_node(%Node{} = node, %ExecutionContext{} = context) do
     # Create initial node execution with proper execution ID from context
     node_execution = NodeExecution.new(context.execution_id, node.id, %{})
     node_execution = NodeExecution.start(node_execution)
@@ -58,10 +41,11 @@ defmodule Prana.NodeExecutor do
       case invoke_action(action, prepared_input) do
         {:ok, output_data, output_port} ->
           # Successful execution - complete the node
-          with {:ok, updated_context} <- update_context(context, node, output_data) do
-            completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-            {:ok, completed_execution, updated_context}
-          else
+          case update_context(context, node, output_data) do
+            {:ok, updated_context} ->
+              completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
+              {:ok, completed_execution, updated_context}
+
             {:error, reason} ->
               failed_execution = NodeExecution.fail(node_execution, reason)
               {:error, {reason, failed_execution}}
@@ -85,14 +69,38 @@ defmodule Prana.NodeExecutor do
     end
   end
 
-  def resume_node(%Node{} = node, %ExecutionContext{} = context, %NodeExecution{} = suspended_node_execution, resume_data, _opts \\ []) do
+  @doc """
+  Resume a suspended node execution with resume data.
+
+  ## Parameters
+  - `node` - The node definition
+  - `context` - Current execution context
+  - `suspended_node_execution` - The suspended NodeExecution to resume
+  - `resume_data` - Data to complete the suspended execution with
+
+  ## Returns
+  - `{:ok, node_execution, updated_context}` - Successfully resumed and completed
+  - `{:suspend, suspension_type, suspend_data, node_execution}` - Suspended again (for retry scenarios)
+  - `{:error, reason}` - Resume failed
+  """
+  @spec resume_node(Node.t(), ExecutionContext.t(), NodeExecution.t(), map()) ::
+          {:ok, NodeExecution.t(), ExecutionContext.t()}
+          | {:suspend, atom(), term(), NodeExecution.t()}
+          | {:error, term()}
+  def resume_node(
+        %Node{} = node,
+        %ExecutionContext{} = context,
+        %NodeExecution{} = suspended_node_execution,
+        resume_data
+      ) do
     # Simple default implementation: complete the suspended node with resume data
     # This provides a clean default behavior that integrations can override if needed
-    
-    with {:ok, updated_context} <- update_context(context, node, resume_data) do
-      completed_execution = NodeExecution.complete(suspended_node_execution, resume_data, "success")
-      {:ok, completed_execution, updated_context}
-    else
+
+    case update_context(context, node, resume_data) do
+      {:ok, updated_context} ->
+        completed_execution = NodeExecution.complete(suspended_node_execution, resume_data, "success")
+        {:ok, completed_execution, updated_context}
+
       {:error, reason} ->
         failed_execution = NodeExecution.fail(suspended_node_execution, reason)
         {:error, {reason, failed_execution}}
@@ -196,7 +204,8 @@ defmodule Prana.NodeExecutor do
   Process different action return formats and determine output port.
   Supports suspension for sub-workflow orchestration and other async patterns.
   """
-  @spec process_action_result(term(), Prana.Action.t()) :: {:ok, term(), String.t()} | {:error, term()} | {:suspend, atom(), term()}
+  @spec process_action_result(term(), Prana.Action.t()) ::
+          {:ok, term(), String.t()} | {:error, term()} | {:suspend, atom(), term()}
   def process_action_result(result, %Prana.Action{} = action) do
     case result do
       # Suspension format for async coordination: {:suspend, type, data}
@@ -256,7 +265,8 @@ defmodule Prana.NodeExecutor do
          %{
            "type" => "invalid_action_return_format",
            "result" => inspect(invalid_result),
-           "message" => "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:suspend, type, data}"
+           "message" =>
+             "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:suspend, type, data}"
          }}
     end
   end
@@ -319,11 +329,12 @@ defmodule Prana.NodeExecutor do
         output_port: nil,
         completed_at: nil,
         duration_ms: nil,
-        metadata: Map.put(node_execution.metadata, :suspension_data, %{
-          type: suspension_type,
-          data: suspend_data,
-          suspended_at: DateTime.utc_now()
-        })
+        metadata:
+          Map.put(node_execution.metadata, :suspension_data, %{
+            type: suspension_type,
+            data: suspend_data,
+            suspended_at: DateTime.utc_now()
+          })
     }
   end
 end
