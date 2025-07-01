@@ -151,8 +151,15 @@ defmodule Prana.NodeExecutorTest do
 
   setup do
     # Start IntegrationRegistry and register test integration
-    {:ok, _pid} = IntegrationRegistry.start_link([])
+    {:ok, registry_pid} = IntegrationRegistry.start_link([])
     :ok = IntegrationRegistry.register_integration(TestIntegration)
+
+    on_exit(fn ->
+      if Process.alive?(registry_pid) do
+        GenServer.stop(registry_pid)
+      end
+    end)
+
     :ok
   end
 

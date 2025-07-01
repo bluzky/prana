@@ -209,9 +209,9 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             "cases" => %{
               "premium" => {"premium", %{"discount" => 0.2, "tier" => "premium"}},
               "standard" => {"standard", %{"discount" => 0.1, "tier" => "standard"}},
-              "basic" => {"basic", %{"discount" => 0.0, "tier" => "basic"}}
+              "basic" => {"basic", %{"discount" => +0.0, "tier" => "basic"}}
             },
-            "default_data" => %{"discount" => 0.0, "tier" => "unknown"}
+            "default_data" => %{"discount" => +0.0, "tier" => "unknown"}
           },
           output_ports: ["premium", "standard", "basic", "default"],
           input_ports: ["input"],
@@ -945,10 +945,15 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "user_type" => "premium",
         "cases" => [
           %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
-          %{"condition" => "$input.user_type", "value" => "standard", "port" => "standard", "data" => %{"discount" => 0.1}},
-          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => 0.0}}
+          %{
+            "condition" => "$input.user_type",
+            "value" => "standard",
+            "port" => "standard",
+            "data" => %{"discount" => 0.1}
+          },
+          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => +0.0}}
         ],
-        "default_data" => %{"discount" => 0.0},
+        "default_data" => %{"discount" => +0.0},
         "input" => %{"user_type" => "premium"}
       }
 
@@ -959,10 +964,15 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "user_type" => "standard",
         "cases" => [
           %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
-          %{"condition" => "$input.user_type", "value" => "standard", "port" => "standard", "data" => %{"discount" => 0.1}},
-          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => 0.0}}
+          %{
+            "condition" => "$input.user_type",
+            "value" => "standard",
+            "port" => "standard",
+            "data" => %{"discount" => 0.1}
+          },
+          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => +0.0}}
         ],
-        "default_data" => %{"discount" => 0.0},
+        "default_data" => %{"discount" => +0.0},
         "input" => %{"user_type" => "standard"}
       }
 
@@ -973,14 +983,19 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "user_type" => "enterprise",
         "cases" => [
           %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
-          %{"condition" => "$input.user_type", "value" => "standard", "port" => "standard", "data" => %{"discount" => 0.1}},
-          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => 0.0}}
+          %{
+            "condition" => "$input.user_type",
+            "value" => "standard",
+            "port" => "standard",
+            "data" => %{"discount" => 0.1}
+          },
+          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => +0.0}}
         ],
-        "default_data" => %{"discount" => 0.0, "tier" => "unknown"},
+        "default_data" => %{"discount" => +0.0, "tier" => "unknown"},
         "input" => %{"user_type" => "enterprise"}
       }
 
-      assert {:ok, %{"discount" => 0.0, "tier" => "unknown"}, "default"} = Logic.switch(unknown_input)
+      assert {:ok, %{"discount" => +0.0, "tier" => "unknown"}, "default"} = Logic.switch(unknown_input)
     end
 
     test "switch action handles numeric values" do
@@ -988,9 +1003,24 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       numeric_input = %{
         "plan_id" => 1,
         "cases" => [
-          %{"condition" => "$input.plan_id", "value" => 1, "port" => "premium", "data" => %{"name" => "Premium Plan", "features" => ["feature1", "feature2"]}},
-          %{"condition" => "$input.plan_id", "value" => 2, "port" => "standard", "data" => %{"name" => "Standard Plan", "features" => ["feature1"]}},
-          %{"condition" => "$input.plan_id", "value" => 3, "port" => "basic", "data" => %{"name" => "Basic Plan", "features" => []}}
+          %{
+            "condition" => "$input.plan_id",
+            "value" => 1,
+            "port" => "premium",
+            "data" => %{"name" => "Premium Plan", "features" => ["feature1", "feature2"]}
+          },
+          %{
+            "condition" => "$input.plan_id",
+            "value" => 2,
+            "port" => "standard",
+            "data" => %{"name" => "Standard Plan", "features" => ["feature1"]}
+          },
+          %{
+            "condition" => "$input.plan_id",
+            "value" => 3,
+            "port" => "basic",
+            "data" => %{"name" => "Basic Plan", "features" => []}
+          }
         ],
         "default_data" => %{"name" => "Unknown Plan", "features" => []},
         "input" => %{"plan_id" => 1}
@@ -1013,12 +1043,12 @@ defmodule Prana.Execution.ConditionalBranchingTest do
     test "switch handles empty cases array" do
       invalid_input = %{
         "cases" => [],
-        "default_data" => %{"discount" => 0.0},
+        "default_data" => %{"discount" => +0.0},
         "default_port" => "default"
       }
 
       # Should use default when no cases match (empty cases)
-      assert {:ok, %{"discount" => 0.0}, "default"} = Logic.switch(invalid_input)
+      assert {:ok, %{"discount" => +0.0}, "default"} = Logic.switch(invalid_input)
     end
   end
 
@@ -1197,12 +1227,42 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "status_code" => 404,
         "cases" => [
           %{"condition" => "$input.status_code", "value" => 200, "port" => "success", "data" => %{"message" => "OK"}},
-          %{"condition" => "$input.status_code", "value" => 201, "port" => "created", "data" => %{"message" => "Created"}},
-          %{"condition" => "$input.status_code", "value" => 400, "port" => "bad_request", "data" => %{"message" => "Bad Request"}},
-          %{"condition" => "$input.status_code", "value" => 401, "port" => "unauthorized", "data" => %{"message" => "Unauthorized"}},
-          %{"condition" => "$input.status_code", "value" => 403, "port" => "forbidden", "data" => %{"message" => "Forbidden"}},
-          %{"condition" => "$input.status_code", "value" => 404, "port" => "not_found", "data" => %{"message" => "Not Found"}},
-          %{"condition" => "$input.status_code", "value" => 500, "port" => "server_error", "data" => %{"message" => "Internal Server Error"}}
+          %{
+            "condition" => "$input.status_code",
+            "value" => 201,
+            "port" => "created",
+            "data" => %{"message" => "Created"}
+          },
+          %{
+            "condition" => "$input.status_code",
+            "value" => 400,
+            "port" => "bad_request",
+            "data" => %{"message" => "Bad Request"}
+          },
+          %{
+            "condition" => "$input.status_code",
+            "value" => 401,
+            "port" => "unauthorized",
+            "data" => %{"message" => "Unauthorized"}
+          },
+          %{
+            "condition" => "$input.status_code",
+            "value" => 403,
+            "port" => "forbidden",
+            "data" => %{"message" => "Forbidden"}
+          },
+          %{
+            "condition" => "$input.status_code",
+            "value" => 404,
+            "port" => "not_found",
+            "data" => %{"message" => "Not Found"}
+          },
+          %{
+            "condition" => "$input.status_code",
+            "value" => 500,
+            "port" => "server_error",
+            "data" => %{"message" => "Internal Server Error"}
+          }
         ],
         "default_data" => %{"message" => "Unknown Status"},
         "input" => %{"status_code" => 404}
@@ -1297,21 +1357,21 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             from_port: "success",
             to: "user_type_check",
             to_port: "input",
-              metadata: %{}
+            metadata: %{}
           },
           %Connection{
             from: "user_type_check",
             from_port: "premium",
             to: "premium_age_check",
             to_port: "input",
-              metadata: %{}
+            metadata: %{}
           },
           %Connection{
             from: "user_type_check",
             from_port: "standard",
             to: "standard_process",
             to_port: "input",
-              metadata: %{}
+            metadata: %{}
           }
         ],
         variables: %{},

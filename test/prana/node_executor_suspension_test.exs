@@ -5,7 +5,6 @@ defmodule Prana.NodeExecutorSuspensionTest do
   alias Prana.ExecutionContext
   alias Prana.IntegrationRegistry
   alias Prana.Node
-  alias Prana.NodeExecution
   alias Prana.NodeExecutor
   alias Prana.Workflow
 

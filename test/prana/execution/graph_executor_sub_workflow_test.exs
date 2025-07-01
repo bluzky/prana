@@ -6,9 +6,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
   alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
-  alias Prana.Middleware
   alias Prana.Node
-  alias Prana.NodeExecution
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
 
