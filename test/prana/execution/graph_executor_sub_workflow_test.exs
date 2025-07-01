@@ -132,9 +132,9 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Verify middleware events were emitted
       assert_receive {:middleware_event, :execution_started, _}
-      assert_receive {:middleware_event, :node_started, %{node: %{id: "trigger"}}}
+      assert_receive {:middleware_event, :node_starting, %{node: %{id: "trigger"}}}
       assert_receive {:middleware_event, :node_completed, %{node: %{id: "trigger"}}}
-      assert_receive {:middleware_event, :node_started, %{node: %{id: "sub_workflow_node"}}}
+      assert_receive {:middleware_event, :node_starting, %{node: %{id: "sub_workflow_node"}}}
       assert_receive {:middleware_event, :node_suspended, %{node: %{id: "sub_workflow_node"}}}
       assert_receive {:middleware_event, :execution_suspended, _}
     end
@@ -416,13 +416,13 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert_receive {:middleware_event, :execution_started, event_data}
       assert event_data.execution.workflow_id == "simple_sub_workflow"
 
-      assert_receive {:middleware_event, :node_started, event_data}
+      assert_receive {:middleware_event, :node_starting, event_data}
       assert event_data.node.id == "trigger"
 
       assert_receive {:middleware_event, :node_completed, event_data}
       assert event_data.node.id == "trigger"
 
-      assert_receive {:middleware_event, :node_started, event_data}
+      assert_receive {:middleware_event, :node_starting, event_data}
       assert event_data.node.id == "sub_workflow_node"
 
       assert_receive {:middleware_event, :node_suspended, event_data}

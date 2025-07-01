@@ -30,6 +30,24 @@ defmodule Prana.NodeExecutor do
   """
   @spec execute_node(Node.t(), ExecutionContext.t(), keyword()) ::
           {:ok, NodeExecution.t(), ExecutionContext.t()} | {:suspend, atom(), term(), NodeExecution.t()} | {:error, term()}
+
+  @doc """
+  Resume a suspended node execution with resume data.
+
+  ## Parameters
+  - `node` - The node definition
+  - `context` - Current execution context
+  - `suspended_node_execution` - The suspended NodeExecution to resume
+  - `resume_data` - Data to complete the suspended execution with
+  - `opts` - Execution options (currently unused)
+
+  ## Returns
+  - `{:ok, node_execution, updated_context}` - Successfully resumed and completed
+  - `{:suspend, suspension_type, suspend_data, node_execution}` - Suspended again (for retry scenarios)
+  - `{:error, reason}` - Resume failed
+  """
+  @spec resume_node(Node.t(), ExecutionContext.t(), NodeExecution.t(), map(), keyword()) ::
+          {:ok, NodeExecution.t(), ExecutionContext.t()} | {:suspend, atom(), term(), NodeExecution.t()} | {:error, term()}
   def execute_node(%Node{} = node, %ExecutionContext{} = context, _opts \\ []) do
     # Create initial node execution with proper execution ID from context
     node_execution = NodeExecution.new(context.execution_id, node.id, %{})
@@ -63,6 +81,20 @@ defmodule Prana.NodeExecutor do
       {:error, reason} ->
         # Input preparation or action retrieval failed
         failed_execution = NodeExecution.fail(node_execution, reason)
+        {:error, {reason, failed_execution}}
+    end
+  end
+
+  def resume_node(%Node{} = node, %ExecutionContext{} = context, %NodeExecution{} = suspended_node_execution, resume_data, _opts \\ []) do
+    # Simple default implementation: complete the suspended node with resume data
+    # This provides a clean default behavior that integrations can override if needed
+    
+    with {:ok, updated_context} <- update_context(context, node, resume_data) do
+      completed_execution = NodeExecution.complete(suspended_node_execution, resume_data, "success")
+      {:ok, completed_execution, updated_context}
+    else
+      {:error, reason} ->
+        failed_execution = NodeExecution.fail(suspended_node_execution, reason)
         {:error, {reason, failed_execution}}
     end
   end
