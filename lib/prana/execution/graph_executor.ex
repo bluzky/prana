@@ -981,23 +981,25 @@ defmodule Prana.GraphExecutor do
 
     if suspended_node && suspended_node_execution do
       # Create ExecutionContext for resume
-      node_execution_context = ExecutionContext.new(execution_graph.workflow, suspended_execution, %{
-        input: extract_node_input_from_routing(suspended_node, execution_context),
-        nodes: Map.get(execution_context, "nodes", %{}),
-        variables: Map.get(execution_context, "variables", %{})
-      })
+      node_execution_context =
+        ExecutionContext.new(execution_graph.workflow, suspended_execution, %{
+          input: extract_node_input_from_routing(suspended_node, execution_context),
+          nodes: Map.get(execution_context, "nodes", %{}),
+          variables: Map.get(execution_context, "variables", %{})
+        })
 
       # Call NodeExecutor to handle resume
       case NodeExecutor.resume_node(suspended_node, node_execution_context, suspended_node_execution, resume_data) do
         {:ok, completed_node_execution, _updated_context} ->
           # Update node_executions list with completed execution
-          updated_executions = Enum.map(suspended_execution.node_executions, fn node_exec ->
-            if node_exec.node_id == suspended_node_id do
-              completed_node_execution
-            else
-              node_exec
-            end
-          end)
+          updated_executions =
+            Enum.map(suspended_execution.node_executions, fn node_exec ->
+              if node_exec.node_id == suspended_node_id do
+                completed_node_execution
+              else
+                node_exec
+              end
+            end)
 
           {:ok, completed_node_execution, updated_executions}
 
