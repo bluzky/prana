@@ -140,10 +140,11 @@ defmodule Prana.GraphExecutor do
               resume_token: nil
           }
 
-          # Update context with sub-workflow results and route output data
-          updated_context = store_resume_data_in_context(execution_context, suspended_node_id, resume_data)
-          updated_context = route_node_output(completed_node_execution, execution_graph, updated_context)
-          updated_context = store_node_result_in_context(completed_node_execution, updated_context)
+          # Handle context updates exactly like regular execution flow
+          # Get the suspended node to pass to store_node_result_in_context
+          suspended_node = Map.get(execution_graph.node_map, suspended_node_id)
+          updated_context = route_node_output(completed_node_execution, execution_graph, execution_context)
+          updated_context = store_node_result_in_context(completed_node_execution, updated_context, suspended_node)
 
           # Continue execution from where it left off
           execute_workflow_loop(resumed_execution, execution_graph, updated_context)
@@ -297,7 +298,7 @@ defmodule Prana.GraphExecutor do
 
           # Route output data and update orchestration context immediately
           updated_orchestration_context = route_node_output(node_execution, execution_graph, orchestration_context)
-          updated_orchestration_context = store_node_result_in_context(node_execution, updated_orchestration_context)
+          updated_orchestration_context = store_node_result_in_context(node_execution, updated_orchestration_context, selected_node)
 
           {:ok, {updated_execution, updated_orchestration_context}}
 
@@ -546,6 +547,10 @@ defmodule Prana.GraphExecutor do
     # Emit node starting event (NodeExecutor will create and manage NodeExecution)
     Middleware.call(:node_starting, %{node: node, execution: execution})
 
+    IO.inspect(">>>>>")
+    IO.inspect(node_input)
+    IO.inspect(orchestration_context)
+
     # Execute the node using ExecutionContext struct (atom keys)
     case NodeExecutor.execute_node(node, node_execution_context) do
       {:ok, result_node_execution, _updated_context} ->
@@ -666,11 +671,9 @@ defmodule Prana.GraphExecutor do
 
   Updated OrchestrationContext with node results.
   """
-  defp store_node_result_in_context(node_execution, orchestration_context) do
-    # Get the node's custom_id for context storage
-    # Note: We need to look up the node from the graph to get custom_id
-    # For now, we'll use the node_id as fallback
-    node_key = node_execution.node_id
+  defp store_node_result_in_context(node_execution, orchestration_context, node \\ nil) do
+    # Use custom_id if node is provided, otherwise fallback to node_id for backward compatibility
+    node_key = if node, do: node.custom_id, else: node_execution.node_id
 
     result_data =
       if node_execution.status == :completed do
@@ -990,7 +993,7 @@ defmodule Prana.GraphExecutor do
 
       # Call NodeExecutor to handle resume
       case NodeExecutor.resume_node(suspended_node, node_execution_context, suspended_node_execution, resume_data) do
-        {:ok, completed_node_execution, _updated_context} ->
+        {:ok, completed_node_execution, updated_context} ->
           # Update node_executions list with completed execution
           updated_executions =
             Enum.map(suspended_execution.node_executions, fn node_exec ->
@@ -1011,12 +1014,6 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Store resume data in execution context for downstream nodes
-  defp store_resume_data_in_context(execution_context, suspended_node_id, resume_data) do
-    nodes = Map.get(execution_context, "nodes", %{})
-    updated_nodes = Map.put(nodes, suspended_node_id, resume_data)
-    Map.put(execution_context, "nodes", updated_nodes)
-  end
 
   # Extract input data for a specific node from routed connection data
   # This function looks for data routed to this node via connections and prepares
