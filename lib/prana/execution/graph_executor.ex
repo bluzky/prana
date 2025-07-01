@@ -61,6 +61,58 @@ defmodule Prana.GraphExecutor do
   require Logger
 
   @doc """
+  Resume a suspended workflow execution with sub-workflow results.
+  
+  ## Parameters
+  
+  - `suspended_execution` - The suspended Execution struct  
+  - `resume_data` - Data to resume with (sub-workflow results, external event data, etc.)
+  - `execution_graph` - The original ExecutionGraph
+  - `execution_context` - The original execution context
+  
+  ## Returns
+  
+  - `{:ok, execution}` - Successful completion after resume
+  - `{:suspend, execution}` - Execution suspended again (for nested async operations)
+  - `{:error, reason}` - Resume failed with error details
+  """
+  @spec resume_workflow(Execution.t(), map(), ExecutionGraph.t(), map()) :: 
+    {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, any()}
+  def resume_workflow(%Execution{status: :suspended} = suspended_execution, resume_data, execution_graph, execution_context) do
+    # Find the suspended node and complete it with the resume data
+    suspended_node_id = suspended_execution.resume_token[:suspended_node_id]
+    
+    if suspended_node_id do
+      # Complete the suspended node execution with resume data
+      updated_executions = complete_suspended_node(suspended_execution.node_executions, suspended_node_id, resume_data)
+      
+      # Find the completed node execution to route its output
+      completed_node_execution = Enum.find(updated_executions, &(&1.node_id == suspended_node_id))
+      
+      # Update execution with completed node executions
+      resumed_execution = %{suspended_execution | 
+        status: :running, 
+        node_executions: updated_executions,
+        resume_token: nil
+      }
+      
+      # Update context with sub-workflow results and route output data
+      updated_context = store_resume_data_in_context(execution_context, suspended_node_id, resume_data)
+      updated_context = route_node_output(completed_node_execution, execution_graph, updated_context)
+      updated_context = store_node_result_in_context(completed_node_execution, updated_context)
+      
+      # Continue execution from where it left off
+      execute_workflow_loop(resumed_execution, execution_graph, updated_context)
+    else
+      {:error, %{type: "invalid_suspended_execution", message: "Cannot find suspended node ID"}}
+    end
+  end
+
+  def resume_workflow(%Execution{status: status}, _resume_data, _execution_graph, _execution_context) do
+    {:error, %{type: "invalid_execution_status", message: "Can only resume suspended executions", status: status}}
+  end
+
+  @doc """
   Execute a workflow graph with the given input data and context.
 
   ## Parameters
@@ -72,6 +124,7 @@ defmodule Prana.GraphExecutor do
   ## Returns
 
   - `{:ok, execution}` - Successful execution with final state
+  - `{:suspend, execution}` - Execution suspended for async coordination (sub-workflows, external events, etc.)
   - `{:error, reason}` - Execution failed with error details
 
   ## Examples
@@ -82,9 +135,13 @@ defmodule Prana.GraphExecutor do
         metadata: %{user_id: 123}
       }
 
+      # Normal execution
       {:ok, execution} = GraphExecutor.execute_graph(graph, %{email: "user@example.com"}, context)
+      
+      # Suspended execution (sub-workflow coordination)
+      {:suspend, execution} = GraphExecutor.execute_graph(graph, %{workflow_id: "child"}, context)
   """
-  @spec execute_graph(ExecutionGraph.t(), map(), map()) :: {:ok, Execution.t()} | {:error, any()}
+  @spec execute_graph(ExecutionGraph.t(), map(), map()) :: {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, any()}
   def execute_graph(%ExecutionGraph{} = execution_graph, input_data, context \\ %{}) do
     # Create initial execution and context
     execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", input_data)
@@ -100,6 +157,10 @@ defmodule Prana.GraphExecutor do
         {:ok, final_execution} ->
           Middleware.call(:execution_completed, %{execution: final_execution})
           {:ok, final_execution}
+
+        {:suspend, suspended_execution} ->
+          # Workflow suspended for async coordination - return suspended execution
+          {:suspend, suspended_execution}
 
         {:error, reason} = error ->
           failed_execution = Execution.fail(execution, reason)
@@ -124,6 +185,10 @@ defmodule Prana.GraphExecutor do
       case find_and_execute_ready_nodes(execution, execution_graph, execution_context) do
         {:ok, {updated_execution, updated_context}} ->
           execute_workflow_loop(updated_execution, execution_graph, updated_context)
+
+        {:suspend, suspended_execution} ->
+          # Workflow execution suspended - return suspended execution for application handling
+          {:suspend, suspended_execution}
 
         {:error, _reason} = error ->
           error
@@ -152,6 +217,24 @@ defmodule Prana.GraphExecutor do
           updated_context = store_node_result_in_context(node_execution, updated_context)
 
           {:ok, {updated_execution, updated_context}}
+
+        %NodeExecution{status: :suspended} = node_execution ->
+          # Node suspended for async coordination - pause workflow execution
+          updated_execution = update_execution_progress(execution, [node_execution])
+          
+          # Suspend the entire execution and emit middleware event for application handling
+          suspended_execution = Execution.suspend(updated_execution, %{
+            suspended_node_id: selected_node.id,
+            suspension_metadata: node_execution.metadata
+          })
+          
+          Middleware.call(:execution_suspended, %{
+            execution: suspended_execution,
+            suspended_node: selected_node,
+            node_execution: node_execution
+          })
+
+          {:suspend, suspended_execution}
 
         %NodeExecution{status: :failed} = node_execution ->
           # Node failed, return error
@@ -338,9 +421,12 @@ defmodule Prana.GraphExecutor do
 
   # Execute a single node with middleware events
   defp execute_single_node_with_events(node, execution_graph, execution_context) do
+    # Extract routed input data for this node from connection routing
+    node_input = extract_node_input_from_routing(node, execution_context)
+    
     # Convert our simple map context to ExecutionContext struct
     # We need a temporary workflow and execution for the ExecutionContext
-    temp_execution = Execution.new(execution_graph.workflow.id, 1, "temp", Map.get(execution_context, "input", %{}))
+    temp_execution = Execution.new(execution_graph.workflow.id, 1, "temp", node_input)
 
     context_struct =
       ExecutionContext.new(execution_graph.workflow, temp_execution, %{
@@ -359,6 +445,16 @@ defmodule Prana.GraphExecutor do
       {:ok, result_node_execution, _updated_context} ->
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
         result_node_execution
+
+      {:suspend, suspension_type, suspend_data, suspended_node_execution} ->
+        # Handle node suspension - emit middleware event for application handling
+        Middleware.call(:node_suspended, %{
+          node: node, 
+          node_execution: suspended_node_execution,
+          suspension_type: suspension_type,
+          suspend_data: suspend_data
+        })
+        suspended_node_execution
 
       {:error, {_reason, error_node_execution}} ->
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
@@ -705,5 +801,68 @@ defmodule Prana.GraphExecutor do
       "executed_nodes" => [],
       "active_paths" => %{}
     }
+  end
+
+  # Complete a suspended node execution with resume data
+  defp complete_suspended_node(node_executions, suspended_node_id, resume_data) do
+    Enum.map(node_executions, fn node_execution ->
+      if node_execution.node_id == suspended_node_id and node_execution.status == :suspended do
+        # Complete the suspended node with resume data
+        NodeExecution.complete(node_execution, resume_data, "success")
+      else
+        node_execution
+      end
+    end)
+  end
+
+  # Store resume data in execution context for downstream nodes
+  defp store_resume_data_in_context(execution_context, suspended_node_id, resume_data) do
+    nodes = Map.get(execution_context, "nodes", %{})
+    updated_nodes = Map.put(nodes, suspended_node_id, resume_data)
+    Map.put(execution_context, "nodes", updated_nodes)
+  end
+
+  # Extract input data for a specific node from routed connection data
+  # This function looks for data routed to this node via connections and prepares
+  # it as the input data for expression evaluation
+  defp extract_node_input_from_routing(node, execution_context) do
+    # Handle case where input_ports might be nil
+    input_ports = node.input_ports || ["input"]  # Default to "input" port
+    
+    # Debug: Log what we're looking for and what's in the context
+    require Logger
+    Logger.debug("Extracting input for node #{node.id}, input_ports: #{inspect(input_ports)}")
+    Logger.debug("Execution context keys: #{inspect(Map.keys(execution_context))}")
+    
+    # Look for routed data using the connection target key format
+    # For a node with input ports, check if data has been routed to any of its ports
+    routed_data = 
+      input_ports
+      |> Enum.reduce(%{}, fn input_port, acc ->
+        routed_data_key = "#{node.id}_#{input_port}"
+        Logger.debug("Looking for routed data key: #{routed_data_key}")
+        
+        case Map.get(execution_context, routed_data_key) do
+          nil -> 
+            Logger.debug("No data found for key: #{routed_data_key}")
+            acc
+          data when is_map(data) -> 
+            Logger.debug("Found map data for key #{routed_data_key}: #{inspect(data)}")
+            Map.merge(acc, data)
+          data -> 
+            Logger.debug("Found non-map data for key #{routed_data_key}: #{inspect(data)}")
+            Map.put(acc, input_port, data)
+        end
+      end)
+    
+    case routed_data do
+      empty when map_size(empty) == 0 ->
+        # No routed data found, use workflow input (for trigger nodes)
+        Logger.debug("No routed data found, using workflow input: #{inspect(Map.get(execution_context, "input", %{}))}")
+        Map.get(execution_context, "input", %{})
+      _ ->
+        Logger.debug("Using routed data: #{inspect(routed_data)}")
+        routed_data
+    end
   end
 end

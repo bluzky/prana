@@ -1,6 +1,6 @@
 # Prana Core Library - Updated Implementation Plan
 
-## Current Status: ~95% Core Engine Complete (Ready for Phase 4)
+## Current Status: ~98% Core Engine Complete (Phase 4.1 Complete)
 
 ### ✅ **COMPLETED PHASES (1-3)**
 - **Phase 1**: Core Data Structures & Behaviors - All structs and behaviors implemented
@@ -10,8 +10,8 @@
 - **Phase 3.3**: Diamond Pattern Coordination - Fork-join with merge strategies
 
 ### 🎯 **CURRENT PRIORITY: Phase 4 - Coordination & Integration Patterns**
-- **Phase 4.1**: Sub-workflow Orchestration (High Priority)
-- **Phase 4.2**: External System Polling & HTTP Integration (Medium Priority)  
+- **Phase 4.1**: Sub-workflow Orchestration (✅ **COMPLETED**)
+- **Phase 4.2**: External System Polling & HTTP Integration (High Priority)  
 - **Phase 4.3**: Time-based Delays & Logging (Medium Priority)
 - **Phase 4.4**: External Event Coordination (Complex - suspension/resume)
 
@@ -138,14 +138,25 @@
   - [x] **Fail-fast behavior** - diamond pattern fails if any branch fails
   - [x] **Context tracking** - execution state through diamond patterns
 
-#### Phase 3.4: Advanced Coordination (🎯 CURRENT PRIORITY - Phase 4)
-- [ ] **Enhanced coordination patterns** (Phase 4.1-4.4)
-  - [ ] **Sub-workflow Orchestration** - parent-child workflow coordination
-  - [ ] **External System Polling** - poll_until with condition evaluation  
-  - [ ] **Time-based Delays** - delay action with state persistence
-  - [ ] **External Event Coordination** - workflow suspension/resume for events
-  - [ ] **Wait-for-All Parallel** - async synchronization with timeout handling
-  - [ ] **Telemetry and Advanced Tracking** - performance monitoring, metrics
+#### Phase 4.1: Sub-workflow Orchestration (✅ COMPLETED)
+- [x] **Sub-workflow Integration** - parent-child workflow coordination
+  - [x] **Workflow Integration** - execute_workflow action with sync/async modes
+  - [x] **Suspension Mechanism** - unified suspension/resume following ADR-003
+  - [x] **NodeExecutor Suspension** - suspension tuple handling and metadata
+  - [x] **GraphExecutor Coordination** - resume_workflow functionality
+  - [x] **Comprehensive Testing** - 34 passing tests (14 workflow + 10 suspension + 10 graph)
+  - [x] **Error Propagation** - validation, timeout, and failure strategy handling
+  - [x] **Fire-and-forget Mode** - asynchronous sub-workflow triggering
+  - [x] **Expression Integration** - dynamic input preparation with context evaluation
+
+#### Phase 4.2-4.4: Advanced Coordination (🎯 CURRENT PRIORITY)
+- [ ] **Wait Integration** - delay action, wait_for_execution with timeout handling
+- [ ] **HTTP Integration** - HTTP requests, webhooks, response handling
+- [ ] **Transform Integration** - extract/map/filter data actions
+- [ ] **Log Integration** - info/debug/error logging actions
+- [ ] **External Event Coordination** - workflow suspension/resume for events
+- [ ] **Time-based Delays** - state persistence for long delays
+- [ ] **Telemetry and Advanced Tracking** - performance monitoring, metrics
 
 ## 4. Registry System (✅ COMPLETED - Simplified)
 
@@ -223,7 +234,15 @@
   - [ ] Debug log action
   - [ ] Error log action
 
-### 6.6 Wait Integration (📋 HIGH PRIORITY - Phase 4.1)
+### 6.6 Workflow Integration (✅ COMPLETED - Phase 4.1)
+- [x] `Prana.Integrations.Workflow` - Sub-workflow orchestration
+  - [x] Execute workflow action with sync/async modes
+  - [x] Suspension mechanism for parent-child coordination
+  - [x] Validation and error handling
+  - [x] Expression-based input preparation
+  - [x] Comprehensive testing (14 unit tests)
+
+### 6.7 Wait Integration (📋 HIGH PRIORITY - Phase 4.1 Remaining)
 - [ ] `Prana.Integrations.Wait` - Advanced coordination
   - [ ] Simple delay action with time-based execution
   - [ ] Wait for execution action with timeout handling
@@ -327,6 +346,7 @@ prana/
 │   │   ├── integrations/      # 🔄 Built-in integrations (PARTIAL)
 │   │   │   ├── logic.ex       # ✅ Logic integration (COMPLETED)
 │   │   │   ├── manual.ex      # ✅ Manual integration (COMPLETED)
+│   │   │   ├── workflow.ex    # ✅ Workflow integration (COMPLETED)
 │   │   │   ├── http.ex        # 📋 HTTP integration (TODO)
 │   │   │   ├── transform.ex   # 📋 Transform integration (TODO)
 │   │   │   ├── log.ex         # 📋 Log integration (TODO)
@@ -342,12 +362,15 @@ prana/
 │   │   ├── execution/         # ✅ Graph executor tests (COMPLETED)
 │   │   │   ├── graph_executor_test.exs                    # ✅ Core execution tests
 │   │   │   ├── graph_executor_conditional_branching_test.exs # ✅ 24 conditional tests
+│   │   │   ├── graph_executor_sub_workflow_test.exs       # ✅ 10 sub-workflow tests
 │   │   │   └── workflow_compiler_test.exs                 # ✅ Compilation tests
 │   │   ├── integrations/      # ✅ Integration tests
 │   │   │   ├── logic_test.exs # ✅ Logic integration tests
-│   │   │   └── manual_test.exs # ✅ Manual integration tests
+│   │   │   ├── manual_test.exs # ✅ Manual integration tests
+│   │   │   └── workflow_test.exs # ✅ Workflow integration tests (14 tests)
 │   │   ├── middleware_test.exs # ✅ Middleware system tests (COMPLETED)
 │   │   ├── node_executor_test.exs # ✅ Node executor tests (COMPLETED)
+│   │   ├── node_executor_suspension_test.exs # ✅ Suspension handling tests (10 tests)
 │   │   └── expression_engine_test.exs # ✅ Expression engine tests
 │   └── prana_test.exs         # 📋 Basic module test
 ├── docs/                      # ✅ Comprehensive documentation
@@ -359,9 +382,11 @@ prana/
 ```
 
 ### Key Achievements
-- **100+ test scenarios** across core components
-- **34 GraphExecutor tests** (7 core + 24 conditional + 3 branch following)
+- **150+ test scenarios** across core components
+- **44 GraphExecutor tests** (7 core + 24 conditional + 10 sub-workflow + 3 branch following)
 - **1358 lines of conditional branching tests** proving robust implementation
 - **351 lines of Logic integration** with comprehensive action support
+- **127 lines of Workflow integration** with sub-workflow orchestration
+- **330 lines of suspension/resume testing** (10 NodeExecutor + 10 GraphExecutor tests)
 - **Production-ready architecture** with O(1) performance optimizations
-- **Branch-following execution** with predictable workflow patterns
+- **Complete Phase 4.1 sub-workflow orchestration** with suspension/resume patterns
