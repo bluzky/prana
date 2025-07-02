@@ -125,7 +125,7 @@ defmodule Prana.GraphExecutor do
         execution_context
       ) do
     # Find the suspended node and complete it with the resume data
-    suspended_node_id = suspended_execution.resume_token[:suspended_node_id]
+    suspended_node_id = suspended_execution.suspended_node_id
 
     if suspended_node_id do
       # Resume the suspended node execution using NodeExecutor
@@ -260,11 +260,14 @@ defmodule Prana.GraphExecutor do
           updated_execution = update_execution_progress(execution, [node_execution])
 
           # Suspend the entire execution and emit middleware event for application handling
+          # TODO: Phase 2 - Update to use proper suspension types and data
+          suspension_data = %{
+            suspended_node_id: selected_node.id,
+            suspension_metadata: node_execution.metadata
+          }
+          
           suspended_execution =
-            Execution.suspend(updated_execution, %{
-              suspended_node_id: selected_node.id,
-              suspension_metadata: node_execution.metadata
-            })
+            Execution.suspend(updated_execution, selected_node.id, :sub_workflow, suspension_data)
 
           Middleware.call(:execution_suspended, %{
             execution: suspended_execution,

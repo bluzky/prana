@@ -108,8 +108,8 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       # Verify suspended execution state
       assert suspended_execution.status == :suspended
       assert suspended_execution.workflow_id == "parent_workflow"
-      assert is_map(suspended_execution.resume_token)
-      assert suspended_execution.resume_token[:suspended_node_id] == "sub_workflow_node"
+      assert is_binary(suspended_execution.resume_token)
+      assert suspended_execution.suspended_node_id == "sub_workflow_node"
 
       # Verify node executions - trigger should be completed, sub_workflow suspended
       completed_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :completed))
@@ -201,7 +201,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       # Verify suspended execution state
       assert suspended_execution.status == :suspended
       assert suspended_execution.workflow_id == "fire_forget_workflow"
-      assert suspended_execution.resume_token[:suspended_node_id] == "fire_forget_sub"
+      assert suspended_execution.suspended_node_id == "fire_forget_sub"
 
       # Verify node executions - trigger completed, fire_forget_sub suspended
       completed_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :completed))
@@ -328,7 +328,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert {:suspend, second_suspended} = result
 
       # Verify we're suspended at the second node
-      assert second_suspended.resume_token[:suspended_node_id] == "second_sub_workflow"
+      assert second_suspended.suspended_node_id == "second_sub_workflow"
 
       # Resume second suspension
       second_resume_data = %{"stage_2_result" => "completed"}
@@ -541,7 +541,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
     executed_nodes = Enum.map(suspended_execution.node_executions, & &1.node_id)
 
     # Find suspended node and add resume data
-    suspended_node_id = suspended_execution.resume_token[:suspended_node_id]
+    suspended_node_id = suspended_execution.suspended_node_id
 
     nodes =
       Enum.reduce(suspended_execution.node_executions, %{}, fn node_exec, acc ->

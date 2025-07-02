@@ -1,7 +1,39 @@
 defmodule Prana.Execution do
   @moduledoc """
-  Represents a workflow execution instance
+  Represents a workflow execution instance with structured suspension support.
+
+  ## Suspension Fields
+
+  - `suspended_node_id` - ID of the node that caused suspension
+  - `suspension_type` - Type of suspension (:webhook, :interval, :schedule, etc.)
+  - `suspension_data` - Typed data structure for the suspension
+  - `suspended_at` - When the execution was suspended
+
+
+  The execution now uses both structured suspension data AND a root-level resume_token
+  for optimal querying and type safety:
+
+  - **Structured fields** provide type safety and direct access
+  - **resume_token** enables fast webhook lookups and database queries
+
+  ## Example
+
+      # Structured suspension data (type-safe)
+      execution.suspension_type       # :webhook
+      execution.suspension_data       # %{resume_url: "...", webhook_id: "..."}
+      execution.suspended_node_id     # "node_123"
+      execution.suspended_at          # ~U[2024-01-01 12:00:00Z]
+
+      # Resume token for fast queries
+      execution.resume_token          # "abc123def456..." (indexed for fast lookups)
+
+  ## Webhook Resume Benefits
+
+      # Fast webhook resume lookup (single indexed query)
+      Repo.get_by(Execution, resume_token: "abc123def456")
   """
+
+  alias Prana.Core.SuspensionData
 
   @type status :: :pending | :running | :suspended | :completed | :failed | :cancelled | :timeout
   @type execution_mode :: :sync | :async | :fire_and_forget
@@ -22,7 +54,10 @@ defmodule Prana.Execution do
           context_data: map(),
           error_data: map() | nil,
           node_executions: [Prana.NodeExecution.t()],
-          webhook_callback_url: String.t() | nil,
+          suspended_node_id: String.t() | nil,
+          suspension_type: SuspensionData.suspension_type() | nil,
+          suspension_data: SuspensionData.suspension_data() | nil,
+          suspended_at: DateTime.t() | nil,
           resume_token: String.t() | nil,
           started_at: DateTime.t() | nil,
           completed_at: DateTime.t() | nil,
@@ -45,7 +80,10 @@ defmodule Prana.Execution do
     :context_data,
     :error_data,
     :node_executions,
-    :webhook_callback_url,
+    :suspended_node_id,
+    :suspension_type,
+    :suspension_data,
+    :suspended_at,
     :resume_token,
     :started_at,
     :completed_at,
@@ -74,7 +112,10 @@ defmodule Prana.Execution do
       context_data: %{},
       error_data: nil,
       node_executions: [],
-      webhook_callback_url: nil,
+      suspended_node_id: nil,
+      suspension_type: nil,
+      suspension_data: nil,
+      suspended_at: nil,
       resume_token: nil,
       started_at: nil,
       completed_at: nil,
@@ -104,10 +145,52 @@ defmodule Prana.Execution do
   end
 
   @doc """
-  Suspends execution with resume token
+  Suspends execution with structured suspension data.
+
+  ## Parameters
+  - `execution` - The execution to suspend
+  - `node_id` - ID of the node that caused the suspension
+  - `suspension_type` - Type of suspension (:webhook, :interval, etc.)
+  - `suspension_data` - Typed suspension data structure
+  - `resume_token` - Optional resume token for webhook lookups (defaults to generated token)
+
+  ## Example
+
+      suspension_data = SuspensionData.create_webhook_suspension(
+        "https://app.com/webhook/abc123",
+        "webhook_1",
+        3600
+      )
+
+      # Auto-generate resume token
+      suspend(execution, "node_123", :webhook, suspension_data)
+
+      # Explicit resume token for webhook scenarios
+      suspend(execution, "node_123", :webhook, suspension_data, "custom_resume_token_123")
   """
-  def suspend(%__MODULE__{} = execution, resume_token) do
-    %{execution | status: :suspended, resume_token: resume_token}
+  def suspend(%__MODULE__{} = execution, node_id, suspension_type, suspension_data, resume_token \\ nil) do
+    final_resume_token = resume_token || generate_resume_token()
+
+    %{
+      execution
+      | status: :suspended,
+        suspended_node_id: node_id,
+        suspension_type: suspension_type,
+        suspension_data: suspension_data,
+        suspended_at: DateTime.utc_now(),
+        resume_token: final_resume_token
+    }
+  end
+
+  @doc """
+  Legacy suspend function for backward compatibility.
+
+  This function is deprecated and will be removed in a future version.
+  Use suspend/4 with structured suspension data instead.
+  """
+  @deprecated "Use suspend/4 with structured suspension data"
+  def suspend(%__MODULE__{} = execution, resume_token) when is_binary(resume_token) do
+    %{execution | status: :suspended}
   end
 
   @doc """
@@ -137,7 +220,91 @@ defmodule Prana.Execution do
     status in [:pending, :running, :suspended]
   end
 
+  @doc """
+  Checks if execution is suspended
+  """
+  def suspended?(%__MODULE__{status: :suspended}), do: true
+  def suspended?(%__MODULE__{}), do: false
+
+  @doc """
+  Resumes a suspended execution by clearing suspension fields.
+
+  This only clears the suspension state - the caller is responsible for
+  updating the status and continuing execution.
+
+  ## Example
+
+      execution
+      |> resume_suspension()
+      |> Map.put(:status, :running)
+  """
+  def resume_suspension(%__MODULE__{} = execution) do
+    %{
+      execution
+      | suspended_node_id: nil,
+        suspension_type: nil,
+        suspension_data: nil,
+        suspended_at: nil,
+        resume_token: nil
+    }
+  end
+
+  @doc """
+  Gets suspension information if execution is suspended.
+
+  ## Returns
+  - `{:ok, suspension_info}` if suspended
+  - `:not_suspended` if not suspended
+
+  ## Example
+
+      case get_suspension_info(execution) do
+        {:ok, %{type: :webhook, data: data, node_id: node_id}} ->
+          # Handle webhook suspension
+        :not_suspended ->
+          # Execution not suspended
+      end
+  """
+  def get_suspension_info(%__MODULE__{
+        status: :suspended,
+        suspended_node_id: node_id,
+        suspension_type: type,
+        suspension_data: data,
+        suspended_at: suspended_at
+      })
+      when not is_nil(node_id) and not is_nil(type) and not is_nil(data) do
+    {:ok,
+     %{
+       node_id: node_id,
+       type: type,
+       data: data,
+       suspended_at: suspended_at
+     }}
+  end
+
+  def get_suspension_info(%__MODULE__{}) do
+    :not_suspended
+  end
+
+  @doc """
+  Validates suspension data for the execution's suspension type.
+
+  ## Returns
+  - `:ok` if valid or not suspended
+  - `{:error, reason}` if invalid suspension data
+  """
+  def validate_suspension_data(%__MODULE__{suspension_type: type, suspension_data: data})
+      when not is_nil(type) and not is_nil(data) do
+    SuspensionData.validate_suspension_data(type, data)
+  end
+
+  def validate_suspension_data(%__MODULE__{}), do: :ok
+
   defp generate_id do
     16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
+  end
+
+  defp generate_resume_token do
+    32 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 32)
   end
 end

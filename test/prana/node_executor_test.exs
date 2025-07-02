@@ -779,7 +779,7 @@ defmodule Prana.NodeExecutorTest do
 
       output_data = %{result: "success"}
 
-      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+      updated_context = NodeExecutor.update_context(context, node, output_data)
 
       # Only stored under custom_id
       assert updated_context.nodes["my_custom_node"] == output_data
@@ -806,7 +806,7 @@ defmodule Prana.NodeExecutorTest do
 
       output_data = %{result: "success"}
 
-      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+      updated_context = NodeExecutor.update_context(context, node, output_data)
 
       assert updated_context.nodes["node-123"] == output_data
       assert map_size(updated_context.nodes) == 1
@@ -829,7 +829,7 @@ defmodule Prana.NodeExecutorTest do
 
       output_data = %{result: "new_data"}
 
-      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+      updated_context = NodeExecutor.update_context(context, node, output_data)
 
       # Both old and new results preserved
       assert updated_context.nodes["existing_node"] == %{"data" => "preserved"}
