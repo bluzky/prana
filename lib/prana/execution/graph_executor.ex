@@ -211,24 +211,8 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  @doc """
-  Main workflow execution loop - continues until workflow is complete or error occurs.
-
-  Uses OrchestrationContext (simple map with string keys) for workflow-level coordination.
-  This is different from ExecutionContext struct used for individual node execution.
-
-  ## Parameters
-
-  - `execution` - Current Execution struct with node_executions
-  - `execution_graph` - Compiled ExecutionGraph with optimization maps
-  - `orchestration_context` - Workflow orchestration context (string keys)
-
-  ## Returns
-
-  - `{:ok, execution}` - Workflow completed successfully
-  - `{:suspend, execution}` - Workflow suspended for async coordination
-  - `{:error, reason}` - Workflow failed with error details
-  """
+  # Main workflow execution loop - continues until workflow is complete or error occurs.
+  # Uses OrchestrationContext (simple map with string keys) for workflow-level coordination.
   defp execute_workflow_loop(execution, execution_graph, orchestration_context) do
     if workflow_complete?(execution, execution_graph) do
       final_execution = Execution.complete(execution, %{})
@@ -248,24 +232,8 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  @doc """
-  Find ready nodes and execute following branch-completion strategy.
-
-  Uses OrchestrationContext for tracking active paths and executed nodes.
-  Converts to ExecutionContext when calling NodeExecutor.execute_node.
-
-  ## Parameters
-
-  - `execution` - Current Execution struct
-  - `execution_graph` - Compiled ExecutionGraph
-  - `orchestration_context` - Workflow orchestration context (string keys)
-
-  ## Returns
-
-  - `{:ok, {execution, orchestration_context}}` - Node executed successfully
-  - `{:suspend, execution}` - Node suspended for async coordination
-  - `{:error, reason}` - Execution failed
-  """
+  # Find ready nodes and execute following branch-completion strategy.
+  # Uses OrchestrationContext for tracking active paths and executed nodes.
   defp find_and_execute_ready_nodes(execution, execution_graph, orchestration_context) do
     ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, orchestration_context)
 
@@ -487,33 +455,8 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  @doc """
-  Execute a single node with middleware events.
-
-  ## Critical Context Conversion Point
-
-  This function is where the context conversion happens:
-  OrchestrationContext (string keys) → ExecutionContext (struct with atom keys)
-
-  Flow:
-  1. Extract routed input data from OrchestrationContext
-  2. Create ExecutionContext struct using real execution (persistent ID)
-  3. Emit :node_starting event (before NodeExecution exists)
-  4. Call NodeExecutor.execute_node with ExecutionContext struct
-  5. NodeExecutor creates, manages, and returns NodeExecution
-  6. Return NodeExecution result (OrchestrationContext updated by caller)
-
-  ## Parameters
-
-  - `node` - Node struct to execute
-  - `execution_graph` - Compiled ExecutionGraph
-  - `orchestration_context` - Workflow orchestration context (string keys)
-  - `execution` - Real execution struct with persistent ID
-
-  ## Returns
-
-  NodeExecution struct with execution results.
-  """
+  # Execute a single node with middleware events.
+  # Critical Context Conversion Point: OrchestrationContext → ExecutionContext
   defp execute_single_node_with_events(node, execution_graph, orchestration_context, execution) do
     # Extract routed input data for this node from connection routing
     node_input = extract_node_input_from_routing(node, orchestration_context)
@@ -604,23 +547,7 @@ defmodule Prana.GraphExecutor do
     Map.get(execution_graph.connection_map, {node_id, output_port}, [])
   end
 
-  @doc """
-  Route data through a single connection with optimized context updates.
-
-  Updates OrchestrationContext with:
-  1. Routed data stored with key "{to_node_id}_{to_port}"
-  2. Active path marked with key "{from_node_id}_{from_port}"
-
-  ## Parameters
-
-  - `node_execution` - Source NodeExecution with output data
-  - `connection` - Connection defining data routing
-  - `orchestration_context` - Current orchestration context (string keys)
-
-  ## Returns
-
-  Updated OrchestrationContext with routed data and active path.
-  """
+  # Route data through a single connection with optimized context updates.
   defp route_data_through_connection(node_execution, connection, orchestration_context) do
     routed_data = node_execution.output_data
 
@@ -636,22 +563,7 @@ defmodule Prana.GraphExecutor do
     |> Map.update("active_paths", %{path_key => true}, &Map.put(&1, path_key, true))
   end
 
-  @doc """
-  Store node execution result in orchestration context for $nodes.node_id access.
-
-  Updates OrchestrationContext with:
-  1. Node result data in "nodes" map for expression access
-  2. Node ID added to "executed_nodes" list for tracking
-
-  ## Parameters
-
-  - `node_execution` - Completed NodeExecution with results
-  - `orchestration_context` - Current orchestration context (string keys)
-
-  ## Returns
-
-  Updated OrchestrationContext with node results.
-  """
+  # Store node execution result in orchestration context for $nodes.node_id access.
   defp store_node_result_in_context(node_execution, orchestration_context, node \\ nil) do
     # Use custom_id if node is provided, otherwise fallback to node_id for backward compatibility
     node_key = if node, do: node.custom_id, else: node_execution.node_id
@@ -669,139 +581,6 @@ defmodule Prana.GraphExecutor do
     |> Map.update("executed_nodes", [node_execution.node_id], &[node_execution.node_id | &1])
   end
 
-  @doc """
-  Execute a sub-workflow synchronously - parent waits for completion.
-
-  Loads the sub-workflow using the workflow_loader callback, executes it,
-  and merges the result back into the parent execution context.
-
-  ## Parameters
-
-  - `node` - Node requesting sub-workflow execution
-  - `context` - Current execution context with workflow_loader
-
-  ## Returns
-
-  - `{:ok, updated_context}` - Sub-workflow completed successfully
-  - `{:error, reason}` - Sub-workflow failed or couldn't be loaded
-  """
-  @spec execute_sub_workflow_sync(Node.t(), map()) :: {:ok, map()} | {:error, any()}
-  def execute_sub_workflow_sync(%Node{} = node, context) do
-    workflow_id = Map.get(node.input_map, "workflow_id")
-
-    if workflow_id do
-      case load_sub_workflow(workflow_id, context) do
-        {:ok, sub_execution_graph} ->
-          # Prepare input data for sub-workflow
-          sub_input_data = Map.get(node.input_map, "input_data", %{})
-
-          # Execute sub-workflow
-          case execute_graph(sub_execution_graph, sub_input_data, context) do
-            {:ok, sub_execution} ->
-              # Merge sub-workflow results into parent context
-              # This is a simplified merge - real implementation might be more sophisticated
-              updated_context = merge_sub_workflow_results(context, sub_execution)
-              {:ok, updated_context}
-
-            {:error, _reason} = error ->
-              error
-          end
-
-        {:error, _reason} = error ->
-          error
-      end
-    else
-      {:error, %{type: "missing_workflow_id", message: "Sub-workflow node missing workflow_id"}}
-    end
-  end
-
-  @doc """
-  Execute a sub-workflow in fire-and-forget mode - parent continues immediately.
-
-  Loads and triggers the sub-workflow execution but does not wait for completion.
-  The parent workflow continues executing immediately.
-
-  ## Parameters
-
-  - `node` - Node requesting sub-workflow execution
-  - `context` - Current execution context with workflow_loader
-
-  ## Returns
-
-  - `{:ok, context}` - Sub-workflow triggered successfully (not completed)
-  - `{:error, reason}` - Sub-workflow failed to trigger or couldn't be loaded
-  """
-  @spec execute_sub_workflow_fire_and_forget(Node.t(), map()) :: {:ok, map()} | {:error, any()}
-  def execute_sub_workflow_fire_and_forget(%Node{} = node, context) do
-    workflow_id = Map.get(node.input_map, "workflow_id")
-
-    if workflow_id do
-      case load_sub_workflow(workflow_id, context) do
-        {:ok, sub_execution_graph} ->
-          # Prepare input data for sub-workflow
-          sub_input_data = Map.get(node.input_map, "input_data", %{})
-
-          # Trigger sub-workflow asynchronously (fire-and-forget)
-          Task.start(fn ->
-            case execute_graph(sub_execution_graph, sub_input_data, context) do
-              {:ok, _sub_execution} ->
-                Logger.info("Fire-and-forget sub-workflow #{workflow_id} completed successfully")
-
-              {:error, reason} ->
-                Logger.warning("Fire-and-forget sub-workflow #{workflow_id} failed: #{inspect(reason)}")
-            end
-          end)
-
-          # Return immediately without waiting
-          {:ok, context}
-
-        {:error, _reason} = error ->
-          error
-      end
-    else
-      {:error, %{type: "missing_workflow_id", message: "Sub-workflow node missing workflow_id"}}
-    end
-  end
-
-  # Load sub-workflow using the workflow_loader callback
-  defp load_sub_workflow(workflow_id, context) do
-    workflow_loader = Map.get(context, :workflow_loader)
-
-    if workflow_loader && is_function(workflow_loader, 1) do
-      try do
-        workflow_loader.(workflow_id)
-      rescue
-        error ->
-          {:error, %{type: "workflow_loader_error", message: Exception.message(error)}}
-      end
-    else
-      {:error, %{type: "missing_workflow_loader", message: "Context missing workflow_loader callback"}}
-    end
-  end
-
-  # Merge sub-workflow execution results into parent context
-  defp merge_sub_workflow_results(parent_context, sub_execution) do
-    # Extract results from sub-execution and merge into parent
-    # This is a simplified implementation - real-world might be more sophisticated
-    sub_results = %{
-      status: sub_execution.status,
-      output_data: extract_final_output(sub_execution),
-      node_executions: length(sub_execution.node_executions)
-    }
-
-    # Store sub-workflow results in parent context
-    Map.put(parent_context, "sub_workflow_result", sub_results)
-  end
-
-  # Extract final output from execution (simplified)
-  defp extract_final_output(execution) do
-    # In a real implementation, this might look for specific output nodes
-    # For now, we'll return basic execution info
-    %{
-      completed_at: execution.completed_at,
-      node_count: length(execution.node_executions)
-    }
-  end
 
   @doc """
   Update execution progress with completed node executions.
@@ -903,46 +682,8 @@ defmodule Prana.GraphExecutor do
     end)
   end
 
-  @doc """
-  Create initial orchestration context for workflow execution.
-
-  ## Context Structure: Orchestration vs Node Execution
-
-  The GraphExecutor uses TWO different context structures:
-
-  1. **OrchestrationContext** (this function creates) - Simple map with string keys
-     - Used by: GraphExecutor for workflow orchestration, routing, conditional branching
-     - Keys: String keys for expression compatibility ("input", "nodes", "variables")
-     - Purpose: Track execution flow, route data, manage conditional paths
-
-  2. **ExecutionContext** (struct in core/) - Structured with atom keys
-     - Used by: NodeExecutor for individual node execution
-     - Keys: Atom keys for compile-time validation (:workflow, :execution, :nodes)
-     - Purpose: Individual node execution and expression evaluation
-
-  ## Translation
-
-  GraphExecutor converts OrchestrationContext → ExecutionContext in
-  `execute_single_node_with_events/3` before calling NodeExecutor.
-
-  ## OrchestrationContext Fields
-
-  - `"input"` - Initial workflow input data (accessible via $input.field)
-  - `"variables"` - Workflow variables (accessible via $variables.key)
-  - `"metadata"` - Execution metadata (user_id, trace_id, etc.)
-  - `"nodes"` - Results from completed nodes (accessible via $nodes.node_id.field)
-  - `"executed_nodes"` - List of completed node IDs for dependency tracking
-  - `"active_paths"` - Map of active conditional paths for branch filtering
-
-  ## Parameters
-
-  - `input_data` - Initial data provided to the workflow
-  - `context` - External context with :variables, :metadata, etc.
-
-  ## Returns
-
-  OrchestrationContext map with string keys for workflow orchestration.
-  """
+  # Create initial orchestration context for workflow execution.
+  # Creates OrchestrationContext (string keys) for workflow orchestration.
   @spec create_initial_orchestration_context(map(), map()) :: map()
   defp create_initial_orchestration_context(input_data, external_context) do
     # Create orchestration context with string keys for expression engine compatibility

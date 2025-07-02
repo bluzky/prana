@@ -265,9 +265,9 @@ end
 For detailed implementation context, refer to these documents:
 
 #### Core Requirements & Architecture
-- **`library_requirements.md`** - Final simplified requirements with struct-based design principles
-- **`implementation_plan.md`** - Detailed phase breakdown with current completion status
-- **`IMPLEMENTATION_SUMMARY.md`** - High-level project overview and architecture summary
+- **`docs/library_requirements.md`** - Final simplified requirements with struct-based design principles
+- **`docs/implementation_plan.md`** - Detailed phase breakdown with current completion status
+- **`docs/IMPLEMENTATION_SUMMARY.md`** - High-level project overview and architecture summary
 
 #### Graph Executor Specifics
 - **`docs/graph_executor_requirement.md`** - Comprehensive GraphExecutor requirements (v1.2, June 23, 2025)
@@ -288,10 +288,30 @@ For detailed implementation context, refer to these documents:
 - **`lib/prana/integrations/`** - All built-in integrations (manual.ex, logic.ex, data.ex, workflow.ex)
 
 ### Git Status Context
-Currently on `main` branch with core platform complete:
+Currently on `feature/wait-integration` branch:
 - **Core Execution Engine Complete**: GraphExecutor handles all execution patterns (sequential, conditional, sub-workflows)
 - **Built-in Integrations Complete**: Manual, Logic, Data, and Workflow integrations fully implemented
 - **Sub-workflow Orchestration Complete**: Suspension/resume mechanisms with comprehensive test coverage
 - **NodeExecutor Architecture**: Clean separation with `execute_node/2` and `resume_node/4` methods
+- **GraphExecutor Cleanup Complete**: Removed redundant `execute_sub_workflow*` APIs, cleaned documentation
+- **Current Development**: Implementing Wait Integration for Phase 4.2 (delay actions, timeout handling)
 - **Comprehensive Documentation**: Integration guides, workflow building guides, and API documentation
 - **Production Ready**: Core platform ready for building complex workflow applications
+
+## Recent Updates
+
+### GraphExecutor Cleanup (December 2025)
+- **Removed redundant APIs**: `execute_sub_workflow_sync/2`, `execute_sub_workflow_fire_and_forget/2`
+- **Cleaned private function documentation**: Converted `@doc` to `#` comments to eliminate warnings
+- **Sub-workflow coordination**: Now handled cleanly through `Prana.Integrations.Workflow` integration
+- **Preserved core functionality**: All 205 tests continue to pass after cleanup
+- **Simplified API surface**: Focus on `execute_graph/3` and `resume_workflow/4` as primary APIs
+
+### Current Development Focus
+- **Wait Integration**: Implementing delay and timeout actions for time-based workflows
+- **Branch**: `feature/wait-integration` 
+- **Next Integrations**: HTTP, Transform, Log integrations for Phase 4.2+
+
+## References
+
+- **Update References Document**: Project documentation and reference tracking maintained
