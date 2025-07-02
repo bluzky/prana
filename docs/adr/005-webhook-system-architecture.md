@@ -2,7 +2,7 @@
 
 **Status**: Accepted
 **Date**: 2025-01-02
-**Updated**: 2025-01-02
+**Updated**: 2025-07-02
 **Authors**: Development Team
 **Reviewers**: Architecture Team
 
@@ -24,39 +24,55 @@ The system must support:
 
 ## Decision
 
-We will implement a **Two-Tier Webhook System** with the following architecture:
+We will implement a **Distributed Webhook System** with clear separation of responsibilities:
 
-### Tier 1: Trigger Webhooks (Fixed URLs per Workflow)
-- **Purpose**: Start new workflow executions
-- **URL Pattern**: `/webhook/workflow/trigger/:workflow_id`
-- **Persistence**: Configuration-based (workflow definitions)
-- **Lifecycle**: Persistent while workflow exists
-- **Storage**: In-memory registry, no database required
+### Prana Library Responsibilities
+- **Webhook URL generation**: Generate unique resume URLs at execution start
+- **Webhook data structures**: Provide structs and utilities for webhook management  
+- **Execution integration**: Include webhook data in execution results when suspended
+- **Resume coordination**: Handle webhook resume via existing `resume_workflow/4` API
 
-### Tier 2: Resume Webhooks (Dynamic URLs per Execution)
-- **Purpose**: Resume suspended workflow executions
-- **URL Pattern**: `/webhook/workflow/resume/:resume_id`
-- **Persistence**: Database-backed with expiry
-- **Lifecycle**: Created at execution start, activated on wait node, consumed/expired on completion
-- **Storage**: Database with automatic cleanup
-- **Validation**: Only valid during active wait node suspension window
+### Application Responsibilities  
+- **HTTP routing**: Handle webhook endpoints (`/webhook/workflow/trigger/:workflow_id`, `/webhook/workflow/resume/:resume_id`)
+- **Persistence**: Store webhook data from execution results in distributed database
+- **Security & validation**: Authenticate webhook requests and validate state
+- **Resume invocation**: Call Prana's `resume_workflow/4` when webhooks received
 
-### Webhook Registry Design
+### Webhook Flow Architecture
+```
+1. Execution Start → Scan workflow for wait nodes → Generate resume URLs for each wait node
+2. Resume URLs available as $execution.{node_id}.resume_url expressions
+3. Email Node → Uses $execution.wait_approval.resume_url in email template  
+4. Wait Node → Activates its pre-generated webhook URL
+5. Webhook Request → Application validates → Calls resume_workflow/4
+6. Execution Resume → Normal Prana workflow continuation at specific node
+```
+
+### Multiple Wait Node Support
+- **Pre-generate resume URLs** for all wait nodes at execution start
+- **Node-specific expressions**: `$execution.{node_id}.resume_url` 
+- **Multiple active webhooks** supported simultaneously
+- **Deterministic URLs** available before wait nodes execute
+
+### Webhook Utilities Design
 
 ```elixir
-# Core registry interface
-defmodule Prana.WebhookRegistry do
-  @doc "Generate resume webhook URL at execution start"
-  def generate_resume_url(execution_id)
+# Webhook utilities (no centralized state)
+defmodule Prana.Webhook do
+  @doc "Generate resume webhook ID at execution start"
+  def generate_execution_resume_id(execution_id)
 
-  @doc "Activate webhook for waiting (sets state to :active)"
-  def activate_resume_webhook(resume_id, node_id, config)
+  @doc "Parse webhook URLs for routing"  
+  def parse_webhook_url(url_path)
 
-  @doc "Validate webhook and extract resume data for GraphExecutor.resume_workflow/4"
-  def handle_resume_webhook(resume_id, payload)
+  @doc "Build full webhook URLs"
+  def build_webhook_url(base_url, type, id)
 
-  @doc "Clean up execution webhooks (application responsibility)"
-  def cleanup_execution_webhooks(execution_id)
+  @doc "Create webhook registration data"
+  def create_webhook_registration(resume_id, execution_id, node_id, config)
+
+  @doc "Validate webhook for resume (application calls this)"
+  def validate_webhook_resume(webhook_registration, payload)
 end
 ```
 

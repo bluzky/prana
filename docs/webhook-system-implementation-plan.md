@@ -15,7 +15,7 @@
 - ✅ Wait integration foundation implemented
 - ✅ ADR-005 architectural decisions finalized
 
-**Implementation Focus**: Two-tier webhook system with trigger URLs (workflow-scoped) and resume URLs (execution-scoped) following n8n patterns.
+**Implementation Focus**: Distributed webhook system where Prana provides utilities and applications handle persistence/routing.
 
 ## Overview
 
@@ -25,19 +25,20 @@ Implementation plan for the two-tier webhook system defined in ADR-005. This pla
 
 ## Phase 1: Core Webhook Infrastructure (High Priority)
 
-### Task 1: WebhookRegistry GenServer Module
+### Task 1: Webhook Utilities Module
 
-**Objective**: Create central webhook routing and state management system
+**Objective**: Create webhook utility functions and data structures (no centralized registry)
 
 #### Implementation Tasks
-- [ ] **webhook-1**: Create `Prana.WebhookRegistry` GenServer module with state management
-- [ ] **webhook-2**: Implement webhook URL pattern parsing for trigger and resume patterns
-- [ ] **webhook-3**: Add webhook lifecycle state management (pending → active → consumed/expired)
+- [ ] **webhook-1**: Create `Prana.Webhook` utilities module (no centralized state)
+- [ ] **webhook-2**: Implement webhook URL pattern parsing and building functions
+- [ ] **webhook-3**: Add webhook validation and data creation helpers
 
 #### Technical Details
-- GenServer with ETS tables for fast webhook lookups
+- Pure functions for webhook ID generation and URL building
 - URL patterns: `/webhook/workflow/trigger/:workflow_id` and `/webhook/workflow/resume/:resume_id`
-- State transitions with proper validation and error handling
+- Utilities for webhook validation and data structure creation
+- No centralized state - applications handle persistence
 
 #### Acceptance Criteria
 - [ ] **AC-WH-1.1**: Parse webhook URLs correctly for trigger (`/webhook/workflow/trigger/:workflow_id`) and resume (`/webhook/workflow/resume/:resume_id`) patterns
@@ -48,26 +49,28 @@ Implementation plan for the two-tier webhook system defined in ADR-005. This pla
 - [ ] **AC-WH-1.6**: Implement webhook lifecycle states (pending, active, consumed, expired)
 - [ ] **AC-WH-1.7**: Generate resume URLs at execution start for expression availability
 
-### Task 2: Webhook Data Structures
+### Task 2: Webhook Data Structures and Context
 
-**Objective**: Define core data structures following ADR-005 specifications
+**Objective**: Define core data structures and execution context enhancements
 
 #### Implementation Tasks
 - [ ] **webhook-4**: Create Prana.WebhookRegistration struct with all required fields
-- [ ] **webhook-5**: Add resume_url field to ExecutionContext for expression access
-- [ ] **webhook-6**: Implement resume URL generation at execution start
+- [ ] **webhook-5**: Add resume_urls map to ExecutionContext for node-specific expression access
+- [ ] **webhook-6**: Implement workflow scanning and resume URL generation at execution start
 
 #### Technical Details
 - WebhookRegistration with resume_id, execution_id, node_id, status, timestamps
-- ExecutionContext enhanced with resume_url for `$execution.resume_url` expressions
-- Resume URL generation using pattern `webhook_{execution_id}_{node_id}_{random}`
+- ExecutionContext enhanced with `resume_urls: %{"node_id" => "webhook_url"}` map
+- Workflow scanning to identify wait nodes and pre-generate their resume URLs
+- Expression support for `$execution.{node_id}.resume_url` syntax
 
 #### Acceptance Criteria
 - [ ] **AC-WH-1.8**: WebhookRegistration contains all required fields (resume_id, execution_id, node_id, status, created_at, expires_at, webhook_config)
-- [ ] **AC-WH-1.9**: WebhookConfig supports HTTP method, timeout, response validation, and custom headers
-- [ ] **AC-WH-1.10**: Suspension data includes complete webhook registration data for application persistence
-- [ ] **AC-WH-1.11**: ExecutionContext.resume_url available for expression evaluation throughout workflow
-- [ ] **AC-WH-1.12**: All webhook structs have proper type specifications and validation
+- [ ] **AC-WH-1.9**: ExecutionContext.resume_urls contains map of node_id → webhook_url for all wait nodes
+- [ ] **AC-WH-1.10**: Workflow scanning correctly identifies all wait nodes at execution start
+- [ ] **AC-WH-1.11**: Expression engine supports `$execution.{node_id}.resume_url` syntax
+- [ ] **AC-WH-1.12**: Resume URLs generated with pattern `webhook_{execution_id}_{node_id}_{random}`
+- [ ] **AC-WH-1.13**: All webhook structs have proper type specifications and validation
 
 ---
 
@@ -96,26 +99,25 @@ Implementation plan for the two-tier webhook system defined in ADR-005. This pla
 
 ### Task 8: GraphExecutor Webhook Integration
 
-**Objective**: Integrate webhook suspensions with GraphExecutor
+**Objective**: Integrate webhook suspensions with GraphExecutor execution results
 
 #### Implementation Tasks
-- [ ] **webhook-8**: Integrate webhook suspensions with GraphExecutor
-- [ ] **webhook-9**: Add webhook data to middleware events for application persistence
-- [ ] **webhook-10**: Implement webhook cleanup on execution completion
+- [ ] **webhook-8**: Return webhook data in GraphExecutor execution results (not middleware)
+- [ ] **webhook-9**: Handle webhook suspension return tuples in GraphExecutor
+- [ ] **webhook-10**: Integrate webhook resume with existing `resume_workflow/4` API
 
 #### Technical Details
 - Handle `{:suspend, :webhook, registration_data}` returns in GraphExecutor
-- Emit `:node_suspended` middleware events with complete webhook data
+- Return webhook data directly in execution results for application storage
 - Integrate with existing `resume_workflow/4` API for webhook resume
-- Automatic webhook cleanup on execution completion/failure
+- No middleware events - webhook data flows through normal execution results
 
 #### Acceptance Criteria
-- [ ] **AC-WH-3.1**: GraphExecutor handles `{:suspend, :webhook, registration_data}` with proper state management
-- [ ] **AC-WH-3.2**: Emit `:node_suspended` middleware event with complete webhook registration data
+- [ ] **AC-WH-3.1**: GraphExecutor returns webhook data in execution results when suspended
+- [ ] **AC-WH-3.2**: Webhook suspension tuples handled correctly in execution flow
 - [ ] **AC-WH-3.3**: Webhook resume integrates seamlessly with existing `resume_workflow/4` API
-- [ ] **AC-WH-3.4**: WebhookRegistry.handle_resume_webhook/2 validates state and returns resume data
-- [ ] **AC-WH-3.5**: Webhook state transitions (active → consumed/expired) handled correctly
-- [ ] **AC-WH-3.6**: Webhook cleanup on execution completion prevents memory leaks
+- [ ] **AC-WH-3.4**: Applications receive complete webhook data for persistence and routing
+- [ ] **AC-WH-3.5**: No centralized state in Prana - all persistence handled by applications
 
 ---
 
