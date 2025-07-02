@@ -15,10 +15,16 @@ defmodule Prana.GraphExecutorTest do
   describe "execute_graph/3" do
     setup do
       # Start the IntegrationRegistry GenServer for testing using ExUnit supervision
-      start_supervised!(Prana.IntegrationRegistry)
+      {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
       # Register test integration for the test
       :ok = IntegrationRegistry.register_integration(TestIntegration)
+
+      on_exit(fn ->
+        if Process.alive?(registry_pid) do
+          GenServer.stop(registry_pid)
+        end
+      end)
 
       :ok
     end
@@ -239,6 +245,7 @@ defmodule Prana.GraphExecutorTest do
       }
 
       workflow = %Workflow{connections: []}
+
       execution_graph = %ExecutionGraph{
         workflow: workflow,
         connection_map: %{},
@@ -283,6 +290,7 @@ defmodule Prana.GraphExecutorTest do
       }
 
       workflow = %Workflow{connections: []}
+
       execution_graph = %ExecutionGraph{
         workflow: workflow,
         connection_map: %{},

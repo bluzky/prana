@@ -149,18 +149,12 @@ defmodule Prana.Integrations.Logic do
     case_data = Map.get(case_config, "data", input_map)
     
     if condition_expr do
-      case evaluate_expression(condition_expr, input_map) do
-        {:ok, actual_value} ->
-          if values_match?(actual_value, expected_value) do
-            {:ok, {case_port, case_data}}
-          else
-            # Try next case
-            find_matching_condition_case(remaining_cases, input_map)
-          end
-          
-        {:error, _reason} ->
-          # Expression evaluation failed for this case, skip and try next
-          find_matching_condition_case(remaining_cases, input_map)
+      {:ok, actual_value} = evaluate_expression(condition_expr, input_map)
+      if values_match?(actual_value, expected_value) do
+        {:ok, {case_port, case_data}}
+      else
+        # Try next case
+        find_matching_condition_case(remaining_cases, input_map)
       end
     else
       # Skip invalid case, try next

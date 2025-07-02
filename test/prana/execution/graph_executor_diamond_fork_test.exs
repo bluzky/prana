@@ -8,7 +8,7 @@ defmodule Prana.Execution.DiamondForkTest do
   - Context tracking and node result availability
   """
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Prana.Connection
   alias Prana.Execution
@@ -186,19 +186,17 @@ defmodule Prana.Execution.DiamondForkTest do
 
   defp create_diamond_workflow_with_failing_branch(failing_branch) do
     workflow = create_basic_diamond_workflow()
-    
+
     # Update the failing branch to use non-existent action to simulate failure
-    updated_nodes = Enum.map(workflow.nodes, fn node ->
-      if node.id == failing_branch do
-        %{node | 
-          action_name: "non_existent_action",
-          input_map: %{"error_message" => "Simulated branch failure"}
-        }
-      else
-        node
-      end
-    end)
-    
+    updated_nodes =
+      Enum.map(workflow.nodes, fn node ->
+        if node.id == failing_branch do
+          %{node | action_name: "non_existent_action", input_map: %{"error_message" => "Simulated branch failure"}}
+        else
+          node
+        end
+      end)
+
     %{workflow | nodes: updated_nodes}
   end
 
@@ -210,9 +208,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "executes diamond pattern A → (B, C) → Merge → D successfully" do
       workflow = create_basic_diamond_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "test_data"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -221,10 +219,10 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       result = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify successful execution
       assert {:ok, %Execution{status: :completed} = execution} = result
-      
+
       # Verify all nodes executed by checking node_executions
       executed_node_ids = Enum.map(execution.node_executions, & &1.node_id)
       assert "start" in executed_node_ids
@@ -232,7 +230,7 @@ defmodule Prana.Execution.DiamondForkTest do
       assert "branch_c" in executed_node_ids
       assert "merge" in executed_node_ids
       assert "final" in executed_node_ids
-      
+
       # Verify sequential execution order by checking node_executions order
       node_execution_order = Enum.map(execution.node_executions, & &1.node_id)
       start_index = Enum.find_index(node_execution_order, &(&1 == "start"))
@@ -240,7 +238,7 @@ defmodule Prana.Execution.DiamondForkTest do
       branch_c_index = Enum.find_index(node_execution_order, &(&1 == "branch_c"))
       merge_index = Enum.find_index(node_execution_order, &(&1 == "merge"))
       final_index = Enum.find_index(node_execution_order, &(&1 == "final"))
-      
+
       # Verify execution order: start < (branch_b, branch_c) < merge < final
       assert start_index < branch_b_index
       assert start_index < branch_c_index
@@ -252,9 +250,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "merge receives outputs from both branches" do
       workflow = create_basic_diamond_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "test_value"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -263,13 +261,13 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify merge node executed successfully
       merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
       assert merge_execution != nil
       assert merge_execution.status == :completed
       assert merge_execution.output_port == "success"
-      
+
       # Verify merge output contains data from both branches
       merged_data = merge_execution.output_data
       assert is_list(merged_data)
@@ -279,9 +277,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "final node receives merged data from merge node" do
       workflow = create_basic_diamond_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "test_value"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -290,13 +288,13 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify final node executed successfully
       final_execution = Enum.find(execution.node_executions, &(&1.node_id == "final"))
       assert final_execution != nil
       assert final_execution.status == :completed
       assert final_execution.output_port == "success"
-      
+
       # Verify merge node also executed successfully
       merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
       assert merge_execution != nil
@@ -312,9 +310,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "workflow fails when first branch (B) fails" do
       workflow = create_diamond_workflow_with_failing_branch("branch_b")
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "test_data"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -323,7 +321,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       result = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify workflow failed (can return error tuple on failure)
       case result do
         {:ok, %Execution{status: :failed} = execution} ->
@@ -331,11 +329,11 @@ defmodule Prana.Execution.DiamondForkTest do
           executed_node_ids = Enum.map(execution.node_executions, & &1.node_id)
           assert "start" in executed_node_ids
           assert "branch_b" in executed_node_ids
-          
+
           # Verify merge and final nodes did not execute
           refute "merge" in executed_node_ids
           refute "final" in executed_node_ids
-          
+
         {:error, error} ->
           # Verify we got a node execution failure
           assert error.type == "node_execution_failed"
@@ -346,9 +344,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "workflow fails when second branch (C) fails" do
       workflow = create_diamond_workflow_with_failing_branch("branch_c")
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "test_data"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -357,7 +355,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       result = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify workflow failed (can return error tuple on failure)
       case result do
         {:ok, %Execution{status: :failed} = execution} ->
@@ -366,11 +364,11 @@ defmodule Prana.Execution.DiamondForkTest do
           assert "start" in executed_node_ids
           assert "branch_b" in executed_node_ids
           assert "branch_c" in executed_node_ids
-          
+
           # Verify merge and final nodes did not execute
           refute "merge" in executed_node_ids
           refute "final" in executed_node_ids
-          
+
         {:error, error} ->
           # Verify we got a node execution failure
           assert error.type == "node_execution_failed"
@@ -381,9 +379,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "merge and final nodes do not execute when any branch fails" do
       workflow = create_diamond_workflow_with_failing_branch("branch_b")
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "test_data"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -392,23 +390,23 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       result = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify workflow failed, regardless of return format
       case result do
         {:ok, %Execution{status: :failed} = execution} ->
           # Verify merge node did not execute
           merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
           assert merge_execution == nil
-          
+
           # Verify final node did not execute
           final_execution = Enum.find(execution.node_executions, &(&1.node_id == "final"))
           assert final_execution == nil
-          
+
           # Verify failed node has error result
           failed_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_b"))
           assert failed_execution != nil
           assert failed_execution.status == :failed
-          
+
         {:error, error} ->
           # Just verify we got the expected failure
           assert error.type == "node_execution_failed"
@@ -425,9 +423,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "executed_nodes includes all diamond pattern nodes in correct order" do
       workflow = create_basic_diamond_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "test_data"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -436,13 +434,13 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify all nodes are tracked in node_executions
       executed_node_ids = Enum.map(execution.node_executions, & &1.node_id)
       expected_nodes = ["start", "branch_b", "branch_c", "merge", "final"]
-      
+
       assert length(executed_node_ids) == length(expected_nodes)
-      
+
       # Verify all expected nodes are present
       Enum.each(expected_nodes, fn node_id ->
         assert node_id in executed_node_ids
@@ -452,9 +450,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "context is available in merge and downstream nodes" do
       workflow = create_basic_diamond_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "context_test"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{"test_var" => "test_value"},
@@ -463,16 +461,16 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify input data preservation
       assert execution.input_data["data"] == "context_test"
-      
+
       # Verify context inheritance through diamond pattern
       branch_b_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_b"))
       branch_c_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_c"))
       merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
       final_execution = Enum.find(execution.node_executions, &(&1.node_id == "final"))
-      
+
       assert branch_b_execution != nil
       assert branch_c_execution != nil
       assert merge_execution != nil
@@ -482,9 +480,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "merge node can access both branch results" do
       workflow = create_basic_diamond_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "branch_test"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -493,16 +491,16 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify merge node has access to branch results
       branch_b_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_b"))
       branch_c_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_c"))
       merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
-      
+
       assert branch_b_execution != nil
       assert branch_c_execution != nil
       assert merge_execution != nil
-      
+
       # Verify merge result contains combined data
       assert merge_execution.status == :completed
       assert merge_execution.output_port == "success"
@@ -514,9 +512,9 @@ defmodule Prana.Execution.DiamondForkTest do
     test "final node can access merged results" do
       workflow = create_basic_diamond_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       input_data = %{"data" => "final_test"}
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -525,23 +523,23 @@ defmodule Prana.Execution.DiamondForkTest do
 
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
-      
+
       # Verify final node has access to all previous results
       final_execution = Enum.find(execution.node_executions, &(&1.node_id == "final"))
       merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
-      
+
       assert final_execution != nil
       assert merge_execution != nil
-      
+
       # Verify final node executed successfully with access to context
       assert final_execution.status == :completed
       assert final_execution.output_port == "success"
-      
+
       # Verify all diamond pattern nodes are accessible in execution
       start_execution = Enum.find(execution.node_executions, &(&1.node_id == "start"))
       branch_b_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_b"))
       branch_c_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_c"))
-      
+
       assert start_execution != nil
       assert branch_b_execution != nil
       assert branch_c_execution != nil

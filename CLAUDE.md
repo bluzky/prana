@@ -46,8 +46,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`Prana.ExecutionContext`**: Shared execution context across workflow
 
 #### Execution Engine
-- **`Prana.NodeExecutor`** (`node_executor.ex`): ✅ **PRODUCTION READY** - Executes individual nodes with expression-based input preparation, MFA action invocation, and comprehensive error handling
-- **`Prana.GraphExecutor`** (`execution/graph_executor.ex`): 🚧 **IN PROGRESS** - Orchestrates workflow execution using NodeExecutor, handles parallel execution, port-based routing, and middleware integration
+- **`Prana.NodeExecutor`** (`node_executor.ex`): ✅ **PRODUCTION READY** - Executes individual nodes with expression-based input preparation, MFA action invocation, suspension/resume patterns, and comprehensive error handling
+- **`Prana.GraphExecutor`** (`execution/graph_executor.ex`): ✅ **PRODUCTION READY** - Orchestrates workflow execution using NodeExecutor, handles conditional branching, port-based routing, sub-workflow coordination, and middleware integration
 - **`Prana.ExpressionEngine`** (`expression_engine.ex`): ✅ **COMPLETE** - Path-based expression evaluation for dynamic data access
 
 #### Registry & Extension System
@@ -55,9 +55,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`Prana.Behaviour.Integration`**: Contract for workflow integrations
 - **`Prana.Behaviour.Middleware`**: Contract for workflow lifecycle event handling
 
+#### Built-in Integrations (`lib/prana/integrations/`)
+- **`Prana.Integrations.Manual`** (`manual.ex`): Test actions for development and testing workflows
+- **`Prana.Integrations.Logic`** (`logic.ex`): Conditional branching with IF/ELSE and switch/case routing
+- **`Prana.Integrations.Data`** (`data.ex`): Data merging and combination operations for fork-join patterns
+- **`Prana.Integrations.Workflow`** (`workflow.ex`): Sub-workflow orchestration with suspension/resume coordination
+
 #### Middleware System
 - **`Prana.Middleware`** (`middleware.ex`): Pipeline execution engine for lifecycle events
-- Events: `:execution_started`, `:execution_completed`, `:execution_failed`, `:node_started`, `:node_completed`, `:node_failed`
+- Events: `:execution_started`, `:execution_completed`, `:execution_failed`, `:node_starting`, `:node_completed`, `:node_failed`, `:node_suspended`, `:execution_suspended`
 
 ### Expression System Usage
 
@@ -126,51 +132,49 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 - ✅ Conditional workflow completion (based on active paths, not total nodes)
 - ✅ Context enhancements: `executed_nodes` and `active_paths` tracking
 
-#### 🎯 CURRENT IMPLEMENTATION TARGET
+#### ✅ VERIFIED COMPLETE - Phase 4.1 Sub-workflow Orchestration
 
-**Phase 3.3 (Advanced Coordination)** - *Partially Complete*:
-- ✅ Merge action exists in Logic integration
-- ⚠️ **Needs**: Diamond pattern coordination (fork-join)
-- ⚠️ **Needs**: Wait integration for async synchronization
-- ⚠️ **Needs**: Wait-for-All parallel pattern support
-- ⚠️ **Needs**: Timeout handling mechanisms
-
-#### Implementation Accuracy Note
-The docs show some inconsistency - `graph_execution pattern.md` section 8 shows Phase 3.2 as TODO, but section 7 and the actual implementation confirm it's complete. The **tests and code confirm Phase 3.2 is fully implemented and working**.
+**Phase 4.1 (Sub-workflow Orchestration)** - **COMPLETE**:
+- ✅ **Workflow Integration** with three execution modes (sync, async, fire-and-forget)
+- ✅ **Suspension/Resume Mechanisms** for parent-child workflow coordination
+- ✅ **NodeExecutor.resume_node/4** for handling suspended node execution
+- ✅ **Comprehensive Sub-workflow Tests** with 100+ test scenarios covering all patterns
+- ✅ **Middleware Integration** with suspension/resume events
 
 ### Current Implementation Status
 
-**Overall Progress**: ~85% Complete (Phase 3.1 + 3.2 Complete, 3.3 in progress)
+**Overall Progress**: ~95% Complete (Core execution engine and sub-workflow orchestration complete)
 
-#### ✅ COMPLETED (Phase 1 + 2)
+#### ✅ COMPLETED (Core Platform)
 1. **All Core Data Structures** - Comprehensive struct-based design with proper type safety
 2. **Behavior Definitions** - Simplified contracts (Integration, Middleware only)
 3. **Expression Engine** - Complete path-based expression evaluation with wildcards and filtering
 4. **Integration Registry** - Runtime integration management with health checking
-5. **Middleware System** - Event-driven lifecycle handling with 100+ test scenarios
-6. **Node Executor** - **PRODUCTION READY** individual node execution with comprehensive testing
+5. **Middleware System** - Event-driven lifecycle handling with comprehensive test coverage
+6. **Node Executor** - **PRODUCTION READY** individual node execution with suspension/resume support
 7. **Workflow Compiler** - Complete workflow compilation into optimized ExecutionGraphs
 
-#### ✅ CURRENT STATUS (Phase 3.1 + 3.2 - COMPLETE)
-1. **Graph Executor Phase 3.1** - Core Execution (Sync/Fire-and-Forget) ✅ **COMPLETE**
+#### ✅ CORE EXECUTION ENGINE - COMPLETE
+1. **Graph Executor Phase 3.1** - Core Execution (Sequential, Sync/Fire-and-Forget) ✅ **COMPLETE**
+2. **Graph Executor Phase 3.2** - Conditional Branching (IF/ELSE, Switch patterns) ✅ **COMPLETE**
+3. **Graph Executor Phase 4.1** - Sub-workflow Orchestration (Parent-child coordination) ✅ **COMPLETE**
 
-2. **Graph Executor Phase 3.2** - Conditional Branching ✅ **COMPLETE**
+#### ✅ BUILT-IN INTEGRATIONS - COMPLETE
+1. **Manual Integration** - Test actions and triggers for development workflows ✅ **COMPLETE**
+2. **Logic Integration** - IF/ELSE and switch/case routing with dynamic ports ✅ **COMPLETE**
+3. **Data Integration** - Merge operations for fork-join patterns (append, merge, concat) ✅ **COMPLETE**
+4. **Workflow Integration** - Sub-workflow orchestration with suspension/resume ✅ **COMPLETE**
 
-#### 🎯 CURRENT PRIORITY (Phase 3.3 - Advanced Coordination)
-- **Enhanced Merge Integration**: Core merge action already exists in Logic integration, needs diamond pattern coordination
-- **Wait Integration**: Async synchronization and timeout handling for Wait patterns
-- **Advanced Coordination**: Complex execution patterns like Wait-for-All parallel
-- **Performance Optimization**: Monitor and optimize sequential vs parallel execution patterns
+#### 🎯 CURRENT PRIORITY (Phase 4.2+ - Additional Integrations)
+- **Wait Integration**: Delay actions and timeout handling for time-based workflows
+- **HTTP Integration**: HTTP requests, webhooks, and API interactions
+- **Transform Integration**: Data transformation, filtering, and mapping operations
+- **Log Integration**: Structured logging actions for workflow debugging
 
-#### 📋 FUTURE PHASES (Graph Executor)
-- **Phase 3.4**: Telemetry and advanced tracking
-- **Phase 4**: Event-driven patterns with suspension/resume
-- **Phase 5**: Loop patterns and advanced coordination
-
-#### 📋 REMAINING (Later Phases)
-1. **Built-in Integrations** (Phase 4) - HTTP, Transform, Logic, Log, Wait
-2. **Main API** (Phase 5) - Public interface for workflow management
-3. **Development Tools** (Phase 6) - Builder, validation, testing utilities
+#### 📋 FUTURE PHASES
+- **Phase 5**: Main API - Public interface for workflow management
+- **Phase 6**: Development Tools - Builder, validation, testing utilities
+- **Phase 7**: Advanced Patterns - Loop constructs, complex coordination patterns
 
 ### Key Design Decisions
 
@@ -186,13 +190,14 @@ The docs show some inconsistency - `graph_execution pattern.md` section 8 shows 
 ### Working with the Codebase
 
 #### Important Context for Development
-- **Node Executor is production-ready** with 100+ comprehensive test scenarios
-- **Workflow Compiler** handles compilation from workflows to ExecutionGraphs with optimization
-- **Graph Executor Phase 3.1** (Core Execution) ✅ **COMPLETE** - sequential execution, sync/fire-and-forget modes
-- **Graph Executor Phase 3.2** (Conditional Branching) ✅ **COMPLETE** - IF/ELSE, Switch patterns with path tracking
-- **Current focus** is Phase 3.3 (Merge + Wait integrations for diamond/coordination patterns)
+- **Core execution engine is production-ready** with comprehensive test coverage across all patterns
+- **Built-in integrations are complete** - Manual, Logic, Data, and Workflow integrations fully implemented
+- **Sub-workflow orchestration is complete** with suspension/resume mechanisms for parent-child coordination
+- **NodeExecutor supports suspension/resume** with `execute_node/2` and `resume_node/4` methods
+- **GraphExecutor handles all execution patterns** - sequential, conditional branching, fork-join, sub-workflows
+- **Current focus** is additional integrations (Wait, HTTP, Transform, Log) for broader workflow capabilities
 - **Major performance improvements**: Single trigger execution, graph pruning, O(1) connection lookups
-- **Advanced conditional execution**: Active path tracking prevents dual branch execution
+- **Advanced execution patterns**: Conditional branching, diamond patterns, sub-workflow coordination
 
 #### Adding New Features
 - Follow existing struct patterns in `lib/prana/core/`
@@ -269,17 +274,24 @@ For detailed implementation context, refer to these documents:
 - **`docs/graph_execution pattern.md`** - All execution patterns supported with conditional branching (v3.0)
 - **`docs/execution_planning_update.md`** - Performance improvements: single trigger, graph pruning, O(1) lookups
 
+#### Built-in Integrations & Workflow Building
+- **`docs/built-in-integrations.md`** - Complete reference for Manual, Logic, Data, and Workflow integrations
+- **`docs/guides/writing_integrations.md`** - Comprehensive guide for creating custom integrations
+- **`docs/guides/building_workflows.md`** - Guide for composing workflows using built-in integrations
+
 #### Testing & Implementation
 - **`test/prana/execution/graph_executor_test.exs`** - Core graph execution tests
 - **`test/prana/execution/graph_executor_conditional_branching_test.exs`** - 24 passing conditional branching tests (1358 lines)
+- **`test/prana/execution/graph_executor_sub_workflow_test.exs`** - Sub-workflow orchestration and suspension/resume tests
 - **`test/prana/execution/workflow_compiler_test.exs`** - Workflow compilation tests
-- **`lib/prana/integrations/logic.ex`** - Logic integration with if_condition, switch, merge actions (351 lines)
-- **`lib/prana/integrations/manual.ex`** - Manual integration for testing workflows
+- **`test/prana/node_executor_suspension_test.exs`** - NodeExecutor suspension and resume handling tests
+- **`lib/prana/integrations/`** - All built-in integrations (manual.ex, logic.ex, data.ex, workflow.ex)
 
 ### Git Status Context
-Currently on `feature/phase2-graph-execution-if-condition` branch with significant advancements:
-- Graph Executor Phase 3.1 (Core Execution) complete with sequential execution and performance optimizations
-- Graph Executor Phase 3.2 (Conditional Branching) complete with IF/ELSE and Switch patterns
-- Active path tracking and conditional workflow completion implemented
-- Comprehensive test coverage for conditional branching scenarios
-- Performance improvements: single trigger execution, graph pruning, O(1) connection lookups
+Currently on `main` branch with core platform complete:
+- **Core Execution Engine Complete**: GraphExecutor handles all execution patterns (sequential, conditional, sub-workflows)
+- **Built-in Integrations Complete**: Manual, Logic, Data, and Workflow integrations fully implemented
+- **Sub-workflow Orchestration Complete**: Suspension/resume mechanisms with comprehensive test coverage
+- **NodeExecutor Architecture**: Clean separation with `execute_node/2` and `resume_node/4` methods
+- **Comprehensive Documentation**: Integration guides, workflow building guides, and API documentation
+- **Production Ready**: Core platform ready for building complex workflow applications

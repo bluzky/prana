@@ -1,5 +1,5 @@
 defmodule Prana.ExpressionEngineTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Prana.ExpressionEngine
 

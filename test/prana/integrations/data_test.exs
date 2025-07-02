@@ -1,12 +1,12 @@
 defmodule Prana.Integrations.DataTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Prana.Integrations.Data
 
   describe "definition/0" do
     test "returns correct integration definition" do
       definition = Data.definition()
-      
+
       assert definition.name == "data"
       assert definition.display_name == "Data"
       assert definition.category == "core"
@@ -21,12 +21,13 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => %{"name" => "John", "age" => 30},
         "input_b" => %{"city" => "NYC", "status" => "active"}
       }
-      
+
       assert {:ok, result, "success"} = Data.merge(input_map)
+
       assert result == [
-        %{"name" => "John", "age" => 30},
-        %{"city" => "NYC", "status" => "active"}
-      ]
+               %{"name" => "John", "age" => 30},
+               %{"city" => "NYC", "status" => "active"}
+             ]
     end
 
     test "merge strategy combines object inputs" do
@@ -35,7 +36,7 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => %{"name" => "John", "age" => 30},
         "input_b" => %{"city" => "NYC", "age" => 31}
       }
-      
+
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == %{"name" => "John", "age" => 31, "city" => "NYC"}
     end
@@ -46,7 +47,7 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => [1, 2, 3],
         "input_b" => [4, 5]
       }
-      
+
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == [1, 2, 3, 4, 5]
     end
@@ -56,7 +57,7 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => %{"a" => 1},
         "input_b" => %{"b" => 2}
       }
-      
+
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == [%{"a" => 1}, %{"b" => 2}]
     end
@@ -67,7 +68,7 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => %{"name" => "John"},
         "input_b" => "invalid_data"
       }
-      
+
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == %{"name" => "John"}
     end
@@ -78,7 +79,7 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => [1, 2, 3],
         "input_b" => %{"invalid" => "data"}
       }
-      
+
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == [1, 2, 3]
     end
@@ -89,7 +90,7 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => %{"data" => "value"}
         # input_b is nil/missing
       }
-      
+
       assert {:ok, result, "success"} = Data.merge(input_map)
       assert result == [%{"data" => "value"}]
     end
@@ -99,7 +100,7 @@ defmodule Prana.Integrations.DataTest do
         "strategy" => "unknown_strategy",
         "input_a" => %{"test" => true}
       }
-      
+
       assert {:error, error, "error"} = Data.merge(input_map)
       assert error.type == "merge_error"
       assert String.contains?(error.message, "unknown_strategy")
