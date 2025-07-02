@@ -42,15 +42,10 @@ defmodule Prana.NodeExecutor do
       case invoke_action(action, prepared_input) do
         {:ok, output_data, output_port} ->
           # Successful execution - complete the node
-          case update_context(context, node, output_data) do
-            {:ok, updated_context} ->
-              completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-              {:ok, completed_execution, updated_context}
+          updated_context = update_context(context, node, output_data)
 
-            {:error, reason} ->
-              failed_execution = NodeExecution.fail(node_execution, reason)
-              {:error, {reason, failed_execution}}
-          end
+          completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
+          {:ok, completed_execution, updated_context}
 
         {:suspend, suspension_type, suspend_data} ->
           # Node suspended for async coordination
@@ -85,7 +80,6 @@ defmodule Prana.NodeExecutor do
   """
   @spec resume_node(Node.t(), ExecutionContext.t(), NodeExecution.t(), map()) ::
           {:ok, NodeExecution.t(), ExecutionContext.t()}
-          | {:error, {term(), NodeExecution.t()}}
   def resume_node(%Node{} = node, %ExecutionContext{} = context, %NodeExecution{} = suspended_node_execution, resume_data) do
     # Extract actual output data from resume data structure
     # For sub-workflows, resume_data contains metadata alongside the actual output
@@ -96,15 +90,10 @@ defmodule Prana.NodeExecutor do
         _ -> resume_data
       end
 
-    case update_context(context, node, output_data) do
-      {:ok, updated_context} ->
-        completed_execution = NodeExecution.complete(suspended_node_execution, output_data, "success")
-        {:ok, completed_execution, updated_context}
+    updated_context = update_context(context, node, output_data)
 
-      {:error, reason} ->
-        failed_execution = NodeExecution.fail(suspended_node_execution, reason)
-        {:error, {reason, failed_execution}}
-    end
+    completed_execution = NodeExecution.complete(suspended_node_execution, output_data, "success")
+    {:ok, completed_execution, updated_context}
   end
 
   @doc """
@@ -122,10 +111,10 @@ defmodule Prana.NodeExecutor do
           # Enrich input with full context access using prefixed keys to avoid conflicts
           context_with_prefixed_keys = %{
             "$input" => context_data["input"],
-            "$nodes" => context_data["nodes"], 
+            "$nodes" => context_data["nodes"],
             "$variables" => context_data["variables"]
           }
-          
+
           enriched_input = Map.merge(processed_map || %{}, context_with_prefixed_keys)
           {:ok, enriched_input}
 
@@ -326,12 +315,11 @@ defmodule Prana.NodeExecutor do
   Update execution context with node results.
   """
   @spec update_context(ExecutionContext.t(), Node.t(), term()) ::
-          {:ok, ExecutionContext.t()} | {:error, term()}
+          ExecutionContext.t()
   def update_context(%ExecutionContext{} = context, %Node{} = node, output_data) do
     # Store result only under node.custom_id for flexible access
     nodes = Map.put(context.nodes, node.custom_id, output_data)
-    updated_context = %{context | nodes: nodes}
-    {:ok, updated_context}
+    %{context | nodes: nodes}
   end
 
   # Private helper functions
