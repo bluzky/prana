@@ -54,6 +54,7 @@ defmodule Prana.Execution do
           context_data: map(),
           error_data: map() | nil,
           node_executions: [Prana.NodeExecution.t()],
+          preparation_data: map(),
           suspended_node_id: String.t() | nil,
           suspension_type: SuspensionData.suspension_type() | nil,
           suspension_data: SuspensionData.suspension_data() | nil,
@@ -87,6 +88,7 @@ defmodule Prana.Execution do
     :resume_token,
     :started_at,
     :completed_at,
+    preparation_data: %{},
     metadata: %{}
   ]
 
@@ -112,6 +114,7 @@ defmodule Prana.Execution do
       context_data: %{},
       error_data: nil,
       node_executions: [],
+      preparation_data: %{},
       suspended_node_id: nil,
       suspension_type: nil,
       suspension_data: nil,

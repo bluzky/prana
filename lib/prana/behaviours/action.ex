@@ -101,34 +101,25 @@ defmodule Prana.Behaviour.Action do
   @type resume_input :: map()
 
   @doc """
-  Prepare action for execution with access to execution context.
+  Prepare action for execution during workflow initialization.
 
   Called once during workflow preparation phase before any nodes execute.
-  Has access to the full execution context including variables, nodes data,
-  and workflow configuration.
+  Simple initialization phase with the node definition.
 
   ## Parameters
-  - `action_config` - Configuration map from the action definition
-  - `execution_context` - Full execution context with variables and node data
+  - `node` - The node struct containing action configuration
 
   ## Returns
-  - `{:ok, preparation_data}` - Preparation successful, data stored in context
+  - `{:ok, preparation_data}` - Preparation successful, data stored in execution
   - `{:error, reason}` - Preparation failed, workflow cannot start
 
   ## Examples
 
-      def prepare(action_config, execution_context) do
-        api_key = execution_context.variables["api_key"]
-        endpoint = action_config["endpoint"]
-        
-        if api_key && endpoint do
-          {:ok, %{api_key: api_key, endpoint: endpoint}}
-        else
-          {:error, "Missing required configuration"}
-        end
+      def prepare(_node) do
+        {:ok, %{initialized_at: DateTime.utc_now()}}
       end
   """
-  @callback prepare(action_config :: map(), execution_context :: ExecutionContext.t()) ::
+  @callback prepare(node :: Prana.Node.t()) ::
               {:ok, preparation_data()} | {:error, reason :: term()}
 
   @doc """

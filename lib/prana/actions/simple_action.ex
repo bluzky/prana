@@ -49,24 +49,23 @@ defmodule Prana.Actions.SimpleAction do
   - Action configuration depends on runtime context
   """
 
-
   defmacro __using__(_opts) do
     quote do
       use Prana.Behaviour.Action
 
       @doc """
       Default preparation - returns empty map.
-      
+
       Simple actions don't need preparation, so this returns an empty map.
       Override this method if your action needs preparation logic.
       """
-      def prepare(_action_config, _execution_context) do
-        {:ok, %{}}
+      def prepare(_node) do
+        {:ok, nil}
       end
 
       @doc """
       Resume not supported for simple actions.
-      
+
       Simple actions don't support suspension/resume. Override this method
       if your action needs to support resumption.
       """
@@ -79,29 +78,29 @@ defmodule Prana.Actions.SimpleAction do
       """
       def suspendable?, do: false
 
-      # Allow overriding prepare/2 and resume/2 for more complex simple actions
-      defoverridable prepare: 2, resume: 2, suspendable?: 0
+      # Allow overriding prepare/1 and resume/2 for more complex simple actions
+      defoverridable prepare: 1, resume: 2, suspendable?: 0
     end
   end
 
   @doc """
   Helper function to create a simple action module dynamically.
-  
+
   This is useful for creating simple actions without defining a full module.
   The action will use the provided function for execution.
-  
+
   ## Parameters
   - `execute_fn` - Function with arity 2 that takes (input_data, preparation_data)
-  
+
   ## Returns
   A module that implements the Action behavior with the provided execute function.
-  
+
   ## Example
-  
+
       action_module = SimpleAction.create(fn input_data, _prep_data ->
         {:ok, %{result: input_data["value"] * 2}}
       end)
-      
+
       # Can be used in action definitions
       %Prana.Action{
         name: "double_value",

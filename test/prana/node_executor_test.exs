@@ -399,7 +399,8 @@ defmodule Prana.NodeExecutorTest do
           "message" => "hello world",
           "$input" => %{"user" => "john"},
           "$nodes" => %{},
-          "$variables" => %{}
+          "$variables" => %{},
+          "$preparation" => %{}
         }
       }
       assert node_execution.error_data == nil
@@ -458,7 +459,8 @@ defmodule Prana.NodeExecutorTest do
         "$nodes" => %{
           "api_call" => %{"user_id" => 123}
         },
-        "$variables" => %{}
+        "$variables" => %{},
+        "$preparation" => %{}
       })
       
       assert node_execution.output_data.original == expected_input_with_context
@@ -770,7 +772,8 @@ defmodule Prana.NodeExecutorTest do
             %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
           ]
         },
-        "$variables" => %{}
+        "$variables" => %{},
+        "$preparation" => %{}
       })
       
       assert node_execution.output_data.input == expected_input_with_context
@@ -812,7 +815,8 @@ defmodule Prana.NodeExecutorTest do
                  "user" => %{"email" => "john@example.com"}
                },
                "$nodes" => %{"prev_step" => %{"result" => "success"}},
-               "$variables" => %{}
+               "$variables" => %{},
+               "$preparation" => %{}
              }
     end
 
@@ -836,7 +840,8 @@ defmodule Prana.NodeExecutorTest do
                "missing" => nil,
                "$input" => %{},
                "$nodes" => %{},
-               "$variables" => %{}
+               "$variables" => %{},
+               "$preparation" => %{}
              }
     end
 
@@ -863,7 +868,8 @@ defmodule Prana.NodeExecutorTest do
         "test" => nil,
         "$input" => %{},
         "$nodes" => %{},
-        "$variables" => %{}
+        "$variables" => %{},
+        "$preparation" => %{}
       }
     end
   end
@@ -1008,7 +1014,8 @@ defmodule Prana.NodeExecutorTest do
         "from_variables" => "secret",
         "$input" => %{"user_id" => 123},
         "$nodes" => %{"step1" => %{"result" => "data"}},
-        "$variables" => %{"api_key" => "secret"}
+        "$variables" => %{"api_key" => "secret"},
+        "$preparation" => %{}
       }
     end
   end

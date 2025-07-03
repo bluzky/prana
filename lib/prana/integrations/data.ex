@@ -28,8 +28,7 @@ defmodule Prana.Integrations.Data do
           name: "merge",
           display_name: "Merge Data",
           description: "Combine data from multiple named input ports (diamond pattern coordination)",
-          module: __MODULE__,
-          function: :merge,
+          module: Prana.Integrations.Data.MergeAction,
           input_ports: ["input_a", "input_b"],
           output_ports: ["success", "error"],
           default_success_port: "success",
@@ -39,25 +38,17 @@ defmodule Prana.Integrations.Data do
     }
   end
 
-  @doc """
+end
+
+defmodule Prana.Integrations.Data.MergeAction do
+  @moduledoc """
   Merge action - combine data from multiple named input ports (ADR-002)
-  
-  Expected input_map:
-  - strategy: "append" | "merge" | "concat" (optional, defaults to "append")
-  - input_a: data from first input port
-  - input_b: data from second input port
-  
-  Strategies:
-  - append: Collect all inputs as array elements [input_a, input_b]
-  - merge: Combine object inputs using Map.merge/2, ignores non-maps
-  - concat: Flatten and concatenate array inputs using List.flatten/1, ignores non-arrays
-  
-  
-  Returns:
-  - {:ok, merged_data, "success"}
-  - {:error, reason, "error"} if merge fails
   """
-  def merge(input_map) do
+  
+  use Prana.Actions.SimpleAction
+
+  @impl true
+  def execute(input_map) do
     strategy = Map.get(input_map, "strategy", "append")
     
     # Extract inputs from named ports
@@ -65,10 +56,10 @@ defmodule Prana.Integrations.Data do
     
     case merge_data_with_strategy(inputs, strategy) do
       {:ok, merged_data} ->
-        {:ok, merged_data, "success"}
+        {:ok, merged_data}
         
       {:error, reason} ->
-        {:error, %{type: "merge_error", message: reason}, "error"}
+        {:error, %{type: "merge_error", message: reason}}
     end
   end
 

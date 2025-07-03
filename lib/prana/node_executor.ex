@@ -112,7 +112,8 @@ defmodule Prana.NodeExecutor do
           context_with_prefixed_keys = %{
             "$input" => context_data["$input"],
             "$nodes" => context_data["$nodes"],
-            "$variables" => context_data["$variables"]
+            "$variables" => context_data["$variables"],
+            "$preparation" => context_data["$preparation"]
           }
 
           enriched_input = Map.merge(processed_map || %{}, context_with_prefixed_keys)
@@ -332,10 +333,16 @@ defmodule Prana.NodeExecutor do
 
   @spec build_expression_context(ExecutionContext.t()) :: map()
   defp build_expression_context(%ExecutionContext{} = context) do
+    preparation_data = case context.execution do
+      nil -> %{}
+      execution -> execution.preparation_data || %{}
+    end
+    
     %{
       "$input" => context.input,
       "$nodes" => context.nodes,
-      "$variables" => context.variables
+      "$variables" => context.variables,
+      "$preparation" => preparation_data
     }
   end
 
