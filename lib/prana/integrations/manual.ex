@@ -22,7 +22,6 @@ defmodule Prana.Integrations.Manual do
           display_name: "Manual Trigger",
           description: "Simple trigger for testing",
           module: Prana.Integrations.Manual.TriggerAction,
-          function: nil,  # Not used in Action behavior pattern
           input_ports: [],
           output_ports: ["success"],
           default_success_port: "success",
@@ -33,7 +32,6 @@ defmodule Prana.Integrations.Manual do
           display_name: "Process Adult",
           description: "Process adult data",
           module: Prana.Integrations.Manual.ProcessAdultAction,
-          function: nil,  # Not used in Action behavior pattern
           input_ports: ["input"],
           output_ports: ["success"],
           default_success_port: "success",
@@ -44,7 +42,6 @@ defmodule Prana.Integrations.Manual do
           display_name: "Process Minor",
           description: "Process minor data",
           module: Prana.Integrations.Manual.ProcessMinorAction,
-          function: nil,  # Not used in Action behavior pattern
           input_ports: ["input"],
           output_ports: ["success"],
           default_success_port: "success",

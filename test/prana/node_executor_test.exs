@@ -177,7 +177,6 @@ defmodule Prana.NodeExecutorTest do
             display_name: "Success Action",
             description: "Always succeeds",
             module: TestSuccessAction,
-            function: nil,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -188,7 +187,6 @@ defmodule Prana.NodeExecutorTest do
             display_name: "Error Action",
             description: "Always fails",
             module: TestErrorAction,
-            function: nil,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -199,7 +197,6 @@ defmodule Prana.NodeExecutorTest do
             display_name: "Transform Action",
             description: "Transforms input data",
             module: TestTransformAction,
-            function: nil,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -210,7 +207,6 @@ defmodule Prana.NodeExecutorTest do
             display_name: "Explicit Port Action",
             description: "Returns explicit port",
             module: TestExplicitPortAction,
-            function: nil,
             input_ports: ["input"],
             output_ports: ["custom_success", "custom_error"],
             default_success_port: "custom_success",
@@ -221,7 +217,6 @@ defmodule Prana.NodeExecutorTest do
             display_name: "Invalid Return Action",
             description: "Returns invalid format",
             module: TestInvalidReturnAction,
-            function: nil,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -232,7 +227,6 @@ defmodule Prana.NodeExecutorTest do
             display_name: "Exception Action",
             description: "Raises an exception",
             module: TestExceptionAction,
-            function: nil,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -243,7 +237,6 @@ defmodule Prana.NodeExecutorTest do
             display_name: "Invalid Port Action",
             description: "Returns non-existent port",
             module: TestInvalidPortAction,
-            function: nil,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -959,7 +952,7 @@ defmodule Prana.NodeExecutorTest do
       assert {:ok, action} = NodeExecutor.get_action(node)
       assert action.name == "success_action"
       assert action.module == TestSuccessAction
-      assert action.function == nil
+      assert action.module == TestSuccessAction
     end
 
     test "handles integration not found" do

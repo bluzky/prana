@@ -169,13 +169,8 @@ defmodule Prana.NodeExecutor do
   """
   @spec invoke_action(Prana.Action.t(), map()) :: {:ok, term(), String.t()} | {:error, term()}
   def invoke_action(%Prana.Action{} = action, input) do
-    result = if action.function do
-      # Old MFA pattern (for backward compatibility)
-      apply(action.module, action.function, [input])
-    else
-      # New Action behavior pattern
-      action.module.execute(input)
-    end
+    # Action behavior pattern
+    result = action.module.execute(input)
     process_action_result(result, action)
   rescue
     error ->
@@ -184,7 +179,7 @@ defmodule Prana.NodeExecutor do
          "type" => "action_execution_failed",
          "error" => inspect(error),
          "module" => action.module,
-         "function" => action.function
+         "action" => action.name
        }}
   catch
     :exit, reason ->
@@ -193,7 +188,7 @@ defmodule Prana.NodeExecutor do
          "type" => "action_exit",
          "reason" => inspect(reason),
          "module" => action.module,
-         "function" => action.function
+         "action" => action.name
        }}
 
     :throw, value ->
@@ -202,7 +197,7 @@ defmodule Prana.NodeExecutor do
          "type" => "action_throw",
          "value" => inspect(value),
          "module" => action.module,
-         "function" => action.function
+         "action" => action.name
        }}
   end
 

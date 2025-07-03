@@ -33,8 +33,7 @@ defmodule Prana.Integrations.Wait do
           name: "wait",
           display_name: "Wait",
           description: "Unified wait action supporting multiple modes: interval, schedule, webhook",
-          module: __MODULE__,
-          function: :wait,
+          module: Prana.Integrations.Wait.WaitAction,
           input_ports: ["input"],
           output_ports: ["success", "timeout", "error"],
           default_success_port: "success",
@@ -234,5 +233,27 @@ defmodule Prana.Integrations.Wait do
 
   defp validate_timeout_hours(_) do
     {:error, "timeout_hours must be a positive number between 1 and 8760 (1 year)"}
+  end
+end
+
+defmodule Prana.Integrations.Wait.WaitAction do
+  @moduledoc """
+  Wait action implementation using Action behavior
+  """
+  
+  use Prana.Actions.SimpleAction
+
+  @impl true
+  def execute(input_map) do
+    case Prana.Integrations.Wait.wait(input_map) do
+      {:suspend, suspension_type, suspension_data} ->
+        {:suspend, suspension_type, suspension_data}
+      {:error, reason, output_port} ->
+        {:error, reason, output_port}
+      {:ok, result, output_port} ->
+        {:ok, result, output_port}
+      {:ok, result} ->
+        {:ok, result, "success"}
+    end
   end
 end

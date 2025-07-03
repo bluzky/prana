@@ -30,7 +30,6 @@ defmodule Prana.Integrations.Logic do
           display_name: "IF Condition",
           description: "Evaluate a condition and route to true or false branch",
           module: Prana.Integrations.Logic.IfConditionAction,
-          function: nil,  # Not used in Action behavior pattern
           input_ports: ["input"],
           output_ports: ["true", "false"],
           default_success_port: "true",
@@ -41,7 +40,6 @@ defmodule Prana.Integrations.Logic do
           display_name: "Switch",
           description: "Multi-case routing based on simple condition expressions",
           module: Prana.Integrations.Logic.SwitchAction,
-          function: nil,  # Not used in Action behavior pattern
           input_ports: ["input"],
           output_ports: ["*"],
           default_success_port: "default",

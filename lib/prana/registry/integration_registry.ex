@@ -218,17 +218,17 @@ defmodule Prana.IntegrationRegistry do
   end
 
   defp check_integration_health(%Prana.Integration{actions: actions}) do
-    # Check if all action functions exist
+    # Check if all action modules implement the Action behavior
     invalid_actions =
-      Enum.reject(actions, fn {_name, %Prana.Action{module: module, function: function}} ->
-        function_exported?(module, function, 1)
+      Enum.reject(actions, fn {_name, %Prana.Action{module: module}} ->
+        function_exported?(module, :execute, 1)
       end)
 
     if Enum.empty?(invalid_actions) do
       :ok
     else
       action_names = Enum.map(invalid_actions, fn {name, _action} -> name end)
-      {:error, "Actions with missing functions: #{inspect(action_names)}"}
+      {:error, "Actions with missing execute/1 function: #{inspect(action_names)}"}
     end
   end
 end

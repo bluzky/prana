@@ -35,7 +35,6 @@ defmodule Prana.Integrations.Workflow do
           display_name: "Execute Sub-workflow",
           description: "Execute a sub-workflow with synchronous or asynchronous coordination",
           module: Prana.Integrations.Workflow.ExecuteWorkflowAction,
-          function: nil,
           input_ports: ["input"],
           output_ports: ["success", "error", "timeout"],
           default_success_port: "success",
