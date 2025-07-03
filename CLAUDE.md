@@ -34,7 +34,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Behavior-Driven**: Clean contracts for integrations and middleware
 - **Node-Port Model**: Explicit data flow through named ports between nodes
 - **Expression System**: Built-in path evaluation (`$input.field`, `$nodes.api.response`) for dynamic data access
-- **MFA Action Pattern**: Actions defined as `{module, function, args}` tuples
+- **Action Behavior Pattern**: Actions implemented as modules following Prana.Behaviour.Action with prepare/execute/resume methods
 
 ### Key Components
 
@@ -46,7 +46,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`Prana.ExecutionContext`**: Shared execution context across workflow
 
 #### Execution Engine
-- **`Prana.NodeExecutor`** (`node_executor.ex`): ✅ **PRODUCTION READY** - Executes individual nodes with expression-based input preparation, MFA action invocation, suspension/resume patterns, and comprehensive error handling
+- **`Prana.NodeExecutor`** (`node_executor.ex`): ✅ **PRODUCTION READY** - Executes individual nodes with expression-based input preparation, Action behavior execution, suspension/resume patterns, and comprehensive error handling
 - **`Prana.GraphExecutor`** (`execution/graph_executor.ex`): ✅ **PRODUCTION READY** - Orchestrates workflow execution using NodeExecutor, handles conditional branching, port-based routing, sub-workflow coordination, and middleware integration
 - **`Prana.ExpressionEngine`** (`expression_engine.ex`): ✅ **COMPLETE** - Path-based expression evaluation for dynamic data access
 
