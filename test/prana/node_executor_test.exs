@@ -8,6 +8,157 @@ defmodule Prana.NodeExecutorTest do
   alias Prana.Node
   alias Prana.NodeExecutor
 
+  # Test Action behavior modules
+  defmodule TestSuccessAction do
+    @behaviour Prana.Behaviour.Action
+    
+    @impl true
+    def prepare(_node) do
+      {:ok, %{}}
+    end
+    
+    @impl true
+    def execute(input_data) do
+      {:ok, %{message: "success", input: input_data}}
+    end
+    
+    @impl true
+    def resume(_suspend_data, _resume_input) do
+      {:error, "Test actions do not support suspension/resume"}
+    end
+  end
+  
+  defmodule TestErrorAction do
+    @behaviour Prana.Behaviour.Action
+    
+    @impl true
+    def prepare(_node) do
+      {:ok, %{}}
+    end
+    
+    @impl true
+    def execute(_input_data) do
+      {:error, "something went wrong"}
+    end
+    
+    @impl true
+    def resume(_suspend_data, _resume_input) do
+      {:error, "Test actions do not support suspension/resume"}
+    end
+  end
+  
+  defmodule TestTransformAction do
+    @behaviour Prana.Behaviour.Action
+    
+    @impl true
+    def prepare(_node) do
+      {:ok, %{}}
+    end
+    
+    @impl true
+    def execute(input_data) do
+      # Use safe approach for now
+      transformed = %{
+        original: input_data,
+        uppercase_name: String.upcase(input_data["name"]),
+        timestamp: System.system_time(:second)
+      }
+      
+      {:ok, transformed}
+    end
+    
+    @impl true
+    def resume(_suspend_data, _resume_input) do
+      {:error, "Test actions do not support suspension/resume"}
+    end
+  end
+  
+  defmodule TestExplicitPortAction do
+    @behaviour Prana.Behaviour.Action
+    
+    @impl true
+    def prepare(_node) do
+      {:ok, %{}}
+    end
+    
+    @impl true
+    def execute(input_data) do
+      should_succeed = if is_map(input_data), do: Map.get(input_data, "should_succeed", false), else: false
+      
+      if should_succeed == true do
+        {:ok, %{result: "explicit success"}, "custom_success"}
+      else
+        {:error, "explicit failure", "custom_error"}
+      end
+    rescue
+      _ ->
+        {:error, "action failed", "custom_error"}
+    end
+    
+    @impl true
+    def resume(_suspend_data, _resume_input) do
+      {:error, "Test actions do not support suspension/resume"}
+    end
+  end
+  
+  defmodule TestInvalidReturnAction do
+    @behaviour Prana.Behaviour.Action
+    
+    @impl true
+    def prepare(_node) do
+      {:ok, %{}}
+    end
+    
+    @impl true
+    def execute(_input_data) do
+      # Return invalid format (direct value instead of tuple)
+      "direct_string_value"
+    end
+    
+    @impl true
+    def resume(_suspend_data, _resume_input) do
+      {:error, "Test actions do not support suspension/resume"}
+    end
+  end
+  
+  defmodule TestExceptionAction do
+    @behaviour Prana.Behaviour.Action
+    
+    @impl true
+    def prepare(_node) do
+      {:ok, %{}}
+    end
+    
+    @impl true
+    def execute(_input_data) do
+      raise "Test exception"
+    end
+    
+    @impl true
+    def resume(_suspend_data, _resume_input) do
+      {:error, "Test actions do not support suspension/resume"}
+    end
+  end
+  
+  defmodule TestInvalidPortAction do
+    @behaviour Prana.Behaviour.Action
+    
+    @impl true
+    def prepare(_node) do
+      {:ok, %{}}
+    end
+    
+    @impl true
+    def execute(_input_data) do
+      {:ok, %{data: "test"}, "nonexistent_port"}
+    end
+    
+    @impl true
+    def resume(_suspend_data, _resume_input) do
+      {:error, "Test actions do not support suspension/resume"}
+    end
+  end
+
   # Test integration module
   defmodule TestIntegration do
     @moduledoc false
@@ -25,8 +176,7 @@ defmodule Prana.NodeExecutorTest do
             name: "success_action",
             display_name: "Success Action",
             description: "Always succeeds",
-            module: __MODULE__,
-            function: :success_action,
+            module: TestSuccessAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -36,8 +186,7 @@ defmodule Prana.NodeExecutorTest do
             name: "error_action",
             display_name: "Error Action",
             description: "Always fails",
-            module: __MODULE__,
-            function: :error_action,
+            module: TestErrorAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -47,8 +196,7 @@ defmodule Prana.NodeExecutorTest do
             name: "transform_action",
             display_name: "Transform Action",
             description: "Transforms input data",
-            module: __MODULE__,
-            function: :transform_action,
+            module: TestTransformAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -58,8 +206,7 @@ defmodule Prana.NodeExecutorTest do
             name: "explicit_port_action",
             display_name: "Explicit Port Action",
             description: "Returns explicit port",
-            module: __MODULE__,
-            function: :explicit_port_action,
+            module: TestExplicitPortAction,
             input_ports: ["input"],
             output_ports: ["custom_success", "custom_error"],
             default_success_port: "custom_success",
@@ -69,8 +216,7 @@ defmodule Prana.NodeExecutorTest do
             name: "invalid_return_action",
             display_name: "Invalid Return Action",
             description: "Returns invalid format",
-            module: __MODULE__,
-            function: :invalid_return_action,
+            module: TestInvalidReturnAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -80,8 +226,7 @@ defmodule Prana.NodeExecutorTest do
             name: "exception_action",
             display_name: "Exception Action",
             description: "Raises an exception",
-            module: __MODULE__,
-            function: :exception_action,
+            module: TestExceptionAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -91,8 +236,7 @@ defmodule Prana.NodeExecutorTest do
             name: "invalid_port_action",
             display_name: "Invalid Port Action",
             description: "Returns non-existent port",
-            module: __MODULE__,
-            function: :invalid_port_action,
+            module: TestInvalidPortAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
             default_success_port: "success",
@@ -100,52 +244,6 @@ defmodule Prana.NodeExecutorTest do
           }
         }
       }
-    end
-
-    # Action implementations
-    def success_action(input) do
-      {:ok, %{message: "success", input: input}}
-    end
-
-    def error_action(_input) do
-      {:error, "something went wrong"}
-    end
-
-    def transform_action(input) do
-      # Use safe approach for now
-      transformed = %{
-        original: input,
-        uppercase_name: String.upcase(input["name"]),
-        timestamp: System.system_time(:second)
-      }
-
-      {:ok, transformed}
-    end
-
-    def explicit_port_action(input) do
-      should_succeed = if is_map(input), do: Map.get(input, "should_succeed", false), else: false
-
-      if should_succeed == true do
-        {:ok, %{result: "explicit success"}, "custom_success"}
-      else
-        {:error, "explicit failure", "custom_error"}
-      end
-    rescue
-      _ ->
-        {:error, "action failed", "custom_error"}
-    end
-
-    def invalid_return_action(_input) do
-      # Return invalid format (direct value instead of tuple)
-      "direct_string_value"
-    end
-
-    def exception_action(_input) do
-      raise "Test exception"
-    end
-
-    def invalid_port_action(_input) do
-      {:ok, %{data: "test"}, "nonexistent_port"}
     end
   end
 
@@ -294,7 +392,8 @@ defmodule Prana.NodeExecutorTest do
           "message" => "hello world",
           "$input" => %{"user" => "john"},
           "$nodes" => %{},
-          "$variables" => %{}
+          "$variables" => %{},
+          "$preparation" => %{}
         }
       }
       assert node_execution.error_data == nil
@@ -353,7 +452,8 @@ defmodule Prana.NodeExecutorTest do
         "$nodes" => %{
           "api_call" => %{"user_id" => 123}
         },
-        "$variables" => %{}
+        "$variables" => %{},
+        "$preparation" => %{}
       })
       
       assert node_execution.output_data.original == expected_input_with_context
@@ -513,8 +613,8 @@ defmodule Prana.NodeExecutorTest do
       # Check error reason (map format)
       assert reason["type"] == "action_execution_failed"
       assert String.contains?(reason["error"], "Test exception")
-      assert reason["module"] == TestIntegration
-      assert reason["function"] == :exception_action
+      assert reason["module"] == TestExceptionAction
+      # Note: function field may be nil for Action behavior pattern
 
       assert node_execution.status == :failed
       assert node_execution.error_data == reason
@@ -665,7 +765,8 @@ defmodule Prana.NodeExecutorTest do
             %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
           ]
         },
-        "$variables" => %{}
+        "$variables" => %{},
+        "$preparation" => %{}
       })
       
       assert node_execution.output_data.input == expected_input_with_context
@@ -707,7 +808,8 @@ defmodule Prana.NodeExecutorTest do
                  "user" => %{"email" => "john@example.com"}
                },
                "$nodes" => %{"prev_step" => %{"result" => "success"}},
-               "$variables" => %{}
+               "$variables" => %{},
+               "$preparation" => %{}
              }
     end
 
@@ -731,7 +833,8 @@ defmodule Prana.NodeExecutorTest do
                "missing" => nil,
                "$input" => %{},
                "$nodes" => %{},
-               "$variables" => %{}
+               "$variables" => %{},
+               "$preparation" => %{}
              }
     end
 
@@ -758,7 +861,8 @@ defmodule Prana.NodeExecutorTest do
         "test" => nil,
         "$input" => %{},
         "$nodes" => %{},
-        "$variables" => %{}
+        "$variables" => %{},
+        "$preparation" => %{}
       }
     end
   end
@@ -779,7 +883,7 @@ defmodule Prana.NodeExecutorTest do
 
       output_data = %{result: "success"}
 
-      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+      updated_context = NodeExecutor.update_context(context, node, output_data)
 
       # Only stored under custom_id
       assert updated_context.nodes["my_custom_node"] == output_data
@@ -806,7 +910,7 @@ defmodule Prana.NodeExecutorTest do
 
       output_data = %{result: "success"}
 
-      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+      updated_context = NodeExecutor.update_context(context, node, output_data)
 
       assert updated_context.nodes["node-123"] == output_data
       assert map_size(updated_context.nodes) == 1
@@ -829,7 +933,7 @@ defmodule Prana.NodeExecutorTest do
 
       output_data = %{result: "new_data"}
 
-      assert {:ok, updated_context} = NodeExecutor.update_context(context, node, output_data)
+      updated_context = NodeExecutor.update_context(context, node, output_data)
 
       # Both old and new results preserved
       assert updated_context.nodes["existing_node"] == %{"data" => "preserved"}
@@ -847,8 +951,8 @@ defmodule Prana.NodeExecutorTest do
 
       assert {:ok, action} = NodeExecutor.get_action(node)
       assert action.name == "success_action"
-      assert action.module == TestIntegration
-      assert action.function == :success_action
+      assert action.module == TestSuccessAction
+      assert action.module == TestSuccessAction
     end
 
     test "handles integration not found" do
@@ -903,7 +1007,8 @@ defmodule Prana.NodeExecutorTest do
         "from_variables" => "secret",
         "$input" => %{"user_id" => 123},
         "$nodes" => %{"step1" => %{"result" => "data"}},
-        "$variables" => %{"api_key" => "secret"}
+        "$variables" => %{"api_key" => "secret"},
+        "$preparation" => %{}
       }
     end
   end

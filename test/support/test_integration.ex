@@ -20,8 +20,7 @@ defmodule Prana.TestSupport.TestIntegration do
           name: "simple_action",
           display_name: "Simple Action",
           description: "A simple test action that can succeed or fail",
-          module: __MODULE__,
-          function: :simple_action,
+          module: Prana.TestSupport.TestIntegration.SimpleTestAction,
           input_ports: ["input"],
           output_ports: ["success", "error"],
           default_success_port: "success",
@@ -30,13 +29,17 @@ defmodule Prana.TestSupport.TestIntegration do
       }
     }
   end
+end
 
-  @doc """
-  Simple action implementation for testing.
-  
-  Can be configured to fail by setting force_error: true in input.
+defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
+  @moduledoc """
+  Simple test action using Action behavior pattern.
   """
-  def simple_action(input) do
+  
+  use Prana.Actions.SimpleAction
+
+  @impl true
+  def execute(input) do
     if Map.get(input, "force_error", false) do
       # Simulate a failure
       {:error, %{

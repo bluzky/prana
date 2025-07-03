@@ -21,8 +21,7 @@ defmodule Prana.Integrations.Manual do
           name: "trigger",
           display_name: "Manual Trigger",
           description: "Simple trigger for testing",
-          module: __MODULE__,
-          function: :trigger,
+          module: Prana.Integrations.Manual.TriggerAction,
           input_ports: [],
           output_ports: ["success"],
           default_success_port: "success",
@@ -32,8 +31,7 @@ defmodule Prana.Integrations.Manual do
           name: "process_adult",
           display_name: "Process Adult",
           description: "Process adult data",
-          module: __MODULE__,
-          function: :process_adult,
+          module: Prana.Integrations.Manual.ProcessAdultAction,
           input_ports: ["input"],
           output_ports: ["success"],
           default_success_port: "success",
@@ -43,8 +41,7 @@ defmodule Prana.Integrations.Manual do
           name: "process_minor",
           display_name: "Process Minor",
           description: "Process minor data",
-          module: __MODULE__,
-          function: :process_minor,
+          module: Prana.Integrations.Manual.ProcessMinorAction,
           input_ports: ["input"],
           output_ports: ["success"],
           default_success_port: "success",
@@ -52,19 +49,5 @@ defmodule Prana.Integrations.Manual do
         }
       }
     }
-  end
-
-  def trigger(input_map) do
-    {:ok, input_map}
-  end
-
-  def process_adult(input_map) do
-    result = Map.merge(input_map, %{"processed_as" => "adult", "timestamp" => DateTime.utc_now()})
-    {:ok, result}
-  end
-
-  def process_minor(input_map) do
-    result = Map.merge(input_map, %{"processed_as" => "minor", "timestamp" => DateTime.utc_now()})
-    {:ok, result}
   end
 end

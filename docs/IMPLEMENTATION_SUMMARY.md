@@ -52,13 +52,13 @@ prana/
 - `execute_node/3` - Main node execution orchestration
 - `prepare_input/2` - Expression evaluation using ExpressionEngine
 - `get_action/1` - Action lookup from IntegrationRegistry
-- `invoke_action/2` - MFA-based action invocation with error handling
+- `invoke_action/2` - Action behavior execution with error handling
 - `process_action_result/2` - Output port determination and validation
 - `update_context/3` - Context state management
 
 **Core Features**:
 - **Expression-based input preparation** using `ExpressionEngine.process_map/2`
-- **MFA action invocation** with comprehensive error handling
+- **Action behavior execution** with comprehensive error handling
 - **Multiple return format support** (explicit ports vs default ports)
 - **Robust error handling** with structured, JSON-serializable error maps
 - **Context management** storing results under node `custom_id`
@@ -266,8 +266,7 @@ defmodule MyApp.SlackIntegration do
       actions: %{
         "send_message" => %Prana.Action{
           name: "send_message",
-          module: __MODULE__,
-          function: :send_message,
+          module: MyApp.SlackIntegration.SendMessageAction,
           input_ports: ["input"],
           output_ports: ["success", "error"]
         }
@@ -275,8 +274,19 @@ defmodule MyApp.SlackIntegration do
     }
   end
 
-  def send_message(input) do
-    {:ok, %{message_id: "123"}}
+end
+
+defmodule MyApp.SlackIntegration.SendMessageAction do
+  @behaviour Prana.Behaviour.Action
+
+  def prepare(_input_map), do: {:ok, %{}}
+
+  def execute(input_map) do
+    {:ok, %{message_id: "123"}, "success"}
+  end
+
+  def resume(_suspend_data, _resume_input) do
+    {:error, "Resume not supported"}
   end
 end
 ```
@@ -423,7 +433,7 @@ handle_node_completion(node_execution, workflow, context) :: next_actions()
 3. **Middleware for Application Logic** - Clean separation between library (execution) and application (persistence)
 4. **Port-Based Routing** - Explicit named ports for data flow instead of implicit connections
 5. **Built-in Expression Engine** - Path-based expression evaluator (✅ **COMPLETED**)
-6. **MFA Action Pattern** - Actions defined as `{module, function, args}` tuples
+6. **Action Behavior Pattern** - Actions implemented as modules following Prana.Behaviour.Action
 7. **Failed Executions Design** - Failed nodes have `output_port = nil`, error routing handled at graph level
 
 ---

@@ -108,8 +108,8 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       # Verify suspended execution state
       assert suspended_execution.status == :suspended
       assert suspended_execution.workflow_id == "parent_workflow"
-      assert is_map(suspended_execution.resume_token)
-      assert suspended_execution.resume_token[:suspended_node_id] == "sub_workflow_node"
+      assert is_binary(suspended_execution.resume_token)
+      assert suspended_execution.suspended_node_id == "sub_workflow_node"
 
       # Verify node executions - trigger should be completed, sub_workflow suspended
       completed_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :completed))
@@ -124,11 +124,10 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert trigger_execution.status == :completed
       assert sub_execution.status == :suspended
 
-      # Verify suspension metadata contains synchronous sub-workflow data
-      suspension_metadata = sub_execution.metadata[:suspension_data]
-      assert suspension_metadata.type == :sub_workflow_sync
-      assert suspension_metadata.data.workflow_id == "child_workflow"
-      assert suspension_metadata.data.execution_mode == "sync"
+      # Verify suspension data contains synchronous sub-workflow data
+      assert sub_execution.suspension_type == :sub_workflow_sync
+      assert sub_execution.suspension_data.workflow_id == "child_workflow"
+      assert sub_execution.suspension_data.execution_mode == "sync"
 
       # Verify middleware events were emitted
       assert_receive {:middleware_event, :execution_started, _}
@@ -201,7 +200,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       # Verify suspended execution state
       assert suspended_execution.status == :suspended
       assert suspended_execution.workflow_id == "fire_forget_workflow"
-      assert suspended_execution.resume_token[:suspended_node_id] == "fire_forget_sub"
+      assert suspended_execution.suspended_node_id == "fire_forget_sub"
 
       # Verify node executions - trigger completed, fire_forget_sub suspended
       completed_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :completed))
@@ -216,11 +215,10 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert trigger_execution.status == :completed
       assert fire_forget_execution.status == :suspended
 
-      # Verify suspension metadata contains fire-and-forget data
-      suspension_metadata = fire_forget_execution.metadata[:suspension_data]
-      assert suspension_metadata.type == :sub_workflow_fire_forget
-      assert suspension_metadata.data.workflow_id == "background_task"
-      assert suspension_metadata.data.execution_mode == "fire_and_forget"
+      # Verify suspension data contains fire-and-forget data
+      assert fire_forget_execution.suspension_type == :sub_workflow_fire_forget
+      assert fire_forget_execution.suspension_data.workflow_id == "background_task"
+      assert fire_forget_execution.suspension_data.execution_mode == "fire_and_forget"
 
       # Simulate caller handling fire-and-forget: trigger child async + immediate resume
       resume_data = %{sub_workflow_triggered: true, workflow_id: "background_task"}
@@ -328,7 +326,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert {:suspend, second_suspended} = result
 
       # Verify we're suspended at the second node
-      assert second_suspended.resume_token[:suspended_node_id] == "second_sub_workflow"
+      assert second_suspended.suspended_node_id == "second_sub_workflow"
 
       # Resume second suspension
       second_resume_data = %{"stage_2_result" => "completed"}
@@ -541,7 +539,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
     executed_nodes = Enum.map(suspended_execution.node_executions, & &1.node_id)
 
     # Find suspended node and add resume data
-    suspended_node_id = suspended_execution.resume_token[:suspended_node_id]
+    suspended_node_id = suspended_execution.suspended_node_id
 
     nodes =
       Enum.reduce(suspended_execution.node_executions, %{}, fn node_exec, acc ->

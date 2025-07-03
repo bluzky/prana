@@ -222,9 +222,9 @@ For integrations that need unlimited output routing:
   output_ports: ["*"]  # Allows any port name
 }
 
-def dynamic_router(input) do
-  port_name = determine_route(input)
-  {:ok, input, port_name}
+def execute(input_map) do
+  port_name = determine_route(input_map)
+  {:ok, input_map, port_name}
 end
 ```
 
@@ -502,13 +502,14 @@ See the [Built-in Integrations Guide](../built-in-integrations.md) for detailed 
 ### Memory Management
 
 ```elixir
-def process_large_dataset(input) do
+def execute(input_map) do
   # Instead of loading everything into memory
-  input["file_path"]
+  result = input_map["file_path"]
   |> File.stream!()
   |> Stream.map(&process_line/1)
   |> Enum.reduce(%{count: 0}, &accumulate_results/2)
-  |> then(&{:ok, &1})
+  
+  {:ok, result, "success"}
 end
 ```
 
@@ -517,10 +518,10 @@ end
 Design actions to be idempotent when possible, especially for suspended operations:
 
 ```elixir
-def idempotent_action(input) do
-  case check_if_already_processed(input["request_id"]) do
-    {:ok, existing_result} -> {:ok, existing_result}
-    {:error, :not_found} -> perform_action(input)
+def execute(input_map) do
+  case check_if_already_processed(input_map["request_id"]) do
+    {:ok, existing_result} -> {:ok, existing_result, "success"}
+    {:error, :not_found} -> perform_action(input_map)
   end
 end
 ```

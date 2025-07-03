@@ -70,15 +70,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, updated_context)
 
-      assert {:suspend, :sub_workflow_sync, suspend_data, suspended_node_execution} = result
-
-      # Verify suspension data
-      assert suspend_data.workflow_id == "user_onboarding"
-      assert suspend_data.input_data == %{"user_id" => 123}
-      assert suspend_data.execution_mode == "sync"
-      assert suspend_data.timeout_ms == 300_000
-      assert suspend_data.failure_strategy == "fail_parent"
-      assert %DateTime{} = suspend_data.triggered_at
+      assert {:suspend, suspended_node_execution} = result
 
       # Verify suspended node execution
       assert suspended_node_execution.node_id == "sub_workflow_node"
@@ -88,11 +80,15 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert suspended_node_execution.completed_at == nil
       assert suspended_node_execution.duration_ms == nil
 
-      # Verify suspension metadata
-      suspension_metadata = suspended_node_execution.metadata[:suspension_data]
-      assert suspension_metadata.type == :sub_workflow_sync
-      assert suspension_metadata.data == suspend_data
-      assert %DateTime{} = suspension_metadata.suspended_at
+      # Verify suspension data stored in NodeExecution
+      assert suspended_node_execution.suspension_type == :sub_workflow_sync
+      suspend_data = suspended_node_execution.suspension_data
+      assert suspend_data.workflow_id == "user_onboarding"
+      assert suspend_data.input_data == %{"user_id" => 123}
+      assert suspend_data.execution_mode == "sync"
+      assert suspend_data.timeout_ms == 300_000
+      assert suspend_data.failure_strategy == "fail_parent"
+      assert %DateTime{} = suspend_data.triggered_at
     end
 
     test "handles fire-and-forget sub-workflow execution", %{context: context} do
@@ -111,17 +107,19 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, context)
 
-      assert {:suspend, :sub_workflow_fire_forget, suspend_data, suspended_node_execution} = result
-
-      # Verify suspension data
-      assert suspend_data.workflow_id == "notification_flow"
-      assert suspend_data.input_data == %{"message" => "Hello World"}
-      assert suspend_data.execution_mode == "fire_and_forget"
-      assert %DateTime{} = suspend_data.triggered_at
+      assert {:suspend, suspended_node_execution} = result
 
       # Verify suspended node execution
       assert suspended_node_execution.node_id == "notification_node"
       assert suspended_node_execution.status == :suspended
+
+      # Verify suspension data stored in NodeExecution
+      assert suspended_node_execution.suspension_type == :sub_workflow_fire_forget
+      suspend_data = suspended_node_execution.suspension_data
+      assert suspend_data.workflow_id == "notification_flow"
+      assert suspend_data.input_data == %{"message" => "Hello World"}
+      assert suspend_data.execution_mode == "fire_and_forget"
+      assert %DateTime{} = suspend_data.triggered_at
     end
 
     test "handles sub-workflow validation errors", %{context: context} do
@@ -174,7 +172,9 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, context)
 
-      assert {:suspend, :sub_workflow_sync, suspend_data, _} = result
+      assert {:suspend, suspended_node_execution} = result
+      suspend_data = suspended_node_execution.suspension_data
+      assert suspended_node_execution.suspension_type == :sub_workflow_sync
 
       # Verify expressions were evaluated
       assert suspend_data.input_data["api_url"] == "https://api.test.com"
@@ -211,7 +211,9 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, complex_context)
 
-      assert {:suspend, :sub_workflow_sync, suspend_data, _} = result
+      assert {:suspend, suspended_node_execution} = result
+      suspend_data = suspended_node_execution.suspension_data
+      assert suspended_node_execution.suspension_type == :sub_workflow_sync
 
       # Verify complex expressions were evaluated correctly
       assert suspend_data.input_data["user_id"] == 456
@@ -240,7 +242,9 @@ defmodule Prana.NodeExecutorSuspensionTest do
       result = NodeExecutor.execute_node(node, context)
 
       # Expression engine returns nil for non-existent references, so this will succeed with suspension
-      assert {:suspend, :sub_workflow_sync, suspend_data, suspended_node_execution} = result
+      assert {:suspend, suspended_node_execution} = result
+      suspend_data = suspended_node_execution.suspension_data
+      assert suspended_node_execution.suspension_type == :sub_workflow_sync
 
       # Verify that the invalid reference was handled gracefully (set to nil)
       assert suspend_data.input_data["invalid_reference"] == nil
@@ -266,7 +270,8 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       result = NodeExecutor.execute_node(node, context)
 
-      assert {:suspend, :sub_workflow_sync, _, suspended_node_execution} = result
+      assert {:suspend, suspended_node_execution} = result
+      assert suspended_node_execution.suspension_type == :sub_workflow_sync
 
       # Verify timing information
       assert %DateTime{} = suspended_node_execution.started_at
@@ -276,10 +281,9 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert suspended_node_execution.completed_at == nil
       assert suspended_node_execution.duration_ms == nil
 
-      # But should have suspension timing in metadata
-      suspension_metadata = suspended_node_execution.metadata[:suspension_data]
-      assert %DateTime{} = suspension_metadata.suspended_at
-      assert DateTime.compare(suspension_metadata.suspended_at, suspended_node_execution.started_at) in [:gt, :eq]
+      # Verify suspension data is present
+      assert suspended_node_execution.suspension_type != nil
+      assert suspended_node_execution.suspension_data != nil
     end
   end
 

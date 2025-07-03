@@ -24,12 +24,12 @@ defmodule Prana.NodeExecutor do
 
   ## Returns
   - `{:ok, node_execution, updated_context}` - Successful execution
-  - `{:suspend, suspension_type, suspend_data, node_execution}` - Node suspended for async coordination
+  - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
   @spec execute_node(Node.t(), ExecutionContext.t()) ::
           {:ok, NodeExecution.t(), ExecutionContext.t()}
-          | {:suspend, atom(), term(), NodeExecution.t()}
+          | {:suspend, NodeExecution.t()}
           | {:error, term()}
   def execute_node(%Node{} = node, %ExecutionContext{} = context) do
     # Create initial node execution with proper execution ID from context
@@ -50,7 +50,7 @@ defmodule Prana.NodeExecutor do
         {:suspend, suspension_type, suspend_data} ->
           # Node suspended for async coordination
           suspended_execution = suspend_node_execution(node_execution, suspension_type, suspend_data)
-          {:suspend, suspension_type, suspend_data, suspended_execution}
+          {:suspend, suspended_execution}
 
         {:error, reason} ->
           # Action execution failed
@@ -110,9 +110,10 @@ defmodule Prana.NodeExecutor do
         {:ok, processed_map} ->
           # Enrich input with full context access using prefixed keys to avoid conflicts
           context_with_prefixed_keys = %{
-            "$input" => context_data["input"],
-            "$nodes" => context_data["nodes"],
-            "$variables" => context_data["variables"]
+            "$input" => context_data["$input"],
+            "$nodes" => context_data["$nodes"],
+            "$variables" => context_data["$variables"],
+            "$preparation" => context_data["$preparation"]
           }
 
           enriched_input = Map.merge(processed_map || %{}, context_with_prefixed_keys)
@@ -164,11 +165,12 @@ defmodule Prana.NodeExecutor do
   end
 
   @doc """
-  Invoke action using MFA pattern and handle different return formats.
+  Invoke action using Action behavior pattern and handle different return formats.
   """
   @spec invoke_action(Prana.Action.t(), map()) :: {:ok, term(), String.t()} | {:error, term()}
   def invoke_action(%Prana.Action{} = action, input) do
-    result = apply(action.module, action.function, [input])
+    # Action behavior pattern
+    result = action.module.execute(input)
     process_action_result(result, action)
   rescue
     error ->
@@ -177,7 +179,7 @@ defmodule Prana.NodeExecutor do
          "type" => "action_execution_failed",
          "error" => inspect(error),
          "module" => action.module,
-         "function" => action.function
+         "action" => action.name
        }}
   catch
     :exit, reason ->
@@ -186,7 +188,7 @@ defmodule Prana.NodeExecutor do
          "type" => "action_exit",
          "reason" => inspect(reason),
          "module" => action.module,
-         "function" => action.function
+         "action" => action.name
        }}
 
     :throw, value ->
@@ -195,7 +197,7 @@ defmodule Prana.NodeExecutor do
          "type" => "action_throw",
          "value" => inspect(value),
          "module" => action.module,
-         "function" => action.function
+         "action" => action.name
        }}
   end
 
@@ -326,10 +328,16 @@ defmodule Prana.NodeExecutor do
 
   @spec build_expression_context(ExecutionContext.t()) :: map()
   defp build_expression_context(%ExecutionContext{} = context) do
+    preparation_data = case context.execution do
+      nil -> %{}
+      execution -> execution.preparation_data || %{}
+    end
+    
     %{
-      "input" => context.input,
-      "nodes" => context.nodes,
-      "variables" => context.variables
+      "$input" => context.input,
+      "$nodes" => context.nodes,
+      "$variables" => context.variables,
+      "$preparation" => preparation_data
     }
   end
 
@@ -368,12 +376,8 @@ defmodule Prana.NodeExecutor do
         output_port: nil,
         completed_at: nil,
         duration_ms: nil,
-        metadata:
-          Map.put(node_execution.metadata, :suspension_data, %{
-            type: suspension_type,
-            data: suspend_data,
-            suspended_at: DateTime.utc_now()
-          })
+        suspension_type: suspension_type,
+        suspension_data: suspend_data
     }
   end
 end

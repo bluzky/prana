@@ -93,6 +93,7 @@ defmodule Prana.ExecutionContext do
     %{context | variables: Map.merge(context.variables, new_variables)}
   end
 
+
   @doc """
   Gets expression evaluation context
   """

@@ -251,7 +251,8 @@ defmodule Prana.ExpressionEngine do
   end
 
   defp parse_and_extract(expression, context) do
-    path = parse_expression_to_path(expression)
+    path =
+      parse_expression_to_path(expression)
 
     if has_wildcard?(expression) or has_filtering?(expression) do
       # Always returns array for wildcards/filters
@@ -270,7 +271,7 @@ defmodule Prana.ExpressionEngine do
   defp parse_expression_to_path(expression) do
     path =
       expression
-      |> String.trim_leading("$")
+      # |> String.trim_leading("$")
       |> String.split(".")
       |> Enum.flat_map(&parse_path_segment/1)
 

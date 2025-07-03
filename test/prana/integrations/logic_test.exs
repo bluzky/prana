@@ -1,7 +1,7 @@
 defmodule Prana.Integrations.LogicTest do
   use ExUnit.Case
 
-  alias Prana.Integrations.Logic
+  alias Prana.Integrations.Logic.SwitchAction
 
   describe "switch/1 - condition-based format" do
     test "matches first condition with exact value" do
@@ -15,9 +15,14 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      context = %{"input" => input_map}
+      # Create proper context structure for SwitchAction
+      input_with_context = Map.merge(input_map, %{
+        "$input" => input_map,
+        "$nodes" => %{},
+        "$variables" => %{}
+      })
 
-      assert {:ok, _data, "premium_port"} = Logic.switch(Map.merge(input_map, context))
+      assert {:ok, _data, "premium_port"} = SwitchAction.execute(input_with_context)
     end
 
     test "matches second condition when first doesn't match" do
@@ -31,9 +36,14 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      context = %{"input" => input_map}
+      # Create proper context structure for SwitchAction
+      input_with_context = Map.merge(input_map, %{
+        "$input" => input_map,
+        "$nodes" => %{},
+        "$variables" => %{}
+      })
 
-      assert {:ok, _data, "verified_port"} = Logic.switch(Map.merge(input_map, context))
+      assert {:ok, _data, "verified_port"} = SwitchAction.execute(input_with_context)
     end
 
     test "uses default when no conditions match" do
@@ -48,9 +58,14 @@ defmodule Prana.Integrations.LogicTest do
         "default_data" => %{"discount" => 0.0}
       }
 
-      context = %{"input" => input_map}
+      # Create proper context structure for SwitchAction
+      input_with_context = Map.merge(input_map, %{
+        "$input" => input_map,
+        "$nodes" => %{},
+        "$variables" => %{}
+      })
 
-      assert {:ok, %{"discount" => 0.0}, "basic_port"} = Logic.switch(Map.merge(input_map, context))
+      assert {:ok, %{"discount" => 0.0}, "basic_port"} = SwitchAction.execute(input_with_context)
     end
 
     test "uses custom case data when provided" do
@@ -67,10 +82,15 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      context = %{"input" => input_map}
+      # Create proper context structure for SwitchAction
+      input_with_context = Map.merge(input_map, %{
+        "$input" => input_map,
+        "$nodes" => %{},
+        "$variables" => %{}
+      })
 
       assert {:ok, %{"discount" => 0.3, "priority" => "high"}, "premium_port"} =
-               Logic.switch(Map.merge(input_map, context))
+               SwitchAction.execute(input_with_context)
     end
 
     test "skips cases with invalid expressions and continues to valid ones" do
@@ -83,10 +103,15 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      context = %{"input" => input_map}
+      # Create proper context structure for SwitchAction
+      input_with_context = Map.merge(input_map, %{
+        "$input" => input_map,
+        "$nodes" => %{},
+        "$variables" => %{}
+      })
 
       # Should match second case after first case fails expression evaluation
-      assert {:ok, _data, "valid_port"} = Logic.switch(Map.merge(input_map, context))
+      assert {:ok, _data, "valid_port"} = SwitchAction.execute(input_with_context)
     end
 
     test "falls back to default when all expressions are invalid" do
@@ -100,11 +125,16 @@ defmodule Prana.Integrations.LogicTest do
         "default_data" => %{"message" => "no valid cases"}
       }
 
-      context = %{"input" => input_map}
+      # Create proper context structure for SwitchAction
+      input_with_context = Map.merge(input_map, %{
+        "$input" => input_map,
+        "$nodes" => %{},
+        "$variables" => %{}
+      })
 
       # Should fall back to default when all cases fail expression evaluation
       assert {:ok, %{"message" => "no valid cases"}, "fallback_port"} =
-               Logic.switch(Map.merge(input_map, context))
+               SwitchAction.execute(input_with_context)
     end
   end
 end

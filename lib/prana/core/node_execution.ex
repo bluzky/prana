@@ -18,6 +18,8 @@ defmodule Prana.NodeExecution do
           started_at: DateTime.t() | nil,
           completed_at: DateTime.t() | nil,
           duration_ms: integer() | nil,
+          suspension_type: atom() | nil,
+          suspension_data: term() | nil,
           metadata: map()
         }
 
@@ -33,6 +35,8 @@ defmodule Prana.NodeExecution do
     :started_at,
     :completed_at,
     :duration_ms,
+    :suspension_type,
+    :suspension_data,
     retry_count: 0,
     metadata: %{}
   ]
@@ -54,6 +58,8 @@ defmodule Prana.NodeExecution do
       started_at: nil,
       completed_at: nil,
       duration_ms: nil,
+      suspension_type: nil,
+      suspension_data: nil,
       metadata: %{}
     }
   end

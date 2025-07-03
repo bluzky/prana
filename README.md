@@ -8,7 +8,7 @@
 - **🔄 Conditional Branching**: Advanced IF/ELSE and switch/case patterns with exclusive path execution
 - **🎯 Expression Engine**: Dynamic data access with `$input.field`, `$nodes.api.response`, wildcards, and filtering
 - **⚡ Sub-workflow Orchestration**: Synchronous, asynchronous, and fire-and-forget execution modes with suspension/resume
-- **🔌 Extensible Integration System**: Clean behavior-driven integration framework with MFA action pattern
+- **🔌 Extensible Integration System**: Clean behavior-driven integration framework with Action behavior pattern
 - **🛡️ Type Safety**: All core entities use proper Elixir structs with compile-time checking
 - **🚀 Production Ready**: Comprehensive test coverage with 205+ passing tests
 
@@ -226,8 +226,7 @@ defmodule MyApp.CustomIntegration do
         "my_action" => %Prana.Action{
           name: "my_action",
           display_name: "My Action",
-          module: __MODULE__,
-          function: :my_action,
+          module: MyApp.CustomIntegration.MyAction,
           input_ports: ["input"],
           output_ports: ["success", "error"]
         }
@@ -235,7 +234,14 @@ defmodule MyApp.CustomIntegration do
     }
   end
 
-  def my_action(enriched_input) do
+end
+
+defmodule MyApp.CustomIntegration.MyAction do
+  @behaviour Prana.Behaviour.Action
+
+  def prepare(_input_map), do: {:ok, %{}}
+
+  def execute(enriched_input) do
     # Access explicitly mapped data
     user_id = enriched_input["user_id"]
     
@@ -245,7 +251,11 @@ defmodule MyApp.CustomIntegration do
     variables = enriched_input["$variables"]
     
     # Your logic here
-    {:ok, %{result: "processed", user_id: user_id}}
+    {:ok, %{result: "processed", user_id: user_id}, "success"}
+  end
+
+  def resume(_suspend_data, _resume_input) do
+    {:error, "Resume not supported"}
   end
 end
 ```
