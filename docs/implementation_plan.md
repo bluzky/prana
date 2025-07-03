@@ -1,19 +1,21 @@
 # Prana Core Library - Updated Implementation Plan
 
-## Current Status: ~98% Core Engine Complete (Phase 4.1 Complete)
+## Current Status: ~99% Core Engine Complete (Phase 4.2 Partially Complete)
 
-### ✅ **COMPLETED PHASES (1-3)**
+### ✅ **COMPLETED PHASES (1-4.1)**
 - **Phase 1**: Core Data Structures & Behaviors - All structs and behaviors implemented
 - **Phase 2**: Core Engine Components - Expression Engine, Node Executor, Workflow Compiler, Middleware
 - **Phase 3.1**: Graph Executor Core Execution - Sequential execution with performance optimization
 - **Phase 3.2**: Conditional Branching - IF/ELSE and Switch patterns with path tracking
 - **Phase 3.3**: Diamond Pattern Coordination - Fork-join with merge strategies
+- **Phase 4.1**: Sub-workflow Orchestration - Parent-child coordination with suspension/resume
+- **Phase 4.2**: Wait Integration - Time-based delays and webhook coordination (✅ **COMPLETED**)
 
-### 🎯 **CURRENT PRIORITY: Phase 4 - Coordination & Integration Patterns**
-- **Phase 4.1**: Sub-workflow Orchestration (✅ **COMPLETED**)
-- **Phase 4.2**: External System Polling & HTTP Integration (High Priority)  
-- **Phase 4.3**: Time-based Delays & Logging (Medium Priority)
-- **Phase 4.4**: External Event Coordination (Complex - suspension/resume)
+### 🎯 **CURRENT PRIORITY: Phase 4.2+ - Additional Integration Patterns**
+- **Wait Integration** (✅ **COMPLETED**) - Interval, schedule, webhook modes with Action behavior
+- **HTTP Integration** (High Priority) - HTTP requests, webhooks, response handling
+- **Transform Integration** (Medium Priority) - Data transformation and manipulation
+- **Log Integration** (Medium Priority) - Structured logging actions
 
 ### 📋 **FUTURE PHASES (5-6)**
 - **Phase 5**: Main API & Workflow Builder
@@ -150,7 +152,7 @@
   - [x] **Expression Integration** - dynamic input preparation with context evaluation
 
 #### Phase 4.2-4.4: Advanced Coordination (🎯 CURRENT PRIORITY)
-- [ ] **Wait Integration** - delay action, wait_for_execution with timeout handling
+- [x] **Wait Integration** - delay action, wait_for_execution with timeout handling (✅ **COMPLETED**)
 - [ ] **HTTP Integration** - HTTP requests, webhooks, response handling
 - [ ] **Transform Integration** - extract/map/filter data actions
 - [ ] **Log Integration** - info/debug/error logging actions
@@ -242,12 +244,14 @@
   - [x] Expression-based input preparation
   - [x] Comprehensive testing (14 unit tests)
 
-### 6.7 Wait Integration (📋 HIGH PRIORITY - Phase 4.1 Remaining)
-- [ ] `Prana.Integrations.Wait` - Advanced coordination
-  - [ ] Simple delay action with time-based execution
-  - [ ] Wait for execution action with timeout handling
-  - [ ] Async synchronization patterns
-  - [ ] State persistence for long delays
+### 6.7 Wait Integration (✅ COMPLETED - Phase 4.2)
+- [x] `Prana.Integrations.Wait` - Advanced coordination (530 lines)
+  - [x] Unified wait action with 3 modes: interval, schedule, webhook
+  - [x] Action Behavior Pattern with prepare/execute/resume methods
+  - [x] Flexible time units (ms, seconds, minutes, hours)
+  - [x] Suspension/resume patterns for efficient resource usage
+  - [x] Webhook coordination with timeout handling and resume URLs
+  - [x] Comprehensive testing (31 test cases, 257 lines)
 
 ## 7. Main API (📋 TODO - Phase 5)
 
@@ -347,10 +351,10 @@ prana/
 │   │   │   ├── logic.ex       # ✅ Logic integration (COMPLETED)
 │   │   │   ├── manual.ex      # ✅ Manual integration (COMPLETED)
 │   │   │   ├── workflow.ex    # ✅ Workflow integration (COMPLETED)
+│   │   │   ├── wait.ex        # ✅ Wait integration (COMPLETED)
 │   │   │   ├── http.ex        # 📋 HTTP integration (TODO)
 │   │   │   ├── transform.ex   # 📋 Transform integration (TODO)
-│   │   │   ├── log.ex         # 📋 Log integration (TODO)
-│   │   │   └── wait.ex        # 📋 Wait integration (TODO)
+│   │   │   └── log.ex         # 📋 Log integration (TODO)
 │   │   ├── dev/               # 📋 Development tools (TODO)
 │   │   └── examples/          # 📋 Example workflows (TODO)
 │   └── prana.ex               # 📋 Main API (TODO)
@@ -367,7 +371,8 @@ prana/
 │   │   ├── integrations/      # ✅ Integration tests
 │   │   │   ├── logic_test.exs # ✅ Logic integration tests
 │   │   │   ├── manual_test.exs # ✅ Manual integration tests
-│   │   │   └── workflow_test.exs # ✅ Workflow integration tests (14 tests)
+│   │   │   ├── workflow_test.exs # ✅ Workflow integration tests (14 tests)
+│   │   │   └── wait_test.exs  # ✅ Wait integration tests (31 tests)
 │   │   ├── middleware_test.exs # ✅ Middleware system tests (COMPLETED)
 │   │   ├── node_executor_test.exs # ✅ Node executor tests (COMPLETED)
 │   │   ├── node_executor_suspension_test.exs # ✅ Suspension handling tests (10 tests)
@@ -382,11 +387,13 @@ prana/
 ```
 
 ### Key Achievements
-- **150+ test scenarios** across core components
+- **180+ test scenarios** across core components
 - **44 GraphExecutor tests** (7 core + 24 conditional + 10 sub-workflow + 3 branch following)
 - **1358 lines of conditional branching tests** proving robust implementation
 - **351 lines of Logic integration** with comprehensive action support
 - **127 lines of Workflow integration** with sub-workflow orchestration
+- **530 lines of Wait integration** with 3 wait modes and Action behavior pattern
 - **330 lines of suspension/resume testing** (10 NodeExecutor + 10 GraphExecutor tests)
+- **257 lines of Wait integration tests** (31 test cases covering all modes)
 - **Production-ready architecture** with O(1) performance optimizations
-- **Complete Phase 4.1 sub-workflow orchestration** with suspension/resume patterns
+- **Complete Phase 4.2 Wait integration** with interval, schedule, and webhook coordination
