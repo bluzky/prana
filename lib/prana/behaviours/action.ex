@@ -4,7 +4,7 @@ defmodule Prana.Behaviour.Action do
 
   This behavior supports the complete action lifecycle:
   - `prepare/2` - Pre-execution setup with access to execution context
-  - `execute/2` - Main action execution with prepared data
+  - `execute/1` - Main action execution with input data
   - `resume/2` - Resume suspended actions with external input
 
   ## Action Lifecycle
@@ -15,8 +15,7 @@ defmodule Prana.Behaviour.Action do
      - Can validate configuration and setup external resources
 
   2. **Execution Phase**: Called when node is ready to execute
-     - Receives input data from previous nodes
-     - Receives preparation data from preparation phase
+     - Receives input data from previous nodes (includes preparation data if needed)
      - Can return success, suspension, or error
 
   3. **Resume Phase**: Called when suspended action receives external input
@@ -49,9 +48,9 @@ defmodule Prana.Behaviour.Action do
           end
         end
 
-        def execute(input_data, preparation_data) do
-          # Make HTTP request with prepared configuration
-          case make_request(preparation_data.endpoint, input_data, preparation_data.api_key) do
+        def execute(input_data) do
+          # Make HTTP request with configuration from input_data
+          case make_request(input_data["endpoint"], input_data, input_data["api_key"]) do
             {:ok, response} -> {:ok, response}
             {:error, reason} -> {:error, reason}
           end
@@ -65,8 +64,8 @@ defmodule Prana.Behaviour.Action do
 
   ## Suspension Example
 
-      def execute(input_data, preparation_data) do
-        webhook_url = preparation_data.webhook_url
+      def execute(input_data) do
+        webhook_url = input_data["webhook_url"]
         
         # Initiate async operation that will callback to webhook
         {:ok, request_id} = start_async_operation(input_data, webhook_url)
@@ -133,15 +132,13 @@ defmodule Prana.Behaviour.Action do
               {:ok, preparation_data()} | {:error, reason :: term()}
 
   @doc """
-  Execute the action with input data and prepared configuration.
+  Execute the action with input data.
 
   Called when the node is ready to execute during workflow execution.
-  Receives processed input data from previous nodes and preparation data
-  from the preparation phase.
+  Receives processed input data from previous nodes and expressions.
 
   ## Parameters
   - `input_data` - Processed input data from previous nodes and expressions
-  - `preparation_data` - Data returned from prepare/2 callback
 
   ## Returns
   - `{:ok, output_data}` - Action completed successfully
@@ -150,23 +147,23 @@ defmodule Prana.Behaviour.Action do
 
   ## Examples
 
-      def execute(input_data, preparation_data) do
-        case make_api_call(preparation_data.endpoint, input_data) do
+      def execute(input_data) do
+        case make_api_call(input_data["endpoint"], input_data) do
           {:ok, response} -> {:ok, response}
           {:error, reason} -> {:error, reason}
         end
       end
 
       # Suspension example
-      def execute(input_data, preparation_data) do
-        webhook_url = preparation_data.webhook_url
+      def execute(input_data) do
+        webhook_url = input_data["webhook_url"]
         {:ok, request_id} = start_async_operation(input_data, webhook_url)
         
         suspend_data = %{request_id: request_id, webhook_url: webhook_url}
         {:suspend, :webhook, suspend_data}
       end
   """
-  @callback execute(input_data(), preparation_data()) ::
+  @callback execute(input_data()) ::
               {:ok, output_data()} | {:suspend, suspension_type(), suspend_data()} | {:error, reason :: term()}
 
   @doc """

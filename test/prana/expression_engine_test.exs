@@ -6,7 +6,7 @@ defmodule Prana.ExpressionEngineTest do
   describe "simple field access" do
     setup do
       context = %{
-        "input" => %{
+        "$input" => %{
           "email" => "john@test.com",
           "age" => 25,
           "is_active" => true,
@@ -15,13 +15,13 @@ defmodule Prana.ExpressionEngineTest do
             "settings" => %{"theme" => "dark"}
           }
         },
-        "nodes" => %{
+        "$nodes" => %{
           "api_call" => %{
             "response" => %{"user_id" => 123, "status" => "success"},
             "status_code" => 200
           }
         },
-        "variables" => %{
+        "$variables" => %{
           "api_url" => "https://api.example.com",
           "retry_count" => 3
         }
@@ -32,7 +32,7 @@ defmodule Prana.ExpressionEngineTest do
 
     test "distinguishes between missing paths (nil) and syntax errors (error)" do
       context = %{
-        "input" => %{"valid_field" => "value"}
+        "$input" => %{"valid_field" => "value"}
       }
 
       # Missing paths should return nil
@@ -57,8 +57,8 @@ defmodule Prana.ExpressionEngineTest do
 
     test "map processing with mixed missing and valid paths" do
       context = %{
-        "input" => %{"existing" => "value"},
-        "nodes" => %{"step1" => %{"result" => "success"}}
+        "$input" => %{"existing" => "value"},
+        "$nodes" => %{"step1" => %{"result" => "success"}}
       }
 
       input_map = %{
@@ -141,7 +141,7 @@ defmodule Prana.ExpressionEngineTest do
   describe "array access" do
     setup do
       context = %{
-        "input" => %{
+        "$input" => %{
           "users" => [
             %{"name" => "John", "email" => "john@test.com", "is_active" => true, "role" => "admin"},
             %{"name" => "Jane", "email" => "jane@test.com", "is_active" => true, "role" => "user"},
@@ -149,7 +149,7 @@ defmodule Prana.ExpressionEngineTest do
           ],
           "tags" => ["urgent", "customer", "support"]
         },
-        "nodes" => %{
+        "$nodes" => %{
           "search_results" => %{
             "items" => [
               %{"title" => "First Result", "score" => 0.95},
@@ -193,7 +193,7 @@ defmodule Prana.ExpressionEngineTest do
   describe "filtering with corrected syntax" do
     setup do
       context = %{
-        "input" => %{
+        "$input" => %{
           "users" => [
             %{"id" => 1, "name" => "John", "email" => "john@test.com", "is_active" => true, "role" => "admin"},
             %{"id" => 2, "name" => "Jane", "email" => "jane@test.com", "is_active" => true, "role" => "user"},
@@ -267,7 +267,7 @@ defmodule Prana.ExpressionEngineTest do
   describe "wildcard extraction - always returns arrays" do
     setup do
       context = %{
-        "input" => %{
+        "$input" => %{
           "users" => [
             %{"name" => "John", "email" => "john@test.com", "skills" => ["elixir", "javascript"]},
             %{"name" => "Jane", "email" => "jane@test.com", "skills" => ["python", "sql"]},
@@ -299,7 +299,7 @@ defmodule Prana.ExpressionEngineTest do
     end
 
     test "wildcard with empty arrays", %{context: _context} do
-      empty_context = %{"input" => %{"users" => []}}
+      empty_context = %{"$input" => %{"users" => []}}
       {:ok, names} = ExpressionEngine.extract("$input.users.*.name", empty_context)
       assert names == []
     end
@@ -308,7 +308,7 @@ defmodule Prana.ExpressionEngineTest do
   describe "map processing" do
     setup do
       context = %{
-        "input" => %{
+        "$input" => %{
           "user_id" => 123,
           "email" => "john@test.com",
           "users" => [
@@ -316,10 +316,10 @@ defmodule Prana.ExpressionEngineTest do
             %{"name" => "Jane", "role" => "user"}
           ]
         },
-        "variables" => %{
+        "$variables" => %{
           "api_url" => "https://api.example.com"
         },
-        "nodes" => %{
+        "$nodes" => %{
           "get_user" => %{
             "profile" => %{"avatar_url" => "https://example.com/avatar.jpg"}
           }
@@ -414,11 +414,11 @@ defmodule Prana.ExpressionEngineTest do
   describe "complex scenarios" do
     test "workflow node input preparation" do
       context = %{
-        "input" => %{
+        "$input" => %{
           "operation" => "send_notifications",
           "tenant_id" => "tenant_123"
         },
-        "nodes" => %{
+        "$nodes" => %{
           "get_users" => %{
             "response" => %{
               "users" => [
@@ -430,7 +430,7 @@ defmodule Prana.ExpressionEngineTest do
             "status_code" => 200
           }
         },
-        "variables" => %{
+        "$variables" => %{
           "api_base_url" => "https://api.example.com",
           "notification_template" => "Welcome {{name}}!"
         }
@@ -461,7 +461,7 @@ defmodule Prana.ExpressionEngineTest do
 
     test "expression edge cases" do
       context = %{
-        "input" => %{
+        "$input" => %{
           "empty_list" => [],
           "null_value" => nil,
           "nested" => %{"deep" => %{"value" => "found"}}

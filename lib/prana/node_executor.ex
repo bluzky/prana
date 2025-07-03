@@ -110,9 +110,9 @@ defmodule Prana.NodeExecutor do
         {:ok, processed_map} ->
           # Enrich input with full context access using prefixed keys to avoid conflicts
           context_with_prefixed_keys = %{
-            "$input" => context_data["input"],
-            "$nodes" => context_data["nodes"],
-            "$variables" => context_data["variables"]
+            "$input" => context_data["$input"],
+            "$nodes" => context_data["$nodes"],
+            "$variables" => context_data["$variables"]
           }
 
           enriched_input = Map.merge(processed_map || %{}, context_with_prefixed_keys)
@@ -164,11 +164,17 @@ defmodule Prana.NodeExecutor do
   end
 
   @doc """
-  Invoke action using MFA pattern and handle different return formats.
+  Invoke action using Action behavior pattern and handle different return formats.
   """
   @spec invoke_action(Prana.Action.t(), map()) :: {:ok, term(), String.t()} | {:error, term()}
   def invoke_action(%Prana.Action{} = action, input) do
-    result = apply(action.module, action.function, [input])
+    result = if action.function do
+      # Old MFA pattern (for backward compatibility)
+      apply(action.module, action.function, [input])
+    else
+      # New Action behavior pattern
+      action.module.execute(input)
+    end
     process_action_result(result, action)
   rescue
     error ->
@@ -327,9 +333,9 @@ defmodule Prana.NodeExecutor do
   @spec build_expression_context(ExecutionContext.t()) :: map()
   defp build_expression_context(%ExecutionContext{} = context) do
     %{
-      "input" => context.input,
-      "nodes" => context.nodes,
-      "variables" => context.variables
+      "$input" => context.input,
+      "$nodes" => context.nodes,
+      "$variables" => context.variables
     }
   end
 
