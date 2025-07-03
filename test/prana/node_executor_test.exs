@@ -13,7 +13,7 @@ defmodule Prana.NodeExecutorTest do
     @behaviour Prana.Behaviour.Action
     
     @impl true
-    def prepare(_action_config, _execution_context) do
+    def prepare(_node) do
       {:ok, %{}}
     end
     
@@ -32,7 +32,7 @@ defmodule Prana.NodeExecutorTest do
     @behaviour Prana.Behaviour.Action
     
     @impl true
-    def prepare(_action_config, _execution_context) do
+    def prepare(_node) do
       {:ok, %{}}
     end
     
@@ -51,7 +51,7 @@ defmodule Prana.NodeExecutorTest do
     @behaviour Prana.Behaviour.Action
     
     @impl true
-    def prepare(_action_config, _execution_context) do
+    def prepare(_node) do
       {:ok, %{}}
     end
     
@@ -77,7 +77,7 @@ defmodule Prana.NodeExecutorTest do
     @behaviour Prana.Behaviour.Action
     
     @impl true
-    def prepare(_action_config, _execution_context) do
+    def prepare(_node) do
       {:ok, %{}}
     end
     
@@ -105,7 +105,7 @@ defmodule Prana.NodeExecutorTest do
     @behaviour Prana.Behaviour.Action
     
     @impl true
-    def prepare(_action_config, _execution_context) do
+    def prepare(_node) do
       {:ok, %{}}
     end
     
@@ -125,7 +125,7 @@ defmodule Prana.NodeExecutorTest do
     @behaviour Prana.Behaviour.Action
     
     @impl true
-    def prepare(_action_config, _execution_context) do
+    def prepare(_node) do
       {:ok, %{}}
     end
     
@@ -144,7 +144,7 @@ defmodule Prana.NodeExecutorTest do
     @behaviour Prana.Behaviour.Action
     
     @impl true
-    def prepare(_action_config, _execution_context) do
+    def prepare(_node) do
       {:ok, %{}}
     end
     

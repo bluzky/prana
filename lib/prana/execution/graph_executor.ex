@@ -494,23 +494,16 @@ defmodule Prana.GraphExecutor do
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
         result_node_execution
 
-      {:suspend, suspension_type, suspend_data, suspended_node_execution} ->
-        # Store suspension information in NodeExecution struct
-        enriched_node_execution = %{
-          suspended_node_execution 
-          | suspension_type: suspension_type,
-            suspension_data: suspend_data
-        }
-        
+      {:suspend, suspended_node_execution} ->
         # Handle node suspension - emit middleware event for application handling
         Middleware.call(:node_suspended, %{
           node: node,
-          node_execution: enriched_node_execution,
-          suspension_type: suspension_type,
-          suspend_data: suspend_data
+          node_execution: suspended_node_execution,
+          suspension_type: suspended_node_execution.suspension_type,
+          suspend_data: suspended_node_execution.suspension_data
         })
 
-        enriched_node_execution
+        suspended_node_execution
 
       {:error, {_reason, error_node_execution}} ->
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})

@@ -24,7 +24,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   @behaviour Prana.Behaviour.Action
 
   @impl true
-  def prepare(_action_config, _execution_context) do
+  def prepare(_node) do
     {:ok, %{}}
   end
 

@@ -124,11 +124,10 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert trigger_execution.status == :completed
       assert sub_execution.status == :suspended
 
-      # Verify suspension metadata contains synchronous sub-workflow data
-      suspension_metadata = sub_execution.metadata[:suspension_data]
-      assert suspension_metadata.type == :sub_workflow_sync
-      assert suspension_metadata.data.workflow_id == "child_workflow"
-      assert suspension_metadata.data.execution_mode == "sync"
+      # Verify suspension data contains synchronous sub-workflow data
+      assert sub_execution.suspension_type == :sub_workflow_sync
+      assert sub_execution.suspension_data.workflow_id == "child_workflow"
+      assert sub_execution.suspension_data.execution_mode == "sync"
 
       # Verify middleware events were emitted
       assert_receive {:middleware_event, :execution_started, _}
@@ -216,11 +215,10 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert trigger_execution.status == :completed
       assert fire_forget_execution.status == :suspended
 
-      # Verify suspension metadata contains fire-and-forget data
-      suspension_metadata = fire_forget_execution.metadata[:suspension_data]
-      assert suspension_metadata.type == :sub_workflow_fire_forget
-      assert suspension_metadata.data.workflow_id == "background_task"
-      assert suspension_metadata.data.execution_mode == "fire_and_forget"
+      # Verify suspension data contains fire-and-forget data
+      assert fire_forget_execution.suspension_type == :sub_workflow_fire_forget
+      assert fire_forget_execution.suspension_data.workflow_id == "background_task"
+      assert fire_forget_execution.suspension_data.execution_mode == "fire_and_forget"
 
       # Simulate caller handling fire-and-forget: trigger child async + immediate resume
       resume_data = %{sub_workflow_triggered: true, workflow_id: "background_task"}

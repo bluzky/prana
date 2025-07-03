@@ -34,7 +34,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   alias Prana.ExpressionEngine
 
   @impl true
-  def prepare(_action_config, _execution_context) do
+  def prepare(_node) do
     {:ok, %{}}
   end
 
