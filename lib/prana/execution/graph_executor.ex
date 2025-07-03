@@ -187,17 +187,27 @@ defmodule Prana.GraphExecutor do
     Middleware.call(:execution_started, %{execution: execution})
 
     try do
-      # Main execution loop
-      case execute_workflow_loop(execution, execution_graph, orchestration_context) do
-        {:ok, final_execution} ->
-          Middleware.call(:execution_completed, %{execution: final_execution})
-          {:ok, final_execution}
+      # Workflow preparation phase - prepare all actions and store in execution
+      case prepare_workflow_actions(execution_graph, execution, orchestration_context) do
+        {:ok, enriched_execution} ->
+          # Main execution loop with enriched execution
+          case execute_workflow_loop(enriched_execution, execution_graph, orchestration_context) do
+            {:ok, final_execution} ->
+              Middleware.call(:execution_completed, %{execution: final_execution})
+              {:ok, final_execution}
 
-        {:suspend, suspended_execution} ->
-          # Workflow suspended for async coordination - return suspended execution
-          {:suspend, suspended_execution}
+            {:suspend, suspended_execution} ->
+              # Workflow suspended for async coordination - return suspended execution
+              {:suspend, suspended_execution}
+
+            {:error, reason} = error ->
+              failed_execution = Execution.fail(enriched_execution, reason)
+              Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
+              error
+          end
 
         {:error, reason} = error ->
+          # Preparation failed, fail the execution
           failed_execution = Execution.fail(execution, reason)
           Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
           error
@@ -251,7 +261,9 @@ defmodule Prana.GraphExecutor do
 
           # Route output data and update orchestration context immediately
           updated_orchestration_context = route_node_output(node_execution, execution_graph, orchestration_context)
-          updated_orchestration_context = store_node_result_in_context(node_execution, updated_orchestration_context, selected_node)
+
+          updated_orchestration_context =
+            store_node_result_in_context(node_execution, updated_orchestration_context, selected_node)
 
           {:ok, {updated_execution, updated_orchestration_context}}
 
@@ -259,15 +271,13 @@ defmodule Prana.GraphExecutor do
           # Node suspended for async coordination - pause workflow execution
           updated_execution = update_execution_progress(execution, [node_execution])
 
-          # Suspend the entire execution and emit middleware event for application handling
-          # TODO: Phase 2 - Update to use proper suspension types and data
-          suspension_data = %{
-            suspended_node_id: selected_node.id,
-            suspension_metadata: node_execution.metadata
-          }
+          # Extract suspension information from NodeExecution fields
+          suspension_type = node_execution.suspension_type || :sub_workflow
+          suspend_data = node_execution.suspension_data || %{}
           
+          # Suspend the entire execution with structured suspension data
           suspended_execution =
-            Execution.suspend(updated_execution, selected_node.id, :sub_workflow, suspension_data)
+            Execution.suspend(updated_execution, selected_node.id, suspension_type, suspend_data)
 
           Middleware.call(:execution_suspended, %{
             execution: suspended_execution,
@@ -485,15 +495,22 @@ defmodule Prana.GraphExecutor do
         result_node_execution
 
       {:suspend, suspension_type, suspend_data, suspended_node_execution} ->
+        # Store suspension information in NodeExecution struct
+        enriched_node_execution = %{
+          suspended_node_execution 
+          | suspension_type: suspension_type,
+            suspension_data: suspend_data
+        }
+        
         # Handle node suspension - emit middleware event for application handling
         Middleware.call(:node_suspended, %{
           node: node,
-          node_execution: suspended_node_execution,
+          node_execution: enriched_node_execution,
           suspension_type: suspension_type,
           suspend_data: suspend_data
         })
 
-        suspended_node_execution
+        enriched_node_execution
 
       {:error, {_reason, error_node_execution}} ->
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
@@ -583,7 +600,6 @@ defmodule Prana.GraphExecutor do
     |> Map.update("nodes", %{node_key => result_data}, &Map.put(&1, node_key, result_data))
     |> Map.update("executed_nodes", [node_execution.node_id], &[node_execution.node_id | &1])
   end
-
 
   @doc """
   Update execution progress with completed node executions.
@@ -751,6 +767,65 @@ defmodule Prana.GraphExecutor do
     end
   end
 
+  # Prepare all workflow actions during the preparation phase.
+  # Scans all nodes in the workflow, calls prepare/1 on each action module,
+  # and stores the preparation data in the execution struct.
+  defp prepare_workflow_actions(execution_graph, execution, _orchestration_context) do
+    # Prepare all actions and collect preparation data
+    case prepare_all_actions(execution_graph.workflow.nodes) do
+      {:ok, preparation_data} ->
+        # Store preparation data in execution
+        enriched_execution = %{execution | preparation_data: preparation_data}
+        {:ok, enriched_execution}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # Prepare all actions in the workflow
+  defp prepare_all_actions(nodes) do
+    Enum.reduce_while(nodes, {:ok, %{}}, fn node, {:ok, acc_prep_data} ->
+      case prepare_single_action(node) do
+        {:ok, nil} ->
+          {:cont, {:ok, acc_prep_data}}
+
+        {:ok, node_prep_data} ->
+          updated_prep_data = Map.put(acc_prep_data, node.custom_id, node_prep_data)
+          {:cont, {:ok, updated_prep_data}}
+
+        {:error, reason} ->
+          {:halt, {:error, %{type: "action_preparation_failed", node_id: node.id, reason: reason}}}
+      end
+    end)
+
+    # Store preparation data using node custom_id
+  end
+
+  # Prepare a single action
+  defp prepare_single_action(node) do
+    # Look up action from integration registry
+    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
+      {:ok, action} ->
+        # Call prepare/1 on the action module
+        try do
+          case action.module.prepare(node) do
+            {:ok, preparation_data} ->
+              {:ok, preparation_data}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
+        rescue
+          error ->
+            {:error, %{type: "preparation_exception", message: Exception.message(error)}}
+        end
+
+      {:error, _reason} ->
+        # Action not found in registry, return empty preparation data
+        {:ok, nil}
+    end
+  end
 
   # Extract input data for a specific node from routed connection data
   # This function looks for data routed to this node via connections and prepares
