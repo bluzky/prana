@@ -233,8 +233,6 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       assert branch_following_detected,
              "Branch following not detected. Execution order: #{inspect(execution_order)}. " <>
                "Expected one branch to complete before other starts, but got interleaved execution."
-
-      IO.puts("✓ Branch following detected. Execution order: #{inspect(execution_order)}")
     end
 
     test "select_node_for_branch_following prioritizes continuing active branches" do

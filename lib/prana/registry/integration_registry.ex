@@ -80,7 +80,7 @@ defmodule Prana.IntegrationRegistry do
       integrations: %{}
     }
 
-    Logger.info("Started Prana Integration Registry")
+    # Logger.info("Started Prana Integration Registry")
     {:ok, state}
   end
 
@@ -134,7 +134,7 @@ defmodule Prana.IntegrationRegistry do
     new_integrations = Map.delete(state.integrations, integration_name)
     new_state = %{state | integrations: new_integrations}
 
-    Logger.info("Unregistered integration: #{integration_name}")
+    # Logger.info("Unregistered integration: #{integration_name}")
     {:reply, :ok, new_state}
   end
 
@@ -192,9 +192,9 @@ defmodule Prana.IntegrationRegistry do
           new_integrations = Map.put(state.integrations, integration.name, integration)
           new_state = %{state | integrations: new_integrations}
 
-          Logger.info(
-            "Registered integration: #{integration.name} (#{module}) with #{map_size(integration.actions)} actions"
-          )
+          # Logger.info(
+          #   "Registered integration: #{integration.name} (#{module}) with #{map_size(integration.actions)} actions"
+          # )
 
           {:ok, new_state}
 

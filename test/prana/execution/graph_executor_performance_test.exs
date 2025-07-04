@@ -129,8 +129,6 @@ defmodule Prana.GraphExecutorPerformanceTest do
       # With O(1) lookups, even 100 nodes should complete quickly
       time_milliseconds = time_microseconds / 1000
       assert time_milliseconds < 1000, "Execution took #{time_milliseconds}ms, expected < 1000ms"
-
-      IO.puts("Performance test: #{node_count} nodes executed in #{time_milliseconds}ms")
     end
 
     test "connection map provides O(1) lookups" do
@@ -200,8 +198,6 @@ defmodule Prana.GraphExecutorPerformanceTest do
 
       time_per_lookup = time_microseconds / 1000
       assert time_per_lookup < 10, "Average lookup took #{time_per_lookup}μs, expected < 10μs"
-
-      IO.puts("Connection lookup performance: #{time_per_lookup}μs per lookup (1000 iterations)")
     end
 
     test "reverse connection map provides fast incoming connection queries" do
@@ -287,8 +283,6 @@ defmodule Prana.GraphExecutorPerformanceTest do
 
       time_per_lookup = time_microseconds / 1000
       assert time_per_lookup < 5, "Reverse lookup took #{time_per_lookup}μs, expected < 5μs"
-
-      IO.puts("Reverse connection lookup performance: #{time_per_lookup}μs per lookup")
     end
 
     test "unified execution architecture provides efficient runtime state management" do
@@ -305,17 +299,18 @@ defmodule Prana.GraphExecutorPerformanceTest do
       }
 
       # Create many completed node executions to test performance
-      node_executions = Enum.map(1..100, fn i ->
-        %NodeExecution{
-          id: "ne_#{i}",
-          execution_id: "perf_test",
-          node_id: "node_#{i}",
-          status: :completed,
-          output_data: %{"result" => "test_#{i}"},
-          output_port: "success",
-          started_at: DateTime.utc_now()
-        }
-      end)
+      node_executions =
+        Enum.map(1..100, fn i ->
+          %NodeExecution{
+            id: "ne_#{i}",
+            execution_id: "perf_test",
+            node_id: "node_#{i}",
+            status: :completed,
+            output_data: %{"result" => "test_#{i}"},
+            output_port: "success",
+            started_at: DateTime.utc_now()
+          }
+        end)
 
       execution = %{execution | node_executions: node_executions}
 
@@ -329,8 +324,6 @@ defmodule Prana.GraphExecutorPerformanceTest do
 
       time_per_rebuild = time_microseconds / 10
       assert time_per_rebuild < 1000, "Runtime rebuild took #{time_per_rebuild}μs, expected < 1000μs"
-
-      IO.puts("Runtime state rebuild performance: #{time_per_rebuild}μs per rebuild")
     end
   end
 end

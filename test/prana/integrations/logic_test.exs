@@ -16,11 +16,12 @@ defmodule Prana.Integrations.LogicTest do
       }
 
       # Create proper context structure for SwitchAction
-      input_with_context = Map.merge(input_map, %{
-        "$input" => input_map,
-        "$nodes" => %{},
-        "$variables" => %{}
-      })
+      input_with_context =
+        Map.merge(input_map, %{
+          "$input" => input_map,
+          "$nodes" => %{},
+          "$variables" => %{}
+        })
 
       assert {:ok, _data, "premium_port"} = SwitchAction.execute(input_with_context)
     end
@@ -37,11 +38,12 @@ defmodule Prana.Integrations.LogicTest do
       }
 
       # Create proper context structure for SwitchAction
-      input_with_context = Map.merge(input_map, %{
-        "$input" => input_map,
-        "$nodes" => %{},
-        "$variables" => %{}
-      })
+      input_with_context =
+        Map.merge(input_map, %{
+          "$input" => input_map,
+          "$nodes" => %{},
+          "$variables" => %{}
+        })
 
       assert {:ok, _data, "verified_port"} = SwitchAction.execute(input_with_context)
     end
@@ -55,17 +57,18 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => "$input.verified", "value" => true, "port" => "verified_port"}
         ],
         "default_port" => "basic_port",
-        "default_data" => %{"discount" => 0.0}
+        "default_data" => %{"discount" => +0.0}
       }
 
       # Create proper context structure for SwitchAction
-      input_with_context = Map.merge(input_map, %{
-        "$input" => input_map,
-        "$nodes" => %{},
-        "$variables" => %{}
-      })
+      input_with_context =
+        Map.merge(input_map, %{
+          "$input" => input_map,
+          "$nodes" => %{},
+          "$variables" => %{}
+        })
 
-      assert {:ok, %{"discount" => 0.0}, "basic_port"} = SwitchAction.execute(input_with_context)
+      assert {:ok, %{"discount" => +0.0}, "basic_port"} = SwitchAction.execute(input_with_context)
     end
 
     test "uses custom case data when provided" do
@@ -83,11 +86,12 @@ defmodule Prana.Integrations.LogicTest do
       }
 
       # Create proper context structure for SwitchAction
-      input_with_context = Map.merge(input_map, %{
-        "$input" => input_map,
-        "$nodes" => %{},
-        "$variables" => %{}
-      })
+      input_with_context =
+        Map.merge(input_map, %{
+          "$input" => input_map,
+          "$nodes" => %{},
+          "$variables" => %{}
+        })
 
       assert {:ok, %{"discount" => 0.3, "priority" => "high"}, "premium_port"} =
                SwitchAction.execute(input_with_context)
@@ -104,11 +108,12 @@ defmodule Prana.Integrations.LogicTest do
       }
 
       # Create proper context structure for SwitchAction
-      input_with_context = Map.merge(input_map, %{
-        "$input" => input_map,
-        "$nodes" => %{},
-        "$variables" => %{}
-      })
+      input_with_context =
+        Map.merge(input_map, %{
+          "$input" => input_map,
+          "$nodes" => %{},
+          "$variables" => %{}
+        })
 
       # Should match second case after first case fails expression evaluation
       assert {:ok, _data, "valid_port"} = SwitchAction.execute(input_with_context)
@@ -126,11 +131,12 @@ defmodule Prana.Integrations.LogicTest do
       }
 
       # Create proper context structure for SwitchAction
-      input_with_context = Map.merge(input_map, %{
-        "$input" => input_map,
-        "$nodes" => %{},
-        "$variables" => %{}
-      })
+      input_with_context =
+        Map.merge(input_map, %{
+          "$input" => input_map,
+          "$nodes" => %{},
+          "$variables" => %{}
+        })
 
       # Should fall back to default when all cases fail expression evaluation
       assert {:ok, %{"message" => "no valid cases"}, "fallback_port"} =
