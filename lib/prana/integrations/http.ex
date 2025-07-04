@@ -45,7 +45,7 @@ defmodule Prana.Integrations.HTTP do
           description: "Wait for incoming HTTP webhook requests",
           module: Prana.Integrations.HTTP.WebhookAction,
           input_ports: ["input"],
-          output_ports: ["success", "timeout", "error"],
+          output_ports: ["success", "error"],
           default_success_port: "success",
           default_error_port: "error"
         }
