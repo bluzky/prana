@@ -42,12 +42,12 @@ defmodule Prana.Integrations.HTTP do
         "webhook" => %Action{
           name: "webhook",
           display_name: "Webhook Trigger",
-          description: "Wait for incoming HTTP webhook requests",
+          description: "Configure webhook endpoint for triggering workflow execution",
           module: Prana.Integrations.HTTP.WebhookAction,
-          input_ports: ["input"],
-          output_ports: ["success", "error"],
+          input_ports: [],
+          output_ports: ["success"],
           default_success_port: "success",
-          default_error_port: "error"
+          default_error_port: nil
         }
       }
     }
