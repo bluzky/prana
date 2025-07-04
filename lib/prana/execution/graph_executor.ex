@@ -61,7 +61,7 @@ defmodule Prana.GraphExecutor do
     workflow_id: String.t(),
     node_executions: [NodeExecution.t()],
     vars: map(),
-    
+
     # Ephemeral runtime state (rebuilt on load)
     __runtime: %{
       "nodes" => %{node_id => output_data},     # completed node outputs
@@ -120,7 +120,7 @@ defmodule Prana.GraphExecutor do
     # Initialize runtime state once for resume (execution loaded from storage)
     env_data = Map.get(execution_context, :env, %{})
     prepared_execution = Execution.rebuild_runtime(suspended_execution, env_data)
-    
+
     # Find the suspended node and complete it with the resume data
     suspended_node_id = prepared_execution.suspended_node_id
 
@@ -178,7 +178,7 @@ defmodule Prana.GraphExecutor do
     # Create initial execution and context
     execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", input_data)
     execution = Execution.start(execution)
-    
+
     # Initialize runtime state once at the start of execution
     env_data = Map.get(context, :env, %{})
     execution = Execution.rebuild_runtime(execution, env_data)
@@ -264,7 +264,7 @@ defmodule Prana.GraphExecutor do
           # Extract suspension information from NodeExecution fields
           suspension_type = node_execution.suspension_type || :sub_workflow
           suspend_data = node_execution.suspension_data || %{}
-          
+
           # Suspend the entire execution with structured suspension data
           suspended_execution =
             Execution.suspend(updated_execution, selected_node.id, suspension_type, suspend_data)
@@ -279,11 +279,11 @@ defmodule Prana.GraphExecutor do
 
         {%NodeExecution{status: :failed} = node_execution, updated_execution} ->
           # Update execution with failed node and mark execution as failed
-          failed_execution = 
+          failed_execution =
             updated_execution
             |> Execution.fail_node(node_execution)
             |> Execution.fail(node_execution.error_data)
-          
+
           {:error, failed_execution}
 
         {%NodeExecution{} = _node_execution, updated_execution} ->
@@ -590,9 +590,9 @@ defmodule Prana.GraphExecutor do
       resume_ready_execution = Execution.resume_suspension(suspended_execution)
 
       # Call NodeExecutor with new unified interface
-      {:ok, _completed_node_execution, updated_execution} = 
+      {:ok, _completed_node_execution, updated_execution} =
         NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data)
-      
+
       {:ok, updated_execution}
     else
       {:error, %{type: "suspended_node_not_found", node_id: suspended_node_id}}
@@ -670,13 +670,13 @@ defmodule Prana.GraphExecutor do
       Enum.reduce(input_ports, %{}, fn input_port, acc ->
         # Find all connections that target this node's input port
         incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.id, input_port)
-        
+
         # Collect data from all connections targeting this port
-        port_data = 
+        port_data =
           Enum.reduce(incoming_connections, nil, fn connection, _acc ->
             # Get the output data from the source node if it's completed
             source_node_output = execution.__runtime["nodes"][connection.from]
-            if source_node_output, do: source_node_output, else: nil
+            if source_node_output, do: source_node_output
           end)
 
         if port_data do
@@ -688,8 +688,8 @@ defmodule Prana.GraphExecutor do
 
     case multi_port_input do
       empty when map_size(empty) == 0 ->
-        # No routed data found, use workflow input for primary port (trigger nodes)
-        %{"primary" => execution.input_data}
+        # No routed data found, use workflow input for node's first input port (typically trigger nodes)
+        %{"input" => execution.input_data}
 
       _ ->
         multi_port_input
@@ -698,19 +698,11 @@ defmodule Prana.GraphExecutor do
 
   # Get incoming connections for a specific node and port
   defp get_incoming_connections_for_node_port(execution_graph, node_id, input_port) do
-    # Use reverse connection map if available, otherwise filter all connections
-    all_incoming = case Map.get(execution_graph, :reverse_connection_map) do
-      nil ->
-        # Fallback: filter all connections (less efficient but functional)
-        Enum.filter(execution_graph.workflow.connections, fn conn ->
-          conn.to == node_id
-        end)
+    # Use reverse connection map for O(1) lookup (exists after proper compilation)
+    # For manually created ExecutionGraphs in tests, fall back to empty list
+    reverse_map = Map.get(execution_graph, :reverse_connection_map, %{})
+    all_incoming = Map.get(reverse_map, node_id, [])
 
-      reverse_map ->
-        # Optimized: direct lookup
-        Map.get(reverse_map, node_id, [])
-    end
-    
     # Filter for connections targeting the specific input port
     Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)
   end

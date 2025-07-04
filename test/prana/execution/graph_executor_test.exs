@@ -58,6 +58,7 @@ defmodule Prana.GraphExecutorTest do
         trigger_node: node,
         dependency_graph: %{},
         connection_map: %{},
+        reverse_connection_map: %{},
         node_map: %{"node_1" => node},
         total_nodes: 1
       }
