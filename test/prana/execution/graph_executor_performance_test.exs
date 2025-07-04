@@ -12,6 +12,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
   use ExUnit.Case, async: false
 
   alias Prana.Connection
+  alias Prana.Execution
   alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
@@ -290,83 +291,46 @@ defmodule Prana.GraphExecutorPerformanceTest do
       IO.puts("Reverse connection lookup performance: #{time_per_lookup}μs per lookup")
     end
 
-    test "optimized context management reduces memory allocations" do
-      # Create a simple workflow to test context update performance
-      nodes = [
-        %Node{
-          id: "trigger",
-          custom_id: "trigger",
-          name: "Trigger",
-          type: :trigger,
-          integration_name: "test",
-          action_name: "simple_action",
-          input_map: %{},
-          output_ports: ["success"],
-          input_ports: []
-        },
-        %Node{
-          id: "action",
-          custom_id: "action",
-          name: "Action",
-          type: :action,
-          integration_name: "test",
-          action_name: "simple_action",
-          input_map: %{},
-          output_ports: ["success"],
-          input_ports: ["input"]
+    test "unified execution architecture provides efficient runtime state management" do
+      # Create a large execution with many completed nodes
+      execution = %Execution{
+        id: "perf_test",
+        workflow_id: "perf_workflow",
+        workflow_version: 1,
+        execution_mode: "performance_test",
+        status: :running,
+        input_data: %{},
+        node_executions: [],
+        __runtime: nil
+      }
+
+      # Create many completed node executions to test performance
+      node_executions = Enum.map(1..100, fn i ->
+        %NodeExecution{
+          id: "ne_#{i}",
+          execution_id: "perf_test",
+          node_id: "node_#{i}",
+          status: :completed,
+          output_data: %{"result" => "test_#{i}"},
+          output_port: "success",
+          started_at: DateTime.utc_now()
         }
-      ]
+      end)
 
-      connections = [
-        %Connection{
-          from: "trigger",
-          from_port: "success",
-          to: "action",
-          to_port: "input"
-        }
-      ]
+      execution = %{execution | node_executions: node_executions}
 
-      workflow = %Workflow{
-        id: "context_test",
-        name: "Context Test",
-        nodes: nodes,
-        connections: connections,
-        variables: %{},
-        settings: %WorkflowSettings{},
-        metadata: %{}
-      }
-
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
-
-      # Test context update performance with large data
-      large_context = %{
-        "input" => %{},
-        "variables" => %{},
-        "metadata" => %{},
-        "nodes" => Map.new(1..100, fn i -> {"node_#{i}", %{"data" => "value_#{i}"}} end),
-        "executed_nodes" => Enum.map(1..100, &"node_#{&1}"),
-        "active_paths" => Map.new(1..100, fn i -> {"path_#{i}", true} end)
-      }
-
-      node_execution = %NodeExecution{
-        node_id: "test_node",
-        output_port: "success",
-        output_data: %{"result" => "test"},
-        status: :completed
-      }
-
-      # Time context update operations
+      # Time runtime state rebuilding operations
       {time_microseconds, _result} =
         :timer.tc(fn ->
-          Enum.reduce(1..100, large_context, fn _i, acc_context ->
-            GraphExecutor.route_node_output(node_execution, execution_graph, acc_context)
+          Enum.reduce(1..10, execution, fn _i, acc_execution ->
+            Execution.rebuild_runtime(acc_execution, %{})
           end)
         end)
 
-      time_per_update = time_microseconds / 100
-      assert time_per_update < 100, "Context update took #{time_per_update}μs, expected < 100μs"
+      time_per_rebuild = time_microseconds / 10
+      assert time_per_rebuild < 1000, "Runtime rebuild took #{time_per_rebuild}μs, expected < 1000μs"
 
-      IO.puts("Context update performance: #{time_per_update}μs per update")
+      IO.puts("Runtime state rebuild performance: #{time_per_rebuild}μs per rebuild")
     end
   end
 end

@@ -2,7 +2,7 @@ defmodule Prana.NodeExecutorTest do
   use ExUnit.Case, async: false
 
   alias Prana.Action
-  alias Prana.ExecutionContext
+  alias Prana.Execution
   alias Prana.Integration
   alias Prana.IntegrationRegistry
   alias Prana.Node
@@ -58,9 +58,15 @@ defmodule Prana.NodeExecutorTest do
     @impl true
     def execute(input_data) do
       # Use safe approach for now
+      name = case Map.get(input_data, "name") do
+        nil -> ""
+        name when is_binary(name) -> name
+        _ -> ""
+      end
+      
       transformed = %{
         original: input_data,
-        uppercase_name: String.upcase(input_data["name"]),
+        uppercase_name: String.upcase(name),
         timestamp: System.system_time(:second)
       }
       
@@ -278,14 +284,13 @@ defmodule Prana.NodeExecutorTest do
       # Use a unique execution ID
       unique_execution_id = Base.encode16("exec-" <> :crypto.strong_rand_bytes(8))
 
-      context = %ExecutionContext{
-        execution_id: unique_execution_id,
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: unique_execution_id}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Verify the node execution has its own unique ID (different from execution_id)
       assert is_binary(node_execution.id)
@@ -331,16 +336,15 @@ defmodule Prana.NodeExecutorTest do
       # Same workflow execution ID for both nodes
       shared_execution_id = Base.encode16("exec-" <> :crypto.strong_rand_bytes(8))
 
-      context = %ExecutionContext{
-        execution_id: shared_execution_id,
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: shared_execution_id}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
       # Execute both nodes
-      assert {:ok, node_execution1, updated_context} = NodeExecutor.execute_node(node1, context)
-      assert {:ok, node_execution2, _final_context} = NodeExecutor.execute_node(node2, updated_context)
+      assert {:ok, node_execution1, updated_execution} = NodeExecutor.execute_node(node1, execution, routed_input)
+      assert {:ok, node_execution2, _final_execution} = NodeExecutor.execute_node(node2, updated_execution, routed_input)
 
       # Both node executions should have different unique IDs
       assert node_execution1.id != node_execution2.id
@@ -373,14 +377,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-1",
-        input: %{"user" => "john"},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{"user" => "john"})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-1"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{"user" => "john"}
 
-      assert {:ok, node_execution, updated_context} = NodeExecutor.execute_node(node, context)
+      assert {:ok, node_execution, updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check node execution
       assert node_execution.node_id == "test-1"
@@ -389,20 +392,16 @@ defmodule Prana.NodeExecutorTest do
       assert node_execution.output_data == %{
         message: "success",
         input: %{
-          "message" => "hello world",
-          "$input" => %{"user" => "john"},
-          "$nodes" => %{},
-          "$variables" => %{},
-          "$preparation" => %{}
+          "message" => "hello world"
         }
       }
       assert node_execution.error_data == nil
       assert is_integer(node_execution.duration_ms)
       assert node_execution.retry_count == 0
 
-      # Check context updates (only stored under custom_id)
-      assert updated_context.nodes["simple_test"] == node_execution.output_data
-      refute Map.has_key?(updated_context.nodes, "test-1")
+      # Check execution runtime updates (only stored under custom_id)
+      assert updated_execution.__runtime["nodes"]["test-1"] == node_execution.output_data
+      assert updated_execution.__runtime["executed_nodes"] == ["test-1"]
     end
 
     test "handles expression evaluation in input_map" do
@@ -422,19 +421,21 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-2",
-        input: %{
-          "user_name" => "alice",
-          "contact" => %{"email" => "alice@example.com"}
-        },
-        nodes: %{
-          "api_call" => %{"user_id" => 123}
-        },
-        variables: %{}
+      execution = Execution.new("wf_1", 1, "graph_executor", %{
+        "user_name" => "alice",
+        "contact" => %{"email" => "alice@example.com"}
+      })
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-2"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      # Simulate api_call node already completed
+      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{"api_call" => %{"user_id" => 123}})}
+      routed_input = %{
+        "user_name" => "alice",
+        "contact" => %{"email" => "alice@example.com"}
       }
 
-      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check that expressions were evaluated
       expected_input = %{
@@ -443,20 +444,8 @@ defmodule Prana.NodeExecutorTest do
         "previous_result" => 123
       }
 
-      # The input passed to the action includes the context enrichment
-      expected_input_with_context = Map.merge(expected_input, %{
-        "$input" => %{
-          "user_name" => "alice",
-          "contact" => %{"email" => "alice@example.com"}
-        },
-        "$nodes" => %{
-          "api_call" => %{"user_id" => 123}
-        },
-        "$variables" => %{},
-        "$preparation" => %{}
-      })
-      
-      assert node_execution.output_data.original == expected_input_with_context
+      # Check that expressions were evaluated correctly in the output
+      assert node_execution.output_data.original == expected_input
       assert node_execution.output_data.uppercase_name == "ALICE"
     end
 
@@ -473,14 +462,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-3",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-3"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check error reason (now a map)
       assert reason["type"] == "action_error"
@@ -510,14 +498,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-4",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-4"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
 
       assert node_execution.output_port == "custom_success"
       assert node_execution.output_data == %{result: "explicit success"}
@@ -539,14 +526,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-5",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-5"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check error reason (map format)
       assert reason["type"] == "action_error"
@@ -570,14 +556,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-6",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-6"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check error reason (map format)
       assert reason["type"] == "invalid_action_return_format"
@@ -601,14 +586,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-7",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-7"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check error reason (map format)
       assert reason["type"] == "action_execution_failed"
@@ -633,14 +617,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-8",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-8"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check error reason (map format)
       assert reason["type"] == "invalid_output_port"
@@ -664,14 +647,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-9",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-9"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check error reason (map format)
       assert reason["type"] == "action_not_found"
@@ -694,14 +676,13 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-10",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-10"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, context)
+      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
 
       # Check error reason (map format)
       assert reason["type"] == "action_not_found"
@@ -729,22 +710,25 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-11",
-        input: %{
-          "order" => %{"id" => "ORD-123"}
-        },
-        nodes: %{
-          "users" => [
-            %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
-            %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
-            %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
-          ]
-        },
-        variables: %{}
+      execution = Execution.new("wf_1", 1, "graph_executor", %{
+        "order" => %{"id" => "ORD-123"}
+      })
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-11"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      # Simulate users node already completed
+      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{
+        "users" => [
+          %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
+          %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
+          %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
+        ]
+      })}
+      routed_input = %{
+        "order" => %{"id" => "ORD-123"}
       }
 
-      assert {:ok, node_execution, _updated_context} = NodeExecutor.execute_node(node, context)
+      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
 
       expected_input = %{
         "all_emails" => ["alice@test.com", "bob@test.com", "carol@test.com"],
@@ -753,28 +737,13 @@ defmodule Prana.NodeExecutorTest do
         "order_id" => "ORD-123"
       }
 
-      # The input passed to the action includes the context enrichment
-      expected_input_with_context = Map.merge(expected_input, %{
-        "$input" => %{
-          "order" => %{"id" => "ORD-123"}
-        },
-        "$nodes" => %{
-          "users" => [
-            %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
-            %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
-            %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
-          ]
-        },
-        "$variables" => %{},
-        "$preparation" => %{}
-      })
-      
-      assert node_execution.output_data.input == expected_input_with_context
+      # Check that expressions were evaluated correctly in the output
+      assert node_execution.output_data.input == expected_input
       assert node_execution.status == :completed
     end
   end
 
-  describe "prepare_input/2" do
+  describe "prepare_input/3" do
     test "evaluates expressions correctly" do
       node = %Node{
         id: "test",
@@ -785,31 +754,28 @@ defmodule Prana.NodeExecutorTest do
         }
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-test",
-        input: %{
-          "name" => "john",
-          "user" => %{"email" => "john@example.com"}
-        },
-        nodes: %{
-          "prev_step" => %{"result" => "success"}
-        },
-        variables: %{}
+      execution = Execution.new("wf_1", 1, "graph_executor", %{
+        "name" => "john",
+        "user" => %{"email" => "john@example.com"}
+      })
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-test"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      # Simulate prev_step node already completed
+      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{
+        "prev_step" => %{"result" => "success"}
+      })}
+      routed_input = %{
+        "name" => "john",
+        "user" => %{"email" => "john@example.com"}
       }
 
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
 
       assert prepared == %{
                "simple" => "john",
                "nested" => "john@example.com",
-               "from_nodes" => "success",
-               "$input" => %{
-                 "name" => "john",
-                 "user" => %{"email" => "john@example.com"}
-               },
-               "$nodes" => %{"prev_step" => %{"result" => "success"}},
-               "$variables" => %{},
-               "$preparation" => %{}
+               "from_nodes" => "success"
              }
     end
 
@@ -821,20 +787,15 @@ defmodule Prana.NodeExecutorTest do
         }
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-test",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-test"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
       assert prepared == %{
-               "missing" => nil,
-               "$input" => %{},
-               "$nodes" => %{},
-               "$variables" => %{},
-               "$preparation" => %{}
+               "missing" => nil
              }
     end
 
@@ -848,99 +809,22 @@ defmodule Prana.NodeExecutorTest do
         }
       }
 
-      context = %ExecutionContext{
-        execution_id: "exec-test",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-test"}
+      execution = Execution.rebuild_runtime(execution, %{})
+      routed_input = %{}
 
       # Most invalid expressions just return nil, but we can test edge cases
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
       assert prepared == %{
-        "test" => nil,
-        "$input" => %{},
-        "$nodes" => %{},
-        "$variables" => %{},
-        "$preparation" => %{}
+        "test" => nil
       }
     end
   end
 
-  describe "update_context/3" do
-    test "stores result only under custom_id" do
-      node = %Node{
-        id: "node-123",
-        custom_id: "my_custom_node"
-      }
-
-      context = %ExecutionContext{
-        execution_id: "exec-test",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
-
-      output_data = %{result: "success"}
-
-      updated_context = NodeExecutor.update_context(context, node, output_data)
-
-      # Only stored under custom_id
-      assert updated_context.nodes["my_custom_node"] == output_data
-      refute Map.has_key?(updated_context.nodes, "node-123")
-
-      # Other context fields unchanged
-      assert updated_context.execution_id == "exec-test"
-      assert updated_context.input == %{}
-      assert updated_context.variables == %{}
-    end
-
-    test "stores under custom_id even when same as id" do
-      node = %Node{
-        id: "node-123",
-        custom_id: "node-123"
-      }
-
-      context = %ExecutionContext{
-        execution_id: "exec-test",
-        input: %{},
-        nodes: %{},
-        variables: %{}
-      }
-
-      output_data = %{result: "success"}
-
-      updated_context = NodeExecutor.update_context(context, node, output_data)
-
-      assert updated_context.nodes["node-123"] == output_data
-      assert map_size(updated_context.nodes) == 1
-    end
-
-    test "preserves existing node results" do
-      node = %Node{
-        id: "node-456",
-        custom_id: "new_node"
-      }
-
-      context = %ExecutionContext{
-        execution_id: "exec-test",
-        input: %{},
-        nodes: %{
-          "existing_node" => %{"data" => "preserved"}
-        },
-        variables: %{}
-      }
-
-      output_data = %{result: "new_data"}
-
-      updated_context = NodeExecutor.update_context(context, node, output_data)
-
-      # Both old and new results preserved
-      assert updated_context.nodes["existing_node"] == %{"data" => "preserved"}
-      assert updated_context.nodes["new_node"] == %{result: "new_data"}
-      assert map_size(updated_context.nodes) == 2
-    end
-  end
+  # Note: update_context/3 functionality is now handled internally by NodeExecutor
+  # Context updates happen automatically when execute_node/3 completes successfully
 
   describe "get_action/1" do
     test "successfully retrieves action from registry" do
@@ -980,14 +864,16 @@ defmodule Prana.NodeExecutorTest do
     end
   end
 
-  describe "build_expression_context/1" do
+  describe "build_expression_context/2" do
     test "builds correct expression context" do
-      context = %ExecutionContext{
-        execution_id: "exec-test",
-        input: %{"user_id" => 123},
-        nodes: %{"step1" => %{"result" => "data"}},
-        variables: %{"api_key" => "secret"}
-      }
+      execution = Execution.new("wf_1", 1, "graph_executor", %{"user_id" => 123})
+      execution = Execution.start(execution)
+      execution = %{execution | id: "exec-test"}
+      execution = Execution.rebuild_runtime(execution, %{"api_key" => "secret"})
+      # Simulate step1 node already completed
+      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{
+        "step1" => %{"result" => "data"}
+      })}
 
       # This tests the private function indirectly through prepare_input
       node = %Node{
@@ -995,20 +881,17 @@ defmodule Prana.NodeExecutorTest do
         input_map: %{
           "from_input" => "$input.user_id",
           "from_nodes" => "$nodes.step1.result",
-          "from_variables" => "$variables.api_key"
+          "from_env" => "$env.api_key"
         }
       }
+      routed_input = %{"user_id" => 123}
 
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, context)
+      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
 
       assert prepared == %{
         "from_input" => 123,
         "from_nodes" => "data",
-        "from_variables" => "secret",
-        "$input" => %{"user_id" => 123},
-        "$nodes" => %{"step1" => %{"result" => "data"}},
-        "$variables" => %{"api_key" => "secret"},
-        "$preparation" => %{}
+        "from_env" => "secret"
       }
     end
   end

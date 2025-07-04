@@ -58,6 +58,7 @@ defmodule Prana.GraphExecutorTest do
         trigger_node: node,
         dependency_graph: %{},
         connection_map: %{},
+        reverse_connection_map: %{},
         node_map: %{"node_1" => node},
         total_nodes: 1
       }
@@ -234,93 +235,6 @@ defmodule Prana.GraphExecutorTest do
     end
   end
 
-  describe "route_node_output/3" do
-    test "routes output data through connections" do
-      # This is a simplified test - full testing would require proper connection setup
-      node_execution = %NodeExecution{
-        node_id: "node_1",
-        output_port: "success",
-        output_data: %{"result" => "test_data"},
-        status: :completed
-      }
-
-      workflow = %Workflow{connections: []}
-
-      execution_graph = %ExecutionGraph{
-        workflow: workflow,
-        connection_map: %{},
-        reverse_connection_map: %{}
-      }
-
-      # Updated context structure for conditional branching
-      context = %{
-        "input" => %{},
-        "variables" => %{},
-        "metadata" => %{},
-        "nodes" => %{},
-        "executed_nodes" => [],
-        "active_paths" => %{}
-      }
-
-      result_context = GraphExecutor.route_node_output(node_execution, execution_graph, context)
-
-      # Should store the node result in context
-      assert is_map(result_context)
-      assert Map.has_key?(result_context, "nodes")
-      assert Map.has_key?(result_context, "executed_nodes")
-      assert Map.has_key?(result_context, "active_paths")
-    end
-
-    test "does not route data for failed nodes" do
-      node_execution = %NodeExecution{
-        id: "exec_1",
-        execution_id: "workflow_exec_1",
-        node_id: "node_1",
-        status: :failed,
-        input_data: %{},
-        # Failed execution
-        output_port: nil,
-        output_data: nil,
-        error_data: %{"error" => "something failed"},
-        retry_count: 0,
-        started_at: nil,
-        completed_at: nil,
-        duration_ms: nil,
-        metadata: %{}
-      }
-
-      workflow = %Workflow{connections: []}
-
-      execution_graph = %ExecutionGraph{
-        workflow: workflow,
-        connection_map: %{},
-        reverse_connection_map: %{}
-      }
-
-      # Updated context structure for conditional branching
-      context = %{
-        "input" => %{},
-        "variables" => %{},
-        "metadata" => %{},
-        "nodes" => %{},
-        "executed_nodes" => [],
-        "active_paths" => %{}
-      }
-
-      result_context = GraphExecutor.route_node_output(node_execution, execution_graph, context)
-
-      # Should still store the node result (with error info) in context
-      assert is_map(result_context)
-      assert Map.has_key?(result_context, "nodes")
-
-      # Let's check step by step
-      nodes_map = result_context["nodes"]
-      assert is_map(nodes_map)
-
-      node_1_data = Map.get(nodes_map, "node_1")
-      refute is_nil(node_1_data)
-
-      assert Map.get(node_1_data, "status") == :failed
-    end
-  end
+  # Note: route_node_output/3 tests removed - routing is now handled internally by NodeExecutor
+  # Output routing and context updates are automatically managed by the unified execution architecture
 end
