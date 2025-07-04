@@ -4,7 +4,7 @@
 **Category**: Network  
 **Module**: `Prana.Integrations.HTTP`
 
-The HTTP integration provides HTTP request capabilities and webhook trigger functionality for external API interactions and incoming HTTP request handling.
+The HTTP integration provides HTTP request capabilities and webhook configuration functionality for external API interactions and incoming HTTP request handling. The webhook action configures webhook endpoints that can trigger new workflow executions when external HTTP requests are received.
 
 ## Actions
 
@@ -52,51 +52,87 @@ The action supports multiple authentication types:
 }
 ```
 
-### Webhook Trigger
+### Webhook Configuration
 - **Action Name**: `webhook`
-- **Description**: Wait for incoming HTTP webhook requests
-- **Input Ports**: `["input"]`
-- **Output Ports**: `["success", "timeout", "error"]`
+- **Description**: Configure webhook endpoint for triggering workflow execution
+- **Input Ports**: `[]` (no input - this is a trigger configuration)
+- **Output Ports**: `["success"]`
+- **Suspendable**: `false`
 
 **Input Parameters** (Skema Schema Validated):
-- `timeout_hours`: Hours until webhook expires (optional, defaults to 24.0, range: 0.1-8760.0)
-- `base_url`: Base URL for webhook URL generation (optional, must start with http:// or https://)
 - `webhook_config`: Webhook configuration object (optional, defaults to {})
   - `path`: Webhook path (optional, defaults to "/webhook")
+  - `methods`: Allowed HTTP methods (optional, defaults to ["POST"], valid: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+  - `auth`: Authentication configuration (optional, defaults to {"type": "none"})
+  - `response_type`: Response timing (optional, defaults to "immediately", one of: "immediately", "end_of_flow")
   - `secret`: Webhook secret for validation (optional)
   - `headers`: Expected headers (optional, defaults to {})
 
+**Authentication Types**:
+- **None**: `{"type": "none"}` (default)
+- **Basic Auth**: `{"type": "basic", "username": "user", "password": "pass"}`
+- **Header Auth**: `{"type": "header", "header_name": "X-API-Key", "header_value": "secret"}`
+- **JWT Auth**: `{"type": "jwt", "jwt_secret": "secret"}` (algorithm extracted from token header)
+
+**Base URL Configuration**:
+The webhook base URL is configured via the `PRANA_BASE_URL` environment variable, not through input parameters. This ensures consistent webhook URL generation across the application.
+
 **Returns**:
-- `{:suspend, :webhook, suspend_data}` to suspend and wait for webhook
-- `{:error, error_data, "error"}` if configuration is invalid
+- `{:ok, configuration, "success"}` with webhook configuration details
+- **On Error**: Execution fails immediately (no error output port)
 
-**Suspension Data**:
-When suspended, the action provides comprehensive context:
-- `mode`: "webhook"
-- `timeout_hours`: Configured timeout
-- `webhook_config`: Webhook configuration
-- `started_at`: Suspension timestamp
-- `expires_at`: Webhook expiration timestamp
-- `webhook_url`: Generated webhook URL (if base_url provided)
-- `input_data`: Original input data
-
-**Resume**:
-When a webhook is received, the action resumes with:
-- `webhook_payload`: The received webhook data
-- `received_at`: Timestamp when webhook was received
-- `original_input`: Original input data from suspension
+**Configuration Response**:
+```elixir
+%{
+  webhook_path: "/custom-webhook",
+  allowed_methods: ["POST", "PUT"],
+  auth_config: %{"type" => "basic", "username" => "user", "password" => "pass"},
+  response_type: "immediately",
+  webhook_url: "https://app.example.com/custom-webhook",  # if PRANA_BASE_URL is set
+  configured_at: ~U[2025-01-01 12:00:00.000000Z]
+}
+```
 
 **Example**:
 ```elixir
 %{
-  "timeout_hours" => 72.0,
-  "base_url" => "https://app.example.com",
   "webhook_config" => %{
     "path" => "/approval-webhook",
-    "secret" => "webhook-secret",
-    "headers" => %{"X-Webhook-Source" => "approval-system"}
+    "methods" => ["POST", "PUT"],
+    "auth" => %{
+      "type" => "jwt",
+      "jwt_secret" => "your-jwt-secret"
+    },
+    "response_type" => "end_of_flow"
   }
 }
+```
+
+**Webhook Validation**:
+Use `Prana.Integrations.HTTP.WebhookAction.validate_webhook_request/2` to validate incoming HTTP requests against the webhook configuration:
+
+```elixir
+# In your application's HTTP handler
+webhook_config = %{
+  allowed_methods: ["POST"],
+  auth_config: %{"type" => "basic", "username" => "user", "password" => "pass"}
+}
+
+request_data = %{
+  method: "POST",
+  headers: %{"authorization" => "Basic dXNlcjpwYXNz"},  # base64 "user:pass"
+  body: "{\"data\": \"value\"}"
+}
+
+case WebhookAction.validate_webhook_request(webhook_config, request_data) do
+  {:ok, validated_request} ->
+    # Trigger new workflow execution with validated_request
+    trigger_workflow_execution(validated_request)
+  
+  {:error, reason} ->
+    # Authentication or method validation failed
+    {:error, 401, reason}
+end
 ```
 
 ## Schema Validation
