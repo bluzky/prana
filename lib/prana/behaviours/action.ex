@@ -91,7 +91,6 @@ defmodule Prana.Behaviour.Action do
       end
   """
 
-  alias Prana.Core.ExecutionContext
 
   @type suspension_type :: :webhook | :interval | :schedule | :sub_workflow | atom()
   @type suspend_data :: term()

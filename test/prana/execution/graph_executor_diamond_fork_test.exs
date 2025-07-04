@@ -334,10 +334,14 @@ defmodule Prana.Execution.DiamondForkTest do
           refute "merge" in executed_node_ids
           refute "final" in executed_node_ids
 
-        {:error, error} ->
-          # Verify we got a node execution failure
-          assert error.type == "node_execution_failed"
-          assert error.node_id == "branch_b"
+        {:error, failed_execution} ->
+          # Verify we got a node execution failure with complete execution state
+          assert failed_execution.status == :failed
+          
+          # Verify the failed node is branch_b
+          failed_node = Enum.find(failed_execution.node_executions, &(&1.status == :failed))
+          assert failed_node != nil
+          assert failed_node.node_id == "branch_b"
       end
     end
 
@@ -369,10 +373,14 @@ defmodule Prana.Execution.DiamondForkTest do
           refute "merge" in executed_node_ids
           refute "final" in executed_node_ids
 
-        {:error, error} ->
-          # Verify we got a node execution failure
-          assert error.type == "node_execution_failed"
-          assert error.node_id == "branch_c"
+        {:error, failed_execution} ->
+          # Verify we got a node execution failure with complete execution state
+          assert failed_execution.status == :failed
+          
+          # Verify the failed node is branch_c
+          failed_node = Enum.find(failed_execution.node_executions, &(&1.status == :failed))
+          assert failed_node != nil
+          assert failed_node.node_id == "branch_c"
       end
     end
 
@@ -407,10 +415,14 @@ defmodule Prana.Execution.DiamondForkTest do
           assert failed_execution != nil
           assert failed_execution.status == :failed
 
-        {:error, error} ->
-          # Just verify we got the expected failure
-          assert error.type == "node_execution_failed"
-          assert error.node_id == "branch_b"
+        {:error, failed_execution} ->
+          # Verify we got a node execution failure with complete execution state
+          assert failed_execution.status == :failed
+          
+          # Verify the failed node is branch_b
+          failed_node = Enum.find(failed_execution.node_executions, &(&1.status == :failed))
+          assert failed_node != nil
+          assert failed_node.node_id == "branch_b"
       end
     end
   end

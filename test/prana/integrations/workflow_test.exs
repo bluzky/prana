@@ -13,7 +13,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "failure_strategy" => "fail_parent"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:suspend, :sub_workflow_sync, suspend_data} = result
       assert suspend_data.workflow_id == "user_onboarding"
@@ -32,7 +32,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "timeout_ms" => 60_000
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:suspend, :sub_workflow_fire_forget, suspend_data} = result
       assert suspend_data.workflow_id == "notification_flow"
@@ -50,7 +50,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "failure_strategy" => "continue"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:suspend, :sub_workflow_async, suspend_data} = result
       assert suspend_data.workflow_id == "user_processing"
@@ -66,7 +66,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "workflow_id" => "simple_flow"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:suspend, :sub_workflow_sync, suspend_data} = result
       assert suspend_data.workflow_id == "simple_flow"
@@ -83,7 +83,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "returns error for missing workflow_id" do
       input_map = %{"input_data" => %{"test" => true}}
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:error, error_data, "error"} = result
       assert error_data.type == "sub_workflow_setup_error"
@@ -93,7 +93,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "returns error for empty workflow_id" do
       input_map = %{"workflow_id" => ""}
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:error, error_data, "error"} = result
       assert error_data.type == "sub_workflow_setup_error"
@@ -103,7 +103,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "returns error for non-string workflow_id" do
       input_map = %{"workflow_id" => 123}
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:error, error_data, "error"} = result
       assert error_data.type == "sub_workflow_setup_error"
@@ -116,7 +116,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "input_data" => "invalid_data"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:error, error_data, "error"} = result
       assert error_data.type == "sub_workflow_setup_error"
@@ -129,7 +129,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "execution_mode" => "invalid_mode"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:error, error_data, "error"} = result
       assert error_data.type == "sub_workflow_setup_error"
@@ -142,7 +142,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "timeout_ms" => -1000
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:error, error_data, "error"} = result
       assert error_data.type == "sub_workflow_setup_error"
@@ -155,7 +155,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "failure_strategy" => "invalid_strategy"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:error, error_data, "error"} = result
       assert error_data.type == "sub_workflow_setup_error"
@@ -168,7 +168,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "failure_strategy" => "continue"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:suspend, :sub_workflow_sync, suspend_data} = result
       assert suspend_data.failure_strategy == "continue"
@@ -189,7 +189,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "input_data" => complex_input
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:suspend, :sub_workflow_sync, suspend_data} = result
       assert suspend_data.input_data == complex_input
@@ -202,7 +202,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "execution_mode" => "sync"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
       assert {:suspend, :sub_workflow_sync, _} = result
 
       # Test fire_and_forget mode
@@ -211,7 +211,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "execution_mode" => "fire_and_forget"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
       assert {:suspend, :sub_workflow_fire_forget, _} = result
     end
 
@@ -224,7 +224,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "failure_strategy" => "continue"
       }
 
-      result = Prana.Integrations.Workflow.ExecuteWorkflowAction.execute(input_map)
+      result = ExecuteWorkflowAction.execute(input_map)
 
       assert {:suspend, :sub_workflow_sync, suspend_data} = result
 

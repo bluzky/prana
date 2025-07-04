@@ -9,7 +9,7 @@ defmodule Prana.GraphExecutor do
   ## Primary API
 
       execute_graph(execution_graph, input_data, context \\ %{})
-        :: {:ok, Execution.t()} | {:error, reason}
+        :: {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
 
   ## Required Context Structure
 
@@ -43,50 +43,46 @@ defmodule Prana.GraphExecutor do
   ## Integration Points
 
   - Uses `WorkflowCompiler` compiled ExecutionGraphs with optimization maps
-  - Uses `NodeExecutor.execute_node/3` for individual node execution
+  - Uses `NodeExecutor.execute_node/3` for individual node execution (unified execution architecture)
   - Uses `ExpressionEngine.process_map/2` for input preparation (via NodeExecutor)
   - Uses `Middleware.call/2` for lifecycle events
-  - Uses `ExecutionContext` for shared state management
+  - Uses unified `Execution` struct with runtime state for all context management
+  - Initializes runtime state once per execution/resume for optimal performance
 
-  ## Context Types Used
+  ## Unified Execution Architecture
 
-  This module uses TWO different context structures for different purposes:
+  This module now uses a single, unified execution context structure:
 
-  ### OrchestrationContext
+  ### Execution with Runtime State
   ```elixir
-  %{
-    "input" => map(),           # Workflow input data
-    "variables" => map(),       # Workflow variables
-    "nodes" => map(),          # Completed node results
-    "executed_nodes" => [binary()],  # List of executed node IDs
-    "active_paths" => map()     # Active conditional paths
+  %Execution{
+    # Persistent metadata and audit trail
+    id: String.t(),
+    workflow_id: String.t(),
+    node_executions: [NodeExecution.t()],
+    vars: map(),
+    
+    # Ephemeral runtime state (rebuilt on load)
+    __runtime: %{
+      "nodes" => %{node_id => output_data},     # completed node outputs
+      "env" => map(),                           # environment data
+      "active_paths" => %{path_key => true},    # conditional branching state
+      "executed_nodes" => [String.t()]          # execution order tracking
+    }
   }
   ```
-  - **Purpose**: Workflow orchestration, data routing, conditional branching
-  - **Keys**: String keys for expression engine compatibility (`$input.field`)
-  - **Used by**: GraphExecutor internal functions
+  - **Purpose**: Single source of truth for all execution state
+  - **Keys**: String keys in runtime for expression engine compatibility
+  - **Used by**: Both GraphExecutor and NodeExecutor
+  - **Benefits**: No context conversion overhead, perfect state rebuilding
 
-  ### ExecutionContext (struct)
-  ```elixir
-  %ExecutionContext{
-    workflow: Workflow.t(),
-    execution: Execution.t(),
-    nodes: map(),             # Node results (for expressions)
-    variables: map()          # Variables (for expressions)
-  }
-  ```
-  - **Purpose**: Individual node execution and expression evaluation
-  - **Keys**: Atom keys for compile-time validation
-  - **Used by**: NodeExecutor.execute_node/3
+  ### Multi-Port Input Routing
 
-  ### Conversion Point
-
-  The conversion happens in `execute_single_node_with_events/3`:
-  `OrchestrationContext` → `ExecutionContext` → `NodeExecutor.execute_node/3`
+  Data flow uses multi-port input routing:
+  `extract_multi_port_input/3` → `%{"port_name" => data}` → `NodeExecutor.execute_node/3`
   """
 
   alias Prana.Execution
-  alias Prana.ExecutionContext
   alias Prana.ExecutionGraph
   alias Prana.Middleware
   alias Prana.Node
@@ -95,10 +91,7 @@ defmodule Prana.GraphExecutor do
 
   require Logger
 
-  # Type alias for clarity in function signatures
-  @type orchestration_context :: %{
-          required(String.t()) => any()
-        }
+  # Note: Orchestration context type removed - using unified Execution struct only
 
   @doc """
   Resume a suspended workflow execution with sub-workflow results.
@@ -124,15 +117,19 @@ defmodule Prana.GraphExecutor do
         execution_graph,
         execution_context
       ) do
+    # Initialize runtime state once for resume (execution loaded from storage)
+    env_data = Map.get(execution_context, :env, %{})
+    prepared_execution = Execution.rebuild_runtime(suspended_execution, env_data)
+    
     # Find the suspended node and complete it with the resume data
-    suspended_node_id = suspended_execution.suspended_node_id
+    suspended_node_id = prepared_execution.suspended_node_id
 
     if suspended_node_id do
       # Resume the suspended node execution using NodeExecutor
-      case resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data, execution_context) do
-        {:ok, {updated_execution, updated_context}} ->
+      case resume_suspended_node(execution_graph, prepared_execution, suspended_node_id, resume_data) do
+        {:ok, updated_execution} ->
           # Node resumed successfully, continue execution (same pattern as main loop)
-          execute_workflow_loop(updated_execution, execution_graph, updated_context)
+          execute_workflow_loop(updated_execution, execution_graph)
 
         {:error, reason} ->
           {:error, reason}
@@ -159,7 +156,7 @@ defmodule Prana.GraphExecutor do
 
   - `{:ok, execution}` - Successful execution with final state
   - `{:suspend, execution}` - Execution suspended for async coordination (sub-workflows, external events, etc.)
-  - `{:error, reason}` - Execution failed with error details
+  - `{:error, failed_execution}` - Execution failed with complete state including failed node details
 
   ## Examples
 
@@ -176,22 +173,25 @@ defmodule Prana.GraphExecutor do
       {:suspend, execution} = GraphExecutor.execute_graph(graph, %{workflow_id: "child"}, context)
   """
   @spec execute_graph(ExecutionGraph.t(), map(), map()) ::
-          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, any()}
+          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
   def execute_graph(%ExecutionGraph{} = execution_graph, input_data, context \\ %{}) do
     # Create initial execution and context
     execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", input_data)
     execution = Execution.start(execution)
-    orchestration_context = create_initial_orchestration_context(input_data, context)
+    
+    # Initialize runtime state once at the start of execution
+    env_data = Map.get(context, :env, %{})
+    execution = Execution.rebuild_runtime(execution, env_data)
 
     # Emit execution started event
     Middleware.call(:execution_started, %{execution: execution})
 
     try do
       # Workflow preparation phase - prepare all actions and store in execution
-      case prepare_workflow_actions(execution_graph, execution, orchestration_context) do
+      case prepare_workflow_actions(execution_graph, execution) do
         {:ok, enriched_execution} ->
           # Main execution loop with enriched execution
-          case execute_workflow_loop(enriched_execution, execution_graph, orchestration_context) do
+          case execute_workflow_loop(enriched_execution, execution_graph) do
             {:ok, final_execution} ->
               Middleware.call(:execution_completed, %{execution: final_execution})
               {:ok, final_execution}
@@ -200,77 +200,67 @@ defmodule Prana.GraphExecutor do
               # Workflow suspended for async coordination - return suspended execution
               {:suspend, suspended_execution}
 
-            {:error, reason} = error ->
-              failed_execution = Execution.fail(enriched_execution, reason)
-              Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
-              error
+            {:error, failed_execution} ->
+              # Failed execution already contains complete state with failed node
+              Middleware.call(:execution_failed, %{execution: failed_execution, reason: failed_execution.error_data})
+              {:error, failed_execution}
           end
 
-        {:error, reason} = error ->
+        {:error, reason} ->
           # Preparation failed, fail the execution
           failed_execution = Execution.fail(execution, reason)
           Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
-          error
+          {:error, failed_execution}
       end
     rescue
       error ->
         reason = %{type: "execution_exception", message: Exception.message(error), details: %{}}
         failed_execution = Execution.fail(execution, reason)
         Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
-        {:error, reason}
+        {:error, failed_execution}
     end
   end
 
   # Main workflow execution loop - continues until workflow is complete or error occurs.
-  # Uses OrchestrationContext (simple map with string keys) for workflow-level coordination.
-  defp execute_workflow_loop(execution, execution_graph, orchestration_context) do
+  # Uses Execution.__runtime for all workflow-level coordination.
+  defp execute_workflow_loop(execution, execution_graph) do
     if workflow_complete?(execution, execution_graph) do
       final_execution = Execution.complete(execution, %{})
       {:ok, final_execution}
     else
-      case find_and_execute_ready_nodes(execution, execution_graph, orchestration_context) do
-        {:ok, {updated_execution, updated_orchestration_context}} ->
-          execute_workflow_loop(updated_execution, execution_graph, updated_orchestration_context)
+      case find_and_execute_ready_nodes(execution, execution_graph) do
+        {:ok, updated_execution} ->
+          execute_workflow_loop(updated_execution, execution_graph)
 
         {:suspend, suspended_execution} ->
           # Workflow execution suspended - return suspended execution for application handling
           {:suspend, suspended_execution}
 
-        {:error, _reason} = error ->
-          error
+        {:error, failed_execution} ->
+          {:error, failed_execution}
       end
     end
   end
 
   # Find ready nodes and execute following branch-completion strategy.
-  # Uses OrchestrationContext for tracking active paths and executed nodes.
-  defp find_and_execute_ready_nodes(execution, execution_graph, orchestration_context) do
-    ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, orchestration_context)
+  # Uses Execution.__runtime for tracking active paths and executed nodes.
+  defp find_and_execute_ready_nodes(execution, execution_graph) do
+    ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, execution.__runtime)
 
     if Enum.empty?(ready_nodes) do
       # No ready nodes but workflow not complete - likely an error condition
       {:error, %{type: "execution_stalled", message: "No ready nodes found but workflow not complete"}}
     else
       # Select single node to execute, prioritizing branch completion
-      selected_node = select_node_for_branch_following(ready_nodes, execution_graph, orchestration_context)
+      selected_node = select_node_for_branch_following(ready_nodes, execution_graph, execution.__runtime)
 
-      case execute_single_node_with_events(selected_node, execution_graph, orchestration_context, execution) do
-        %NodeExecution{status: :completed} = node_execution ->
-          # Update execution with completed node execution
-          updated_execution = update_execution_progress(execution, [node_execution])
+      case execute_single_node_with_events(selected_node, execution_graph, execution) do
+        {%NodeExecution{status: :completed} = _node_execution, updated_execution} ->
+          # Output routing and context updates are now handled internally by NodeExecutor
+          # and the Execution.complete_node/2 function
+          {:ok, updated_execution}
 
-          # Route output data and update orchestration context immediately
-          updated_orchestration_context = route_node_output(node_execution, execution_graph, orchestration_context)
-
-          updated_orchestration_context =
-            store_node_result_in_context(node_execution, updated_orchestration_context, selected_node)
-
-          {:ok, {updated_execution, updated_orchestration_context}}
-
-        %NodeExecution{status: :suspended} = node_execution ->
-          # Node suspended for async coordination - pause workflow execution
-          updated_execution = update_execution_progress(execution, [node_execution])
-
+        {%NodeExecution{status: :suspended} = node_execution, updated_execution} ->
           # Extract suspension information from NodeExecution fields
           suspension_type = node_execution.suspension_type || :sub_workflow
           suspend_data = node_execution.suspension_data || %{}
@@ -287,26 +277,19 @@ defmodule Prana.GraphExecutor do
 
           {:suspend, suspended_execution}
 
-        %NodeExecution{status: :failed} = node_execution ->
-          # Node failed, return error
-          _updated_execution = update_execution_progress(execution, [node_execution])
-          _updated_orchestration_context = store_node_result_in_context(node_execution, orchestration_context)
+        {%NodeExecution{status: :failed} = node_execution, updated_execution} ->
+          # Update execution with failed node and mark execution as failed
+          failed_execution = 
+            updated_execution
+            |> Execution.fail_node(node_execution)
+            |> Execution.fail(node_execution.error_data)
+          
+          {:error, failed_execution}
 
-          {:error,
-           %{
-             type: "node_execution_failed",
-             message: "Node #{selected_node.id} failed during execution",
-             node_id: selected_node.id,
-             node_execution: node_execution,
-             error_data: node_execution.error_data
-           }}
-
-        %NodeExecution{} = node_execution ->
-          # Node finished with other status
-          updated_execution = update_execution_progress(execution, [node_execution])
-          updated_orchestration_context = store_node_result_in_context(node_execution, orchestration_context)
-
-          {:ok, {updated_execution, updated_orchestration_context}}
+        {%NodeExecution{} = _node_execution, updated_execution} ->
+          # Node finished with other status - no additional handling needed
+          # All context updates are handled by NodeExecutor and Execution functions
+          {:ok, updated_execution}
       end
     end
   rescue
@@ -468,31 +451,19 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Execute a single node with middleware events.
-  # Critical Context Conversion Point: OrchestrationContext → ExecutionContext
-  defp execute_single_node_with_events(node, execution_graph, orchestration_context, execution) do
-    # Extract routed input data for this node from connection routing
-    node_input = extract_node_input_from_routing(node, orchestration_context)
+  # Execute a single node with middleware events using unified execution architecture
+  defp execute_single_node_with_events(node, execution_graph, execution) do
+    # Extract multi-port input data for this node from execution graph and runtime state
+    routed_input = extract_multi_port_input(node, execution_graph, execution)
 
-    # CONTEXT CONVERSION: OrchestrationContext → ExecutionContext
-    # Convert our OrchestrationContext (string keys) to ExecutionContext struct (atom keys)
-
-    node_execution_context =
-      ExecutionContext.new(execution_graph.workflow, execution, %{
-        # Use routed input data for this specific node
-        input: node_input,
-        nodes: Map.get(orchestration_context, "nodes", %{}),
-        variables: Map.get(orchestration_context, "variables", %{})
-      })
-
-    # Emit node starting event (NodeExecutor will create and manage NodeExecution)
+    # Emit node starting event
     Middleware.call(:node_starting, %{node: node, execution: execution})
 
-    # Execute the node using ExecutionContext struct (atom keys)
-    case NodeExecutor.execute_node(node, node_execution_context) do
-      {:ok, result_node_execution, _updated_context} ->
+    # Execute the node using the new unified interface
+    case NodeExecutor.execute_node(node, execution, routed_input) do
+      {:ok, result_node_execution, updated_execution} ->
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
-        result_node_execution
+        {result_node_execution, updated_execution}
 
       {:suspend, suspended_node_execution} ->
         # Handle node suspension - emit middleware event for application handling
@@ -503,117 +474,29 @@ defmodule Prana.GraphExecutor do
           suspend_data: suspended_node_execution.suspension_data
         })
 
-        suspended_node_execution
+        # Add the suspended node execution to the execution's node_executions list
+        # This is needed for resume_suspended_node/4 to find the suspended node execution
+        updated_execution = %{execution | node_executions: execution.node_executions ++ [suspended_node_execution]}
+        {suspended_node_execution, updated_execution}
 
       {:error, {_reason, error_node_execution}} ->
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
-        error_node_execution
+        # Add the failed node execution to the execution's node_executions list
+        # This ensures failed node executions are preserved in the audit trail
+        updated_execution = %{execution | node_executions: execution.node_executions ++ [error_node_execution]}
+        {error_node_execution, updated_execution}
     end
   end
 
-  @doc """
-  Route output data from completed nodes to dependent nodes based on ports.
+  # Note: Output routing and context updates are now handled internally by NodeExecutor
+  # and the Execution.complete_node/2 function. No separate routing logic needed.
 
-  Uses ExecutionGraph.connections to determine data flow paths. For successful
-  node executions, routes output data to connected nodes. Failed nodes
-  (output_port = nil) do not route data.
-
-  ## Context Usage
-
-  This function operates on OrchestrationContext (string keys) for workflow
-  data routing and conditional path activation.
-
-  ## Parameters
-
-  - `node_execution` - Completed NodeExecution with output data and port
-  - `execution_graph` - ExecutionGraph containing connections
-  - `orchestration_context` - Current orchestration context to update (string keys)
-
-  ## Returns
-
-  Updated OrchestrationContext with routed data and active paths.
-  """
-  @spec route_node_output(NodeExecution.t(), ExecutionGraph.t(), map()) :: map()
-  def route_node_output(%NodeExecution{} = node_execution, %ExecutionGraph{} = execution_graph, orchestration_context) do
-    # Only route output for successful executions (output_port is not nil)
-    if node_execution.output_port do
-      # Find connections from this node's output port using O(1) lookup
-      connections =
-        get_connections_from_node_port(
-          execution_graph,
-          node_execution.node_id,
-          node_execution.output_port
-        )
-
-      # Route data through each connection
-      Enum.reduce(connections, orchestration_context, fn connection, acc_orchestration_context ->
-        route_data_through_connection(node_execution, connection, acc_orchestration_context)
-      end)
-    else
-      # Failed nodes don't route data, but store their result in context
-      store_node_result_in_context(node_execution, orchestration_context)
-    end
-  end
-
-  # Get connections from a specific node and port using O(1) lookup
+  # Get connections from a specific node and port using O(1) lookup (still needed for active path reconstruction)
   defp get_connections_from_node_port(execution_graph, node_id, output_port) do
     Map.get(execution_graph.connection_map, {node_id, output_port}, [])
   end
 
-  # Route data through a single connection with optimized context updates.
-  defp route_data_through_connection(node_execution, connection, orchestration_context) do
-    routed_data = node_execution.output_data
-
-    # Store routed data in context for the target node
-    target_input_key = "#{connection.to}_#{connection.to_port}"
-
-    # Mark this conditional path as active for branching logic
-    path_key = "#{connection.from}_#{connection.from_port}"
-
-    # Batch context updates to reduce map copying
-    orchestration_context
-    |> Map.put(target_input_key, routed_data)
-    |> Map.update("active_paths", %{path_key => true}, &Map.put(&1, path_key, true))
-  end
-
-  # Store node execution result in orchestration context for $nodes.node_id access.
-  defp store_node_result_in_context(node_execution, orchestration_context, node \\ nil) do
-    # Use custom_id if node is provided, otherwise fallback to node_id for backward compatibility
-    node_key = if node, do: node.custom_id, else: node_execution.node_id
-
-    result_data =
-      if node_execution.status == :completed do
-        node_execution.output_data
-      else
-        %{"error" => node_execution.error_data, "status" => node_execution.status}
-      end
-
-    # Batch context updates to reduce map copying
-    orchestration_context
-    |> Map.update("nodes", %{node_key => result_data}, &Map.put(&1, node_key, result_data))
-    |> Map.update("executed_nodes", [node_execution.node_id], &[node_execution.node_id | &1])
-  end
-
-  @doc """
-  Update execution progress with completed node executions.
-
-  Adds the completed node executions to the main execution tracking
-  and updates execution statistics.
-
-  ## Parameters
-
-  - `execution` - Current Execution struct
-  - `completed_node_executions` - List of newly completed NodeExecution structs
-
-  ## Returns
-
-  Updated Execution struct with progress tracking.
-  """
-  @spec update_execution_progress(Execution.t(), [NodeExecution.t()]) :: Execution.t()
-  def update_execution_progress(%Execution{} = execution, completed_node_executions) do
-    updated_executions = execution.node_executions ++ completed_node_executions
-    %{execution | node_executions: updated_executions}
-  end
+  # Note: Execution progress updates are now handled internally by NodeExecutor
 
   @doc """
   Check if workflow execution is complete.
@@ -694,67 +577,23 @@ defmodule Prana.GraphExecutor do
     end)
   end
 
-  # Create initial orchestration context for workflow execution.
-  # Creates OrchestrationContext (string keys) for workflow orchestration.
-  @spec create_initial_orchestration_context(map(), map()) :: map()
-  defp create_initial_orchestration_context(input_data, external_context) do
-    # Create orchestration context with string keys for expression engine compatibility
-    # This is NOT the same as ExecutionContext struct used by NodeExecutor
-    %{
-      "input" => input_data,
-      "variables" => Map.get(external_context, :variables, %{}),
-      "metadata" => Map.get(external_context, :metadata, %{}),
-      "nodes" => %{},
-      "executed_nodes" => [],
-      "active_paths" => %{}
-    }
-  end
+  # Note: Initial context creation is no longer needed with unified execution architecture
 
   # Complete a suspended node execution with resume data
-  defp resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data, execution_context) do
+  defp resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data) do
     # Find the suspended node definition and execution
     suspended_node = Map.get(execution_graph.node_map, suspended_node_id)
     suspended_node_execution = Enum.find(suspended_execution.node_executions, &(&1.node_id == suspended_node_id))
 
     if suspended_node && suspended_node_execution do
-      # Create ExecutionContext for resume
-      node_execution_context =
-        ExecutionContext.new(execution_graph.workflow, suspended_execution, %{
-          input: extract_node_input_from_routing(suspended_node, execution_context),
-          nodes: Map.get(execution_context, "nodes", %{}),
-          variables: Map.get(execution_context, "variables", %{})
-        })
+      # Clear suspension state for resume (runtime state already initialized in resume_workflow)
+      resume_ready_execution = Execution.resume_suspension(suspended_execution)
 
-      # Call NodeExecutor to handle resume
-      case NodeExecutor.resume_node(suspended_node, node_execution_context, suspended_node_execution, resume_data) do
-        {:ok, completed_node_execution, _updated_context} ->
-          # Update node_executions list with completed execution
-          updated_executions =
-            Enum.map(suspended_execution.node_executions, fn node_exec ->
-              if node_exec.node_id == suspended_node_id do
-                completed_node_execution
-              else
-                node_exec
-              end
-            end)
-
-          # Build complete execution and context like find_and_execute_ready_nodes does
-          updated_execution = %{
-            suspended_execution
-            | status: :running,
-              node_executions: updated_executions,
-              resume_token: nil
-          }
-
-          # Handle context updates exactly like regular execution flow
-          updated_context = route_node_output(completed_node_execution, execution_graph, execution_context)
-          updated_context = store_node_result_in_context(completed_node_execution, updated_context, suspended_node)
-
-          {:ok, {updated_execution, updated_context}}
-
-        {:error, {reason, failed_node_execution}} ->
-          {:error, %{type: "resume_failed", reason: reason, node_execution: failed_node_execution}}
-      end
+      # Call NodeExecutor with new unified interface
+      {:ok, _completed_node_execution, updated_execution} = 
+        NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data)
+      
+      {:ok, updated_execution}
     else
       {:error, %{type: "suspended_node_not_found", node_id: suspended_node_id}}
     end
@@ -763,7 +602,7 @@ defmodule Prana.GraphExecutor do
   # Prepare all workflow actions during the preparation phase.
   # Scans all nodes in the workflow, calls prepare/1 on each action module,
   # and stores the preparation data in the execution struct.
-  defp prepare_workflow_actions(execution_graph, execution, _orchestration_context) do
+  defp prepare_workflow_actions(execution_graph, execution) do
     # Prepare all actions and collect preparation data
     case prepare_all_actions(execution_graph.workflow.nodes) do
       {:ok, preparation_data} ->
@@ -820,34 +659,59 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  # Extract input data for a specific node from routed connection data
-  # This function looks for data routed to this node via connections and prepares
-  # it as the input data for expression evaluation
-  defp extract_node_input_from_routing(node, execution_context) do
-    # Handle case where input_ports might be nil
-    # Default to "input" port
+  # Extract multi-port input data for a node by computing routing from execution graph and runtime state
+  # Returns a map with port names as keys and routed data as values
+  defp extract_multi_port_input(node, execution_graph, execution) do
+    # Handle case where input_ports might be nil - default to ["input"]
     input_ports = node.input_ports || ["input"]
 
-    # Look for routed data using the connection target key format
-    # For a node with input ports, check if data has been routed to any of its ports
-    routed_data =
+    # Build multi-port input map: port_name => routed_data
+    multi_port_input =
       Enum.reduce(input_ports, %{}, fn input_port, acc ->
-        routed_data_key = "#{node.id}_#{input_port}"
+        # Find all connections that target this node's input port
+        incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.id, input_port)
+        
+        # Collect data from all connections targeting this port
+        port_data = 
+          Enum.reduce(incoming_connections, nil, fn connection, _acc ->
+            # Get the output data from the source node if it's completed
+            source_node_output = execution.__runtime["nodes"][connection.from]
+            if source_node_output, do: source_node_output, else: nil
+          end)
 
-        case Map.get(execution_context, routed_data_key) do
-          nil -> acc
-          data when is_map(data) -> Map.merge(acc, data)
-          data -> Map.put(acc, input_port, data)
+        if port_data do
+          Map.put(acc, input_port, port_data)
+        else
+          acc
         end
       end)
 
-    case routed_data do
+    case multi_port_input do
       empty when map_size(empty) == 0 ->
-        # No routed data found, use workflow input (for trigger nodes)
-        Map.get(execution_context, "input", %{})
+        # No routed data found, use workflow input for primary port (trigger nodes)
+        %{"primary" => execution.input_data}
 
       _ ->
-        routed_data
+        multi_port_input
     end
+  end
+
+  # Get incoming connections for a specific node and port
+  defp get_incoming_connections_for_node_port(execution_graph, node_id, input_port) do
+    # Use reverse connection map if available, otherwise filter all connections
+    all_incoming = case Map.get(execution_graph, :reverse_connection_map) do
+      nil ->
+        # Fallback: filter all connections (less efficient but functional)
+        Enum.filter(execution_graph.workflow.connections, fn conn ->
+          conn.to == node_id
+        end)
+
+      reverse_map ->
+        # Optimized: direct lookup
+        Map.get(reverse_map, node_id, [])
+    end
+    
+    # Filter for connections targeting the specific input port
+    Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)
   end
 end

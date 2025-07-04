@@ -62,7 +62,10 @@ defmodule Prana.Execution do
           resume_token: String.t() | nil,
           started_at: DateTime.t() | nil,
           completed_at: DateTime.t() | nil,
-          metadata: map()
+          metadata: map(),
+          __runtime: %{
+            String.t() => any()
+          } | nil
         }
 
   defstruct [
@@ -88,6 +91,7 @@ defmodule Prana.Execution do
     :resume_token,
     :started_at,
     :completed_at,
+    :__runtime,
     preparation_data: %{},
     metadata: %{}
   ]
@@ -305,6 +309,165 @@ defmodule Prana.Execution do
 
   defp generate_id do
     16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
+  end
+
+  @doc """
+  Rebuilds runtime state from persistent execution data and environment context.
+  
+  This function reconstructs the ephemeral runtime state from the persistent
+  node_executions audit trail and provided environment data.
+  
+  ## Parameters
+  - `execution` - The execution to rebuild runtime state for
+  - `env_data` - Environment context data from the application
+  
+  ## Returns
+  Updated execution with rebuilt __runtime state containing:
+  - `"nodes"` - Map of completed node outputs for routing
+  - `"env"` - Environment data from application
+  - `"active_paths"` - Active conditional branching paths
+  - `"executed_nodes"` - Chronological list of executed node IDs
+  
+  ## Example
+  
+      # Load from storage (has nil __runtime)
+      execution = Repo.get(Execution, execution_id)
+      
+      # Rebuild runtime state
+      env_data = %{"api_key" => "abc123", "base_url" => "https://api.example.com"}
+      execution = rebuild_runtime(execution, env_data)
+      
+      # Now ready for execution/resume
+      execution.__runtime["nodes"]         # %{"node_1" => %{...}, "node_2" => %{...}}
+      execution.__runtime["env"]           # %{"api_key" => "abc123", ...}
+      execution.__runtime["active_paths"]  # %{"path_1" => true, "path_2" => true}
+      execution.__runtime["executed_nodes"] # ["node_1", "node_2"]
+  """
+  def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
+    # Build nodes map from completed node executions
+    nodes = 
+      execution.node_executions
+      |> Enum.filter(fn node_exec -> node_exec.status == :completed end)
+      |> Enum.reduce(%{}, fn node_exec, acc ->
+        Map.put(acc, node_exec.node_id, node_exec.output_data)
+      end)
+    
+    # Build active paths from node executions with output ports
+    active_paths = 
+      execution.node_executions
+      |> Enum.filter(fn node_exec -> node_exec.status == :completed and not is_nil(node_exec.output_port) end)
+      |> Enum.reduce(%{}, fn node_exec, acc ->
+        path_key = "#{node_exec.node_id}_#{node_exec.output_port}"
+        Map.put(acc, path_key, true)
+      end)
+    
+    # Build executed nodes list in chronological order
+    executed_nodes = 
+      execution.node_executions
+      |> Enum.sort_by(& &1.started_at, DateTime)
+      |> Enum.map(& &1.node_id)
+    
+    # Build runtime state
+    runtime = %{
+      "nodes" => nodes,
+      "env" => env_data,
+      "active_paths" => active_paths,
+      "executed_nodes" => executed_nodes
+    }
+    
+    %{execution | __runtime: runtime}
+  end
+
+
+  @doc """
+  Adds a completed node execution to the execution and updates runtime state.
+  
+  This function integrates an already-completed NodeExecution into the execution's
+  audit trail and synchronizes the runtime state for optimal performance.
+  
+  ## Parameters
+  - `execution` - The execution to update
+  - `completed_node_execution` - The completed NodeExecution to add
+  
+  ## Returns
+  Updated execution with synchronized persistent and runtime state
+  
+  ## Example
+  
+      completed_node_exec = NodeExecution.complete(node_exec, %{user_id: 123}, "success")
+      execution = complete_node(execution, completed_node_exec)
+      
+      # Both persistent and runtime state updated
+      execution.node_executions  # Contains the completed NodeExecution
+      execution.__runtime["nodes"]["api_call"]  # Contains %{user_id: 123}
+  """
+  def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :completed} = completed_node_execution) do
+    node_id = completed_node_execution.node_id
+    output_data = completed_node_execution.output_data
+    output_port = completed_node_execution.output_port
+    
+    # Remove any existing node execution for this node (to handle retries/updates)
+    remaining_executions = 
+      Enum.reject(execution.node_executions, fn ne -> ne.node_id == node_id end)
+    
+    # Add the completed node execution to the list (append to maintain chronological order)
+    updated_node_executions = remaining_executions ++ [completed_node_execution]
+    
+    # Update runtime state if present
+    updated_runtime = 
+      case execution.__runtime do
+        nil -> nil
+        runtime ->
+          runtime
+          |> Map.put("nodes", Map.put(runtime["nodes"], node_id, output_data))
+          |> Map.put("executed_nodes", runtime["executed_nodes"] ++ [node_id])
+          |> Map.put("active_paths", Map.put(runtime["active_paths"], "#{node_id}_#{output_port}", true))
+      end
+    
+    %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
+  end
+
+  @doc """
+  Adds a failed node execution to the execution and updates runtime state.
+  
+  This function integrates an already-failed NodeExecution into the execution's
+  audit trail and synchronizes the runtime state.
+  
+  ## Parameters
+  - `execution` - The execution to update
+  - `failed_node_execution` - The failed NodeExecution to add
+  
+  ## Returns
+  Updated execution with synchronized persistent and runtime state
+  
+  ## Example
+  
+      failed_node_exec = NodeExecution.fail(node_exec, %{error: "Network timeout"})
+      execution = fail_node(execution, failed_node_exec)
+      
+      # Both persistent and runtime state updated
+      execution.node_executions  # Contains the failed NodeExecution
+      execution.__runtime["nodes"]["api_call"]  # Not present (failed nodes don't provide output)
+  """
+  def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :failed} = failed_node_execution) do
+    node_id = failed_node_execution.node_id
+    
+    # Remove any existing node execution for this node (to handle retries/updates)
+    remaining_executions = 
+      Enum.reject(execution.node_executions, fn ne -> ne.node_id == node_id end)
+    
+    # Add the failed node execution to the list (append to maintain chronological order)
+    updated_node_executions = remaining_executions ++ [failed_node_execution]
+    
+    # Update runtime state if present (add to executed nodes but not to nodes map)
+    updated_runtime = 
+      case execution.__runtime do
+        nil -> nil
+        runtime ->
+          Map.put(runtime, "executed_nodes", runtime["executed_nodes"] ++ [node_id])
+      end
+    
+    %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
   end
 
   defp generate_resume_token do
