@@ -188,6 +188,18 @@ defmodule Prana.Behaviour.Action do
               {:ok, output_data()} | {:error, reason :: term()}
 
   @doc """
+  Returns the input schema for this action.
+  Used for validation and UI generation.
+  """
+  @callback input_schema() :: module() | map()
+
+  @doc """
+  Validates input_map for this action using schema.
+  """
+  @callback validate_input(input_map :: map()) :: 
+    {:ok, validated_map :: map()} | {:error, reasons :: [String.t()]}
+
+  @doc """
   Returns true if this action supports suspension/resume operations.
   
   Default implementation returns false. Override to return true for actions
@@ -195,7 +207,7 @@ defmodule Prana.Behaviour.Action do
   """
   @callback suspendable?() :: boolean()
 
-  @optional_callbacks [suspendable?: 0]
+  @optional_callbacks [suspendable?: 0, input_schema: 0, validate_input: 1]
 
   defmacro __using__(_opts) do
     quote do

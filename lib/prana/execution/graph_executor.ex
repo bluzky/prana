@@ -233,7 +233,6 @@ defmodule Prana.GraphExecutor do
           execute_workflow_loop(updated_execution, execution_graph)
 
         {:suspend, suspended_execution} ->
-          # Workflow execution suspended - return suspended execution for application handling
           {:suspend, suspended_execution}
 
         {:error, failed_execution} ->
