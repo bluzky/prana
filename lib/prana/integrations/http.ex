@@ -56,12 +56,75 @@ end
 
 defmodule Prana.Integrations.HTTP.RequestAction do
   @moduledoc """
-  HTTP Request action implementation
-  
+  HTTP Request action implementation with Skema schema validation
+
   Supports GET, POST, PUT, DELETE methods with configurable headers, body, timeout, and authentication.
   """
-  
+
   @behaviour Prana.Behaviour.Action
+
+  use Skema
+
+  defschema AuthSchema do
+    field(:type, :string,
+      required: true,
+      in: ["basic", "bearer", "api_key"]
+    )
+
+    # For basic auth
+    field(:username, :string)
+    # For basic auth
+    field(:password, :string)
+    # For bearer auth
+    field(:token, :string)
+    # For API key
+    field(:key, :string)
+    # For API key
+    field(:header, :string, default: "X-API-Key")
+  end
+
+  defschema HTTPRequestSchema do
+    field(:url, :string,
+      required: true,
+      format: ~r/^https?:\/\/.+/
+    )
+
+    field(:method, :string,
+      default: "GET",
+      in: ["GET", "POST", "PUT", "DELETE", "HEAD", "PATCH", "OPTIONS"]
+    )
+
+    field(:headers, :map, default: %{})
+
+    field(:timeout, :integer,
+      default: 5000,
+      number: [min: 1, max: 300_000]
+    )
+
+    field(:retry, :integer,
+      default: 0,
+      number: [min: 0, max: 10]
+    )
+
+    field(:auth, AuthSchema)
+    field(:body, :string)
+    field(:json, :map)
+    field(:params, :map, default: %{})
+  end
+
+  @impl true
+  def input_schema, do: HTTPRequestSchema
+
+  @impl true
+  def validate_input(input_map) do
+    case HTTPRequestSchema.cast_and_validate(input_map) do
+      {:ok, validated_data} ->
+        {:ok, validated_data}
+
+      {:error, errors} ->
+        {:error, format_errors(errors)}
+    end
+  end
 
   @impl true
   def prepare(_node) do
@@ -71,13 +134,16 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   @impl true
   def execute(input_map) do
     case make_http_request(input_map) do
-      {:ok, response} -> 
+      {:ok, response} ->
         {:ok, format_response(response), "success"}
-      {:error, :timeout} -> 
+
+      {:error, :timeout} ->
         {:error, %{type: "timeout", message: "Request timed out"}, "timeout"}
-      {:error, reason} when is_binary(reason) -> 
+
+      {:error, reason} when is_binary(reason) ->
         {:error, %{type: "http_error", message: reason}, "error"}
-      {:error, reason} -> 
+
+      {:error, reason} ->
         {:error, %{type: "http_error", message: format_error(reason)}, "error"}
     end
   end
@@ -87,12 +153,25 @@ defmodule Prana.Integrations.HTTP.RequestAction do
     {:error, "HTTP request action does not support resume"}
   end
 
+  # Format validation errors
+  defp format_errors(errors) do
+    Enum.map(errors, fn
+      {field, messages} when is_list(messages) ->
+        "#{field}: #{Enum.join(messages, ", ")}"
+
+      {field, message} when is_binary(message) ->
+        "#{field}: #{message}"
+
+      {field, message} ->
+        "#{field}: #{inspect(message)}"
+    end)
+  end
+
   # Make HTTP request using Req
   defp make_http_request(input_map) do
     with {:ok, method} <- get_method(input_map),
          {:ok, url} <- get_url(input_map),
          {:ok, options} <- build_request_options(input_map) do
-      
       case method do
         :get -> Req.get(url, options)
         :post -> Req.post(url, options)
@@ -102,15 +181,13 @@ defmodule Prana.Integrations.HTTP.RequestAction do
         :patch -> Req.patch(url, options)
         :options -> Req.request(url, [method: :options] ++ options)
       end
-    else
-      {:error, reason} -> {:error, reason}
     end
   end
 
   # Get HTTP method from input
   defp get_method(input_map) do
     method = Map.get(input_map, "method", "GET")
-    
+
     case String.downcase(method) do
       "get" -> {:ok, :get}
       "post" -> {:ok, :post}
@@ -139,14 +216,11 @@ defmodule Prana.Integrations.HTTP.RequestAction do
          {:ok, options} <- add_json(options, input_map),
          {:ok, options} <- add_timeout(options, input_map),
          {:ok, options} <- add_auth(options, input_map),
-         {:ok, options} <- add_params(options, input_map),
-         {:ok, options} <- add_retry(options, input_map) do
-      {:ok, options}
-    else
-      {:error, reason} -> {:error, reason}
+         {:ok, options} <- add_params(options, input_map) do
+      add_retry(options, input_map)
     end
   end
-  
+
   # Helper functions for building options
   defp add_headers(options, input_map) do
     case Map.get(input_map, "headers") do
@@ -155,21 +229,21 @@ defmodule Prana.Integrations.HTTP.RequestAction do
       _ -> {:error, "Headers must be a map"}
     end
   end
-  
+
   defp add_body(options, input_map) do
     case Map.get(input_map, "body") do
       nil -> {:ok, options}
       body -> {:ok, Keyword.put(options, :body, body)}
     end
   end
-  
+
   defp add_json(options, input_map) do
     case Map.get(input_map, "json") do
       nil -> {:ok, options}
       json -> {:ok, Keyword.put(options, :json, json)}
     end
   end
-  
+
   defp add_timeout(options, input_map) do
     case Map.get(input_map, "timeout") do
       nil -> {:ok, options}
@@ -177,14 +251,14 @@ defmodule Prana.Integrations.HTTP.RequestAction do
       _ -> {:error, "Timeout must be an integer (milliseconds)"}
     end
   end
-  
+
   defp add_auth(options, input_map) do
     case build_auth_options(input_map) do
       {:ok, auth_options} -> {:ok, Keyword.merge(options, auth_options)}
       {:error, reason} -> {:error, reason}
     end
   end
-  
+
   defp add_params(options, input_map) do
     case Map.get(input_map, "params") do
       nil -> {:ok, options}
@@ -192,7 +266,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
       _ -> {:error, "Params must be a map"}
     end
   end
-  
+
   defp add_retry(options, input_map) do
     case Map.get(input_map, "retry") do
       nil -> {:ok, options}
@@ -205,20 +279,20 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   # Build authentication options
   defp build_auth_options(input_map) do
     case Map.get(input_map, "auth") do
-      nil -> 
+      nil ->
         {:ok, []}
-      
+
       %{"type" => "basic", "username" => username, "password" => password} ->
         {:ok, [auth: {username, password}]}
-      
+
       %{"type" => "bearer", "token" => token} ->
         {:ok, [auth: {:bearer, token}]}
-      
+
       %{"type" => "api_key", "key" => key, "header" => header} ->
         header_name = header || "X-API-Key"
         {:ok, [headers: %{header_name => key}]}
-      
-      _ -> 
+
+      _ ->
         {:error, "Invalid authentication configuration"}
     end
   end
@@ -241,23 +315,53 @@ end
 defmodule Prana.Integrations.HTTP.WebhookAction do
   @moduledoc """
   Webhook action implementation using Action behavior with suspend/resume pattern
-  
+
   Suspends execution and waits for incoming HTTP webhook requests.
   """
-  
+
   @behaviour Prana.Behaviour.Action
+
+  use Skema
+
+  defschema WebhookConfigSchema do
+    field(:path, :string, default: "/webhook")
+    field(:secret, :string)
+    field(:headers, :map, default: %{})
+  end
+
+  defschema WebhookSchema do
+    field(:timeout_hours, :float,
+      default: 24.0,
+      number: [min: 0.1, max: 8760.0]
+    )
+
+    field(:base_url, :string, format: ~r/^https?:\/\/.+/)
+
+    field(:webhook_config, WebhookConfigSchema, default: %{})
+  end
+
+  @impl true
+  def input_schema, do: WebhookSchema
+
+  @impl true
+  def validate_input(input_map) do
+    case Skema.cast_and_validate(input_map, WebhookSchema) do
+      {:ok, validated_data} -> {:ok, validated_data}
+      {:error, errors} -> {:error, format_errors(errors)}
+    end
+  end
 
   @impl true
   def prepare(node) do
     # Webhook preparation could include URL generation
     config = Map.get(node, :config, %{})
-    
+
     preparation_data = %{
       timeout_hours: Map.get(config, "timeout_hours", 24),
       webhook_path: Map.get(config, "webhook_path", "/webhook"),
       prepared_at: DateTime.utc_now()
     }
-    
+
     {:ok, preparation_data}
   end
 
@@ -265,20 +369,23 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   def execute(input_map) do
     timeout_hours = Map.get(input_map, "timeout_hours", 24)
     webhook_config = Map.get(input_map, "webhook_config", %{})
-    
+
     case validate_webhook_config(timeout_hours, webhook_config) do
       :ok ->
         now = DateTime.utc_now()
         expires_at = DateTime.add(now, timeout_hours * 3600, :second)
-        
+
         # Build webhook URL if base_url provided
-        webhook_url = case Map.get(input_map, "base_url") do
-          nil -> nil
-          base_url -> 
-            webhook_path = Map.get(webhook_config, "path", "/webhook")
-            "#{base_url}#{webhook_path}"
-        end
-        
+        webhook_url =
+          case Map.get(input_map, "base_url") do
+            nil ->
+              nil
+
+            base_url ->
+              webhook_path = Map.get(webhook_config, "path", "/webhook")
+              "#{base_url}#{webhook_path}"
+          end
+
         suspend_data = %{
           mode: "webhook",
           timeout_hours: timeout_hours,
@@ -288,9 +395,9 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
           webhook_url: webhook_url,
           input_data: input_map
         }
-        
+
         {:suspend, :webhook, suspend_data}
-      
+
       {:error, reason} ->
         {:error, %{type: "webhook_config_error", message: reason}, "error"}
     end
@@ -299,22 +406,37 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   @impl true
   def resume(suspend_data, resume_input) do
     expires_at = Map.get(suspend_data, :expires_at)
-    
+
     # Check if webhook has expired
     if expires_at && DateTime.after?(DateTime.utc_now(), expires_at) do
       {:error, %{type: "webhook_timeout", message: "Webhook has expired"}}
     else
       # Return webhook payload
-      {:ok, %{
-        webhook_payload: resume_input,
-        received_at: DateTime.utc_now(),
-        original_input: Map.get(suspend_data, :input_data, %{})
-      }}
+      {:ok,
+       %{
+         webhook_payload: resume_input,
+         received_at: DateTime.utc_now(),
+         original_input: Map.get(suspend_data, :input_data, %{})
+       }}
     end
   end
 
   @impl true
   def suspendable?, do: true
+
+  # Format validation errors
+  defp format_errors(errors) do
+    Enum.map(errors, fn
+      {field, messages} when is_list(messages) ->
+        "#{field}: #{Enum.join(messages, ", ")}"
+
+      {field, message} when is_binary(message) ->
+        "#{field}: #{message}"
+
+      {field, message} ->
+        "#{field}: #{inspect(message)}"
+    end)
+  end
 
   # Validate webhook configuration
   defp validate_webhook_config(timeout_hours, _webhook_config) do

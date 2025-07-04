@@ -252,4 +252,130 @@ defmodule Prana.Integrations.HTTPTest do
       assert WebhookAction.suspendable?() == true
     end
   end
+
+  describe "RequestAction schema validation" do
+    test "validates required URL field" do
+      input_map = %{"method" => "GET"}
+      
+      assert {:error, errors} = RequestAction.validate_input(input_map)
+      assert Enum.any?(errors, &String.contains?(&1, "url"))
+    end
+
+    test "validates HTTP method inclusion" do
+      input_map = %{"url" => "https://example.com", "method" => "INVALID"}
+      
+      assert {:error, errors} = RequestAction.validate_input(input_map)
+      assert Enum.any?(errors, &String.contains?(&1, "method"))
+    end
+
+    test "validates timeout range" do
+      input_map = %{"url" => "https://example.com", "timeout" => -1}
+      
+      assert {:error, errors} = RequestAction.validate_input(input_map)
+      assert Enum.any?(errors, &String.contains?(&1, "timeout"))
+    end
+
+    test "validates URL format" do
+      input_map = %{"url" => "invalid-url"}
+      
+      assert {:error, errors} = RequestAction.validate_input(input_map)
+      assert Enum.any?(errors, &String.contains?(&1, "url"))
+    end
+
+    test "validates auth configuration" do
+      input_map = %{
+        "url" => "https://example.com",
+        "auth" => %{"type" => "invalid"}
+      }
+      
+      assert {:error, errors} = RequestAction.validate_input(input_map)
+      assert Enum.any?(errors, &String.contains?(&1, "auth"))
+    end
+
+    test "casts string numbers to integers" do
+      input_map = %{
+        "url" => "https://example.com",
+        "timeout" => "5000",
+        "retry" => "3"
+      }
+      
+      assert {:ok, validated} = RequestAction.validate_input(input_map)
+      assert validated.timeout == 5000
+      assert validated.retry == 3
+    end
+
+    test "applies default values" do
+      input_map = %{"url" => "https://example.com"}
+      
+      assert {:ok, validated} = RequestAction.validate_input(input_map)
+      assert validated.method == "GET"
+      assert validated.timeout == 5000
+      assert validated.retry == 0
+      assert validated.headers == %{}
+      assert validated.params == %{}
+    end
+
+    test "validates nested auth schema" do
+      input_map = %{
+        "url" => "https://example.com",
+        "auth" => %{
+          "type" => "basic",
+          "username" => "user",
+          "password" => "pass"
+        }
+      }
+      
+      assert {:ok, validated} = RequestAction.validate_input(input_map)
+      assert validated.auth.type == "basic"
+      assert validated.auth.username == "user"
+      assert validated.auth.password == "pass"
+    end
+
+    test "returns input_schema" do
+      assert RequestAction.input_schema() == Prana.Integrations.HTTP.RequestAction.HTTPRequestSchema
+    end
+  end
+
+  describe "WebhookAction schema validation" do
+    test "validates timeout_hours range" do
+      input_map = %{"timeout_hours" => -1}
+      
+      assert {:error, errors} = WebhookAction.validate_input(input_map)
+      assert Enum.any?(errors, &String.contains?(&1, "timeout_hours"))
+    end
+
+    test "validates base_url format" do
+      input_map = %{"base_url" => "invalid-url"}
+      
+      assert {:error, errors} = WebhookAction.validate_input(input_map)
+      assert Enum.any?(errors, &String.contains?(&1, "base_url"))
+    end
+
+    test "applies default webhook config" do
+      input_map = %{}
+      
+      assert {:ok, validated} = WebhookAction.validate_input(input_map)
+      assert validated.timeout_hours == 24.0
+      assert validated.webhook_config == %{}
+    end
+
+    test "validates nested webhook config schema" do
+      input_map = %{
+        "webhook_config" => %{
+          "path" => "/custom-webhook",
+          "secret" => "mysecret",
+          "headers" => %{"X-Custom" => "value"}
+        }
+      }
+      
+      assert {:ok, validated} = WebhookAction.validate_input(input_map)
+      assert validated.webhook_config.path == "/custom-webhook"
+      assert validated.webhook_config.secret == "mysecret"
+      assert validated.webhook_config.headers == %{"X-Custom" => "value"}
+    end
+
+    test "returns input_schema" do
+      assert WebhookAction.input_schema() == Prana.Integrations.HTTP.WebhookAction.WebhookSchema
+    end
+  end
 end
