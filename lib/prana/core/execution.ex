@@ -49,7 +49,7 @@ defmodule Prana.Execution do
           status: status(),
           trigger_type: String.t(),
           trigger_data: map(),
-          input_data: map(),
+          vars: map(),
           output_data: map() | nil,
           context_data: map(),
           error_data: map() | nil,
@@ -79,7 +79,7 @@ defmodule Prana.Execution do
     :status,
     :trigger_type,
     :trigger_data,
-    :input_data,
+    :vars,
     :output_data,
     :context_data,
     :error_data,
@@ -99,7 +99,7 @@ defmodule Prana.Execution do
   @doc """
   Creates a new execution
   """
-  def new(workflow_id, workflow_version, trigger_type, input_data, trigger_node_id \\ nil) do
+  def new(workflow_id, workflow_version, trigger_type, vars, trigger_node_id \\ nil) do
     execution_id = generate_id()
 
     %__MODULE__{
@@ -113,7 +113,7 @@ defmodule Prana.Execution do
       status: :pending,
       trigger_type: trigger_type,
       trigger_data: %{},
-      input_data: input_data,
+      vars: vars,
       output_data: nil,
       context_data: %{},
       error_data: nil,

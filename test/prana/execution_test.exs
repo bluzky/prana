@@ -1,9 +1,10 @@
 defmodule Prana.ExecutionTest do
   use ExUnit.Case
-  doctest Prana.Execution
 
   alias Prana.Execution
   alias Prana.NodeExecution
+
+  doctest Prana.Execution
 
   describe "runtime state rebuilding" do
     test "rebuild_runtime/2 creates runtime state from node executions" do
@@ -44,16 +45,16 @@ defmodule Prana.ExecutionTest do
 
       # Verify runtime state structure
       assert result.__runtime["nodes"] == %{
-        "node_1" => %{"output" => %{user_id: 123}, "context" => %{}},
-        "node_2" => %{"output" => %{email: "test@example.com"}, "context" => %{}}
-      }
+               "node_1" => %{"output" => %{user_id: 123}, "context" => %{}},
+               "node_2" => %{"output" => %{email: "test@example.com"}, "context" => %{}}
+             }
 
       assert result.__runtime["env"] == env_data
 
       assert result.__runtime["active_paths"] == %{
-        "node_1_success" => true,
-        "node_2_primary" => true
-      }
+               "node_1_success" => true,
+               "node_2_primary" => true
+             }
 
       assert result.__runtime["executed_nodes"] == ["node_1", "node_2", "node_3"]
     end
@@ -109,12 +110,11 @@ defmodule Prana.ExecutionTest do
       # Only completed nodes should be in nodes map
       assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}, "context" => %{}}}
       assert result.__runtime["active_paths"] == %{"node_3_done" => true}
-      
+
       # But all nodes should be in executed_nodes (chronological order)
       assert result.__runtime["executed_nodes"] == ["node_1", "node_2", "node_3"]
     end
   end
-
 
   describe "complete_node/2" do
     test "completes node and updates both persistent and runtime state" do
@@ -132,12 +132,14 @@ defmodule Prana.ExecutionTest do
       }
 
       # Create and complete a NodeExecution first
-      node_execution = NodeExecution.new("exec_1", "node_1", %{input: "test"})
-      |> NodeExecution.start()
-      
+      node_execution =
+        "exec_1"
+        |> NodeExecution.new("node_1")
+        |> NodeExecution.start()
+
       output_data = %{result: "success"}
       completed_node_execution = NodeExecution.complete(node_execution, output_data, "success")
-      
+
       result = Execution.complete_node(execution, completed_node_execution)
 
       # Verify persistent state
@@ -167,12 +169,14 @@ defmodule Prana.ExecutionTest do
       }
 
       # Create and complete a NodeExecution independently
-      node_execution = NodeExecution.new("exec_1", "node_1", %{})
-      |> NodeExecution.start()
-      
+      node_execution =
+        "exec_1"
+        |> NodeExecution.new("node_1")
+        |> NodeExecution.start()
+
       output_data = %{result: "success"}
       completed_node_execution = NodeExecution.complete(node_execution, output_data, "success")
-      
+
       result = Execution.complete_node(execution, completed_node_execution)
 
       # Should integrate the completed node execution
@@ -194,11 +198,13 @@ defmodule Prana.ExecutionTest do
       }
 
       # Create and complete a NodeExecution first
-      node_execution = NodeExecution.new("exec_1", "node_1", %{})
-      |> NodeExecution.start()
-      
+      node_execution =
+        "exec_1"
+        |> NodeExecution.new("node_1")
+        |> NodeExecution.start()
+
       completed_node_execution = NodeExecution.complete(node_execution, %{data: "test"}, "success")
-      
+
       result = Execution.complete_node(execution, completed_node_execution)
 
       # Should still update persistent state
@@ -223,7 +229,6 @@ defmodule Prana.ExecutionTest do
             execution_id: "exec_1",
             node_id: "node_1",
             status: :running,
-            input_data: %{input: "test"},
             started_at: ~U[2024-01-01 10:00:00Z]
           }
         ],
@@ -239,7 +244,7 @@ defmodule Prana.ExecutionTest do
       running_node_execution = Enum.find(execution.node_executions, &(&1.node_id == "node_1"))
       error_data = %{error: "network timeout"}
       failed_node_execution = NodeExecution.fail(running_node_execution, error_data)
-      
+
       result = Execution.fail_node(execution, failed_node_execution)
 
       # Verify persistent state
@@ -269,12 +274,14 @@ defmodule Prana.ExecutionTest do
       }
 
       # Create and fail a NodeExecution first
-      node_execution = NodeExecution.new("exec_1", "node_1", %{})
-      |> NodeExecution.start()
-      
+      node_execution =
+        "exec_1"
+        |> NodeExecution.new("node_1")
+        |> NodeExecution.start()
+
       error_data = %{error: "test error"}
       failed_node_execution = NodeExecution.fail(node_execution, error_data)
-      
+
       result = Execution.fail_node(execution, failed_node_execution)
 
       # Should integrate the failed node execution
@@ -311,11 +318,13 @@ defmodule Prana.ExecutionTest do
       }
 
       # Complete another node
-      node_execution_2 = NodeExecution.new("exec_1", "node_2", %{})
-      |> NodeExecution.start()
-      
+      node_execution_2 =
+        "exec_1"
+        |> NodeExecution.new("node_2")
+        |> NodeExecution.start()
+
       completed_node_execution_2 = NodeExecution.complete(node_execution_2, %{email: "test@example.com"}, "primary")
-      
+
       result = Execution.complete_node(execution, completed_node_execution_2)
 
       # Verify state synchronization
@@ -347,19 +356,19 @@ defmodule Prana.ExecutionTest do
       }
 
       # Build incrementally using the new interface
-      node_exec_1 = NodeExecution.new("exec_1", "node_1", %{}) |> NodeExecution.start()
+      node_exec_1 = "exec_1" |> NodeExecution.new("node_1") |> NodeExecution.start()
       completed_node_1 = NodeExecution.complete(node_exec_1, %{user_id: 123}, "success")
-      
-      node_exec_2 = NodeExecution.new("exec_1", "node_2", %{}) |> NodeExecution.start()
+
+      node_exec_2 = "exec_1" |> NodeExecution.new("node_2") |> NodeExecution.start()
       completed_node_2 = NodeExecution.complete(node_exec_2, %{email: "test@example.com"}, "primary")
-      
-      incremental_result = 
+
+      incremental_result =
         execution
         |> Execution.complete_node(completed_node_1)
         |> Execution.complete_node(completed_node_2)
         |> then(fn exec ->
           # Create and fail node execution for node_3
-          node_exec_3 = NodeExecution.new("exec_1", "node_3", %{}) |> NodeExecution.start()
+          node_exec_3 = "exec_1" |> NodeExecution.new("node_3") |> NodeExecution.start()
           failed_node_3 = NodeExecution.fail(node_exec_3, %{error: "timeout"})
           Execution.fail_node(exec, failed_node_3)
         end)

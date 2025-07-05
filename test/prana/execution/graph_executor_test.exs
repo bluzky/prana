@@ -63,8 +63,6 @@ defmodule Prana.GraphExecutorTest do
         total_nodes: 1
       }
 
-      input_data = %{"test" => "data"}
-
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -72,7 +70,7 @@ defmodule Prana.GraphExecutorTest do
       }
 
       # Now that we have registered the test integration, execution should succeed
-      result = GraphExecutor.execute_graph(execution_graph, input_data, context)
+      result = GraphExecutor.execute_graph(execution_graph, context)
 
       # Should return successful execution
       assert {:ok, execution} = result
@@ -181,7 +179,7 @@ defmodule Prana.GraphExecutorTest do
         id: "test_exec",
         workflow_id: "test",
         status: :running,
-        input_data: %{},
+        vars: %{},
         output_data: nil,
         node_executions: [
           %NodeExecution{node_id: "node_1", status: :completed},
@@ -219,7 +217,7 @@ defmodule Prana.GraphExecutorTest do
         id: "test_exec",
         workflow_id: "test",
         status: :running,
-        input_data: %{},
+        vars: %{},
         output_data: nil,
         node_executions: [
           %NodeExecution{node_id: "node_1", status: :completed}

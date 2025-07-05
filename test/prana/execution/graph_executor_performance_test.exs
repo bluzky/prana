@@ -106,9 +106,6 @@ defmodule Prana.GraphExecutorPerformanceTest do
       assert map_size(execution_graph.reverse_connection_map) == node_count - 1
       assert map_size(execution_graph.node_map) == node_count
 
-      # Time the execution to ensure it scales well
-      input_data = %{"test" => "data"}
-
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -117,7 +114,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
 
       {time_microseconds, result} =
         :timer.tc(fn ->
-          GraphExecutor.execute_graph(execution_graph, input_data, context)
+          GraphExecutor.execute_graph(execution_graph, context)
         end)
 
       # Should complete successfully
@@ -293,7 +290,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
         workflow_version: 1,
         execution_mode: "performance_test",
         status: :running,
-        input_data: %{},
+        vars: %{},
         node_executions: [],
         __runtime: nil
       }

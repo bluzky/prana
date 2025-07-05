@@ -14,9 +14,9 @@ defmodule Prana.Actions.SimpleAction do
       defmodule MyApp.SimpleHttpAction do
         use Prana.Actions.SimpleAction
 
-        def execute(input_data, _preparation_data) do
+        def execute(params, _context) do
           # Simple HTTP request logic
-          case HTTPoison.get(input_data["url"]) do
+          case HTTPoison.get(params["url"]) do
             {:ok, %{status_code: 200, body: body}} ->
               {:ok, %{response: body}}
             {:error, reason} ->
@@ -90,15 +90,15 @@ defmodule Prana.Actions.SimpleAction do
   The action will use the provided function for execution.
 
   ## Parameters
-  - `execute_fn` - Function with arity 2 that takes (input_data, preparation_data)
+  - `execute_fn` - Function with arity 2 that takes (params, preparation_data)
 
   ## Returns
   A module that implements the Action behavior with the provided execute function.
 
   ## Example
 
-      action_module = SimpleAction.create(fn input_data, _prep_data ->
-        {:ok, %{result: input_data["value"] * 2}}
+      action_module = SimpleAction.create(fn params, _prep_data ->
+        {:ok, %{result: params["value"] * 2}}
       end)
 
       # Can be used in action definitions
@@ -114,8 +114,8 @@ defmodule Prana.Actions.SimpleAction do
       quote do
         use Prana.Actions.SimpleAction
 
-        def execute(input_data, preparation_data) do
-          unquote(execute_fn).(input_data, preparation_data)
+        def execute(params, preparation_data) do
+          unquote(execute_fn).(params, preparation_data)
         end
       end,
       Macro.Env.location(__ENV__)

@@ -60,14 +60,14 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       assert preparation_data.duration_ms == 30_000
       assert %DateTime{} = preparation_data.resume_at
       assert %DateTime{} = preparation_data.prepared_at
-      
+
       # Resume time should be in the future
       assert DateTime.after?(preparation_data.resume_at, preparation_data.prepared_at)
     end
 
     test "schedule mode validates and parses datetime" do
       future_time = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
-      
+
       input_map = %{
         "mode" => "schedule",
         "schedule_at" => future_time,
@@ -85,7 +85,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
 
     test "schedule mode returns error for past datetime" do
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
-      
+
       input_map = %{
         "mode" => "schedule",
         "schedule_at" => past_time
@@ -97,14 +97,14 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
 
     test "returns error for missing mode" do
       input_map = %{}
-      
+
       {:error, reason} = WaitAction.prepare(input_map)
       assert reason == "mode is required"
     end
 
     test "returns error for invalid mode" do
       input_map = %{"mode" => "invalid"}
-      
+
       {:error, reason} = WaitAction.prepare(input_map)
       assert reason =~ "mode must be 'interval', 'schedule', or 'webhook'"
     end
@@ -153,25 +153,22 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     test "webhook mode processes resume data correctly" do
       suspend_data = %{
         mode: "webhook",
-        pass_through: true,
-        input_data: %{"original" => "data"},
-        expires_at: DateTime.utc_now() |> DateTime.add(3600, :second)
+        expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
       }
-      
+
       resume_input = %{"webhook_payload" => "received"}
 
       {:ok, output_data} = WaitAction.resume(suspend_data, resume_input)
 
-      assert output_data["original"] == "data"
       assert output_data["webhook_payload"] == "received"
     end
 
     test "webhook mode returns error for expired webhook" do
       suspend_data = %{
         mode: "webhook",
-        expires_at: DateTime.utc_now() |> DateTime.add(-3600, :second)
+        expires_at: DateTime.add(DateTime.utc_now(), -3600, :second)
       }
-      
+
       resume_input = %{"webhook_payload" => "received"}
 
       {:error, error} = WaitAction.resume(suspend_data, resume_input)
@@ -180,29 +177,11 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       assert error.message == "Webhook has expired"
     end
 
-    test "webhook mode without pass_through returns only resume data" do
-      suspend_data = %{
-        mode: "webhook",
-        pass_through: false,
-        input_data: %{"original" => "data"},
-        expires_at: DateTime.utc_now() |> DateTime.add(3600, :second)
-      }
-      
-      resume_input = %{"webhook_payload" => "received"}
-
-      {:ok, output_data} = WaitAction.resume(suspend_data, resume_input)
-
-      assert output_data == %{"webhook_payload" => "received"}
-      refute Map.has_key?(output_data, "original")
-    end
-
     test "interval mode validates timing before resuming" do
-      future_resume = DateTime.utc_now() |> DateTime.add(3600, :second)
-      
+      future_resume = DateTime.add(DateTime.utc_now(), 3600, :second)
+
       suspend_data = %{
         mode: "interval",
-        pass_through: true,
-        input_data: %{"test" => "data"},
         resume_at: future_resume
       }
 
@@ -213,27 +192,23 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     end
 
     test "interval mode resumes successfully when time has passed" do
-      past_resume = DateTime.utc_now() |> DateTime.add(-3600, :second)
-      
+      past_resume = DateTime.add(DateTime.utc_now(), -3600, :second)
+
       suspend_data = %{
         mode: "interval",
-        pass_through: true,
-        input_data: %{"test" => "data"},
         resume_at: past_resume
       }
 
       {:ok, output_data} = WaitAction.resume(suspend_data, %{})
 
-      assert output_data == %{"test" => "data"}
+      assert output_data == %{}
     end
 
     test "schedule mode validates timing before resuming" do
-      future_schedule = DateTime.utc_now() |> DateTime.add(3600, :second)
-      
+      future_schedule = DateTime.add(DateTime.utc_now(), 3600, :second)
+
       suspend_data = %{
         mode: "schedule",
-        pass_through: true,
-        input_data: %{"test" => "data"},
         schedule_at: future_schedule
       }
 
@@ -244,23 +219,21 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     end
 
     test "schedule mode resumes successfully when time has arrived" do
-      past_schedule = DateTime.utc_now() |> DateTime.add(-3600, :second)
-      
+      past_schedule = DateTime.add(DateTime.utc_now(), -3600, :second)
+
       suspend_data = %{
         mode: "schedule",
-        pass_through: true,
-        input_data: %{"test" => "data"},
         schedule_at: past_schedule
       }
 
       {:ok, output_data} = WaitAction.resume(suspend_data, %{})
 
-      assert output_data == %{"test" => "data"}
+      assert output_data == %{}
     end
 
     test "returns error for unknown suspension mode" do
       suspend_data = %{mode: "unknown"}
-      
+
       {:error, reason} = WaitAction.resume(suspend_data, %{})
 
       assert reason =~ "Unknown suspension mode"
@@ -278,7 +251,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       }
 
       {:ok, preparation_data} = WaitAction.prepare(prepare_input)
-      
+
       assert String.starts_with?(preparation_data.resume_id, "exec_workflow_123_")
       assert String.contains?(preparation_data.webhook_url, preparation_data.resume_id)
 
@@ -287,30 +260,25 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
         "mode" => "webhook",
         "timeout_hours" => 24,
         "base_url" => "https://myapp.com",
-        "pass_through" => true,
-        "original_data" => "preserved",
         "$preparation" => %{
           "current_node" => preparation_data
         }
       }
 
       {:suspend, :webhook, suspension_data} = WaitAction.execute(execute_input, %{})
-      
+
       assert suspension_data.resume_id == preparation_data.resume_id
       assert suspension_data.webhook_url == preparation_data.webhook_url
-      assert suspension_data.pass_through == true
-      assert suspension_data.input_data["original_data"] == "preserved"
 
       # 3. Resume phase
       webhook_payload = %{
         "user_input" => "approved",
-        "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
+        "timestamp" => DateTime.to_iso8601(DateTime.utc_now())
       }
 
       {:ok, final_output} = WaitAction.resume(suspension_data, webhook_payload)
-      
+
       # Should merge original data with webhook payload
-      assert final_output["original_data"] == "preserved"
       assert final_output["user_input"] == "approved"
       assert final_output["timestamp"] != nil
     end

@@ -144,12 +144,11 @@ defmodule Prana.GraphExecutor do
   end
 
   @doc """
-  Execute a workflow graph with the given input data and context.
+  Execute a workflow graph with the given context.
 
   ## Parameters
 
   - `execution_graph` - Pre-compiled ExecutionGraph from WorkflowCompiler
-  - `input_data` - Initial input data for the workflow
   - `context` - Execution context with workflow_loader callback and optional variables/metadata
 
   ## Returns
@@ -167,16 +166,16 @@ defmodule Prana.GraphExecutor do
       }
 
       # Normal execution
-      {:ok, execution} = GraphExecutor.execute_graph(graph, %{email: "user@example.com"}, context)
+      {:ok, execution} = GraphExecutor.execute_graph(graph, context)
 
       # Suspended execution (sub-workflow coordination)
-      {:suspend, execution} = GraphExecutor.execute_graph(graph, %{workflow_id: "child"}, context)
+      {:suspend, execution} = GraphExecutor.execute_graph(graph, context)
   """
-  @spec execute_graph(ExecutionGraph.t(), map(), map()) ::
+  @spec execute_graph(ExecutionGraph.t(), map()) ::
           {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
-  def execute_graph(%ExecutionGraph{} = execution_graph, input_data, context \\ %{}) do
+  def execute_graph(%ExecutionGraph{} = execution_graph, context \\ %{}) do
     # Create initial execution and context
-    execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", input_data)
+    execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", execution_graph.workflow.variables)
     execution = Execution.start(execution)
 
     # Initialize runtime state once at the start of execution
@@ -688,14 +687,7 @@ defmodule Prana.GraphExecutor do
         end
       end)
 
-    case multi_port_input do
-      empty when map_size(empty) == 0 ->
-        # No routed data found, use workflow input for node's first input port (typically trigger nodes)
-        %{"input" => execution.input_data}
-
-      _ ->
-        multi_port_input
-    end
+    multi_port_input
   end
 
   # Get incoming connections for a specific node and port
