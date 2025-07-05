@@ -276,8 +276,8 @@ defmodule Prana.Integrations.Wait.WaitAction do
   end
 
   @impl true
-  def execute(input_map) do
-    case Prana.Integrations.Wait.wait(input_map) do
+  def execute(params, _context) do
+    case Prana.Integrations.Wait.wait(params) do
       {:suspend, suspension_type, suspension_data} ->
         {:suspend, suspension_type, suspension_data}
       {:error, reason, output_port} ->

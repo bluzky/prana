@@ -27,7 +27,7 @@ defmodule Prana.Integrations.DataTest do
         "input_b" => %{"city" => "NYC", "status" => "active"}
       }
 
-      assert {:ok, result} = MergeAction.execute(input_map)
+      assert {:ok, result} = MergeAction.execute(input_map, %{})
 
       assert result == [
                %{"name" => "John", "age" => 30},
@@ -42,7 +42,7 @@ defmodule Prana.Integrations.DataTest do
         "input_b" => %{"city" => "NYC", "age" => 31}
       }
 
-      assert {:ok, result} = MergeAction.execute(input_map)
+      assert {:ok, result} = MergeAction.execute(input_map, %{})
       assert result == %{"name" => "John", "age" => 31, "city" => "NYC"}
     end
 
@@ -53,7 +53,7 @@ defmodule Prana.Integrations.DataTest do
         "input_b" => [4, 5]
       }
 
-      assert {:ok, result} = MergeAction.execute(input_map)
+      assert {:ok, result} = MergeAction.execute(input_map, %{})
       assert result == [1, 2, 3, 4, 5]
     end
 
@@ -63,7 +63,7 @@ defmodule Prana.Integrations.DataTest do
         "input_b" => %{"b" => 2}
       }
 
-      assert {:ok, result} = MergeAction.execute(input_map)
+      assert {:ok, result} = MergeAction.execute(input_map, %{})
       assert result == [%{"a" => 1}, %{"b" => 2}]
     end
 
@@ -74,7 +74,7 @@ defmodule Prana.Integrations.DataTest do
         "input_b" => "invalid_data"
       }
 
-      assert {:ok, result} = MergeAction.execute(input_map)
+      assert {:ok, result} = MergeAction.execute(input_map, %{})
       assert result == %{"name" => "John"}
     end
 
@@ -85,7 +85,7 @@ defmodule Prana.Integrations.DataTest do
         "input_b" => %{"invalid" => "data"}
       }
 
-      assert {:ok, result} = MergeAction.execute(input_map)
+      assert {:ok, result} = MergeAction.execute(input_map, %{})
       assert result == [1, 2, 3]
     end
 
@@ -96,7 +96,7 @@ defmodule Prana.Integrations.DataTest do
         # input_b is nil/missing
       }
 
-      assert {:ok, result} = MergeAction.execute(input_map)
+      assert {:ok, result} = MergeAction.execute(input_map, %{})
       assert result == [%{"data" => "value"}]
     end
 
@@ -106,7 +106,7 @@ defmodule Prana.Integrations.DataTest do
         "input_a" => %{"test" => true}
       }
 
-      assert {:error, error} = MergeAction.execute(input_map)
+      assert {:error, error} = MergeAction.execute(input_map, %{})
       assert error.type == "merge_error"
       assert String.contains?(error.message, "unknown_strategy")
     end

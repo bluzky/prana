@@ -18,14 +18,14 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       input_map = %{"method" => "GET"}
 
       assert {:error, %{type: "http_error", message: "URL is required"}, "error"} =
-               RequestAction.execute(input_map)
+               RequestAction.execute(input_map, %{})
     end
 
     test "validates HTTP method" do
       input_map = %{"url" => "https://example.com", "method" => "INVALID"}
 
       assert {:error, %{type: "http_error", message: "Unsupported HTTP method: INVALID"}, "error"} =
-               RequestAction.execute(input_map)
+               RequestAction.execute(input_map, %{})
     end
 
     test "validates headers parameter" do
@@ -36,7 +36,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       }
 
       assert {:error, %{type: "http_error", message: "Headers must be a map"}, "error"} =
-               RequestAction.execute(input_map)
+               RequestAction.execute(input_map, %{})
     end
 
     test "validates timeout parameter" do
@@ -47,7 +47,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       }
 
       assert {:error, %{type: "http_error", message: "Timeout must be an integer (milliseconds)"}, "error"} =
-               RequestAction.execute(input_map)
+               RequestAction.execute(input_map, %{})
     end
 
     test "validates params parameter" do
@@ -58,7 +58,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       }
 
       assert {:error, %{type: "http_error", message: "Params must be a map"}, "error"} =
-               RequestAction.execute(input_map)
+               RequestAction.execute(input_map, %{})
     end
 
     test "validates retry parameter" do
@@ -69,7 +69,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       }
 
       assert {:error, %{type: "http_error", message: "Retry must be boolean or integer"}, "error"} =
-               RequestAction.execute(input_map)
+               RequestAction.execute(input_map, %{})
     end
 
     test "validates authentication configuration" do
@@ -80,7 +80,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       }
 
       assert {:error, %{type: "http_error", message: "Invalid authentication configuration"}, "error"} =
-               RequestAction.execute(input_map)
+               RequestAction.execute(input_map, %{})
     end
   end
 

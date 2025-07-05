@@ -39,18 +39,18 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
   use Prana.Actions.SimpleAction
 
   @impl true
-  def execute(input) do
-    if Map.get(input, "force_error", false) do
+  def execute(params, _context) do
+    if Map.get(params, "force_error", false) do
       # Simulate a failure
       {:error, %{
         type: "test_error",
         message: "Simulated test failure",
-        details: %{input: input}
+        details: %{input: params}
       }}
     else
       # Normal success case
       {:ok, %{
-        original_input: input,
+        original_input: params,
         processed: true,
         timestamp: DateTime.utc_now()
       }}

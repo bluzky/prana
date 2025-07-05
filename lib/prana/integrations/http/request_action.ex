@@ -76,8 +76,8 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   end
 
   @impl true
-  def execute(input_map) do
-    case make_http_request(input_map) do
+  def execute(params, _context) do
+    case make_http_request(params) do
       {:ok, response} ->
         {:ok, format_response(response), "success"}
 

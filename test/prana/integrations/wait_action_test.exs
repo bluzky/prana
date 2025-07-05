@@ -123,7 +123,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
         }
       }
 
-      {:suspend, :webhook, suspension_data} = WaitAction.execute(input_map)
+      {:suspend, :webhook, suspension_data} = WaitAction.execute(input_map, %{})
 
       assert suspension_data.mode == "webhook"
       assert suspension_data.timeout_hours == 24
@@ -140,7 +140,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
         "unit" => "seconds"
       }
 
-      {:suspend, :interval, suspension_data} = WaitAction.execute(input_map)
+      {:suspend, :interval, suspension_data} = WaitAction.execute(input_map, %{})
 
       assert suspension_data.mode == "interval"
       assert suspension_data.duration_ms == 30_000
@@ -294,7 +294,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
         }
       }
 
-      {:suspend, :webhook, suspension_data} = WaitAction.execute(execute_input)
+      {:suspend, :webhook, suspension_data} = WaitAction.execute(execute_input, %{})
       
       assert suspension_data.resume_id == preparation_data.resume_id
       assert suspension_data.webhook_url == preparation_data.webhook_url

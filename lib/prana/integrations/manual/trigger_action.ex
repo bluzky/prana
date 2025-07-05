@@ -6,7 +6,7 @@ defmodule Prana.Integrations.Manual.TriggerAction do
   use Prana.Actions.SimpleAction
 
   @impl true
-  def execute(input_data) do
-    {:ok, input_data}
+  def execute(params, _context) do
+    {:ok, params}
   end
 end

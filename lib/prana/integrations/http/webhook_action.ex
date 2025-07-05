@@ -103,8 +103,8 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   # end
 
   @impl true
-  def execute(input_map) do
-    webhook_config = Map.get(input_map, "webhook_config", %{})
+  def execute(params, _context) do
+    webhook_config = Map.get(params, "webhook_config", %{})
 
     # Build webhook URL using base_url from environment variable only
     webhook_url =

@@ -6,8 +6,8 @@ defmodule Prana.Integrations.Manual.ProcessAdultAction do
   use Prana.Actions.SimpleAction
 
   @impl true
-  def execute(input_data) do
-    result = Map.merge(input_data, %{"processed_as" => "adult", "timestamp" => DateTime.utc_now()})
+  def execute(params, _context) do
+    result = Map.merge(params, %{"processed_as" => "adult", "timestamp" => DateTime.utc_now()})
     {:ok, result}
   end
 end

@@ -48,7 +48,7 @@ defmodule Prana.Integrations.Data.MergeAction do
   use Prana.Actions.SimpleAction
 
   @impl true
-  def execute(params) do
+  def execute(params, _context) do
     strategy = Map.get(params, "strategy", "append")
     
     # Extract inputs from named ports

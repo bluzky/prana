@@ -23,11 +23,11 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   end
 
   @impl true
-  def execute(params) do
+  def execute(params, context) do
     condition = Map.get(params, "condition")
 
     if condition do
-      case evaluate_condition(condition, params) do
+      case evaluate_condition(condition, context) do
         {:ok, true} ->
           true_data = Map.get(params, "true_data", params)
           {:ok, true_data, "true"}

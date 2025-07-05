@@ -122,13 +122,15 @@ defmodule Prana.Behaviour.Action do
               {:ok, preparation_data()} | {:error, reason :: term()}
 
   @doc """
-  Execute the action with resolved params.
+  Execute the action with resolved params and full execution context.
 
   Called when the node is ready to execute during workflow execution.
-  Receives resolved params from node configuration expressions.
+  Receives resolved params from node configuration expressions and full execution context
+  for advanced expression evaluation and context access.
 
   ## Parameters
   - `params` - Resolved params from node configuration and expressions
+  - `context` - Full execution context including $input, $nodes, $env, $vars, etc.
 
   ## Returns
   - `{:ok, output_data}` - Action completed successfully
@@ -137,15 +139,30 @@ defmodule Prana.Behaviour.Action do
 
   ## Examples
 
-      def execute(params) do
+      def execute(params, context) do
         case make_api_call(params["endpoint"], params) do
           {:ok, response} -> {:ok, response}
           {:error, reason} -> {:error, reason}
         end
       end
 
+      # Using full context for dynamic behavior
+      def execute(params, context) do
+        # Access node outputs directly
+        api_data = context["$nodes"]["api_call"]["output"]
+        
+        # Access environment variables
+        api_key = context["$env"]["API_KEY"]
+        
+        # Use both params and context
+        case make_enhanced_request(params, api_data, api_key) do
+          {:ok, response} -> {:ok, response}
+          {:error, reason} -> {:error, reason}
+        end
+      end
+
       # Suspension example
-      def execute(params) do
+      def execute(params, context) do
         webhook_url = params["webhook_url"]
         {:ok, request_id} = start_async_operation(params, webhook_url)
         
@@ -153,7 +170,7 @@ defmodule Prana.Behaviour.Action do
         {:suspend, :webhook, suspend_data}
       end
   """
-  @callback execute(params()) ::
+  @callback execute(params(), context :: map()) ::
               {:ok, output_data()} | {:suspend, suspension_type(), suspend_data()} | {:error, reason :: term()}
 
   @doc """

@@ -923,36 +923,43 @@ defmodule Prana.Execution.ConditionalBranchingTest do
   describe "Logic integration" do
     test "if_condition action evaluates conditions correctly" do
       # Test adult condition (true) - should work
-      result1 =
-        IfConditionAction.execute(%{
-          "condition" => "$input.is_adult",
-          "true_data" => %{"status" => "adult"},
-          "false_data" => %{"status" => "minor"},
-          "$input" => %{"is_adult" => true},
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      params = %{
+        "condition" => "$input.is_adult",
+        "true_data" => %{"status" => "adult"},
+        "false_data" => %{"status" => "minor"}
+      }
+
+      context = %{
+        "$input" => %{"is_adult" => true},
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
+
+      result1 = IfConditionAction.execute(params, context)
 
       assert {:ok, %{"status" => "adult"}, "true"} = result1
 
       # Test minor condition (false) - should work
-      result2 =
-        IfConditionAction.execute(%{
-          "condition" => "$input.is_adult",
-          "true_data" => %{"status" => "adult"},
-          "false_data" => %{"status" => "minor"},
-          "$input" => %{"is_adult" => false},
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      params2 = %{
+        "condition" => "$input.is_adult",
+        "true_data" => %{"status" => "adult"},
+        "false_data" => %{"status" => "minor"}
+      }
+
+      context2 = %{
+        "$input" => %{"is_adult" => false},
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
+
+      result2 = IfConditionAction.execute(params2, context2)
 
       assert {:ok, %{"status" => "minor"}, "false"} = result2
     end
 
     test "switch action routes to correct ports" do
-      # Test premium user
-      premium_input = %{
-        "user_type" => "premium",
+      # Separate params and context for SwitchAction
+      premium_params = %{
         "cases" => [
           %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
           %{
@@ -960,20 +967,22 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             "value" => "standard",
             "port" => "standard",
             "data" => %{"discount" => 0.1}
-          },
-          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => +0.0}}
+          }
         ],
-        "default_data" => %{"discount" => +0.0},
+        "default_port" => "basic",
+        "default_data" => %{"discount" => +0.0}
+      }
+
+      premium_context = %{
         "$input" => %{"user_type" => "premium"},
         "$nodes" => %{},
         "$variables" => %{}
       }
 
-      assert {:ok, %{"discount" => 0.2}, "premium"} = SwitchAction.execute(premium_input)
+      assert {:ok, %{"discount" => 0.2}, "premium"} = SwitchAction.execute(premium_params, premium_context)
 
-      # Test standard user
-      standard_input = %{
-        "user_type" => "standard",
+      # Separate params and context for SwitchAction
+      standard_params = %{
         "cases" => [
           %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
           %{
@@ -982,19 +991,21 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             "port" => "standard",
             "data" => %{"discount" => 0.1}
           },
-          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => +0.0}}
+          %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => 0.0}}
         ],
-        "default_data" => %{"discount" => +0.0},
+        "default_data" => %{"discount" => +0.0}
+      }
+
+      standard_context = %{
         "$input" => %{"user_type" => "standard"},
         "$nodes" => %{},
         "$variables" => %{}
       }
 
-      assert {:ok, %{"discount" => 0.1}, "standard"} = SwitchAction.execute(standard_input)
+      assert {:ok, %{"discount" => 0.1}, "standard"} = SwitchAction.execute(standard_params, standard_context)
 
-      # Test unknown user (default case)
-      unknown_input = %{
-        "user_type" => "enterprise",
+      # Separate params and context for SwitchAction
+      unknown_params = %{
         "cases" => [
           %{"condition" => "$input.user_type", "value" => "premium", "port" => "premium", "data" => %{"discount" => 0.2}},
           %{
@@ -1005,19 +1016,22 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           },
           %{"condition" => "$input.user_type", "value" => "basic", "port" => "basic", "data" => %{"discount" => +0.0}}
         ],
-        "default_data" => %{"discount" => +0.0, "tier" => "unknown"},
+        "default_data" => %{"discount" => +0.0, "tier" => "unknown"}
+      }
+
+      unknown_context = %{
         "$input" => %{"user_type" => "enterprise"},
         "$nodes" => %{},
         "$variables" => %{}
       }
 
-      assert {:ok, %{"discount" => +0.0, "tier" => "unknown"}, "default"} = SwitchAction.execute(unknown_input)
+      assert {:ok, %{"discount" => +0.0, "tier" => "unknown"}, "default"} =
+               SwitchAction.execute(unknown_params, unknown_context)
     end
 
     test "switch action handles numeric values" do
-      # Test condition-based format with numeric values
-      numeric_input = %{
-        "plan_id" => 1,
+      # Separate params and context for SwitchAction
+      numeric_params = %{
         "cases" => [
           %{
             "condition" => "$input.plan_id",
@@ -1038,35 +1052,52 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             "data" => %{"name" => "Basic Plan", "features" => []}
           }
         ],
-        "default_data" => %{"name" => "Unknown Plan", "features" => []},
+        "default_data" => %{"name" => "Unknown Plan", "features" => []}
+      }
+
+      numeric_context = %{
         "$input" => %{"plan_id" => 1},
         "$nodes" => %{},
         "$variables" => %{}
       }
 
       assert {:ok, %{"name" => "Premium Plan", "features" => ["feature1", "feature2"]}, "premium"} =
-               SwitchAction.execute(numeric_input)
+               SwitchAction.execute(numeric_params, numeric_context)
     end
 
     test "if_condition handles missing condition" do
-      invalid_input = %{
-        "age" => 25,
+      # Separate params and context for IfConditionAction
+      invalid_params = %{
         "true_data" => %{"status" => "adult"},
         "false_data" => %{"status" => "minor"}
+        # Note: missing "condition" field to test error case
       }
 
-      assert {:error, "Missing required 'condition' field"} = IfConditionAction.execute(invalid_input)
+      invalid_context = %{
+        "$input" => %{"age" => 25},
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
+
+      assert {:error, "Missing required 'condition' field"} = IfConditionAction.execute(invalid_params, invalid_context)
     end
 
     test "switch handles empty cases array" do
-      invalid_input = %{
+      # Separate params and context for SwitchAction
+      empty_params = %{
         "cases" => [],
         "default_data" => %{"discount" => +0.0},
         "default_port" => "default"
       }
 
+      empty_context = %{
+        "$input" => %{},
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
+
       # Should use default when no cases match (empty cases)
-      assert {:ok, %{"discount" => +0.0}, "default"} = SwitchAction.execute(invalid_input)
+      assert {:ok, %{"discount" => +0.0}, "default"} = SwitchAction.execute(empty_params, empty_context)
     end
   end
 
@@ -1117,7 +1148,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         metadata: %{}
       }
 
-      # Create execution with failed condition node  
+      # Create execution with failed condition node
       execution = %Execution{
         id: "test_execution",
         workflow_id: "if_else_test",
@@ -1243,9 +1274,8 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
   describe "performance and integration" do
     test "handles complex switch workflow with multiple branches" do
-      # Test workflow with many switch cases using condition-based format
-      complex_switch_input = %{
-        "status_code" => 404,
+      # Separate params and context for SwitchAction
+      complex_params = %{
         "cases" => [
           %{"condition" => "$input.status_code", "value" => 200, "port" => "success", "data" => %{"message" => "OK"}},
           %{
@@ -1285,13 +1315,16 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             "data" => %{"message" => "Internal Server Error"}
           }
         ],
-        "default_data" => %{"message" => "Unknown Status"},
+        "default_data" => %{"message" => "Unknown Status"}
+      }
+
+      complex_context = %{
         "$input" => %{"status_code" => 404},
         "$nodes" => %{},
         "$variables" => %{}
       }
 
-      assert {:ok, %{"message" => "Not Found"}, "not_found"} = SwitchAction.execute(complex_switch_input)
+      assert {:ok, %{"message" => "Not Found"}, "not_found"} = SwitchAction.execute(complex_params, complex_context)
     end
 
     test "conditional workflow with nested structure" do

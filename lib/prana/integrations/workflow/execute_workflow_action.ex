@@ -29,13 +29,13 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   end
 
   @impl true
-  def execute(input_data) do
+  def execute(params, _context) do
     # Extract configuration
-    workflow_id = Map.get(input_data, "workflow_id")
-    input_data_for_workflow = Map.get(input_data, "input_data", input_data)
-    execution_mode = Map.get(input_data, "execution_mode", "sync")
-    timeout_ms = Map.get(input_data, "timeout_ms", 300_000)  # 5 minutes default
-    failure_strategy = Map.get(input_data, "failure_strategy", "fail_parent")
+    workflow_id = Map.get(params, "workflow_id")
+    input_data_for_workflow = Map.get(params, "input_data", params)
+    execution_mode = Map.get(params, "execution_mode", "sync")
+    timeout_ms = Map.get(params, "timeout_ms", 300_000)  # 5 minutes default
+    failure_strategy = Map.get(params, "failure_strategy", "fail_parent")
 
     # Validate required parameters
     with :ok <- validate_workflow_id(workflow_id),

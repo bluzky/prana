@@ -36,9 +36,12 @@ defmodule Prana.NodeExecutor do
     node_execution = NodeExecution.new(execution.id, node.id, routed_input)
     node_execution = NodeExecution.start(node_execution)
 
-    with {:ok, prepared_input} <- prepare_input(node, execution, routed_input),
+    # Build context once for both input preparation and action execution
+    context = build_expression_context(execution, routed_input)
+    
+    with {:ok, prepared_params} <- prepare_params(node, context),
          {:ok, action} <- get_action(node) do
-      case invoke_action(action, prepared_input) do
+      case invoke_action(action, prepared_params, context) do
         {:ok, output_data, output_port, context} ->
           # Complete the local node execution and update context
           completed_execution = 
@@ -72,7 +75,7 @@ defmodule Prana.NodeExecutor do
       end
     else
       {:error, reason} ->
-        # Input preparation or action retrieval failed
+        # Params preparation or action retrieval failed
         failed_execution = NodeExecution.fail(node_execution, reason)
         {:error, {reason, failed_execution}}
     end
@@ -113,32 +116,27 @@ defmodule Prana.NodeExecutor do
   end
 
   @doc """
-  Prepare node input using two-mode input handling.
-  
-  Mode 1 (input_map defined): Evaluate input_map expressions and pass result to action
-  Mode 2 (input_map nil): Pass raw routed_input directly to action
+  Prepare node params using expression evaluation.
   
   ## Parameters
-  - `node` - The node to prepare input for
-  - `execution` - Current execution state (with __runtime initialized)
-  - `routed_input` - Input data routed to this node's input ports
+  - `node` - The node to prepare params for
+  - `context` - Full execution context for expression evaluation
   
   ## Returns
-  - `{:ok, prepared_input}` - Input ready for action execution
-  - `{:error, reason}` - Input preparation failed
+  - `{:ok, prepared_params}` - Params ready for action execution
+  - `{:error, reason}` - Params preparation failed
   """
-  @spec prepare_input(Node.t(), Prana.Execution.t(), map()) :: {:ok, map()} | {:error, term()}
-  def prepare_input(%Node{params: nil}, %Prana.Execution{} = _execution, routed_input) do
-    # Mode 2: Raw input mode - pass routed_input directly to action
-    {:ok, routed_input}
+  @spec prepare_params(Node.t(), map()) :: {:ok, map()} | {:error, term()}
+  def prepare_params(%Node{params: nil}, _context) do
+    # No params defined - return empty map
+    {:ok, %{}}
   end
   
-  def prepare_input(%Node{params: params}, %Prana.Execution{} = execution, routed_input) when is_map(params) do
-    # Mode 1: Structured params mode - evaluate params expressions
-    context_data = build_expression_context(execution, routed_input)
+  def prepare_params(%Node{params: params}, context) when is_map(params) do
+    # Evaluate params expressions using context
 
     try do
-      case ExpressionEngine.process_map(params, context_data) do
+      case ExpressionEngine.process_map(params, context) do
         {:ok, processed_map} ->
           {:ok, processed_map || %{}}
 
@@ -190,10 +188,10 @@ defmodule Prana.NodeExecutor do
   @doc """
   Invoke action using Action behavior pattern and handle different return formats.
   """
-  @spec invoke_action(Prana.Action.t(), map()) :: {:ok, term(), String.t()} | {:error, term()}
-  def invoke_action(%Prana.Action{} = action, input) do
-    # Action behavior pattern
-    result = action.module.execute(input)
+  @spec invoke_action(Prana.Action.t(), map(), map()) :: {:ok, term(), String.t()} | {:error, term()}
+  def invoke_action(%Prana.Action{} = action, input, context) do
+    # Action behavior pattern with full context access
+    result = action.module.execute(input, context)
     process_action_result(result, action)
   rescue
     error ->

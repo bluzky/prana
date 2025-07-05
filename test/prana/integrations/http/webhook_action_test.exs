@@ -30,7 +30,7 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
         "webhook_config" => %{"path" => "/test-webhook"}
       }
 
-      assert {:ok, result, "success"} = WebhookAction.execute(input_map)
+      assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
       assert result.webhook_path == "/test-webhook"
       assert result.allowed_methods == ["POST"]
       assert result.auth_config == %{"type" => "none"}
@@ -47,7 +47,7 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
         "webhook_config" => %{"path" => "/my-webhook"}
       }
 
-      assert {:ok, result, "success"} = WebhookAction.execute(input_map)
+      assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
       assert result.webhook_url == "https://example.com/my-webhook"
 
       # Restore original environment
@@ -65,7 +65,7 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
 
       input_map = %{}
 
-      assert {:ok, result, "success"} = WebhookAction.execute(input_map)
+      assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
       assert result.webhook_path == "/webhook"
       assert result.webhook_url == "https://example.com/webhook"
 
