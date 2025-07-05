@@ -35,25 +35,37 @@ Access data passed to the current node via input ports.
 
 **Structure**: `%{"port_name" => data}` for multi-port input routing
 
-### `$nodes` - Completed Node Outputs
+### `$nodes` - Completed Node Outputs and Context
 
-Access outputs from previously completed nodes in the workflow.
+Access outputs and context from previously completed nodes in the workflow.
 
 ```elixir
-# Access node output
+# Structured node access (recommended)
+"$nodes.api_call.output.response.user_id"
+"$nodes.validation.output.status"
+"$nodes.api_call.context.loop_index"
+
+# Direct field access (legacy, still supported)
 "$nodes.api_call.response.user_id"
 "$nodes.validation.status"
 
 # Nested access
-"$nodes.database_query.results[0].name"
-"$nodes.external_api.data.*.id"
+"$nodes.database_query.output.results[0].name"
+"$nodes.external_api.output.data.*.id"
+
+# Context access for loop metadata
+"$nodes.batch_processor.context.batch_size"
+"$nodes.batch_processor.context.has_more_items"
+"$nodes.batch_processor.context.index"
 
 # Multiple node coordination
-"$nodes.user_service.user_id"
-"$nodes.payment_service.transaction_id"
+"$nodes.user_service.output.user_id"
+"$nodes.payment_service.output.transaction_id"
 ```
 
-**Structure**: `%{node_id => output_data}`
+**Structure**: 
+- **Structured access**: `%{node_id => %{output: output_data, context: context_data}}`
+- **Legacy access**: `%{node_id => output_data}` (still supported)
 
 ### `$env` - Environment Variables
 
@@ -139,35 +151,72 @@ Access execution-specific metadata and preparation data.
 }
 ```
 
+## Node Context Access
+
+The structured node access pattern provides access to both output data and execution context:
+
+### Output Data Access
+```elixir
+# Structured pattern (recommended)
+"$nodes.api_call.output.response.user_id"
+"$nodes.validation.output.status"
+
+# Legacy pattern (still supported)
+"$nodes.api_call.response.user_id"
+"$nodes.validation.status"
+```
+
+### Context Data Access
+```elixir
+# Loop iteration context
+"$nodes.batch_processor.context.batch_size"
+"$nodes.batch_processor.context.has_more_items"
+"$nodes.batch_processor.context.index"
+
+# Execution metadata
+"$nodes.api_call.context.retry_count"
+"$nodes.api_call.context.execution_time_ms"
+```
+
+**Benefits of Structured Access:**
+- **Extensibility**: Clean separation of output data and execution context
+- **Loop Support**: Access to iteration metadata and loop state
+- **Future-Proof**: Ready for additional node attributes (timing, metadata, etc.)
+- **Clarity**: Explicit distinction between data output and execution context
+
 ## Expression Engine Features
 
 All built-in variables support these advanced expression features:
 
 ### Simple Field Access
 ```elixir
-"$input.email"                    # Single value
-"$nodes.api_call.response.user_id" # Nested access
-"$vars.api_url"                   # Variables
+"$input.email"                           # Single value
+"$nodes.api_call.output.response.user_id" # Nested access (structured)
+"$nodes.api_call.response.user_id"       # Nested access (legacy)
+"$vars.api_url"                          # Variables
 ```
 
 ### Array Access
 ```elixir
-"$input.users[0].name"            # Index access
-"$nodes.search_results.items[1]"  # Node output arrays
+"$input.users[0].name"                    # Index access
+"$nodes.search_results.output.items[1]"  # Node output arrays (structured)
+"$nodes.search_results.items[1]"         # Node output arrays (legacy)
 ```
 
 ### Wildcard Extraction (Returns Arrays)
 ```elixir
-"$input.users.*.name"             # All user names
-"$nodes.batch_process.results.*"  # All batch results
-"$vars.configs.*.endpoint"        # All configuration endpoints
+"$input.users.*.name"                     # All user names
+"$nodes.batch_process.output.results.*"  # All batch results (structured)
+"$nodes.batch_process.results.*"         # All batch results (legacy)
+"$vars.configs.*.endpoint"               # All configuration endpoints
 ```
 
 ### Filtering (Returns Arrays)
 ```elixir
-"$input.users.{role: \"admin\"}.email"        # Filter by role
-"$nodes.validation.results.{status: \"pass\"}" # Filter node outputs
-"$vars.services.{enabled: true}.url"          # Filter enabled services
+"$input.users.{role: \"admin\"}.email"                    # Filter by role
+"$nodes.validation.output.results.{status: \"pass\"}"    # Filter node outputs (structured)
+"$nodes.validation.results.{status: \"pass\"}"           # Filter node outputs (legacy)
+"$vars.services.{enabled: true}.url"                     # Filter enabled services
 ```
 
 ## Complete Context Example
@@ -183,12 +232,23 @@ Here's a complete example of the expression context structure:
   },
   "$nodes" => %{
     "api_call" => %{
-      "response" => %{"user_id" => 123, "status" => "success"}
+      "output" => %{
+        "response" => %{"user_id" => 123, "status" => "success"}
+      },
+      "context" => %{
+        "retry_count" => 0,
+        "execution_time_ms" => 250
+      }
     },
     "validation" => %{
-      "valid" => true,
-      "score" => 95,
-      "errors" => []
+      "output" => %{
+        "valid" => true,
+        "score" => 95,
+        "errors" => []
+      },
+      "context" => %{
+        "validation_rules_applied" => ["email", "age", "terms"]
+      }
     }
   },
   "$env" => %{
@@ -230,7 +290,7 @@ Actions receive these variables through the expression context when their input 
   input_config: %{
     "to" => "$input.email",
     "subject" => "Welcome to #{$workflow.id}",
-    "body" => "Hello #{$input.name}, your account ID is #{$nodes.registration.user_id}"
+    "body" => "Hello #{$input.name}, your account ID is #{$nodes.registration.output.user_id}"
   }
 }
 ```
@@ -242,7 +302,7 @@ Built-in variables can be used in conditional expressions:
 ```elixir
 # In connection conditions
 %Prana.Connection{
-  condition: "$nodes.validation.score >= 90",
+  condition: "$nodes.validation.output.score >= 90",
   # ...
 }
 
@@ -257,6 +317,12 @@ Built-in variables can be used in conditional expressions:
 ```
 
 ## Implementation Notes
+
+### Node Access Pattern Migration
+- **Current**: Both structured (`$nodes.{id}.output`) and legacy (`$nodes.{id}.field`) patterns supported
+- **Recommended**: Use structured pattern for new workflows and loop integrations
+- **Legacy Support**: Existing workflows continue to work unchanged
+- **Context Access**: Only available through structured pattern (`$nodes.{id}.context`)
 
 ### Variable Name Discrepancy
 - **Documentation**: Often references `$variables`
