@@ -2,7 +2,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   @moduledoc """
   Execute Sub-workflow Action - trigger a sub-workflow with coordination
   
-  Expected input_map:
+  Expected params:
   - workflow_id: The ID of the sub-workflow to execute
   - input_data: Data to pass to the sub-workflow (optional, defaults to full input)
   - execution_mode: Execution mode - "sync" | "async" | "fire_and_forget" (optional, defaults to "sync")

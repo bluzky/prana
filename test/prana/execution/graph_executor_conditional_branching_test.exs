@@ -77,7 +77,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :trigger,
           integration_name: "manual",
           action_name: "trigger",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: [],
           error_handling: %Prana.ErrorHandling{},
@@ -94,7 +94,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :logic,
           integration_name: "logic",
           action_name: "if_condition",
-          input_map: %{
+          params: %{
             "condition" => "age >= 18",
             "true_data" => %{"status" => "adult", "message" => "You are an adult"},
             "false_data" => %{"status" => "minor", "message" => "You are a minor"}
@@ -115,7 +115,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_adult",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: ["input"],
           error_handling: %Prana.ErrorHandling{},
@@ -132,7 +132,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_minor",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: ["input"],
           error_handling: %Prana.ErrorHandling{},
@@ -189,7 +189,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :trigger,
           integration_name: "manual",
           action_name: "trigger",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: [],
           error_handling: %Prana.ErrorHandling{},
@@ -206,7 +206,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :logic,
           integration_name: "logic",
           action_name: "switch",
-          input_map: %{
+          params: %{
             "switch_expression" => "user_type",
             "cases" => %{
               "premium" => {"premium", %{"discount" => 0.2, "tier" => "premium"}},
@@ -231,7 +231,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_adult",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: ["input"],
           error_handling: %Prana.ErrorHandling{},
@@ -248,7 +248,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_adult",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: ["input"],
           error_handling: %Prana.ErrorHandling{},
@@ -265,7 +265,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_minor",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: ["input"],
           error_handling: %Prana.ErrorHandling{},
@@ -1309,7 +1309,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             type: :trigger,
             integration_name: "manual",
             action_name: "trigger",
-            input_map: %{},
+            params: %{},
             output_ports: ["success"],
             input_ports: [],
             error_handling: %Prana.ErrorHandling{},
@@ -1324,7 +1324,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             type: :logic,
             integration_name: "logic",
             action_name: "switch",
-            input_map: %{
+            params: %{
               "switch_expression" => "user_type",
               "cases" => %{
                 "premium" => {"premium", %{"requires_age_check" => true}},
@@ -1346,7 +1346,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             type: :logic,
             integration_name: "logic",
             action_name: "if_condition",
-            input_map: %{
+            params: %{
               "condition" => "age >= 21",
               "true_data" => %{"eligible" => true, "tier" => "premium_adult"},
               "false_data" => %{"eligible" => false, "tier" => "premium_minor"}
@@ -1365,7 +1365,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             type: :action,
             integration_name: "manual",
             action_name: "process_adult",
-            input_map: %{},
+            params: %{},
             output_ports: ["success"],
             input_ports: ["input"],
             error_handling: %Prana.ErrorHandling{},

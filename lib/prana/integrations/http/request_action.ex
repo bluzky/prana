@@ -60,7 +60,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   def input_schema, do: HTTPRequestSchema
 
   @impl true
-  def validate_input(input_map) do
+  def validate_params(input_map) do
     case HTTPRequestSchema.cast_and_validate(input_map) do
       {:ok, validated_data} ->
         {:ok, validated_data}

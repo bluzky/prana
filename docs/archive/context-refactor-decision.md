@@ -84,7 +84,7 @@ NodeExecutor builds unified expression context with required built-in variables:
 **Mode 1: Structured Input (input_map defined)**
 ```elixir
 %Prana.Node{
-  input_map: %{
+  params: %{
     "url" => "$vars.api_base/users/$input.primary.user_id",
     "method" => "GET", 
     "headers" => %{"Authorization" => "Bearer $env.token"},
@@ -93,7 +93,7 @@ NodeExecutor builds unified expression context with required built-in variables:
   }
 }
 
-# Action receives evaluated input_map:
+# Action receives evaluated params:
 # %{"url" => "https://api.com/users/123", "method" => "GET", "headers" => %{...}, ...}
 ```
 
@@ -102,7 +102,7 @@ NodeExecutor builds unified expression context with required built-in variables:
 %Prana.Node{
   integration_name: "code",
   action_name: "eval", 
-  input_map: nil  # No input transformation
+  params: nil  # No input transformation
 }
 
 # Action receives raw routed_input:

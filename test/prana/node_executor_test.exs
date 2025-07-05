@@ -276,7 +276,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{"test" => "data"},
+        params: %{"test" => "data"},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -316,7 +316,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{"test" => "data1"},
+        params: %{"test" => "data1"},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -328,7 +328,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{"test" => "data2"},
+        params: %{"test" => "data2"},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -370,7 +370,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{
+        params: %{
           "message" => "hello world"
         },
         output_ports: ["success", "error"],
@@ -412,7 +412,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "transform_action",
-        input_map: %{
+        params: %{
           "name" => "$input.user_name",
           "email" => "$input.contact.email",
           "previous_result" => "$nodes.api_call.user_id"
@@ -457,7 +457,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "error_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -491,7 +491,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "explicit_port_action",
-        input_map: %{
+        params: %{
           "should_succeed" => true
         },
         output_ports: ["custom_success", "custom_error"],
@@ -519,7 +519,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "explicit_port_action",
-        input_map: %{
+        params: %{
           "should_succeed" => false
         },
         output_ports: ["custom_success", "custom_error"],
@@ -551,7 +551,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "invalid_return_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -581,7 +581,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "exception_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -612,7 +612,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "invalid_port_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -642,7 +642,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "nonexistent",
         action_name: "some_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -671,7 +671,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "nonexistent_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -700,7 +700,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{
+        params: %{
           "all_emails" => "$nodes.users.*.email",
           "admin_emails" => "$nodes.users.{role: \"admin\"}.email",
           "first_user" => "$nodes.users[0].name",
@@ -747,7 +747,7 @@ defmodule Prana.NodeExecutorTest do
     test "evaluates expressions correctly" do
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "simple" => "$input.name",
           "nested" => "$input.user.email",
           "from_nodes" => "$nodes.prev_step.result"
@@ -782,7 +782,7 @@ defmodule Prana.NodeExecutorTest do
     test "handles missing expression data gracefully" do
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "missing" => "$input.nonexistent.field"
         }
       }
@@ -804,7 +804,7 @@ defmodule Prana.NodeExecutorTest do
       # For now, we'll test with invalid input_map structure
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "test" => "$invalid..expression"
         }
       }
@@ -878,7 +878,7 @@ defmodule Prana.NodeExecutorTest do
       # This tests the private function indirectly through prepare_input
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "from_input" => "$input.user_id",
           "from_nodes" => "$nodes.step1.result",
           "from_env" => "$env.api_key"

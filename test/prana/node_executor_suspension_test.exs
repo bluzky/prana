@@ -54,7 +54,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
-        input_map: %{
+        params: %{
           "workflow_id" => "user_onboarding",
           "input_data" => %{"user_id" => "$vars.user_id"},
           "execution_mode" => "sync",
@@ -96,7 +96,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
-        input_map: %{
+        params: %{
           "workflow_id" => "notification_flow",
           "input_data" => %{"message" => "Hello World"},
           "execution_mode" => "fire_and_forget"
@@ -128,7 +128,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
-        input_map: %{
+        params: %{
           # Invalid empty workflow_id
           "workflow_id" => "",
           "wait_for_completion" => true
@@ -160,7 +160,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
-        input_map: %{
+        params: %{
           "workflow_id" => "expression_flow",
           "input_data" => %{
             "api_url" => "$vars.api_url",
@@ -199,7 +199,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
-        input_map: %{
+        params: %{
           "workflow_id" => "complex_flow",
           "input_data" => %{
             "user_id" => "$vars.user.id",
@@ -233,7 +233,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
-        input_map: %{
+        params: %{
           "workflow_id" => "test_flow",
           "input_data" => %{
             "invalid_reference" => "$vars.nonexistent.deeply.nested.field"
@@ -262,7 +262,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
-        input_map: %{
+        params: %{
           "workflow_id" => "timing_flow",
           "wait_for_completion" => true
         }

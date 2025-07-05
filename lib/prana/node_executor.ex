@@ -128,17 +128,17 @@ defmodule Prana.NodeExecutor do
   - `{:error, reason}` - Input preparation failed
   """
   @spec prepare_input(Node.t(), Prana.Execution.t(), map()) :: {:ok, map()} | {:error, term()}
-  def prepare_input(%Node{input_map: nil}, %Prana.Execution{} = _execution, routed_input) do
+  def prepare_input(%Node{params: nil}, %Prana.Execution{} = _execution, routed_input) do
     # Mode 2: Raw input mode - pass routed_input directly to action
     {:ok, routed_input}
   end
   
-  def prepare_input(%Node{input_map: input_map}, %Prana.Execution{} = execution, routed_input) when is_map(input_map) do
-    # Mode 1: Structured input mode - evaluate input_map expressions
+  def prepare_input(%Node{params: params}, %Prana.Execution{} = execution, routed_input) when is_map(params) do
+    # Mode 1: Structured params mode - evaluate params expressions
     context_data = build_expression_context(execution, routed_input)
 
     try do
-      case ExpressionEngine.process_map(input_map, context_data) do
+      case ExpressionEngine.process_map(params, context_data) do
         {:ok, processed_map} ->
           {:ok, processed_map || %{}}
 
@@ -147,16 +147,16 @@ defmodule Prana.NodeExecutor do
            %{
              "type" => "expression_evaluation_failed",
              "reason" => reason,
-             "input_map" => input_map
+             "params" => params
            }}
       end
     rescue
       error ->
         {:error,
          %{
-           "type" => "input_preparation_failed",
+           "type" => "params_preparation_failed",
            "error" => inspect(error),
-           "input_map" => input_map
+           "params" => params
          }}
     end
   end

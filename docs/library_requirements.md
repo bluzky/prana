@@ -30,7 +30,7 @@
   type: :trigger | :action | :logic | :wait | :output,
   integration_name: String.t(),
   action_name: String.t(),
-  input_map: map(),
+  params: map(),
   output_ports: [String.t()],
   input_ports: [String.t()],
   error_handling: Prana.ErrorHandling.t(),

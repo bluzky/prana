@@ -47,7 +47,7 @@ workflow = %Prana.Workflow{
       type: :trigger,
       integration_name: "manual",
       action_name: "trigger",
-      input_map: %{},
+      params: %{},
       output_ports: ["success"]
     },
     %Prana.Node{
@@ -56,7 +56,7 @@ workflow = %Prana.Workflow{
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: %{
+      params: %{
         "message" => "$input.message",
         "user" => "$input.user"
       },
@@ -287,7 +287,7 @@ end
 %Prana.Node{
   integration_name: "custom",
   action_name: "my_action",
-  input_map: %{
+  params: %{
     "user_id" => "$input.user_id",
     "api_key" => "$variables.api_key"
   }

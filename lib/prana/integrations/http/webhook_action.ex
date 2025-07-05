@@ -47,7 +47,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   def input_schema, do: WebhookSchema
 
   @impl true
-  def validate_input(input_map) do
+  def validate_params(input_map) do
     case Skema.cast_and_validate(input_map, WebhookSchema) do
       {:ok, validated_data} ->
         case validate_methods(validated_data.webhook_config.methods) do

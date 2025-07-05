@@ -48,9 +48,9 @@ defmodule Prana.Behaviour.Action do
           end
         end
 
-        def execute(input_data) do
-          # Make HTTP request with configuration from input_data
-          case make_request(input_data["endpoint"], input_data, input_data["api_key"]) do
+        def execute(params) do
+          # Make HTTP request with configuration from params
+          case make_request(params["endpoint"], params, params["api_key"]) do
             {:ok, response} -> {:ok, response}
             {:error, reason} -> {:error, reason}
           end
@@ -64,11 +64,11 @@ defmodule Prana.Behaviour.Action do
 
   ## Suspension Example
 
-      def execute(input_data) do
-        webhook_url = input_data["webhook_url"]
+      def execute(params) do
+        webhook_url = params["webhook_url"]
         
         # Initiate async operation that will callback to webhook
-        {:ok, request_id} = start_async_operation(input_data, webhook_url)
+        {:ok, request_id} = start_async_operation(params, webhook_url)
         
         # Suspend with webhook data
         suspend_data = %{
@@ -95,7 +95,7 @@ defmodule Prana.Behaviour.Action do
   @type suspension_type :: :webhook | :interval | :schedule | :sub_workflow | atom()
   @type suspend_data :: term()
   @type preparation_data :: map()
-  @type input_data :: map() 
+  @type params :: map() 
   @type output_data :: term()
   @type resume_input :: map()
 
@@ -122,13 +122,13 @@ defmodule Prana.Behaviour.Action do
               {:ok, preparation_data()} | {:error, reason :: term()}
 
   @doc """
-  Execute the action with input data.
+  Execute the action with resolved params.
 
   Called when the node is ready to execute during workflow execution.
-  Receives processed input data from previous nodes and expressions.
+  Receives resolved params from node configuration expressions.
 
   ## Parameters
-  - `input_data` - Processed input data from previous nodes and expressions
+  - `params` - Resolved params from node configuration and expressions
 
   ## Returns
   - `{:ok, output_data}` - Action completed successfully
@@ -137,23 +137,23 @@ defmodule Prana.Behaviour.Action do
 
   ## Examples
 
-      def execute(input_data) do
-        case make_api_call(input_data["endpoint"], input_data) do
+      def execute(params) do
+        case make_api_call(params["endpoint"], params) do
           {:ok, response} -> {:ok, response}
           {:error, reason} -> {:error, reason}
         end
       end
 
       # Suspension example
-      def execute(input_data) do
-        webhook_url = input_data["webhook_url"]
-        {:ok, request_id} = start_async_operation(input_data, webhook_url)
+      def execute(params) do
+        webhook_url = params["webhook_url"]
+        {:ok, request_id} = start_async_operation(params, webhook_url)
         
         suspend_data = %{request_id: request_id, webhook_url: webhook_url}
         {:suspend, :webhook, suspend_data}
       end
   """
-  @callback execute(input_data()) ::
+  @callback execute(params()) ::
               {:ok, output_data()} | {:suspend, suspension_type(), suspend_data()} | {:error, reason :: term()}
 
   @doc """
@@ -194,9 +194,9 @@ defmodule Prana.Behaviour.Action do
   @callback input_schema() :: module() | map()
 
   @doc """
-  Validates input_map for this action using schema.
+  Validates params for this action using schema.
   """
-  @callback validate_input(input_map :: map()) :: 
+  @callback validate_params(params :: map()) :: 
     {:ok, validated_map :: map()} | {:error, reasons :: [String.t()]}
 
   @doc """
@@ -207,7 +207,7 @@ defmodule Prana.Behaviour.Action do
   """
   @callback suspendable?() :: boolean()
 
-  @optional_callbacks [suspendable?: 0, input_schema: 0, validate_input: 1]
+  @optional_callbacks [suspendable?: 0, input_schema: 0, validate_params: 1]
 
   defmacro __using__(_opts) do
     quote do

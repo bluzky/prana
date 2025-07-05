@@ -33,7 +33,7 @@ This document outlines the implementation plan for integrating Skema schema vali
   @doc """
   Validates input_map for this action using schema.
   """
-  @callback validate_input(input_map :: map()) :: 
+  @callback validate_params(input_map :: map()) ::
     {:ok, validated_map :: map()} | {:error, reasons :: [String.t()]}
 
   @optional_callbacks [input_schema: 0, validate_input: 1]
@@ -49,20 +49,20 @@ This document outlines the implementation plan for integrating Skema schema vali
     use Skema
 
     defschema HTTPRequestSchema do
-      field :url, :string, required: true, 
+      field :url, :string, required: true,
             validation: [format: ~r/^https?:\/\/.+/]
-      
-      field :method, :string, default: "GET", 
+
+      field :method, :string, default: "GET",
             inclusion: ["GET", "POST", "PUT", "DELETE", "HEAD", "PATCH", "OPTIONS"]
-      
+
       field :headers, :map, default: %{}
-      
-      field :timeout, :integer, default: 5000, 
+
+      field :timeout, :integer, default: 5000,
             number: [greater_than: 0, less_than: 300_000]
-      
-      field :retry, :integer, default: 0, 
+
+      field :retry, :integer, default: 0,
             number: [greater_than_or_equal_to: 0, less_than: 10]
-      
+
       field :auth, AuthSchema
       field :body, :string
       field :json, :map
@@ -70,9 +70,9 @@ This document outlines the implementation plan for integrating Skema schema vali
     end
 
     defschema AuthSchema do
-      field :type, :string, required: true, 
+      field :type, :string, required: true,
             inclusion: ["basic", "bearer", "api_key"]
-      
+
       field :username, :string  # For basic auth
       field :password, :string  # For basic auth
       field :token, :string     # For bearer auth
@@ -90,12 +90,12 @@ This document outlines the implementation plan for integrating Skema schema vali
     use Skema
 
     defschema WebhookSchema do
-      field :timeout_hours, :float, default: 24.0, 
+      field :timeout_hours, :float, default: 24.0,
             number: [greater_than: 0.1, less_than_or_equal_to: 8760.0]
-      
-      field :base_url, :string, 
+
+      field :base_url, :string,
             validation: [format: ~r/^https?:\/\/.+/]
-      
+
       field :webhook_config, WebhookConfigSchema, default: %{}
     end
 
@@ -114,7 +114,7 @@ This document outlines the implementation plan for integrating Skema schema vali
 - **Changes**:
   ```elixir
   @impl true
-  def validate_input(input_map) do
+  def validate_params(input_map) do
     case Skema.cast_and_validate(input_map, HTTPRequestSchema) do
       {:ok, validated_data} -> {:ok, validated_data}
       {:error, errors} -> {:error, format_errors(errors)}
@@ -133,7 +133,7 @@ This document outlines the implementation plan for integrating Skema schema vali
 - **Changes**:
   ```elixir
   @impl true
-  def validate_input(input_map) do
+  def validate_params(input_map) do
     case Skema.cast_and_validate(input_map, WebhookSchema) do
       {:ok, validated_data} -> {:ok, validated_data}
       {:error, errors} -> {:error, format_errors(errors)}
@@ -149,7 +149,7 @@ This document outlines the implementation plan for integrating Skema schema vali
   @impl true
   def input_schema, do: HTTPRequestSchema
 
-  # In WebhookAction  
+  # In WebhookAction
   @impl true
   def input_schema, do: WebhookSchema
   ```
@@ -165,7 +165,7 @@ This document outlines the implementation plan for integrating Skema schema vali
     def extract_field_info(schema_module) do
       # Introspect Skema schema and return field metadata
       # - Field types
-      # - Required fields  
+      # - Required fields
       # - Default values
       # - Validation rules
       # - Nested schemas
@@ -216,7 +216,7 @@ This document outlines the implementation plan for integrating Skema schema vali
 ### **Phase 6: Documentation**
 
 #### **skema-12: Update Documentation** (LOW PRIORITY)
-- **Files**: 
+- **Files**:
   - Update HTTP integration usage guide
   - Add schema examples to README
   - Document validation patterns
@@ -287,7 +287,7 @@ This document outlines the implementation plan for integrating Skema schema vali
 ## Timeline Estimate
 
 - **Phase 1-3** (Core Implementation): 2-3 days
-- **Phase 4** (Utilities): 1 day  
+- **Phase 4** (Utilities): 1 day
 - **Phase 5** (Testing): 1-2 days
 - **Phase 6** (Documentation): 1 day
 

@@ -52,7 +52,7 @@ Simple sequential execution where each node processes the output of the previous
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "send_welcome",
@@ -60,7 +60,7 @@ Simple sequential execution where each node processes the output of the previous
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
-      input_map: %{
+      params: %{
         "workflow_id" => "welcome_email",
         "input_data" => "$nodes.process_user",
         "execution_mode" => "fire_and_forget"
@@ -106,7 +106,7 @@ Route data to different paths based on conditions using the Logic integration.
       type: :action,
       integration_name: "logic",
       action_name: "if_condition",
-      input_map: %{
+      params: %{
         "condition" => "age >= 18",
         "age" => "$input.age"
       }
@@ -117,7 +117,7 @@ Route data to different paths based on conditions using the Logic integration.
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "process_minor",
@@ -125,7 +125,7 @@ Route data to different paths based on conditions using the Logic integration.
       type: :action,
       integration_name: "manual",
       action_name: "process_minor",
-      input_map: "$input"
+      params: "$input"
     }
   ],
   connections: [
@@ -173,7 +173,7 @@ Route to multiple different paths based on field values using switch logic.
       type: :action,
       integration_name: "logic",
       action_name: "switch",
-      input_map: %{
+      params: %{
         "cases" => [
           %{
             "condition" => "$input.subscription_tier",
@@ -204,7 +204,7 @@ Route to multiple different paths based on field values using switch logic.
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "standard_processor", 
@@ -212,7 +212,7 @@ Route to multiple different paths based on field values using switch logic.
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "basic_processor",
@@ -220,7 +220,7 @@ Route to multiple different paths based on field values using switch logic.
       type: :action,
       integration_name: "manual", 
       action_name: "process_minor",
-      input_map: "$input"
+      params: "$input"
     }
   ],
   connections: [
@@ -274,7 +274,7 @@ Split execution into parallel paths and merge results back together.
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "enrichment_path",
@@ -282,7 +282,7 @@ Split execution into parallel paths and merge results back together.
       type: :action,
       integration_name: "manual",
       action_name: "process_minor",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "merge_results",
@@ -290,7 +290,7 @@ Split execution into parallel paths and merge results back together.
       type: :action,
       integration_name: "data",
       action_name: "merge",
-      input_map: %{
+      params: %{
         "strategy" => "merge",
         "input_a" => "$nodes.validation_path",
         "input_b" => "$nodes.enrichment_path"
@@ -350,7 +350,7 @@ Coordinate parent and child workflows for complex business processes.
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
-      input_map: %{
+      params: %{
         "workflow_id" => "document_check",
         "input_data" => %{
           "user_id" => "$input.user_id",
@@ -367,7 +367,7 @@ Coordinate parent and child workflows for complex business processes.
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
-      input_map: %{
+      params: %{
         "workflow_id" => "biometric_check",
         "input_data" => %{
           "user_id" => "$input.user_id",
@@ -384,7 +384,7 @@ Coordinate parent and child workflows for complex business processes.
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
-      input_map: %{
+      params: %{
         "workflow_id" => "verification_complete_notification",
         "input_data" => %{
           "user_email" => "$input.email",
@@ -462,7 +462,7 @@ Use expressions to access and transform data throughout the workflow.
   type: :action,
   integration_name: "manual",
   action_name: "process_adult",
-  input_map: %{
+  params: %{
     # Simple field mapping
     "user_id" => "$input.user_id",
     "email" => "$input.contact.email",
@@ -496,7 +496,7 @@ Collects inputs as separate array elements.
   type: :action,
   integration_name: "data",
   action_name: "merge",
-  input_map: %{
+  params: %{
     "strategy" => "append",
     "input_a" => "$nodes.path_a.result",
     "input_b" => "$nodes.path_b.result"
@@ -519,7 +519,7 @@ Combines map inputs using deep merge.
   type: :action,
   integration_name: "data",
   action_name: "merge",
-  input_map: %{
+  params: %{
     "strategy" => "merge",
     "input_a" => "$nodes.validation.user_data",
     "input_b" => "$nodes.enrichment.additional_data"
@@ -542,7 +542,7 @@ Flattens and concatenates array inputs.
   type: :action,
   integration_name: "data",
   action_name: "merge",
-  input_map: %{
+  params: %{
     "strategy" => "concat",
     "input_a" => "$nodes.source_a.items",
     "input_b" => "$nodes.source_b.items"
@@ -578,7 +578,7 @@ Combine conditional logic with data merging.
       type: :action,
       integration_name: "logic",
       action_name: "if_condition",
-      input_map: %{
+      params: %{
         "condition" => "age >= 18",
         "age" => "$input.age"
       }
@@ -589,7 +589,7 @@ Combine conditional logic with data merging.
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "minor_processing",
@@ -597,7 +597,7 @@ Combine conditional logic with data merging.
       type: :action,
       integration_name: "manual",
       action_name: "process_minor",
-      input_map: "$input"
+      params: "$input"
     },
     %Node{
       id: "merge_results",
@@ -605,7 +605,7 @@ Combine conditional logic with data merging.
       type: :action,
       integration_name: "data",
       action_name: "merge",
-      input_map: %{
+      params: %{
         "strategy" => "append",
         "input_a" => "$nodes.adult_processing",
         "input_b" => "$nodes.minor_processing"
@@ -644,7 +644,7 @@ Coordinate multiple levels of sub-workflow execution.
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
-      input_map: %{
+      params: %{
         "workflow_id" => "basic_validation",
         "input_data" => "$input",
         "execution_mode" => "sync"
@@ -656,7 +656,7 @@ Coordinate multiple levels of sub-workflow execution.
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
-      input_map: %{
+      params: %{
         "workflow_id" => "advanced_processing",
         "input_data" => %{
           "original_input" => "$input",
@@ -672,7 +672,7 @@ Coordinate multiple levels of sub-workflow execution.
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
-      input_map: %{
+      params: %{
         "workflow_id" => "notification_batch",
         "input_data" => %{
           "user_data" => "$input",
@@ -750,7 +750,7 @@ test_workflow = %Workflow{
       type: :action,
       integration_name: "manual",
       action_name: "process_adult",
-      input_map: "$input"
+      params: "$input"
     }
   ],
   connections: [

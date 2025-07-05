@@ -52,7 +52,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
         type: :trigger,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: []
       }
@@ -66,7 +66,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
             type: :action,
             integration_name: "test",
             action_name: "simple_action",
-            input_map: %{},
+            params: %{},
             output_ports: ["success"],
             input_ports: ["input"]
           }
@@ -140,7 +140,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
         type: :trigger,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: []
       }
@@ -155,7 +155,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
             type: :action,
             integration_name: "test",
             action_name: "simple_action",
-            input_map: %{},
+            params: %{},
             output_ports: ["success"],
             input_ports: ["input"]
           }
@@ -209,7 +209,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -224,7 +224,7 @@ defmodule Prana.GraphExecutorPerformanceTest do
             type: :trigger,
             integration_name: "test",
             action_name: "simple_action",
-            input_map: %{},
+            params: %{},
             output_ports: ["success"],
             input_ports: []
           }

@@ -71,7 +71,7 @@ defmodule Prana.Execution.DiamondForkTest do
           type: :trigger,
           integration_name: "manual",
           action_name: "trigger",
-          input_map: %{},
+          params: %{},
           output_ports: ["success"],
           input_ports: []
         },
@@ -84,7 +84,7 @@ defmodule Prana.Execution.DiamondForkTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_adult",
-          input_map: %{
+          params: %{
             "data" => "$input.data",
             "branch" => "B"
           },
@@ -100,7 +100,7 @@ defmodule Prana.Execution.DiamondForkTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_minor",
-          input_map: %{
+          params: %{
             "data" => "$input.data",
             "branch" => "C"
           },
@@ -116,7 +116,7 @@ defmodule Prana.Execution.DiamondForkTest do
           type: :action,
           integration_name: "data",
           action_name: "merge",
-          input_map: %{
+          params: %{
             "strategy" => "append",
             "input_a" => "$nodes.branch_b",
             "input_b" => "$nodes.branch_c"
@@ -133,7 +133,7 @@ defmodule Prana.Execution.DiamondForkTest do
           type: :action,
           integration_name: "manual",
           action_name: "process_adult",
-          input_map: %{
+          params: %{
             "data" => "$input.data",
             "final_step" => "true"
           },
@@ -191,7 +191,7 @@ defmodule Prana.Execution.DiamondForkTest do
     updated_nodes =
       Enum.map(workflow.nodes, fn node ->
         if node.id == failing_branch do
-          %{node | action_name: "non_existent_action", input_map: %{"error_message" => "Simulated branch failure"}}
+          %{node | action_name: "non_existent_action", params: %{"error_message" => "Simulated branch failure"}}
         else
           node
         end

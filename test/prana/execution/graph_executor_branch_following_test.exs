@@ -50,7 +50,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :trigger,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: []
       }
@@ -63,7 +63,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -75,7 +75,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -88,7 +88,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -100,7 +100,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -113,7 +113,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input_a", "input_b"]
       }

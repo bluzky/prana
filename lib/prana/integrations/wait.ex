@@ -46,7 +46,7 @@ defmodule Prana.Integrations.Wait do
   @doc """
   Unified wait action - supports multiple wait modes
 
-  Expected input_map:
+  Expected params:
   - mode: Wait mode - "interval" | "schedule" | "webhook" (required)
 
   Mode-specific parameters:

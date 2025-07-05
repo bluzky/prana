@@ -61,7 +61,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             type: :action,
             integration_name: "workflow",
             action_name: "execute_workflow",
-            input_map: %{
+            params: %{
               "workflow_id" => "child_workflow",
               "input_data" => %{"user_id" => "$input.user_id"},
               "execution_mode" => "sync",
@@ -74,7 +74,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             type: :action,
             integration_name: "manual",
             action_name: "process_adult",
-            input_map: %{"data" => "$input"}
+            params: %{"data" => "$input"}
           }
         ],
         connections: [
@@ -157,7 +157,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             type: :action,
             integration_name: "workflow",
             action_name: "execute_workflow",
-            input_map: %{
+            params: %{
               "workflow_id" => "background_task",
               "input_data" => %{"task" => "cleanup"},
               "execution_mode" => "fire_and_forget"
@@ -169,7 +169,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             type: :action,
             integration_name: "manual",
             action_name: "process_adult",
-            input_map: %{"data" => "$input"}
+            params: %{"data" => "$input"}
           }
         ],
         connections: [
@@ -454,7 +454,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           type: :action,
           integration_name: "workflow",
           action_name: "execute_workflow",
-          input_map: %{
+          params: %{
             "workflow_id" => "child_workflow",
             "input_data" => %{"user_id" => "$input.user_id"},
             "execution_mode" => "sync"
@@ -503,7 +503,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           type: :action,
           integration_name: "workflow",
           action_name: "execute_workflow",
-          input_map: %{
+          params: %{
             "workflow_id" => "stage_1_workflow",
             "execution_mode" => "sync"
           }
@@ -514,7 +514,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           type: :action,
           integration_name: "workflow",
           action_name: "execute_workflow",
-          input_map: %{
+          params: %{
             "workflow_id" => "stage_2_workflow",
             "execution_mode" => "sync"
           }

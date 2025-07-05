@@ -12,7 +12,7 @@ defmodule Prana.Node do
           type: node_type(),
           integration_name: String.t(),
           action_name: String.t(),
-          input_map: map(),
+          params: map(),
           output_ports: [String.t()],
           input_ports: [String.t()],
           error_handling: Prana.ErrorHandling.t(),
@@ -29,7 +29,7 @@ defmodule Prana.Node do
     :type,
     :integration_name,
     :action_name,
-    :input_map,
+    :params,
     :output_ports,
     :input_ports,
     :error_handling,
@@ -41,7 +41,7 @@ defmodule Prana.Node do
   @doc """
   Creates a new node
   """
-  def new(name, type, integration_name, action_name, input_map \\ %{}, custom_id \\ nil) do
+  def new(name, type, integration_name, action_name, params \\ %{}, custom_id \\ nil) do
     %__MODULE__{
       id: generate_id(),
       custom_id: custom_id || generate_custom_id(name),
@@ -49,7 +49,7 @@ defmodule Prana.Node do
       type: type,
       integration_name: integration_name,
       action_name: action_name,
-      input_map: input_map,
+      params: params,
       output_ports: [],
       input_ports: [],
       error_handling: %Prana.ErrorHandling{},
@@ -71,7 +71,7 @@ defmodule Prana.Node do
       type: parse_type(Map.get(data, "type") || Map.get(data, :type)),
       integration_name: Map.get(data, "integration_name") || Map.get(data, :integration_name),
       action_name: Map.get(data, "action_name") || Map.get(data, :action_name),
-      input_map: Map.get(data, "input_map") || Map.get(data, :input_map) || %{},
+      params: Map.get(data, "params") || Map.get(data, :params) || Map.get(data, "input_map") || Map.get(data, :input_map) || %{},
       output_ports: Map.get(data, "output_ports") || Map.get(data, :output_ports) || [],
       input_ports: Map.get(data, "input_ports") || Map.get(data, :input_ports) || [],
       error_handling: parse_error_handling(Map.get(data, "error_handling") || Map.get(data, :error_handling)),
