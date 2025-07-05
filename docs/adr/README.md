@@ -16,10 +16,11 @@ Each ADR includes:
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [001](./001-branch-following-execution.md) | Branch-Following Execution Strategy | Accepted | 2025-06-26 |
-| [002](./002-enhanced-merge-node-multiple-inputs.md) | Enhanced Merge Node with Multiple Named Input Ports | Proposed | 2025-06-26 |
-| [003](./003-unified-suspension-resume.md) | Unified Suspension/Resume Mechanism for Async Coordination | Proposed | 2024-12-29 |
-| [004](./004-middleware-system.md) | Middleware System for Workflow Lifecycle Events | Accepted | 2024-12-29 |
+| [001](./001-branch-following-execution.md) | Branch-Following Execution Strategy | Accepted | 2025-07-05 |
+| [002](./002-enhanced-merge-node-multiple-inputs.md) | Enhanced Merge Node with Multiple Named Input Ports | Proposed | 2025-07-05 |
+| [003](./003-unified-suspension-resume.md) | Unified Suspension/Resume Mechanism for Async Coordination | Proposed | 2025-07-05 |
+| [004](./004-middleware-system.md) | Middleware System for Workflow Lifecycle Events | Accepted | 2025-07-05 |
+| [006](./006-loop-integration-design.md) | Loop Integration Design | Proposed | 2025-07-05 |
 
 ## Creating New ADRs
 

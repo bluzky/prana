@@ -60,7 +60,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   def input_schema, do: HTTPRequestSchema
 
   @impl true
-  def validate_input(input_map) do
+  def validate_params(input_map) do
     case HTTPRequestSchema.cast_and_validate(input_map) do
       {:ok, validated_data} ->
         {:ok, validated_data}
@@ -76,8 +76,8 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   end
 
   @impl true
-  def execute(input_map) do
-    case make_http_request(input_map) do
+  def execute(params, _context) do
+    case make_http_request(params) do
       {:ok, response} ->
         {:ok, format_response(response), "success"}
 
@@ -93,7 +93,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
+  def resume(_params, _context, _resume_data) do
     {:error, "HTTP request action does not support resume"}
   end
 

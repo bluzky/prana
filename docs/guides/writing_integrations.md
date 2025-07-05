@@ -59,7 +59,7 @@ end
 #### 2. Simple Error
 ```elixir
 def my_action(input) do
-  case validate_input(input) do
+  case validate_params(input) do
     :ok -> {:ok, process_data(input)}
     {:error, reason} -> {:error, reason}
   end
@@ -276,20 +276,20 @@ def my_action(enriched_input) do
   # enriched_input contains:
   # 1. Explicitly mapped data from the node's input_map
   # 2. Full context access via prefixed keys
-  
+
   # Explicitly mapped data (from node's input_map)
   user_email = enriched_input["user_email"]      # From "$input.user.email"
-  api_key = enriched_input["api_key"]            # From "$variables.api_key" 
+  api_key = enriched_input["api_key"]            # From "$variables.api_key"
   prev_result = enriched_input["previous_data"]  # From "$nodes.step1.result"
-  
+
   # Full context access (always available)
   full_input = enriched_input["$input"]      # Complete workflow input
   all_nodes = enriched_input["$nodes"]       # All completed node results
   variables = enriched_input["$variables"]   # All workflow variables
-  
+
   # Use explicit data for primary logic
   send_email(to: user_email, api_key: api_key)
-  
+
   # Use context access for advanced scenarios
   if enriched_input["$input"]["debug_mode"] do
     log_debug_info(all_nodes)
@@ -304,7 +304,7 @@ end
 # Node configuration
 %Node{
   id: "send_email",
-  input_map: %{
+  params: %{
     "to" => "$input.user.email",
     "subject" => "Welcome!",
     "user_name" => "$input.user.name",
@@ -319,10 +319,10 @@ def send_email(input) do
   subject = input["subject"]          # "Welcome!"
   user_name = input["user_name"]      # "John"
   api_key = input["api_key"]          # "key123"
-  
+
   # Full context also available if needed
   debug_mode = input["$input"]["debug_mode"]  # Optional debugging
-  
+
   {:ok, %{message_id: "123", sent_to: to}}
 end
 ```
@@ -332,7 +332,7 @@ end
 # Node with minimal mapping
 %Node{
   id: "dynamic_processor",
-  input_map: %{
+  params: %{
     "operation_type" => "$input.operation"
   }
 }
@@ -340,18 +340,18 @@ end
 # Action uses context for dynamic data access
 def dynamic_processor(input) do
   operation = input["operation_type"]  # Explicit mapping
-  
+
   case operation do
     "user_data" ->
       # Access specific user data from context
       user_data = input["$input"]["user"]
       {:ok, process_user(user_data)}
-      
+
     "node_results" ->
       # Access all previous node results
       results = input["$nodes"]
       {:ok, aggregate_results(results)}
-      
+
     "variable_lookup" ->
       # Access workflow variables dynamically
       var_name = input["$input"]["variable_name"]
@@ -370,7 +370,7 @@ The enriched input always includes these context keys:
   # Your explicitly mapped data
   "user_id" => 123,
   "status" => "active",
-  
+
   # Full context access (safe prefixed keys)
   "$input" => %{
     # Complete workflow input data
@@ -467,7 +467,7 @@ test "integration works in workflow" do
         id: "test_node",
         integration_name: "custom",
         action_name: "my_action",
-        input_map: %{"data" => "$input.user_data"}
+        params: %{"data" => "$input.user_data"}
       }
     ]
   }
@@ -508,7 +508,7 @@ def execute(input_map) do
   |> File.stream!()
   |> Stream.map(&process_line/1)
   |> Enum.reduce(%{count: 0}, &accumulate_results/2)
-  
+
   {:ok, result, "success"}
 end
 ```

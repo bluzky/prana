@@ -33,19 +33,38 @@ defmodule Prana.NodeExecutor do
           | {:error, term()}
   def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input) do
     # Create initial node execution with proper execution ID from execution
-    node_execution = NodeExecution.new(execution.id, node.id, routed_input)
-    node_execution = NodeExecution.start(node_execution)
+    node_execution =
+      execution.id
+      |> NodeExecution.new(node.id)
+      |> NodeExecution.start()
 
-    with {:ok, prepared_input} <- prepare_input(node, execution, routed_input),
+    # Build context once for both input preparation and action execution
+    context = build_expression_context(execution, routed_input)
+
+    with {:ok, prepared_params} <- prepare_params(node, context),
          {:ok, action} <- get_action(node) do
-      case invoke_action(action, prepared_input) do
-        {:ok, output_data, output_port} ->
-          # Complete the local node execution first
-          completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-          
+      node_execution = %{node_execution | params: prepared_params}
+
+      case invoke_action(action, prepared_params, context) do
+        {:ok, output_data, output_port, context} ->
+          # Complete the local node execution and update context
+          completed_execution =
+            node_execution
+            |> NodeExecution.complete(output_data, output_port)
+            |> NodeExecution.update_context(context)
+
           # Then integrate it into the execution state
           updated_execution = Prana.Execution.complete_node(execution, completed_execution)
-          
+
+          {:ok, completed_execution, updated_execution}
+
+        {:ok, output_data, output_port} ->
+          # Complete the local node execution without context data
+          completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
+
+          # Then integrate it into the execution state
+          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+
           {:ok, completed_execution, updated_execution}
 
         {:suspend, suspension_type, suspend_data} ->
@@ -60,7 +79,7 @@ defmodule Prana.NodeExecutor do
       end
     else
       {:error, reason} ->
-        # Input preparation or action retrieval failed
+        # Params preparation or action retrieval failed
         failed_execution = NodeExecution.fail(node_execution, reason)
         {:error, {reason, failed_execution}}
     end
@@ -80,73 +99,94 @@ defmodule Prana.NodeExecutor do
   - `{:error, {reason, failed_node_execution}}` - Resume failed
   """
   @spec resume_node(Node.t(), Prana.Execution.t(), NodeExecution.t(), map()) ::
-          {:ok, NodeExecution.t(), Prana.Execution.t()}
-  def resume_node(%Node{} = _node, %Prana.Execution{} = execution, %NodeExecution{} = suspended_node_execution, resume_data) do
-    # Extract actual output data from resume data structure
-    # For sub-workflows, resume_data contains metadata alongside the actual output
-    output_data =
-      case resume_data do
-        %{"sub_workflow_output" => output} -> output
-        # Use full resume data if no sub_workflow_output key
-        _ -> resume_data
-      end
+          {:ok, NodeExecution.t(), Prana.Execution.t()} | {:error, {term(), NodeExecution.t()}}
+  def resume_node(
+        %Node{} = node,
+        %Prana.Execution{} = execution,
+        %NodeExecution{} = suspended_node_execution,
+        resume_data
+      ) do
+    # Build context for resume (same as execute_node)
+    context = build_expression_context(execution, %{})
 
-    # Complete the suspended node execution first
-    completed_execution = NodeExecution.complete(suspended_node_execution, output_data, "success")
-    
-    # Then integrate it into the execution state
-    updated_execution = Prana.Execution.complete_node(execution, completed_execution)
-    
-    {:ok, completed_execution, updated_execution}
+    # Get the original params from the suspended node execution
+    params = suspended_node_execution.params || %{}
+
+    with {:ok, action} <- get_action(node) do
+      case invoke_resume_action(action, params, context, resume_data) do
+        {:ok, output_data, output_port} ->
+          # Complete the suspended node execution
+          completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+
+          # Integrate it into the execution state
+          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+
+          {:ok, completed_execution, updated_execution}
+
+        {:ok, output_data, output_port, context} ->
+          # Complete with context data
+          completed_execution =
+            suspended_node_execution
+            |> NodeExecution.complete(output_data, output_port)
+            |> NodeExecution.update_context(context)
+
+          # Integrate it into the execution state
+          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+
+          {:ok, completed_execution, updated_execution}
+
+        {:error, reason} ->
+          # Resume failed
+          failed_execution = NodeExecution.fail(suspended_node_execution, reason)
+          {:error, {reason, failed_execution}}
+      end
+    else
+      {:error, reason} ->
+        # Action retrieval failed
+        failed_execution = NodeExecution.fail(suspended_node_execution, reason)
+        {:error, {reason, failed_execution}}
+    end
   end
 
   @doc """
-  Prepare node input using two-mode input handling.
-  
-  Mode 1 (input_map defined): Evaluate input_map expressions and pass result to action
-  Mode 2 (input_map nil): Pass raw routed_input directly to action
-  
+  Prepare node params using expression evaluation.
+
   ## Parameters
-  - `node` - The node to prepare input for
-  - `execution` - Current execution state (with __runtime initialized)
-  - `routed_input` - Input data routed to this node's input ports
-  
+  - `node` - The node to prepare params for
+  - `context` - Full execution context for expression evaluation
+
   ## Returns
-  - `{:ok, prepared_input}` - Input ready for action execution
-  - `{:error, reason}` - Input preparation failed
+  - `{:ok, prepared_params}` - Params ready for action execution
+  - `{:error, reason}` - Params preparation failed
   """
-  @spec prepare_input(Node.t(), Prana.Execution.t(), map()) :: {:ok, map()} | {:error, term()}
-  def prepare_input(%Node{input_map: nil}, %Prana.Execution{} = _execution, routed_input) do
-    # Mode 2: Raw input mode - pass routed_input directly to action
-    {:ok, routed_input}
+  @spec prepare_params(Node.t(), map()) :: {:ok, map()} | {:error, term()}
+  def prepare_params(%Node{params: nil}, _context) do
+    # No params defined - return empty map
+    {:ok, %{}}
   end
-  
-  def prepare_input(%Node{input_map: input_map}, %Prana.Execution{} = execution, routed_input) when is_map(input_map) do
-    # Mode 1: Structured input mode - evaluate input_map expressions
-    context_data = build_expression_context(execution, routed_input)
 
-    try do
-      case ExpressionEngine.process_map(input_map, context_data) do
-        {:ok, processed_map} ->
-          {:ok, processed_map || %{}}
+  # Evaluate params expressions using context
+  def prepare_params(%Node{params: params}, context) when is_map(params) do
+    case ExpressionEngine.process_map(params, context) do
+      {:ok, processed_map} ->
+        {:ok, processed_map || %{}}
 
-        {:error, reason} ->
-          {:error,
-           %{
-             "type" => "expression_evaluation_failed",
-             "reason" => reason,
-             "input_map" => input_map
-           }}
-      end
-    rescue
-      error ->
+      {:error, reason} ->
         {:error,
          %{
-           "type" => "input_preparation_failed",
-           "error" => inspect(error),
-           "input_map" => input_map
+           "type" => "expression_evaluation_failed",
+           "reason" => reason,
+           "params" => params
          }}
     end
+  rescue
+    error ->
+      {:error,
+       %{
+         "type" => "params_preparation_failed",
+         "error" => inspect(error),
+         "params" => params
+       }}
   end
 
   @doc """
@@ -178,10 +218,10 @@ defmodule Prana.NodeExecutor do
   @doc """
   Invoke action using Action behavior pattern and handle different return formats.
   """
-  @spec invoke_action(Prana.Action.t(), map()) :: {:ok, term(), String.t()} | {:error, term()}
-  def invoke_action(%Prana.Action{} = action, input) do
-    # Action behavior pattern
-    result = action.module.execute(input)
+  @spec invoke_action(Prana.Action.t(), map(), map()) :: {:ok, term(), String.t()} | {:error, term()}
+  def invoke_action(%Prana.Action{} = action, input, context) do
+    # Action behavior pattern with full context access
+    result = action.module.execute(input, context)
     process_action_result(result, action)
   rescue
     error ->
@@ -213,6 +253,43 @@ defmodule Prana.NodeExecutor do
   end
 
   @doc """
+  Invoke action resume method with params, context, and resume data.
+  """
+  @spec invoke_resume_action(Prana.Action.t(), map(), map(), term()) :: {:ok, term(), String.t()} | {:error, term()}
+  def invoke_resume_action(%Prana.Action{} = action, params, context, resume_data) do
+    # Call the action's resume method
+    result = action.module.resume(params, context, resume_data)
+    process_action_result(result, action)
+  rescue
+    error ->
+      {:error,
+       %{
+         "type" => "action_resume_failed",
+         "error" => inspect(error),
+         "module" => action.module,
+         "action" => action.name
+       }}
+  catch
+    :exit, reason ->
+      {:error,
+       %{
+         "type" => "action_resume_exit",
+         "reason" => inspect(reason),
+         "module" => action.module,
+         "action" => action.name
+       }}
+
+    :throw, value ->
+      {:error,
+       %{
+         "type" => "action_resume_throw",
+         "value" => inspect(value),
+         "module" => action.module,
+         "action" => action.name
+       }}
+  end
+
+  @doc """
   Process different action return formats and determine output port.
 
   Supports suspension for sub-workflow orchestration and other async patterns.
@@ -224,6 +301,10 @@ defmodule Prana.NodeExecutor do
   - `{:error, error}` - Error with default error port
   - `{:ok, data, port}` - Success with explicit port selection
   - `{:error, error, port}` - Error with explicit port selection
+
+  ### Context-Aware Returns
+  - `{:ok, data, port, context}` - Success with port and context data
+  - `{:ok, data, context}` - Success with context data (default port)
 
   ### Suspension Returns
   - `{:suspend, suspension_type, suspend_data}` - Pause execution for async coordination
@@ -243,10 +324,15 @@ defmodule Prana.NodeExecutor do
       # Explicit port routing
       {:ok, result, "premium_path"}
 
+      # Context-aware success (default port)
+      {:ok, %{user_id: 123}, %{"batch_size" => 10, "has_more" => true}}
+
+      # Context-aware with explicit port
+      {:ok, result, "premium_path", %{"processing_time_ms" => 150}}
+
       # Sub-workflow suspension
       {:suspend, :sub_workflow_sync, %{
         workflow_id: "child_workflow",
-        input_data: %{"user_id" => 123},
         execution_mode: "sync",
         timeout_ms: 300_000
       }}
@@ -258,12 +344,30 @@ defmodule Prana.NodeExecutor do
       }}
   """
   @spec process_action_result(term(), Prana.Action.t()) ::
-          {:ok, term(), String.t()} | {:error, term()} | {:suspend, atom(), term()}
+          {:ok, term(), String.t()} | {:ok, term(), String.t(), map()} | {:error, term()} | {:suspend, atom(), term()}
   def process_action_result(result, %Prana.Action{} = action) do
     case result do
       # Suspension format for async coordination: {:suspend, type, data}
       {:suspend, suspension_type, suspend_data} when is_atom(suspension_type) ->
         {:suspend, suspension_type, suspend_data}
+
+      # Context-aware explicit port format: {:ok, data, port, context}
+      {:ok, data, port, context} when is_binary(port) and is_map(context) ->
+        if allows_dynamic_ports?(action) or port in action.output_ports do
+          {:ok, data, port, context}
+        else
+          {:error,
+           %{
+             "type" => "invalid_output_port",
+             "port" => port,
+             "available_ports" => action.output_ports
+           }}
+        end
+
+      # Context-aware default port format: {:ok, data, context}
+      {:ok, data, context} when is_map(context) ->
+        port = action.default_success_port || get_default_success_port(action)
+        {:ok, data, port, context}
 
       # Explicit port format: {:ok, data, port}
       {:ok, data, port} when is_binary(port) ->
@@ -319,7 +423,7 @@ defmodule Prana.NodeExecutor do
            "type" => "invalid_action_return_format",
            "result" => inspect(invalid_result),
            "message" =>
-             "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:suspend, type, data}"
+             "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}"
          }}
     end
   end
@@ -330,15 +434,21 @@ defmodule Prana.NodeExecutor do
   defp build_expression_context(%Prana.Execution{} = execution, routed_input) do
     # Build standardized expression context with all built-in variables
     %{
-      "$input" => routed_input,                           # routed input by port
-      "$nodes" => execution.__runtime["nodes"],           # completed node outputs  
-      "$env" => execution.__runtime["env"],               # environment variables
-      "$vars" => execution.input_data,                    # workflow variables (renamed from vars per decision doc)
-      "$workflow" => %{                                   # workflow metadata
+      # routed input by port
+      "$input" => routed_input,
+      # structured node data (output + context)
+      "$nodes" => execution.__runtime["nodes"],
+      # environment variables
+      "$env" => execution.__runtime["env"],
+      # workflow variables
+      "$vars" => execution.vars,
+      # workflow metadata
+      "$workflow" => %{
         "id" => execution.workflow_id,
         "version" => execution.workflow_version
       },
-      "$execution" => %{                                  # execution metadata
+      # execution metadata
+      "$execution" => %{
         "id" => execution.id,
         "mode" => execution.execution_mode,
         "preparation" => execution.preparation_data

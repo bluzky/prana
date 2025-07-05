@@ -47,7 +47,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   def input_schema, do: WebhookSchema
 
   @impl true
-  def validate_input(input_map) do
+  def validate_params(input_map) do
     case Skema.cast_and_validate(input_map, WebhookSchema) do
       {:ok, validated_data} ->
         case validate_methods(validated_data.webhook_config.methods) do
@@ -103,8 +103,8 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   # end
 
   @impl true
-  def execute(input_map) do
-    webhook_config = Map.get(input_map, "webhook_config", %{})
+  def execute(params, _context) do
+    webhook_config = Map.get(params, "webhook_config", %{})
 
     # Build webhook URL using base_url from environment variable only
     webhook_url =
@@ -131,7 +131,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
+  def resume(_params, _context, _resume_data) do
     {:error, "Webhook action does not support resume"}
   end
 

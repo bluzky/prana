@@ -10,87 +10,92 @@ defmodule Prana.NodeExecutorTest do
 
   # Test Action behavior modules
   defmodule TestSuccessAction do
+    @moduledoc false
     @behaviour Prana.Behaviour.Action
-    
+
     @impl true
     def prepare(_node) do
       {:ok, %{}}
     end
-    
+
     @impl true
-    def execute(input_data) do
-      {:ok, %{message: "success", input: input_data}}
+    def execute(params, _context) do
+      {:ok, %{message: "success", input: params}}
     end
-    
+
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
-  
+
   defmodule TestErrorAction do
+    @moduledoc false
     @behaviour Prana.Behaviour.Action
-    
+
     @impl true
     def prepare(_node) do
       {:ok, %{}}
     end
-    
+
     @impl true
-    def execute(_input_data) do
+    def execute(_params, _context) do
       {:error, "something went wrong"}
     end
-    
+
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
-  
+
   defmodule TestTransformAction do
+    @moduledoc false
     @behaviour Prana.Behaviour.Action
-    
+
     @impl true
     def prepare(_node) do
       {:ok, %{}}
     end
-    
+
     @impl true
-    def execute(input_data) do
+    def execute(params, _context) do
       # Use safe approach for now
-      name = case Map.get(input_data, "name") do
-        nil -> ""
-        name when is_binary(name) -> name
-        _ -> ""
-      end
-      
+      name =
+        case Map.get(params, "name") do
+          nil -> ""
+          name when is_binary(name) -> name
+          _ -> ""
+        end
+
       transformed = %{
-        original: input_data,
+        original: params,
         uppercase_name: String.upcase(name),
         timestamp: System.system_time(:second)
       }
-      
+
       {:ok, transformed}
     end
-    
+
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
-  
+
   defmodule TestExplicitPortAction do
+    @moduledoc false
     @behaviour Prana.Behaviour.Action
-    
+
     @impl true
     def prepare(_node) do
       {:ok, %{}}
     end
-    
+
     @impl true
-    def execute(input_data) do
-      should_succeed = if is_map(input_data), do: Map.get(input_data, "should_succeed", false), else: false
-      
+    def execute(params, _context) do
+      should_succeed = if is_map(params), do: Map.get(params, "should_succeed", false), else: false
+
       if should_succeed == true do
         {:ok, %{result: "explicit success"}, "custom_success"}
       else
@@ -100,67 +105,70 @@ defmodule Prana.NodeExecutorTest do
       _ ->
         {:error, "action failed", "custom_error"}
     end
-    
+
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
-  
+
   defmodule TestInvalidReturnAction do
+    @moduledoc false
     @behaviour Prana.Behaviour.Action
-    
+
     @impl true
     def prepare(_node) do
       {:ok, %{}}
     end
-    
+
     @impl true
-    def execute(_input_data) do
+    def execute(_params, _context) do
       # Return invalid format (direct value instead of tuple)
       "direct_string_value"
     end
-    
+
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
-  
+
   defmodule TestExceptionAction do
+    @moduledoc false
     @behaviour Prana.Behaviour.Action
-    
+
     @impl true
     def prepare(_node) do
       {:ok, %{}}
     end
-    
+
     @impl true
-    def execute(_input_data) do
+    def execute(_params, _context) do
       raise "Test exception"
     end
-    
+
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
-  
+
   defmodule TestInvalidPortAction do
+    @moduledoc false
     @behaviour Prana.Behaviour.Action
-    
+
     @impl true
     def prepare(_node) do
       {:ok, %{}}
     end
-    
+
     @impl true
-    def execute(_input_data) do
+    def execute(_params, _context) do
       {:ok, %{data: "test"}, "nonexistent_port"}
     end
-    
+
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
@@ -276,7 +284,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{"test" => "data"},
+        params: %{"test" => "data"},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -316,7 +324,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{"test" => "data1"},
+        params: %{"test" => "data1"},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -328,7 +336,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{"test" => "data2"},
+        params: %{"test" => "data2"},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -370,7 +378,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{
+        params: %{
           "message" => "hello world"
         },
         output_ports: ["success", "error"],
@@ -389,18 +397,20 @@ defmodule Prana.NodeExecutorTest do
       assert node_execution.node_id == "test-1"
       assert node_execution.status == :completed
       assert node_execution.output_port == "success"
+
       assert node_execution.output_data == %{
-        message: "success",
-        input: %{
-          "message" => "hello world"
-        }
-      }
+               message: "success",
+               input: %{
+                 "message" => "hello world"
+               }
+             }
+
       assert node_execution.error_data == nil
       assert is_integer(node_execution.duration_ms)
       assert node_execution.retry_count == 0
 
       # Check execution runtime updates (only stored under custom_id)
-      assert updated_execution.__runtime["nodes"]["test-1"] == node_execution.output_data
+      assert updated_execution.__runtime["nodes"]["test-1"] == %{"output" => node_execution.output_data, "context" => %{}}
       assert updated_execution.__runtime["executed_nodes"] == ["test-1"]
     end
 
@@ -412,7 +422,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "transform_action",
-        input_map: %{
+        params: %{
           "name" => "$input.user_name",
           "email" => "$input.contact.email",
           "previous_result" => "$nodes.api_call.user_id"
@@ -421,15 +431,18 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      execution = Execution.new("wf_1", 1, "graph_executor", %{
-        "user_name" => "alice",
-        "contact" => %{"email" => "alice@example.com"}
-      })
+      execution =
+        Execution.new("wf_1", 1, "graph_executor", %{
+          "user_name" => "alice",
+          "contact" => %{"email" => "alice@example.com"}
+        })
+
       execution = Execution.start(execution)
       execution = %{execution | id: "exec-2"}
       execution = Execution.rebuild_runtime(execution, %{})
       # Simulate api_call node already completed
       execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{"api_call" => %{"user_id" => 123}})}
+
       routed_input = %{
         "user_name" => "alice",
         "contact" => %{"email" => "alice@example.com"}
@@ -457,7 +470,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "error_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -491,7 +504,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "explicit_port_action",
-        input_map: %{
+        params: %{
           "should_succeed" => true
         },
         output_ports: ["custom_success", "custom_error"],
@@ -519,7 +532,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "explicit_port_action",
-        input_map: %{
+        params: %{
           "should_succeed" => false
         },
         output_ports: ["custom_success", "custom_error"],
@@ -551,7 +564,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "invalid_return_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -581,7 +594,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "exception_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -612,7 +625,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "invalid_port_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -642,7 +655,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "nonexistent",
         action_name: "some_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -671,7 +684,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "nonexistent_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success", "error"],
         input_ports: ["input"]
       }
@@ -700,7 +713,7 @@ defmodule Prana.NodeExecutorTest do
         type: :action,
         integration_name: "test",
         action_name: "success_action",
-        input_map: %{
+        params: %{
           "all_emails" => "$nodes.users.*.email",
           "admin_emails" => "$nodes.users.{role: \"admin\"}.email",
           "first_user" => "$nodes.users[0].name",
@@ -710,20 +723,27 @@ defmodule Prana.NodeExecutorTest do
         input_ports: ["input"]
       }
 
-      execution = Execution.new("wf_1", 1, "graph_executor", %{
-        "order" => %{"id" => "ORD-123"}
-      })
+      execution =
+        Execution.new("wf_1", 1, "graph_executor", %{
+          "order" => %{"id" => "ORD-123"}
+        })
+
       execution = Execution.start(execution)
       execution = %{execution | id: "exec-11"}
       execution = Execution.rebuild_runtime(execution, %{})
       # Simulate users node already completed
-      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{
-        "users" => [
-          %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
-          %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
-          %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
-        ]
-      })}
+      execution = %{
+        execution
+        | __runtime:
+            Map.put(execution.__runtime, "nodes", %{
+              "users" => [
+                %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
+                %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
+                %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
+              ]
+            })
+      }
+
       routed_input = %{
         "order" => %{"id" => "ORD-123"}
       }
@@ -743,34 +763,34 @@ defmodule Prana.NodeExecutorTest do
     end
   end
 
-  describe "prepare_input/3" do
+  describe "prepare_params/2" do
     test "evaluates expressions correctly" do
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "simple" => "$input.name",
           "nested" => "$input.user.email",
           "from_nodes" => "$nodes.prev_step.result"
         }
       }
 
-      execution = Execution.new("wf_1", 1, "graph_executor", %{
-        "name" => "john",
-        "user" => %{"email" => "john@example.com"}
-      })
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-test"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      # Simulate prev_step node already completed
-      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{
-        "prev_step" => %{"result" => "success"}
-      })}
       routed_input = %{
         "name" => "john",
         "user" => %{"email" => "john@example.com"}
       }
 
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
+      context = %{
+        "$input" => routed_input,
+        "$nodes" => %{
+          "prev_step" => %{"result" => "success"}
+        },
+        "$env" => %{},
+        "$vars" => %{},
+        "$workflow" => %{"id" => "wf_1", "version" => 1},
+        "$execution" => %{"id" => "exec-test", "mode" => "sync", "preparation" => %{}}
+      }
+
+      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
 
       assert prepared == %{
                "simple" => "john",
@@ -782,18 +802,22 @@ defmodule Prana.NodeExecutorTest do
     test "handles missing expression data gracefully" do
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "missing" => "$input.nonexistent.field"
         }
       }
 
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-test"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
+      context = %{
+        "$input" => %{},
+        "$nodes" => %{},
+        "$env" => %{},
+        "$vars" => %{},
+        "$workflow" => %{"id" => "wf_1", "version" => 1},
+        "$execution" => %{"id" => "exec-test", "mode" => "sync", "preparation" => %{}}
+      }
 
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
+      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
+
       assert prepared == %{
                "missing" => nil
              }
@@ -804,22 +828,26 @@ defmodule Prana.NodeExecutorTest do
       # For now, we'll test with invalid input_map structure
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "test" => "$invalid..expression"
         }
       }
 
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-test"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
+      context = %{
+        "$input" => %{},
+        "$nodes" => %{},
+        "$env" => %{},
+        "$vars" => %{},
+        "$workflow" => %{"id" => "wf_1", "version" => 1},
+        "$execution" => %{"id" => "exec-test", "mode" => "sync", "preparation" => %{}}
+      }
 
       # Most invalid expressions just return nil, but we can test edge cases
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
+      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
+
       assert prepared == %{
-        "test" => nil
-      }
+               "test" => nil
+             }
     end
   end
 
@@ -866,33 +894,32 @@ defmodule Prana.NodeExecutorTest do
 
   describe "build_expression_context/2" do
     test "builds correct expression context" do
-      execution = Execution.new("wf_1", 1, "graph_executor", %{"user_id" => 123})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-test"}
-      execution = Execution.rebuild_runtime(execution, %{"api_key" => "secret"})
-      # Simulate step1 node already completed
-      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{
-        "step1" => %{"result" => "data"}
-      })}
-
-      # This tests the private function indirectly through prepare_input
+      # This tests the private function indirectly through prepare_params
       node = %Node{
         id: "test",
-        input_map: %{
+        params: %{
           "from_input" => "$input.user_id",
           "from_nodes" => "$nodes.step1.result",
           "from_env" => "$env.api_key"
         }
       }
-      routed_input = %{"user_id" => 123}
 
-      assert {:ok, prepared} = NodeExecutor.prepare_input(node, execution, routed_input)
+      context = %{
+        "$input" => %{"user_id" => 123},
+        "$nodes" => %{"step1" => %{"result" => "data"}},
+        "$env" => %{"api_key" => "secret"},
+        "$vars" => %{"user_id" => 123},
+        "$workflow" => %{"id" => "wf_1", "version" => 1},
+        "$execution" => %{"id" => "exec-test", "mode" => "async", "preparation" => %{}}
+      }
+
+      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
 
       assert prepared == %{
-        "from_input" => 123,
-        "from_nodes" => "data",
-        "from_env" => "secret"
-      }
+               "from_input" => 123,
+               "from_nodes" => "data",
+               "from_env" => "secret"
+             }
     end
   end
 

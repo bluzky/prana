@@ -2,10 +2,10 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   @moduledoc """
   Switch Action - Multi-case routing based on simple condition expressions
   
-  Expected input_map:
+  Expected params:
   - cases: list of case objects with condition, value, port, and optional data
   - default_port: port to use when no cases match (defaults to "default")
-  - default_data: optional default data (defaults to input_map)
+  - default_data: optional default data (defaults to params)
   
   Example:
   %{
@@ -22,7 +22,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   - condition: expression to evaluate (e.g., "$input.field")
   - value: expected value to match against
   - port: output port name
-  - data: optional output data (defaults to input_map)
+  - data: optional output data (defaults to params)
   
   Returns:
   - {:ok, data, port_name} for matching case
@@ -39,13 +39,13 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   end
 
   @impl true
-  def execute(input_data) do
-    cases = Map.get(input_data, "cases", [])
-    default_port = Map.get(input_data, "default_port", "default")
-    default_data = Map.get(input_data, "default_data", input_data)
+  def execute(params, context) do
+    cases = Map.get(params, "cases", [])
+    default_port = Map.get(params, "default_port", "default")
+    default_data = Map.get(params, "default_data", params)
     
     # Try each case in order
-    case find_matching_condition_case(cases, input_data) do
+    case find_matching_condition_case(cases, params, context) do
       {:ok, {case_port, case_data}} ->
         {:ok, case_data, case_port}
         
@@ -58,28 +58,28 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
+  def resume(_params, _context, _resume_data) do
     {:error, "Switch action does not support suspension/resume"}
   end
 
   # Private helper functions
 
   # Find first matching condition case
-  defp find_matching_condition_case([], _input_data), do: :no_match
+  defp find_matching_condition_case([], _params, _context), do: :no_match
   
-  defp find_matching_condition_case([case_config | remaining_cases], input_data) do
+  defp find_matching_condition_case([case_config | remaining_cases], params, context) do
     condition_expr = Map.get(case_config, "condition")
     expected_value = Map.get(case_config, "value")
     case_port = Map.get(case_config, "port", "default")
-    case_data = Map.get(case_config, "data", input_data)
+    case_data = Map.get(case_config, "data", params)
     
     if condition_expr do
-      case evaluate_expression(condition_expr, input_data) do
+      case evaluate_expression(condition_expr, context) do
         {:ok, actual_value} ->
           if values_match?(actual_value, expected_value) do
             {:ok, {case_port, case_data}}
           else
-            find_matching_condition_case(remaining_cases, input_data)
+            find_matching_condition_case(remaining_cases, params, context)
           end
           
         {:error, reason} ->

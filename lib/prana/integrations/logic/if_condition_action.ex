@@ -2,10 +2,10 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   @moduledoc """
   IF Condition Action - evaluates a condition and routes to true/false
 
-  Expected input_map:
+  Expected params:
   - condition: expression to evaluate (e.g., "$input.age >= 18")
-  - true_data: optional data to pass on true branch (defaults to input)
-  - false_data: optional data to pass on false branch (defaults to input)
+  - true_data: optional data to pass on true branch (defaults to params)
+  - false_data: optional data to pass on false branch (defaults to params)
 
   Returns:
   - {:ok, data, "true"} if condition is true
@@ -23,17 +23,17 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   end
 
   @impl true
-  def execute(input_data) do
-    condition = Map.get(input_data, "condition")
+  def execute(params, context) do
+    condition = Map.get(params, "condition")
 
     if condition do
-      case evaluate_condition(condition, input_data) do
+      case evaluate_condition(condition, context) do
         {:ok, true} ->
-          true_data = Map.get(input_data, "true_data", input_data)
+          true_data = Map.get(params, "true_data", params)
           {:ok, true_data, "true"}
 
         {:ok, false} ->
-          false_data = Map.get(input_data, "false_data", input_data)
+          false_data = Map.get(params, "false_data", params)
           {:ok, false_data, "false"}
 
         {:error, reason} ->
@@ -45,7 +45,7 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
+  def resume(_params, _context, _resume_data) do
     {:error, "IF Condition action does not support suspension/resume"}
   end
 

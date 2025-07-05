@@ -48,11 +48,11 @@ defmodule Prana.Integrations.Data.MergeAction do
   use Prana.Actions.SimpleAction
 
   @impl true
-  def execute(input_map) do
-    strategy = Map.get(input_map, "strategy", "append")
+  def execute(params, _context) do
+    strategy = Map.get(params, "strategy", "append")
     
     # Extract inputs from named ports
-    inputs = extract_inputs_from_map(input_map)
+    inputs = extract_inputs_from_map(params)
     
     case merge_data_with_strategy(inputs, strategy) do
       {:ok, merged_data} ->
@@ -68,10 +68,10 @@ defmodule Prana.Integrations.Data.MergeAction do
   # ============================================================================
 
   # Extract inputs from named ports (ADR-002 format)
-  defp extract_inputs_from_map(input_map) do
+  defp extract_inputs_from_map(params) do
     # Collect named port inputs, excluding nil values
-    input_a = Map.get(input_map, "input_a")
-    input_b = Map.get(input_map, "input_b")
+    input_a = Map.get(params, "input_a")
+    input_b = Map.get(params, "input_b")
     
     [input_a, input_b] |> Enum.reject(&is_nil/1)
   end

@@ -10,7 +10,7 @@ defmodule Prana.NodeExecution do
           execution_id: String.t(),
           node_id: String.t(),
           status: status(),
-          input_data: map(),
+          params: map(),
           output_data: map() | nil,
           output_port: String.t() | nil,
           error_data: map() | nil,
@@ -20,7 +20,8 @@ defmodule Prana.NodeExecution do
           duration_ms: integer() | nil,
           suspension_type: atom() | nil,
           suspension_data: term() | nil,
-          metadata: map()
+          metadata: map(),
+          context_data: map()
         }
 
   defstruct [
@@ -28,7 +29,6 @@ defmodule Prana.NodeExecution do
     :execution_id,
     :node_id,
     :status,
-    :input_data,
     :output_data,
     :output_port,
     :error_data,
@@ -37,20 +37,21 @@ defmodule Prana.NodeExecution do
     :duration_ms,
     :suspension_type,
     :suspension_data,
+    params: %{},
     retry_count: 0,
-    metadata: %{}
+    metadata: %{},
+    context_data: %{}
   ]
 
   @doc """
   Creates a new node execution
   """
-  def new(execution_id, node_id, input_data) do
+  def new(execution_id, node_id) do
     %__MODULE__{
       id: generate_id(),
       execution_id: execution_id,
       node_id: node_id,
       status: :pending,
-      input_data: input_data,
       output_data: nil,
       output_port: nil,
       error_data: nil,
@@ -60,7 +61,8 @@ defmodule Prana.NodeExecution do
       duration_ms: nil,
       suspension_type: nil,
       suspension_data: nil,
-      metadata: %{}
+      metadata: %{},
+      context_data: %{}
     }
   end
 
@@ -108,6 +110,13 @@ defmodule Prana.NodeExecution do
   """
   def increment_retry(%__MODULE__{} = node_execution) do
     %{node_execution | retry_count: node_execution.retry_count + 1}
+  end
+
+  @doc """
+  Updates context data for the node execution
+  """
+  def update_context(%__MODULE__{} = node_execution, context_data) do
+    %{node_execution | context_data: context_data}
   end
 
   defp calculate_duration(nil), do: nil

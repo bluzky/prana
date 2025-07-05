@@ -1,22 +1,22 @@
 defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   @moduledoc """
   Execute Sub-workflow Action - trigger a sub-workflow with coordination
-  
-  Expected input_map:
+
+  Expected params:
   - workflow_id: The ID of the sub-workflow to execute
   - input_data: Data to pass to the sub-workflow (optional, defaults to full input)
   - execution_mode: Execution mode - "sync" | "async" | "fire_and_forget" (optional, defaults to "sync")
   - timeout_ms: Maximum time to wait for sub-workflow completion in milliseconds (optional, defaults to 5 minutes)
   - failure_strategy: How to handle sub-workflow failures - "fail_parent" | "continue" (optional, defaults to "fail_parent")
-  
+
   Execution Modes:
   - Synchronous ("sync"): Parent workflow suspends until sub-workflow completes
   - Asynchronous ("async"): Parent workflow suspends, sub-workflow executes async, parent resumes when complete
   - Fire-and-Forget ("fire_and_forget"): Parent workflow triggers sub-workflow and continues immediately
-  
+
   Returns:
   - {:suspend, :sub_workflow_sync, suspend_data} for synchronous execution
-  - {:suspend, :sub_workflow_async, suspend_data} for asynchronous execution  
+  - {:suspend, :sub_workflow_async, suspend_data} for asynchronous execution
   - {:suspend, :sub_workflow_fire_forget, suspend_data} for fire-and-forget execution
   - {:error, reason} if sub-workflow setup fails
   """
@@ -29,25 +29,22 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   end
 
   @impl true
-  def execute(input_data) do
+  def execute(params, _context) do
     # Extract configuration
-    workflow_id = Map.get(input_data, "workflow_id")
-    input_data_for_workflow = Map.get(input_data, "input_data", input_data)
-    execution_mode = Map.get(input_data, "execution_mode", "sync")
-    timeout_ms = Map.get(input_data, "timeout_ms", 300_000)  # 5 minutes default
-    failure_strategy = Map.get(input_data, "failure_strategy", "fail_parent")
+    workflow_id = Map.get(params, "workflow_id")
+    execution_mode = Map.get(params, "execution_mode", "sync")
+    # 5 minutes default
+    timeout_ms = Map.get(params, "timeout_ms", 300_000)
+    failure_strategy = Map.get(params, "failure_strategy", "fail_parent")
 
     # Validate required parameters
     with :ok <- validate_workflow_id(workflow_id),
-         :ok <- validate_input_data(input_data_for_workflow),
          :ok <- validate_execution_mode(execution_mode),
          :ok <- validate_timeout(timeout_ms),
          :ok <- validate_failure_strategy(failure_strategy) do
-      
       # Prepare sub-workflow execution data
       sub_workflow_data = %{
         workflow_id: workflow_id,
-        input_data: input_data_for_workflow,
         execution_mode: execution_mode,
         timeout_ms: timeout_ms,
         failure_strategy: failure_strategy,
@@ -58,11 +55,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
         "sync" ->
           # Synchronous execution - suspend parent workflow (caller handles child execution and resume)
           {:suspend, :sub_workflow_sync, sub_workflow_data}
-          
+
         "async" ->
           # Asynchronous execution - suspend parent workflow (caller handles async child execution and resume)
           {:suspend, :sub_workflow_async, sub_workflow_data}
-          
+
         "fire_and_forget" ->
           # Fire-and-forget execution - suspend briefly (caller triggers child and immediately resumes)
           {:suspend, :sub_workflow_fire_forget, sub_workflow_data}
@@ -74,10 +71,45 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
-    # For workflow actions, resume is handled by the GraphExecutor
-    # This function should not be called directly
-    {:error, "Workflow action resume handled by GraphExecutor"}
+  def resume(params, _context, resume_data) do
+    # Extract sub-workflow execution results
+    execution_mode = Map.get(params, "execution_mode", "sync")
+    failure_strategy = Map.get(params, "failure_strategy", "fail_parent")
+    
+    # Process sub-workflow completion data
+    case resume_data do
+      %{"sub_workflow_output" => output, "status" => "completed"} ->
+        # Sub-workflow completed successfully
+        {:ok, output, "success"}
+      
+      %{"sub_workflow_output" => output} ->
+        # Sub-workflow completed successfully (no explicit status)
+        {:ok, output, "success"}
+      
+      %{"status" => "failed", "error" => error} when failure_strategy == "fail_parent" ->
+        # Sub-workflow failed and should fail parent
+        {:error, %{type: "sub_workflow_failed", error: error}, "error"}
+      
+      %{"status" => "failed", "error" => error} when failure_strategy == "continue" ->
+        # Sub-workflow failed but parent should continue
+        {:ok, %{sub_workflow_failed: true, error: error}, "failure"}
+      
+      %{"status" => "timeout"} when failure_strategy == "fail_parent" ->
+        # Sub-workflow timed out and should fail parent
+        {:error, %{type: "sub_workflow_timeout", message: "Sub-workflow execution timed out"}, "error"}
+      
+      %{"status" => "timeout"} when failure_strategy == "continue" ->
+        # Sub-workflow timed out but parent should continue
+        {:ok, %{sub_workflow_timeout: true}, "timeout"}
+      
+      # For fire-and-forget, any resume data indicates successful trigger
+      _ when execution_mode == "fire_and_forget" ->
+        {:ok, resume_data, "success"}
+      
+      # Default case - treat as successful completion
+      _ ->
+        {:ok, resume_data, "success"}
+    end
   end
 
   # ============================================================================
@@ -89,10 +121,6 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   defp validate_workflow_id(""), do: {:error, "workflow_id cannot be empty"}
   defp validate_workflow_id(workflow_id) when is_binary(workflow_id), do: :ok
   defp validate_workflow_id(_), do: {:error, "workflow_id must be a string"}
-
-  # Validate input_data parameter
-  defp validate_input_data(input_data) when is_map(input_data), do: :ok
-  defp validate_input_data(_), do: {:error, "input_data must be a map"}
 
   # Validate timeout_ms parameter
   defp validate_timeout(timeout_ms) when is_integer(timeout_ms) and timeout_ms > 0, do: :ok

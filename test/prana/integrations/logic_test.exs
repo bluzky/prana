@@ -5,9 +5,8 @@ defmodule Prana.Integrations.LogicTest do
 
   describe "switch/1 - condition-based format" do
     test "matches first condition with exact value" do
-      input_map = %{
-        "tier" => "premium",
-        "verified" => true,
+      # Separate params and context for SwitchAction
+      params = %{
         "cases" => [
           %{"condition" => "$input.tier", "value" => "premium", "port" => "premium_port"},
           %{"condition" => "$input.verified", "value" => true, "port" => "verified_port"}
@@ -15,21 +14,20 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      # Create proper context structure for SwitchAction
-      input_with_context =
-        Map.merge(input_map, %{
-          "$input" => input_map,
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      context = %{
+        "$input" => %{
+          "tier" => "premium",
+          "verified" => true
+        },
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
 
-      assert {:ok, _data, "premium_port"} = SwitchAction.execute(input_with_context)
+      assert {:ok, _data, "premium_port"} = SwitchAction.execute(params, context)
     end
 
     test "matches second condition when first doesn't match" do
-      input_map = %{
-        "tier" => "standard",
-        "verified" => true,
+      params = %{
         "cases" => [
           %{"condition" => "$input.tier", "value" => "premium", "port" => "premium_port"},
           %{"condition" => "$input.verified", "value" => true, "port" => "verified_port"}
@@ -37,21 +35,20 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      # Create proper context structure for SwitchAction
-      input_with_context =
-        Map.merge(input_map, %{
-          "$input" => input_map,
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      context = %{
+        "$input" => %{
+          "tier" => "standard",
+          "verified" => true
+        },
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
 
-      assert {:ok, _data, "verified_port"} = SwitchAction.execute(input_with_context)
+      assert {:ok, _data, "verified_port"} = SwitchAction.execute(params, context)
     end
 
     test "uses default when no conditions match" do
-      input_map = %{
-        "tier" => "basic",
-        "verified" => false,
+      params = %{
         "cases" => [
           %{"condition" => "$input.tier", "value" => "premium", "port" => "premium_port"},
           %{"condition" => "$input.verified", "value" => true, "port" => "verified_port"}
@@ -60,20 +57,20 @@ defmodule Prana.Integrations.LogicTest do
         "default_data" => %{"discount" => +0.0}
       }
 
-      # Create proper context structure for SwitchAction
-      input_with_context =
-        Map.merge(input_map, %{
-          "$input" => input_map,
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      context = %{
+        "$input" => %{
+          "tier" => "basic",
+          "verified" => false
+        },
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
 
-      assert {:ok, %{"discount" => +0.0}, "basic_port"} = SwitchAction.execute(input_with_context)
+      assert {:ok, %{"discount" => +0.0}, "basic_port"} = SwitchAction.execute(params, context)
     end
 
     test "uses custom case data when provided" do
-      input_map = %{
-        "tier" => "premium",
+      params = %{
         "cases" => [
           %{
             "condition" => "$input.tier",
@@ -85,21 +82,20 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      # Create proper context structure for SwitchAction
-      input_with_context =
-        Map.merge(input_map, %{
-          "$input" => input_map,
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      context = %{
+        "$input" => %{
+          "tier" => "premium"
+        },
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
 
       assert {:ok, %{"discount" => 0.3, "priority" => "high"}, "premium_port"} =
-               SwitchAction.execute(input_with_context)
+               SwitchAction.execute(params, context)
     end
 
     test "skips cases with invalid expressions and continues to valid ones" do
-      input_map = %{
-        "tier" => "premium",
+      params = %{
         "cases" => [
           %{"condition" => "$invalid.expression.that.does.not.exist", "value" => "premium", "port" => "invalid_port"},
           %{"condition" => "$input.tier", "value" => "premium", "port" => "valid_port"}
@@ -107,21 +103,20 @@ defmodule Prana.Integrations.LogicTest do
         "default_port" => "default"
       }
 
-      # Create proper context structure for SwitchAction
-      input_with_context =
-        Map.merge(input_map, %{
-          "$input" => input_map,
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      context = %{
+        "$input" => %{
+          "tier" => "premium"
+        },
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
 
       # Should match second case after first case fails expression evaluation
-      assert {:ok, _data, "valid_port"} = SwitchAction.execute(input_with_context)
+      assert {:ok, _data, "valid_port"} = SwitchAction.execute(params, context)
     end
 
     test "falls back to default when all expressions are invalid" do
-      input_map = %{
-        "tier" => "premium",
+      params = %{
         "cases" => [
           %{"condition" => "$invalid.expression.one", "value" => "premium", "port" => "invalid_port1"},
           %{"condition" => "$invalid.expression.two", "value" => "basic", "port" => "invalid_port2"}
@@ -130,17 +125,17 @@ defmodule Prana.Integrations.LogicTest do
         "default_data" => %{"message" => "no valid cases"}
       }
 
-      # Create proper context structure for SwitchAction
-      input_with_context =
-        Map.merge(input_map, %{
-          "$input" => input_map,
-          "$nodes" => %{},
-          "$variables" => %{}
-        })
+      context = %{
+        "$input" => %{
+          "tier" => "premium"
+        },
+        "$nodes" => %{},
+        "$variables" => %{}
+      }
 
       # Should fall back to default when all cases fail expression evaluation
       assert {:ok, %{"message" => "no valid cases"}, "fallback_port"} =
-               SwitchAction.execute(input_with_context)
+               SwitchAction.execute(params, context)
     end
   end
 end

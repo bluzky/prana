@@ -178,7 +178,7 @@ prana/
   type: :trigger | :action | :logic | :wait | :output,
   integration_name: String.t(),
   action_name: String.t(),
-  input_map: map(),                # Configuration/input data
+  params: map(),                # Configuration/input data
   output_ports: [String.t()],      # Available output ports
   input_ports: [String.t()],       # Available input ports
   error_handling: Prana.ErrorHandling.t(),

@@ -50,7 +50,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :trigger,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: []
       }
@@ -63,7 +63,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -75,7 +75,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -88,7 +88,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -100,7 +100,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input"]
       }
@@ -113,7 +113,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        input_map: %{},
+        params: %{},
         output_ports: ["success"],
         input_ports: ["input_a", "input_b"]
       }
@@ -176,8 +176,6 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
 
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
-      input_data = %{"test" => "data"}
-
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
@@ -185,7 +183,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       }
 
       # Execute workflow
-      {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
+      {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
 
       # Verify execution completed successfully
       assert execution.status == :completed

@@ -144,12 +144,11 @@ defmodule Prana.GraphExecutor do
   end
 
   @doc """
-  Execute a workflow graph with the given input data and context.
+  Execute a workflow graph with the given context.
 
   ## Parameters
 
   - `execution_graph` - Pre-compiled ExecutionGraph from WorkflowCompiler
-  - `input_data` - Initial input data for the workflow
   - `context` - Execution context with workflow_loader callback and optional variables/metadata
 
   ## Returns
@@ -167,16 +166,16 @@ defmodule Prana.GraphExecutor do
       }
 
       # Normal execution
-      {:ok, execution} = GraphExecutor.execute_graph(graph, %{email: "user@example.com"}, context)
+      {:ok, execution} = GraphExecutor.execute_graph(graph, context)
 
       # Suspended execution (sub-workflow coordination)
-      {:suspend, execution} = GraphExecutor.execute_graph(graph, %{workflow_id: "child"}, context)
+      {:suspend, execution} = GraphExecutor.execute_graph(graph, context)
   """
-  @spec execute_graph(ExecutionGraph.t(), map(), map()) ::
+  @spec execute_graph(ExecutionGraph.t(), map()) ::
           {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
-  def execute_graph(%ExecutionGraph{} = execution_graph, input_data, context \\ %{}) do
+  def execute_graph(%ExecutionGraph{} = execution_graph, context \\ %{}) do
     # Create initial execution and context
-    execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", input_data)
+    execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", execution_graph.workflow.variables)
     execution = Execution.start(execution)
 
     # Initialize runtime state once at the start of execution
@@ -567,7 +566,10 @@ defmodule Prana.GraphExecutor do
     Enum.reduce(node_executions, %{}, fn node_exec, acc ->
       result_data =
         if node_exec.status == :completed do
-          node_exec.output_data
+          %{
+            "output" => node_exec.output_data,
+            "context" => node_exec.context_data
+          }
         else
           %{"error" => node_exec.error_data, "status" => node_exec.status}
         end
@@ -589,10 +591,13 @@ defmodule Prana.GraphExecutor do
       resume_ready_execution = Execution.resume_suspension(suspended_execution)
 
       # Call NodeExecutor with new unified interface
-      {:ok, _completed_node_execution, updated_execution} =
-        NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data)
+      case NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data) do
+        {:ok, _completed_node_execution, updated_execution} ->
+          {:ok, updated_execution}
 
-      {:ok, updated_execution}
+        {:error, {reason, _failed_node_execution}} ->
+          {:error, reason}
+      end
     else
       {:error, %{type: "suspended_node_not_found", node_id: suspended_node_id}}
     end
@@ -673,9 +678,9 @@ defmodule Prana.GraphExecutor do
         # Collect data from all connections targeting this port
         port_data =
           Enum.reduce(incoming_connections, nil, fn connection, _acc ->
-            # Get the output data from the source node if it's completed
-            source_node_output = execution.__runtime["nodes"][connection.from]
-            if source_node_output, do: source_node_output
+            # Get the structured node data and extract output
+            source_node_data = execution.__runtime["nodes"][connection.from]
+            if source_node_data, do: source_node_data["output"]
           end)
 
         if port_data do
@@ -685,14 +690,7 @@ defmodule Prana.GraphExecutor do
         end
       end)
 
-    case multi_port_input do
-      empty when map_size(empty) == 0 ->
-        # No routed data found, use workflow input for node's first input port (typically trigger nodes)
-        %{"input" => execution.input_data}
-
-      _ ->
-        multi_port_input
-    end
+    multi_port_input
   end
 
   # Get incoming connections for a specific node and port

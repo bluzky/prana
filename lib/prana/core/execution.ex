@@ -49,7 +49,7 @@ defmodule Prana.Execution do
           status: status(),
           trigger_type: String.t(),
           trigger_data: map(),
-          input_data: map(),
+          vars: map(),
           output_data: map() | nil,
           context_data: map(),
           error_data: map() | nil,
@@ -79,7 +79,7 @@ defmodule Prana.Execution do
     :status,
     :trigger_type,
     :trigger_data,
-    :input_data,
+    :vars,
     :output_data,
     :context_data,
     :error_data,
@@ -99,7 +99,7 @@ defmodule Prana.Execution do
   @doc """
   Creates a new execution
   """
-  def new(workflow_id, workflow_version, trigger_type, input_data, trigger_node_id \\ nil) do
+  def new(workflow_id, workflow_version, trigger_type, vars, trigger_node_id \\ nil) do
     execution_id = generate_id()
 
     %__MODULE__{
@@ -113,7 +113,7 @@ defmodule Prana.Execution do
       status: :pending,
       trigger_type: trigger_type,
       trigger_data: %{},
-      input_data: input_data,
+      vars: vars,
       output_data: nil,
       context_data: %{},
       error_data: nil,
@@ -344,12 +344,16 @@ defmodule Prana.Execution do
       execution.__runtime["executed_nodes"] # ["node_1", "node_2"]
   """
   def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
-    # Build nodes map from completed node executions
-    nodes = 
+    # Build node structured data for $nodes.{id}.output and $nodes.{id}.context patterns
+    node_structured = 
       execution.node_executions
       |> Enum.filter(fn node_exec -> node_exec.status == :completed end)
       |> Enum.reduce(%{}, fn node_exec, acc ->
-        Map.put(acc, node_exec.node_id, node_exec.output_data)
+        node_data = %{
+          "output" => node_exec.output_data,
+          "context" => node_exec.context_data
+        }
+        Map.put(acc, node_exec.node_id, node_data)
       end)
     
     # Build active paths from node executions with output ports
@@ -369,7 +373,7 @@ defmodule Prana.Execution do
     
     # Build runtime state
     runtime = %{
-      "nodes" => nodes,
+      "nodes" => node_structured,
       "env" => env_data,
       "active_paths" => active_paths,
       "executed_nodes" => executed_nodes
@@ -418,10 +422,17 @@ defmodule Prana.Execution do
       case execution.__runtime do
         nil -> nil
         runtime ->
+          # Update structured node data
+          node_data = %{
+            "output" => output_data,
+            "context" => completed_node_execution.context_data
+          }
+          updated_node_map = Map.put(runtime["nodes"] || %{}, node_id, node_data)
+          
           runtime
-          |> Map.put("nodes", Map.put(runtime["nodes"], node_id, output_data))
-          |> Map.put("executed_nodes", runtime["executed_nodes"] ++ [node_id])
-          |> Map.put("active_paths", Map.put(runtime["active_paths"], "#{node_id}_#{output_port}", true))
+          |> Map.put("nodes", updated_node_map)
+          |> Map.put("executed_nodes", (runtime["executed_nodes"] || []) ++ [node_id])
+          |> Map.put("active_paths", Map.put(runtime["active_paths"] || %{}, "#{node_id}_#{output_port}", true))
       end
     
     %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
