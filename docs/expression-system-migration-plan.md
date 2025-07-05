@@ -1,14 +1,14 @@
 # Expression System Migration Plan
 
 **Date**: July 2025
-**Status**: Phase 1 Complete ✅
-**Purpose**: Migrate from `$node.{node_id}` to `$node.{node_id}.output` for extensible node attributes
+**Status**: Phase 1 Complete ✅, Tests Need Update 🔄
+**Purpose**: Migrate from `$node.{node_id}` to `$nodes.{node_id}.output` for extensible node attributes
 
 ## Overview
 
-**✅ COMPLETED**: The expression system now supports structured node access patterns `$node.{node_id}.output` and `$node.{node_id}.context` for extensible node attributes, enabling loop context support and future node metadata access.
+**✅ INFRASTRUCTURE COMPLETE**: The expression system runtime infrastructure supports structured node access patterns `$nodes.{node_id}.output` and `$nodes.{node_id}.context` for extensible node attributes, enabling loop context support and future node metadata access.
 
-**Key Achievement**: Full backward compatibility maintained - existing `$nodes.{node_id}` patterns continue to work unchanged while new structured patterns are available for advanced use cases.
+**🔄 TESTS NEED UPDATE**: Expression engine tests currently use flat `$nodes.{node_id}.field` patterns and need to be updated to use the new structured `$nodes.{node_id}.output.field` format.
 
 ## Current State Analysis
 
@@ -73,11 +73,11 @@
 - **COMPLETE** Added support for `{:ok, data, context}` and `{:ok, data, port, context}` patterns
 - **COMPLETE** Context populated via clean `update_context/2` pattern
 
-#### ✅ 1.4 Add Comprehensive Tests
-- **COMPLETE** Expression engine supports structured node patterns
-- **COMPLETE** All 25 expression engine tests pass with new functionality
-- **COMPLETE** Updated test contexts to use `$nodes.{node_id}.output` and `$nodes.{node_id}.context`
-- **COMPLETE** New patterns work with wildcards, filtering, and array access
+#### 🔄 1.4 Add Comprehensive Tests
+- **COMPLETE** Expression engine supports structured node patterns  
+- **COMPLETE** All 25 expression engine tests pass
+- **PENDING** Update test contexts to use `$nodes.{node_id}.output` and `$nodes.{node_id}.context`
+- **VERIFIED** New patterns work with wildcards, filtering, and array access in runtime
 
 ### Phase 2: Deprecation Warning System - OPTIONAL
 **Duration**: 1 week (if needed)
@@ -89,8 +89,8 @@
 - **RATIONALE**: `$nodes.{node_id}.output` and `$nodes.{node_id}.context` provide clear, structured access
 
 #### 2.2 Update Documentation
-- **COMPLETE**: Updated expression patterns to use structured format
-- **COMPLETE**: Updated test examples to demonstrate new patterns
+- **COMPLETE**: Expression patterns documented for structured format
+- **PENDING**: Update test examples to demonstrate new patterns  
 - **COMPLETE**: Migration plan reflects current structured approach
 
 ### Phase 3: Gradual Migration - OPTIONAL
@@ -259,16 +259,17 @@ end
 - [x] Context-aware action returns implemented
 - [x] Clean integration with existing codebase
 
-### Phase 2 Success - COMPLETE
+### Phase 2 Success - PARTIALLY COMPLETE
 - [x] Decision made to use structured patterns without deprecation
 - [x] Documentation updated with structured patterns
-- [x] Test examples updated to demonstrate new patterns
+- [ ] Test examples updated to demonstrate new patterns (PENDING)
 
 ### Phase 3 Success - ORGANIC APPROACH
 - [x] Existing integrations continue working unchanged
 - [x] New patterns available for loop integrations
-- [ ] Documentation updated for both patterns (TODO)
-- [x] Test coverage for new functionality
+- [x] Documentation updated for structured patterns
+- [x] Runtime infrastructure supports structured patterns
+- [ ] Test examples updated to use structured patterns (PENDING)
 
 ### Phase 4 Success - CANCELLED
 - [x] Decision made to maintain backward compatibility permanently
@@ -287,16 +288,18 @@ end
 
 ## Next Steps
 
-1. **Loop Integration Development**: Use new context patterns for iteration tracking
-2. **Integration Updates**: Update built-in integrations to use structured patterns as needed
-3. **Advanced Features**: Leverage context patterns for complex workflow coordination
+1. **Update Test Examples**: Update expression engine tests to use `$nodes.{node_id}.output` structured patterns
+2. **Loop Integration Development**: Use new context patterns for iteration tracking 
+3. **Integration Updates**: Update built-in integrations to use structured patterns as needed
+4. **Advanced Features**: Leverage context patterns for complex workflow coordination
 
 ## Implementation Summary
 
-**Latest Update**: Expression system migration to `$nodes.{node_id}.output` and `$nodes.{node_id}.context` patterns  
-**Files Changed**: `test/prana/expression_engine_test.exs`, `docs/expression-system-migration-plan.md`  
-**Test Status**: All 25 expression engine tests passing  
-**Breaking Changes**: None - clean migration to structured patterns
+**Current Status**: Runtime infrastructure complete, test examples need update  
+**Infrastructure**: `$nodes.{node_id}.output` and `$nodes.{node_id}.context` patterns supported in runtime  
+**Test Status**: All 25 expression engine tests passing (using legacy flat patterns)  
+**Remaining Work**: Update test examples to demonstrate structured patterns  
+**Breaking Changes**: None - runtime supports both flat and structured patterns
 
 ## References
 
