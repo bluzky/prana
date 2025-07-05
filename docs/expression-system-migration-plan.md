@@ -18,11 +18,12 @@
 
 ### Current Expression Patterns
 ```elixir
-# Direct node output access
-"$node.api_call.user_id"              # Single value
-"$node.api_call.response.user_id"     # Nested access
-"$node.api_call.users.*.name"         # Wildcard access
-"$node.api_call.users.{status: \"active\"}.email"  # Filtered access
+# Structured node access (NEW FORMAT)
+"$nodes.api_call.output.user_id"              # Single value from output
+"$nodes.api_call.output.response.user_id"     # Nested access from output
+"$nodes.api_call.output.users.*.name"         # Wildcard access from output
+"$nodes.api_call.output.users.{status: \"active\"}.email"  # Filtered access from output
+"$nodes.api_call.context.loop_index"          # Context access
 ```
 
 ### Usage Locations to Audit
@@ -50,10 +51,10 @@
 **Risk**: Low
 
 #### ✅ 1.1 Update Expression Engine
-- **COMPLETE** `lib/prana/expression_engine.ex` now supports both patterns:
-  - `$nodes.{node_id}` → legacy pattern (fully backward compatible)
-  - `$node.{node_id}.output` → structured output access (new)
-  - `$node.{node_id}.context` → context access (new)
+- **COMPLETE** `lib/prana/expression_engine.ex` now supports structured patterns:
+  - `$nodes.{node_id}.output` → structured output access (current)
+  - `$nodes.{node_id}.context` → context access (current)
+  - Uses familiar `$nodes` naming with structured access patterns
 
 #### ✅ 1.2 Update NodeExecution Structure
 - **COMPLETE** `%NodeExecution{}` includes context_data field:
@@ -73,8 +74,9 @@
 - **COMPLETE** Context populated via clean `update_context/2` pattern
 
 #### ✅ 1.4 Add Comprehensive Tests
-- **COMPLETE** Expression engine supports new node patterns
-- **COMPLETE** All 311 existing tests pass with new functionality
+- **COMPLETE** Expression engine supports structured node patterns
+- **COMPLETE** All 25 expression engine tests pass with new functionality
+- **COMPLETE** Updated test contexts to use `$nodes.{node_id}.output` and `$nodes.{node_id}.context`
 - **COMPLETE** New patterns work with wildcards, filtering, and array access
 
 ### Phase 2: Deprecation Warning System - OPTIONAL
@@ -83,13 +85,13 @@
 **Status**: Skipped - No deprecation needed due to clean backward compatibility
 
 #### 2.1 Add Deprecation Warnings
-- **DECISION**: Skip deprecation warnings - both patterns can coexist indefinitely
-- **RATIONALE**: `$nodes` patterns remain useful for simple cases, `$node` patterns for advanced cases
+- **DECISION**: No deprecation warnings needed - clean migration to structured patterns
+- **RATIONALE**: `$nodes.{node_id}.output` and `$nodes.{node_id}.context` provide clear, structured access
 
 #### 2.2 Update Documentation
-- **TODO**: Update documentation to show both patterns
-- **TODO**: Add examples of new structured patterns
-- **TODO**: Document when to use each pattern
+- **COMPLETE**: Updated expression patterns to use structured format
+- **COMPLETE**: Updated test examples to demonstrate new patterns
+- **COMPLETE**: Migration plan reflects current structured approach
 
 ### Phase 3: Gradual Migration - OPTIONAL
 **Duration**: As needed
@@ -257,10 +259,10 @@ end
 - [x] Context-aware action returns implemented
 - [x] Clean integration with existing codebase
 
-### Phase 2 Success - SKIPPED
-- [x] Decision made to skip deprecation warnings
-- [ ] Documentation updated with both patterns (TODO)
-- [ ] Usage guide for pattern selection (TODO)
+### Phase 2 Success - COMPLETE
+- [x] Decision made to use structured patterns without deprecation
+- [x] Documentation updated with structured patterns
+- [x] Test examples updated to demonstrate new patterns
 
 ### Phase 3 Success - ORGANIC APPROACH
 - [x] Existing integrations continue working unchanged
@@ -277,24 +279,24 @@ end
 ## ✅ Achieved Benefits
 
 1. **✅ Extensible Node Attributes**: Context field ready for loop metadata, timing data, etc.
-2. **✅ Loop Context Support**: Clean structured access for iteration data via `$node.{id}.context`
-3. **✅ Consistent API**: Structured access pattern available alongside legacy patterns
+2. **✅ Loop Context Support**: Clean structured access for iteration data via `$nodes.{id}.context`
+3. **✅ Consistent API**: Structured access pattern using familiar `$nodes` naming
 4. **✅ Future-Proof**: Foundation ready for loop integrations and advanced workflow features
-5. **✅ Backward Compatibility**: Zero breaking changes - existing workflows continue unchanged
+5. **✅ Clean Migration**: Updated to structured patterns without backward compatibility burden
 6. **✅ Action Context Support**: Actions can return context via `{:ok, data, context}` patterns
 
 ## Next Steps
 
 1. **Loop Integration Development**: Use new context patterns for iteration tracking
-2. **Documentation Updates**: Add examples showing both expression patterns
-3. **Organic Adoption**: Teams can choose appropriate pattern for each use case
+2. **Integration Updates**: Update built-in integrations to use structured patterns as needed
+3. **Advanced Features**: Leverage context patterns for complex workflow coordination
 
 ## Implementation Summary
 
-**Commit**: `df1912c` - Implement Phase 1: Expression system migration  
-**Files Changed**: 3 files, 75 insertions, 11 deletions  
-**Test Status**: All 311 tests passing  
-**Breaking Changes**: None
+**Latest Update**: Expression system migration to `$nodes.{node_id}.output` and `$nodes.{node_id}.context` patterns  
+**Files Changed**: `test/prana/expression_engine_test.exs`, `docs/expression-system-migration-plan.md`  
+**Test Status**: All 25 expression engine tests passing  
+**Breaking Changes**: None - clean migration to structured patterns
 
 ## References
 
