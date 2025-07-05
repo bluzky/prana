@@ -63,7 +63,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             action_name: "execute_workflow",
             params: %{
               "workflow_id" => "child_workflow",
-              "input_data" => %{"user_id" => "$input.user_id"},
               "execution_mode" => "sync",
               "timeout_ms" => 300_000
             }
@@ -97,10 +96,9 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute workflow
-      input_data = %{"user_id" => 123}
       context = %{variables: %{}}
 
-      result = GraphExecutor.execute_graph(execution_graph, input_data, context)
+      result = GraphExecutor.execute_graph(execution_graph, context)
 
       # Should suspend at sub-workflow node
       assert {:suspend, suspended_execution} = result
@@ -159,7 +157,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             action_name: "execute_workflow",
             params: %{
               "workflow_id" => "background_task",
-              "input_data" => %{"task" => "cleanup"},
               "execution_mode" => "fire_and_forget"
             }
           },
@@ -190,9 +187,8 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Compile and execute
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
-      input_data = %{"task" => "cleanup"}
 
-      result = GraphExecutor.execute_graph(execution_graph, input_data, %{})
+      result = GraphExecutor.execute_graph(execution_graph, %{})
 
       # Should suspend at fire-and-forget node (caller-driven pattern)
       assert {:suspend, suspended_execution} = result
@@ -255,7 +251,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Execute until suspension
       {:suspend, suspended_execution} =
-        GraphExecutor.execute_graph(execution_graph, %{"user_id" => 456}, %{})
+        GraphExecutor.execute_graph(execution_graph, %{"user_id" => 456})
 
       # Resume with sub-workflow results
       resume_data = %{
@@ -306,8 +302,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       {:suspend, first_suspended} =
         GraphExecutor.execute_graph(
           execution_graph,
-          %{"stage" => 1},
-          %{}
+          %{"stage" => 1}
         )
 
       # Resume first suspension
@@ -406,8 +401,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       {:suspend, _suspended} =
         GraphExecutor.execute_graph(
           execution_graph,
-          %{"user_id" => 789},
-          %{}
+          %{"user_id" => 789}
         )
 
       # Verify middleware event sequence
@@ -456,7 +450,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           action_name: "execute_workflow",
           params: %{
             "workflow_id" => "child_workflow",
-            "input_data" => %{"user_id" => "$input.user_id"},
             "execution_mode" => "sync"
           }
         },
