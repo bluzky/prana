@@ -400,7 +400,7 @@ defmodule Prana.NodeExecutorTest do
       assert node_execution.retry_count == 0
 
       # Check execution runtime updates (only stored under custom_id)
-      assert updated_execution.__runtime["nodes"]["test-1"] == node_execution.output_data
+      assert updated_execution.__runtime["nodes"]["test-1"] == %{"output" => node_execution.output_data, "context" => %{}}
       assert updated_execution.__runtime["executed_nodes"] == ["test-1"]
     end
 

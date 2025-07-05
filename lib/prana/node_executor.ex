@@ -371,8 +371,7 @@ defmodule Prana.NodeExecutor do
     # Build standardized expression context with all built-in variables
     %{
       "$input" => routed_input,                           # routed input by port
-      "$nodes" => execution.__runtime["nodes"],           # completed node outputs (legacy) 
-      "$node" => execution.__runtime["node"],             # structured node data (new patterns)
+      "$nodes" => execution.__runtime["nodes"],           # structured node data (output + context)
       "$env" => execution.__runtime["env"],               # environment variables
       "$vars" => execution.input_data,                    # workflow variables (renamed from vars per decision doc)
       "$workflow" => %{                                   # workflow metadata

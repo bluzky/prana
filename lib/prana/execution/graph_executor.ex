@@ -567,7 +567,10 @@ defmodule Prana.GraphExecutor do
     Enum.reduce(node_executions, %{}, fn node_exec, acc ->
       result_data =
         if node_exec.status == :completed do
-          node_exec.output_data
+          %{
+            "output" => node_exec.output_data,
+            "context" => node_exec.context_data
+          }
         else
           %{"error" => node_exec.error_data, "status" => node_exec.status}
         end
@@ -673,9 +676,9 @@ defmodule Prana.GraphExecutor do
         # Collect data from all connections targeting this port
         port_data =
           Enum.reduce(incoming_connections, nil, fn connection, _acc ->
-            # Get the output data from the source node if it's completed
-            source_node_output = execution.__runtime["nodes"][connection.from]
-            if source_node_output, do: source_node_output
+            # Get the structured node data and extract output
+            source_node_data = execution.__runtime["nodes"][connection.from]
+            if source_node_data, do: source_node_data["output"]
           end)
 
         if port_data do

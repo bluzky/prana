@@ -44,8 +44,8 @@ defmodule Prana.ExecutionTest do
 
       # Verify runtime state structure
       assert result.__runtime["nodes"] == %{
-        "node_1" => %{user_id: 123},
-        "node_2" => %{email: "test@example.com"}
+        "node_1" => %{"output" => %{user_id: 123}, "context" => %{}},
+        "node_2" => %{"output" => %{email: "test@example.com"}, "context" => %{}}
       }
 
       assert result.__runtime["env"] == env_data
@@ -107,7 +107,7 @@ defmodule Prana.ExecutionTest do
       result = Execution.rebuild_runtime(execution, %{})
 
       # Only completed nodes should be in nodes map
-      assert result.__runtime["nodes"] == %{"node_3" => %{result: "success"}}
+      assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}, "context" => %{}}}
       assert result.__runtime["active_paths"] == %{"node_3_done" => true}
       
       # But all nodes should be in executed_nodes (chronological order)
@@ -147,7 +147,7 @@ defmodule Prana.ExecutionTest do
       assert completed_node.output_port == "success"
 
       # Verify runtime state
-      assert result.__runtime["nodes"]["node_1"] == output_data
+      assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data, "context" => %{}}
       assert result.__runtime["executed_nodes"] == ["node_1"]
       assert result.__runtime["active_paths"]["node_1_success"] == true
     end
@@ -303,7 +303,7 @@ defmodule Prana.ExecutionTest do
           }
         ],
         __runtime: %{
-          "nodes" => %{"node_1" => %{user_id: 123}},
+          "nodes" => %{"node_1" => %{"output" => %{user_id: 123}, "context" => %{}}},
           "env" => %{"api_key" => "test"},
           "active_paths" => %{"node_1_success" => true},
           "executed_nodes" => ["node_1"]
@@ -319,8 +319,8 @@ defmodule Prana.ExecutionTest do
       result = Execution.complete_node(execution, completed_node_execution_2)
 
       # Verify state synchronization
-      assert result.__runtime["nodes"]["node_1"] == %{user_id: 123}
-      assert result.__runtime["nodes"]["node_2"] == %{email: "test@example.com"}
+      assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}, "context" => %{}}
+      assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}, "context" => %{}}
       assert result.__runtime["executed_nodes"] == ["node_1", "node_2"]
       assert result.__runtime["active_paths"]["node_1_success"] == true
       assert result.__runtime["active_paths"]["node_2_primary"] == true
