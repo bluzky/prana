@@ -591,10 +591,13 @@ defmodule Prana.GraphExecutor do
       resume_ready_execution = Execution.resume_suspension(suspended_execution)
 
       # Call NodeExecutor with new unified interface
-      {:ok, _completed_node_execution, updated_execution} =
-        NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data)
+      case NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data) do
+        {:ok, _completed_node_execution, updated_execution} ->
+          {:ok, updated_execution}
 
-      {:ok, updated_execution}
+        {:error, {reason, _failed_node_execution}} ->
+          {:error, reason}
+      end
     else
       {:error, %{type: "suspended_node_not_found", node_id: suspended_node_id}}
     end

@@ -131,7 +131,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
+  def resume(_params, _context, _resume_data) do
     {:error, "Webhook action does not support resume"}
   end
 

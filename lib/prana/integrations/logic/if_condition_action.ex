@@ -45,7 +45,7 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
+  def resume(_params, _context, _resume_data) do
     {:error, "IF Condition action does not support suspension/resume"}
   end
 

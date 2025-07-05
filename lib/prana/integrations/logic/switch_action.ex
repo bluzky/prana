@@ -58,7 +58,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   end
 
   @impl true
-  def resume(_suspend_data, _resume_input) do
+  def resume(_params, _context, _resume_data) do
     {:error, "Switch action does not support suspension/resume"}
   end
 

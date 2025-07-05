@@ -99,29 +99,53 @@ defmodule Prana.NodeExecutor do
   - `{:error, {reason, failed_node_execution}}` - Resume failed
   """
   @spec resume_node(Node.t(), Prana.Execution.t(), NodeExecution.t(), map()) ::
-          {:ok, NodeExecution.t(), Prana.Execution.t()}
+          {:ok, NodeExecution.t(), Prana.Execution.t()} | {:error, {term(), NodeExecution.t()}}
   def resume_node(
-        %Node{} = _node,
+        %Node{} = node,
         %Prana.Execution{} = execution,
         %NodeExecution{} = suspended_node_execution,
         resume_data
       ) do
-    # Extract actual output data from resume data structure
-    # For sub-workflows, resume_data contains metadata alongside the actual output
-    output_data =
-      case resume_data do
-        %{"sub_workflow_output" => output} -> output
-        # Use full resume data if no sub_workflow_output key
-        _ -> resume_data
+    # Build context for resume (same as execute_node)
+    context = build_expression_context(execution, %{})
+
+    # Get the original params from the suspended node execution
+    params = suspended_node_execution.params || %{}
+
+    with {:ok, action} <- get_action(node) do
+      case invoke_resume_action(action, params, context, resume_data) do
+        {:ok, output_data, output_port} ->
+          # Complete the suspended node execution
+          completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+
+          # Integrate it into the execution state
+          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+
+          {:ok, completed_execution, updated_execution}
+
+        {:ok, output_data, output_port, context} ->
+          # Complete with context data
+          completed_execution =
+            suspended_node_execution
+            |> NodeExecution.complete(output_data, output_port)
+            |> NodeExecution.update_context(context)
+
+          # Integrate it into the execution state
+          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+
+          {:ok, completed_execution, updated_execution}
+
+        {:error, reason} ->
+          # Resume failed
+          failed_execution = NodeExecution.fail(suspended_node_execution, reason)
+          {:error, {reason, failed_execution}}
       end
-
-    # Complete the suspended node execution first
-    completed_execution = NodeExecution.complete(suspended_node_execution, output_data, "success")
-
-    # Then integrate it into the execution state
-    updated_execution = Prana.Execution.complete_node(execution, completed_execution)
-
-    {:ok, completed_execution, updated_execution}
+    else
+      {:error, reason} ->
+        # Action retrieval failed
+        failed_execution = NodeExecution.fail(suspended_node_execution, reason)
+        {:error, {reason, failed_execution}}
+    end
   end
 
   @doc """
@@ -222,6 +246,43 @@ defmodule Prana.NodeExecutor do
       {:error,
        %{
          "type" => "action_throw",
+         "value" => inspect(value),
+         "module" => action.module,
+         "action" => action.name
+       }}
+  end
+
+  @doc """
+  Invoke action resume method with params, context, and resume data.
+  """
+  @spec invoke_resume_action(Prana.Action.t(), map(), map(), term()) :: {:ok, term(), String.t()} | {:error, term()}
+  def invoke_resume_action(%Prana.Action{} = action, params, context, resume_data) do
+    # Call the action's resume method
+    result = action.module.resume(params, context, resume_data)
+    process_action_result(result, action)
+  rescue
+    error ->
+      {:error,
+       %{
+         "type" => "action_resume_failed",
+         "error" => inspect(error),
+         "module" => action.module,
+         "action" => action.name
+       }}
+  catch
+    :exit, reason ->
+      {:error,
+       %{
+         "type" => "action_resume_exit",
+         "reason" => inspect(reason),
+         "module" => action.module,
+         "action" => action.name
+       }}
+
+    :throw, value ->
+      {:error,
+       %{
+         "type" => "action_resume_throw",
          "value" => inspect(value),
          "module" => action.module,
          "action" => action.name

@@ -78,10 +78,10 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
     end
   end
 
-  describe "WebhookAction resume/2" do
+  describe "WebhookAction resume/3" do
     test "returns error for unsupported resume operation" do
       assert {:error, "Webhook action does not support resume"} =
-               WebhookAction.resume(%{}, %{})
+               WebhookAction.resume(%{}, %{}, %{})
     end
   end
 

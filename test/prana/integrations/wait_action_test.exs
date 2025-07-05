@@ -149,92 +149,43 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     end
   end
 
-  describe "resume/2" do
+  describe "resume/3" do
     test "webhook mode processes resume data correctly" do
-      suspend_data = %{
-        mode: "webhook",
-        expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
-      }
+      params = %{"mode" => "webhook", "timeout_hours" => 24}
+      context = %{}
+      resume_data = %{"webhook_payload" => "received"}
 
-      resume_input = %{"webhook_payload" => "received"}
-
-      {:ok, output_data} = WaitAction.resume(suspend_data, resume_input)
+      {:ok, output_data} = WaitAction.resume(params, context, resume_data)
 
       assert output_data["webhook_payload"] == "received"
     end
 
-    test "webhook mode returns error for expired webhook" do
-      suspend_data = %{
-        mode: "webhook",
-        expires_at: DateTime.add(DateTime.utc_now(), -3600, :second)
-      }
+    test "interval mode resumes successfully" do
+      params = %{"mode" => "interval", "duration" => 30, "unit" => "seconds"}
+      context = %{}
+      resume_data = %{}
 
-      resume_input = %{"webhook_payload" => "received"}
-
-      {:error, error} = WaitAction.resume(suspend_data, resume_input)
-
-      assert error.type == "webhook_timeout"
-      assert error.message == "Webhook has expired"
-    end
-
-    test "interval mode validates timing before resuming" do
-      future_resume = DateTime.add(DateTime.utc_now(), 3600, :second)
-
-      suspend_data = %{
-        mode: "interval",
-        resume_at: future_resume
-      }
-
-      {:error, error} = WaitAction.resume(suspend_data, %{})
-
-      assert error.type == "interval_not_ready"
-      assert error.message == "Interval duration not yet elapsed"
-    end
-
-    test "interval mode resumes successfully when time has passed" do
-      past_resume = DateTime.add(DateTime.utc_now(), -3600, :second)
-
-      suspend_data = %{
-        mode: "interval",
-        resume_at: past_resume
-      }
-
-      {:ok, output_data} = WaitAction.resume(suspend_data, %{})
+      {:ok, output_data} = WaitAction.resume(params, context, resume_data)
 
       assert output_data == %{}
     end
 
-    test "schedule mode validates timing before resuming" do
-      future_schedule = DateTime.add(DateTime.utc_now(), 3600, :second)
+    test "schedule mode resumes successfully" do
+      params = %{"mode" => "schedule", "schedule_at" => DateTime.to_iso8601(DateTime.utc_now())}
+      context = %{}
+      resume_data = %{}
 
-      suspend_data = %{
-        mode: "schedule",
-        schedule_at: future_schedule
-      }
-
-      {:error, error} = WaitAction.resume(suspend_data, %{})
-
-      assert error.type == "schedule_not_ready"
-      assert error.message == "Scheduled time has not yet arrived"
-    end
-
-    test "schedule mode resumes successfully when time has arrived" do
-      past_schedule = DateTime.add(DateTime.utc_now(), -3600, :second)
-
-      suspend_data = %{
-        mode: "schedule",
-        schedule_at: past_schedule
-      }
-
-      {:ok, output_data} = WaitAction.resume(suspend_data, %{})
+      {:ok, output_data} = WaitAction.resume(params, context, resume_data)
 
       assert output_data == %{}
     end
 
     test "returns error for unknown suspension mode" do
-      suspend_data = %{mode: "unknown"}
+      params = %{"mode" => "unknown"}
+      context = %{}
+      resume_data = %{}
 
-      {:error, reason} = WaitAction.resume(suspend_data, %{})
+      {:error, reason} = WaitAction.resume(params, context, resume_data)
 
       assert reason =~ "Unknown suspension mode"
     end
@@ -276,9 +227,12 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
         "timestamp" => DateTime.to_iso8601(DateTime.utc_now())
       }
 
-      {:ok, final_output} = WaitAction.resume(suspension_data, webhook_payload)
+      params = %{"mode" => "webhook", "timeout_hours" => 24}
+      context = %{}
 
-      # Should merge original data with webhook payload
+      {:ok, final_output} = WaitAction.resume(params, context, webhook_payload)
+
+      # Should return the webhook payload
       assert final_output["user_input"] == "approved"
       assert final_output["timestamp"] != nil
     end

@@ -181,8 +181,9 @@ defmodule Prana.Behaviour.Action do
   completes the action execution.
 
   ## Parameters
-  - `suspend_data` - Data returned from execute/2 when action suspended
-  - `resume_input` - External input data (webhook payload, timer data, etc.)
+  - `params` - Resolved params from node configuration (same as execute/2)
+  - `context` - Full execution context (same as execute/2)
+  - `resume_data` - External input data (webhook payload, timer data, etc.)
 
   ## Returns
   - `{:ok, output_data}` - Action completed successfully
@@ -190,8 +191,8 @@ defmodule Prana.Behaviour.Action do
 
   ## Examples
 
-      def resume(suspend_data, resume_input) do
-        case resume_input do
+      def resume(params, context, resume_data) do
+        case resume_data do
           %{"status" => "success", "data" => data} ->
             {:ok, data}
           %{"status" => "error", "error" => error} ->
@@ -201,7 +202,7 @@ defmodule Prana.Behaviour.Action do
         end
       end
   """
-  @callback resume(suspend_data(), resume_input()) ::
+  @callback resume(params(), context :: map(), resume_data :: term()) ::
               {:ok, output_data()} | {:error, reason :: term()}
 
   @doc """

@@ -84,10 +84,10 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
     end
   end
 
-  describe "RequestAction resume/2" do
+  describe "RequestAction resume/3" do
     test "returns error for unsupported resume operation" do
       assert {:error, "HTTP request action does not support resume"} =
-               RequestAction.resume(%{}, %{})
+               RequestAction.resume(%{}, %{}, %{})
     end
   end
 

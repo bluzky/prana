@@ -69,7 +69,7 @@ defmodule Prana.Actions.SimpleAction do
       Simple actions don't support suspension/resume. Override this method
       if your action needs to support resumption.
       """
-      def resume(_suspend_data, _resume_input) do
+      def resume(_params, _context, _resume_data) do
         {:error, "Resume not supported"}
       end
 
@@ -78,8 +78,8 @@ defmodule Prana.Actions.SimpleAction do
       """
       def suspendable?, do: false
 
-      # Allow overriding prepare/1 and resume/2 for more complex simple actions
-      defoverridable prepare: 1, resume: 2, suspendable?: 0
+      # Allow overriding prepare/1 and resume/3 for more complex simple actions
+      defoverridable prepare: 1, resume: 3, suspendable?: 0
     end
   end
 

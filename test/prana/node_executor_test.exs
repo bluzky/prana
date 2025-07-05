@@ -24,7 +24,7 @@ defmodule Prana.NodeExecutorTest do
     end
 
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
@@ -44,7 +44,7 @@ defmodule Prana.NodeExecutorTest do
     end
 
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
@@ -78,7 +78,7 @@ defmodule Prana.NodeExecutorTest do
     end
 
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
@@ -107,7 +107,7 @@ defmodule Prana.NodeExecutorTest do
     end
 
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
@@ -128,7 +128,7 @@ defmodule Prana.NodeExecutorTest do
     end
 
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
@@ -148,7 +148,7 @@ defmodule Prana.NodeExecutorTest do
     end
 
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
@@ -168,7 +168,7 @@ defmodule Prana.NodeExecutorTest do
     end
 
     @impl true
-    def resume(_suspend_data, _resume_input) do
+    def resume(_params, _context, _resume_data) do
       {:error, "Test actions do not support suspension/resume"}
     end
   end
