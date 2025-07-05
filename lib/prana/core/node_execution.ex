@@ -20,7 +20,8 @@ defmodule Prana.NodeExecution do
           duration_ms: integer() | nil,
           suspension_type: atom() | nil,
           suspension_data: term() | nil,
-          metadata: map()
+          metadata: map(),
+          context_data: map()
         }
 
   defstruct [
@@ -38,7 +39,8 @@ defmodule Prana.NodeExecution do
     :suspension_type,
     :suspension_data,
     retry_count: 0,
-    metadata: %{}
+    metadata: %{},
+    context_data: %{}
   ]
 
   @doc """
@@ -60,7 +62,8 @@ defmodule Prana.NodeExecution do
       duration_ms: nil,
       suspension_type: nil,
       suspension_data: nil,
-      metadata: %{}
+      metadata: %{},
+      context_data: %{}
     }
   end
 
@@ -108,6 +111,13 @@ defmodule Prana.NodeExecution do
   """
   def increment_retry(%__MODULE__{} = node_execution) do
     %{node_execution | retry_count: node_execution.retry_count + 1}
+  end
+
+  @doc """
+  Updates context data for the node execution
+  """
+  def update_context(%__MODULE__{} = node_execution, context_data) do
+    %{node_execution | context_data: context_data}
   end
 
   defp calculate_duration(nil), do: nil

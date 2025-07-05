@@ -39,8 +39,20 @@ defmodule Prana.NodeExecutor do
     with {:ok, prepared_input} <- prepare_input(node, execution, routed_input),
          {:ok, action} <- get_action(node) do
       case invoke_action(action, prepared_input) do
+        {:ok, output_data, output_port, context} ->
+          # Complete the local node execution and update context
+          completed_execution = 
+            node_execution
+            |> NodeExecution.complete(output_data, output_port)
+            |> NodeExecution.update_context(context)
+          
+          # Then integrate it into the execution state
+          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+          
+          {:ok, completed_execution, updated_execution}
+
         {:ok, output_data, output_port} ->
-          # Complete the local node execution first
+          # Complete the local node execution without context data
           completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
           
           # Then integrate it into the execution state
@@ -225,6 +237,10 @@ defmodule Prana.NodeExecutor do
   - `{:ok, data, port}` - Success with explicit port selection
   - `{:error, error, port}` - Error with explicit port selection
 
+  ### Context-Aware Returns
+  - `{:ok, data, port, context}` - Success with port and context data
+  - `{:ok, data, context}` - Success with context data (default port)
+
   ### Suspension Returns
   - `{:suspend, suspension_type, suspend_data}` - Pause execution for async coordination
 
@@ -243,6 +259,12 @@ defmodule Prana.NodeExecutor do
       # Explicit port routing
       {:ok, result, "premium_path"}
 
+      # Context-aware success (default port)
+      {:ok, %{user_id: 123}, %{"batch_size" => 10, "has_more" => true}}
+
+      # Context-aware with explicit port
+      {:ok, result, "premium_path", %{"processing_time_ms" => 150}}
+
       # Sub-workflow suspension
       {:suspend, :sub_workflow_sync, %{
         workflow_id: "child_workflow",
@@ -258,12 +280,30 @@ defmodule Prana.NodeExecutor do
       }}
   """
   @spec process_action_result(term(), Prana.Action.t()) ::
-          {:ok, term(), String.t()} | {:error, term()} | {:suspend, atom(), term()}
+          {:ok, term(), String.t()} | {:ok, term(), String.t(), map()} | {:error, term()} | {:suspend, atom(), term()}
   def process_action_result(result, %Prana.Action{} = action) do
     case result do
       # Suspension format for async coordination: {:suspend, type, data}
       {:suspend, suspension_type, suspend_data} when is_atom(suspension_type) ->
         {:suspend, suspension_type, suspend_data}
+
+      # Context-aware explicit port format: {:ok, data, port, context}
+      {:ok, data, port, context} when is_binary(port) and is_map(context) ->
+        if allows_dynamic_ports?(action) or port in action.output_ports do
+          {:ok, data, port, context}
+        else
+          {:error,
+           %{
+             "type" => "invalid_output_port",
+             "port" => port,
+             "available_ports" => action.output_ports
+           }}
+        end
+
+      # Context-aware default port format: {:ok, data, context}
+      {:ok, data, context} when is_map(context) ->
+        port = action.default_success_port || get_default_success_port(action)
+        {:ok, data, port, context}
 
       # Explicit port format: {:ok, data, port}
       {:ok, data, port} when is_binary(port) ->
@@ -319,7 +359,7 @@ defmodule Prana.NodeExecutor do
            "type" => "invalid_action_return_format",
            "result" => inspect(invalid_result),
            "message" =>
-             "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:suspend, type, data}"
+             "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}"
          }}
     end
   end
@@ -331,7 +371,8 @@ defmodule Prana.NodeExecutor do
     # Build standardized expression context with all built-in variables
     %{
       "$input" => routed_input,                           # routed input by port
-      "$nodes" => execution.__runtime["nodes"],           # completed node outputs  
+      "$nodes" => execution.__runtime["nodes"],           # completed node outputs (legacy) 
+      "$node" => execution.__runtime["node"],             # structured node data (new patterns)
       "$env" => execution.__runtime["env"],               # environment variables
       "$vars" => execution.input_data,                    # workflow variables (renamed from vars per decision doc)
       "$workflow" => %{                                   # workflow metadata
