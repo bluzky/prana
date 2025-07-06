@@ -46,6 +46,46 @@ defmodule Prana.Integrations.Manual do
           output_ports: ["success"],
           default_success_port: "success",
           default_error_port: "success"
+        },
+        "set_data" => %Action{
+          name: "set_data",
+          display_name: "Set Data",
+          description: "Set data for testing",
+          module: Prana.Integrations.Manual.SetDataAction,
+          input_ports: ["input"],
+          output_ports: ["success"],
+          default_success_port: "success",
+          default_error_port: "success"
+        },
+        "increment_counter" => %Action{
+          name: "increment_counter",
+          display_name: "Increment Counter",
+          description: "Increment counter for loop testing",
+          module: Prana.Integrations.Manual.IncrementCounterAction,
+          input_ports: ["input"],
+          output_ports: ["success"],
+          default_success_port: "success",
+          default_error_port: "success"
+        },
+        "attempt_operation" => %Action{
+          name: "attempt_operation",
+          display_name: "Attempt Operation",
+          description: "Simulate operation that may fail for retry testing",
+          module: Prana.Integrations.Manual.AttemptOperationAction,
+          input_ports: ["input"],
+          output_ports: ["success"],
+          default_success_port: "success",
+          default_error_port: "success"
+        },
+        "increment_retry" => %Action{
+          name: "increment_retry",
+          display_name: "Increment Retry",
+          description: "Increment retry counter for retry testing",
+          module: Prana.Integrations.Manual.IncrementRetryAction,
+          input_ports: ["input"],
+          output_ports: ["success"],
+          default_success_port: "success",
+          default_error_port: "success"
         }
       }
     }
