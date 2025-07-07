@@ -11,9 +11,9 @@ This document outlines the implementation plan for adding loop support to the Pr
 3. **Runtime Rebuilding**: Use last execution per node for expression evaluation
 4. **GraphExecutor**: Track global execution order and per-node iterations
 
-## Phase 1: Core Data Structure Changes
+## Phase 1: Core Data Structure Changes ✅ **COMPLETED**
 
-### 1.1 Update NodeExecution Struct (`lib/prana/core/node_execution.ex`)
+### 1.1 Update NodeExecution Struct (`lib/prana/core/node_execution.ex`) ✅ **COMPLETED**
 
 **Add new fields:**
 ```elixir
@@ -44,7 +44,7 @@ def new(execution_id, node_id, execution_index \\ 0, run_index \\ 0) do
 end
 ```
 
-### 1.2 Update Execution Struct (`lib/prana/core/execution.ex`)
+### 1.2 Update Execution Struct (`lib/prana/core/execution.ex`) ✅ **COMPLETED**
 
 **Change node_executions from list to map and add execution index tracking:**
 ```elixir
@@ -63,7 +63,7 @@ defstruct [
 ]
 ```
 
-### 1.3 Update Execution Helper Functions
+### 1.3 Update Execution Helper Functions ✅ **COMPLETED**
 
 **Update `complete_node/2`:**
 ```elixir
@@ -157,9 +157,9 @@ def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
 end
 ```
 
-## Phase 2: Execution Engine Updates
+## Phase 2: Execution Engine Updates ✅ **COMPLETED**
 
-### 2.1 Update GraphExecutor (`lib/prana/execution/graph_executor.ex`)
+### 2.1 Update GraphExecutor (`lib/prana/execution/graph_executor.ex`) ✅ **COMPLETED**
 
 **Update node execution tracking:**
 ```elixir
@@ -200,7 +200,7 @@ end
 - **Resume-Friendly**: Automatically preserved across suspension/resume
 - **Thread-Safe**: Single source of truth, no race conditions
 
-### 2.2 Update NodeExecutor (`lib/prana/node_executor.ex`)
+### 2.2 Update NodeExecutor (`lib/prana/node_executor.ex`) ✅ **COMPLETED**
 
 **Update execute_node function signature:**
 ```elixir
@@ -212,24 +212,29 @@ def execute_node(node, execution, execution_index, run_index) do
 end
 ```
 
-## Phase 3: Testing & Validation
+## Phase 3: Testing & Validation 🔄 **IN PROGRESS**
 
 ### 3.1 Testing Strategy
 
 **CRITICAL**: All existing tests must pass before adding new functionality. This ensures we haven't broken existing behavior during the refactor.
 
-**Step 1: Fix Core Tests (Priority 1)**
-1. Run `mix test` to identify all failing tests
-2. Fix tests one module at a time in dependency order:
-   - `test/prana/core/node_execution_test.exs`
-   - `test/prana/core/execution_test.exs`
-   - `test/prana/node_executor_test.exs`
-   - `test/prana/execution/graph_executor_test.exs`
-   - `test/prana/expression_engine_test.exs`
-3. **Gate**: All existing tests must pass before proceeding
+**Step 1: Fix Core Tests (Priority 1) ✅ COMPLETED**
+1. ✅ Run `mix test` to identify all failing tests
+2. ✅ Fix tests one module at a time in dependency order:
+   - ✅ `test/prana/core/node_execution_test.exs` - **COMPLETED**
+   - ✅ `test/prana/core/execution_test.exs` - **COMPLETED**
+   - ✅ `test/prana/node_executor_test.exs` - **COMPLETED**
+   - ✅ `test/prana/execution/graph_executor_test.exs` - **COMPLETED**
+   - ✅ `test/prana/expression_engine_test.exs` - **COMPLETED**
+3. 🔄 **Gate**: Core tests pass, remaining test files need map structure updates
 
-**Step 2: Add New Test Cases (Priority 2)**
-Only after Step 1 is complete, add new test cases for loop functionality.
+**Step 2: Fix Remaining Test Files 🔄 IN PROGRESS**
+- 🔄 `test/prana/execution/graph_executor_conditional_branching_test.exs` - **NEEDS UPDATE**
+- 🔄 `test/prana/execution/simple_loop_test.exs` - **NEEDS UPDATE**  
+- 🔄 `test/prana/execution/graph_executor_sub_workflow_test.exs` - **NEEDS UPDATE**
+
+**Step 3: Add New Test Cases (Priority 3) ⏸️ PENDING**
+Only after Steps 1-2 are complete, add new test cases for loop functionality.
 
 ### 3.2 Core Test Updates Required
 
@@ -300,11 +305,12 @@ With the new structure, expressions can access:
 ## Breaking Changes Impact
 
 ### Files Requiring Updates
-- `lib/prana/core/execution.ex` ✓
-- `lib/prana/core/node_execution.ex` ✓
-- `lib/prana/execution/graph_executor.ex` ✓
-- `lib/prana/node_executor.ex` ✓
-- All test files using `node_executions` ✓
+- `lib/prana/core/execution.ex` ✅ **COMPLETED**
+- `lib/prana/core/node_execution.ex` ✅ **COMPLETED**  
+- `lib/prana/execution/graph_executor.ex` ✅ **COMPLETED**
+- `lib/prana/node_executor.ex` ✅ **COMPLETED**
+- Core test files (`execution_test.exs`, `graph_executor_test.exs`) ✅ **COMPLETED**
+- Remaining test files (conditional branching, simple loop, sub-workflow) 🔄 **IN PROGRESS**
 
 ### Migration Strategy
 1. **Gradual Migration**: Update core structures first
@@ -320,11 +326,27 @@ With the new structure, expressions can access:
 
 ## Success Criteria
 
-1. **Data Structure**: Map-based node_executions with proper indexing
-2. **Execution Tracking**: Global execution_index and per-node run_index
-3. **Expression Access**: Proper access to latest node outputs
-4. **Test Coverage**: All existing tests pass with new structure
-5. **Loop Foundation**: Ready for loop control flow implementation
+1. ✅ **Data Structure**: Map-based node_executions with proper indexing - **COMPLETED**
+2. ✅ **Execution Tracking**: Global execution_index and per-node run_index - **COMPLETED**
+3. ✅ **Expression Access**: Proper access to latest node outputs - **COMPLETED**
+4. 🔄 **Test Coverage**: Core tests pass, remaining test files need map structure updates - **IN PROGRESS**
+5. ✅ **Loop Foundation**: Ready for loop control flow implementation - **COMPLETED**
+
+## Implementation Status Summary
+
+**✅ COMPLETED (Phases 1-2):**
+- Core data structure changes with execution tracking
+- Map-based node_executions with O(1) lookup by node_id  
+- GraphExecutor and NodeExecutor updated with execution tracking
+- Legacy list structure support removed for cleaner codebase
+- Core test files migrated to new structure
+- Foundation ready for loop implementation
+
+**🔄 IN PROGRESS (Phase 3):**
+- Remaining test files need map structure updates (conditional branching, simple loop, sub-workflow)
+
+**⏸️ PENDING:**
+- New test cases for loop functionality (after all existing tests pass)
 
 ## Next Steps After Implementation
 
