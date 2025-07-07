@@ -187,7 +187,6 @@ defmodule Prana.NodeExecutorSuspensionTest do
       action = %Action{
         name: "test_action",
         output_ports: ["success", "error"],
-        default_success_port: "success",
         default_error_port: "error"
       }
 

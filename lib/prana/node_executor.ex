@@ -112,35 +112,36 @@ defmodule Prana.NodeExecutor do
     # Get the original params from the suspended node execution
     params = suspended_node_execution.params || %{}
 
-    with {:ok, action} <- get_action(node) do
-      case invoke_resume_action(action, params, context, resume_data) do
-        {:ok, output_data, output_port} ->
-          # Complete the suspended node execution
-          completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+    case get_action(node) do
+      {:ok, action} ->
+        case invoke_resume_action(action, params, context, resume_data) do
+          {:ok, output_data, output_port} ->
+            # Complete the suspended node execution
+            completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
 
-          # Integrate it into the execution state
-          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+            # Integrate it into the execution state
+            updated_execution = Prana.Execution.complete_node(execution, completed_execution)
 
-          {:ok, completed_execution, updated_execution}
+            {:ok, completed_execution, updated_execution}
 
-        {:ok, output_data, output_port, context} ->
-          # Complete with context data
-          completed_execution =
-            suspended_node_execution
-            |> NodeExecution.complete(output_data, output_port)
-            |> NodeExecution.update_context(context)
+          {:ok, output_data, output_port, context} ->
+            # Complete with context data
+            completed_execution =
+              suspended_node_execution
+              |> NodeExecution.complete(output_data, output_port)
+              |> NodeExecution.update_context(context)
 
-          # Integrate it into the execution state
-          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+            # Integrate it into the execution state
+            updated_execution = Prana.Execution.complete_node(execution, completed_execution)
 
-          {:ok, completed_execution, updated_execution}
+            {:ok, completed_execution, updated_execution}
 
-        {:error, reason} ->
-          # Resume failed
-          failed_execution = NodeExecution.fail(suspended_node_execution, reason)
-          {:error, {reason, failed_execution}}
-      end
-    else
+          {:error, reason} ->
+            # Resume failed
+            failed_execution = NodeExecution.fail(suspended_node_execution, reason)
+            {:error, {reason, failed_execution}}
+        end
+
       {:error, reason} ->
         # Action retrieval failed
         failed_execution = NodeExecution.fail(suspended_node_execution, reason)
@@ -402,12 +403,12 @@ defmodule Prana.NodeExecutor do
 
       # Default success format: {:ok, data}
       {:ok, data} ->
-        port = action.default_success_port || get_default_success_port(action)
+        port = get_default_success_port(action)
         {:ok, data, port}
 
       # Default error format: {:error, error}
       {:error, error} ->
-        port = action.default_error_port || get_default_error_port(action)
+        port = get_default_error_port(action)
 
         {:error,
          %{
@@ -459,11 +460,10 @@ defmodule Prana.NodeExecutor do
   @spec get_default_success_port(Prana.Action.t()) :: String.t()
   defp get_default_success_port(%Prana.Action{output_ports: ports}) do
     cond do
-      "success" in ports -> "success"
       "output" in ports -> "output"
       length(ports) > 0 -> List.first(ports)
       # fallback
-      true -> "success"
+      true -> "output"
     end
   end
 

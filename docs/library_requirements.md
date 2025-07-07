@@ -207,7 +207,7 @@ defmodule MyApp.SlackIntegration do
           function: :send_message,
           input_ports: ["input"],
           output_ports: ["success", "error"],
-          default_success_port: "success",
+          
           default_error_port: "error"
         }
       }

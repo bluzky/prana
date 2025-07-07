@@ -25,7 +25,7 @@ defmodule Prana.Integrations.WaitTest do
       assert wait_action.module == Prana.Integrations.Wait.WaitAction
       assert wait_action.input_ports == ["input"]
       assert wait_action.output_ports == ["success", "timeout", "error"]
-      assert wait_action.default_success_port == "success"
+
       assert wait_action.default_error_port == "error"
     end
   end

@@ -37,7 +37,7 @@ defmodule Prana.Integrations.Wait do
           module: Prana.Integrations.Wait.WaitAction,
           input_ports: ["input"],
           output_ports: ["success", "timeout", "error"],
-          default_success_port: "success",
+          
           default_error_port: "error"
         }
       }

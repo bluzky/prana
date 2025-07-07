@@ -37,9 +37,9 @@ We will implement **two distinct loop types** that align with Prana's architectu
 ### Simple Loop Pattern
 ```elixir
 # Workflow structure:
-A: Initialize state → 
-B: Process step → 
-C: Logic IF (condition: "$variables.counter < 10") → 
+A: Initialize state →
+B: Process step →
+C: Logic IF (condition: "$variables.counter < 10") →
    - true → D: Update state → back to B (loop)
    - false → E: Complete (exit)
 ```
@@ -64,7 +64,7 @@ C: Logic IF (condition: "$variables.counter < 10") →
       description: "Process array items in batches with result collection",
       input_ports: ["input"],  # Single input port for both initial and loop-back
       output_ports: ["batch", "done", "error"],
-      default_success_port: "batch"
+
     }
   }
 }
@@ -81,8 +81,8 @@ The forEach loop leverages Prana's general node execution pattern:
 **forEach Loop Execution Flow**:
 ```elixir
 # Workflow structure:
-Initial Node → 
-              → Loop Node (input port) → batch → Process → 
+Initial Node →
+              → Loop Node (input port) → batch → Process →
 Loop-back ────┘                                           │
                                                           │
 Loop Node ← done ← Final Processing ← ────────────────────┘
@@ -123,7 +123,7 @@ Loop Node ← done ← Final Processing ← ────────────
 # Internal loop state
 %{
   items: [...],              # Original items array
-  current_batch: 0,          # Current batch index  
+  current_batch: 0,          # Current batch index
   total_batches: 10,         # Total number of batches
   processed_results: [],     # Collected results from each batch
   is_completed: false        # Completion flag
@@ -181,19 +181,19 @@ To support extensible node attributes, the expression system will be refactored:
 ### Simple Loop Example
 ```elixir
 # Retry API call until success or max attempts
-A: Set retry_count (0) → 
-B: HTTP Request → 
-C: Logic IF (condition: "$input.success == false && $variables.retry_count < 3") → 
+A: Set retry_count (0) →
+B: HTTP Request →
+C: Logic IF (condition: "$input.success == false && $variables.retry_count < 3") →
    - true → D: Increment retry_count → back to B
    - false → E: Complete
 ```
 
-### Loop Over Items Example  
+### Loop Over Items Example
 ```elixir
 # Process 100 users in batches of 10
-A: Get users (100 items) → 
-B: Loop Over Items (batch_size: 10) → 
-   - batch → C: Send notifications (can access $node.B.context.batch_size) → 
+A: Get users (100 items) →
+B: Loop Over Items (batch_size: 10) →
+   - batch → C: Send notifications (can access $node.B.context.batch_size) →
    - C connects back to B (input port)
    - B → done → D: Summary report
 ```
@@ -201,13 +201,13 @@ B: Loop Over Items (batch_size: 10) →
 ### Nested Loop Example
 ```elixir
 # Process departments, then users within each department
-A: Get departments → 
-B: Loop Over Departments (batch_size: 5) → 
-   - batch → C: Get users for department → 
-   - C → D: Loop Over Users (batch_size: 10) → 
-     - batch → E: Process user (can access both $node.B.context.index and $node.D.context.index) → 
+A: Get departments →
+B: Loop Over Departments (batch_size: 5) →
+   - batch → C: Get users for department →
+   - C → D: Loop Over Users (batch_size: 10) →
+     - batch → E: Process user (can access both $node.B.context.index and $node.D.context.index) →
      - E connects back to D
-   - D → done → F: Department summary → 
+   - D → done → F: Department summary →
    - F connects back to B
    - B → done → G: Final report
 ```

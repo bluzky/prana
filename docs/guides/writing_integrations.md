@@ -26,7 +26,7 @@ defmodule MyApp.CustomIntegration do
           function: :my_action,
           input_ports: ["input"],
           output_ports: ["success", "error"],
-          default_success_port: "success",
+          
           default_error_port: "error"
         }
       }

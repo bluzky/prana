@@ -32,7 +32,7 @@ defmodule Prana.Integrations.Data do
           module: Prana.Integrations.Data.MergeAction,
           input_ports: ["input_a", "input_b"],
           output_ports: ["success", "error"],
-          default_success_port: "success",
+          
           default_error_port: "error"
         }
       }

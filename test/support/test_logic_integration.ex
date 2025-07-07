@@ -25,7 +25,6 @@ defmodule Prana.TestSupport.TestLogicIntegration do
           function: :if_condition,
           input_ports: ["input"],
           output_ports: ["true", "false"],
-          default_success_port: "true",
           default_error_port: "false"
         },
         "switch" => %Action{
@@ -36,7 +35,6 @@ defmodule Prana.TestSupport.TestLogicIntegration do
           function: :switch,
           input_ports: ["input"],
           output_ports: ["premium", "standard", "basic", "default"],
-          default_success_port: "default",
           default_error_port: "default"
         }
       }
@@ -45,17 +43,17 @@ defmodule Prana.TestSupport.TestLogicIntegration do
 
   def if_condition(input_map) do
     condition = Map.get(input_map, "condition")
-    
+
     if condition do
       case evaluate_condition(condition, input_map) do
         {:ok, true} ->
           true_data = Map.get(input_map, "true_data", input_map)
           {:ok, true_data, "true"}
-          
+
         {:ok, false} ->
           false_data = Map.get(input_map, "false_data", input_map)
           {:ok, false_data, "false"}
-          
+
         {:error, reason} ->
           {:error, %{type: "condition_evaluation_error", message: reason}, "false"}
       end
@@ -68,18 +66,18 @@ defmodule Prana.TestSupport.TestLogicIntegration do
     switch_expression = Map.get(input_map, "switch_expression")
     cases = Map.get(input_map, "cases", %{})
     default_data = Map.get(input_map, "default_data", input_map)
-    
+
     if switch_expression do
       case extract_value(switch_expression, input_map) do
         {:ok, switch_value} ->
           case find_matching_case(switch_value, cases) do
             {:ok, {case_port, case_data}} ->
               {:ok, case_data, case_port}
-              
+
             :no_match ->
               {:ok, default_data, "default"}
           end
-          
+
         {:error, reason} ->
           {:error, %{type: "switch_evaluation_error", message: reason}, "default"}
       end
@@ -109,16 +107,22 @@ defmodule Prana.TestSupport.TestLogicIntegration do
     cond do
       String.contains?(condition, ">=") ->
         evaluate_comparison(condition, ">=", context)
+
       String.contains?(condition, "<=") ->
         evaluate_comparison(condition, "<=", context)
+
       String.contains?(condition, ">") ->
         evaluate_comparison(condition, ">", context)
+
       String.contains?(condition, "<") ->
         evaluate_comparison(condition, "<", context)
+
       String.contains?(condition, "==") ->
         evaluate_comparison(condition, "==", context)
+
       String.contains?(condition, "!=") ->
         evaluate_comparison(condition, "!=", context)
+
       true ->
         {:error, "Unsupported condition format: #{condition}"}
     end
@@ -126,21 +130,24 @@ defmodule Prana.TestSupport.TestLogicIntegration do
 
   defp evaluate_comparison(condition, operator, context) do
     parts = String.split(condition, operator, parts: 2)
-    
+
     case parts do
       [left_expr, right_expr] ->
         left_value = extract_value(String.trim(left_expr), context)
         right_value = extract_value(String.trim(right_expr), context)
-        
+
         case {left_value, right_value} do
           {{:ok, left}, {:ok, right}} ->
             result = apply_comparison(left, right, operator)
             {:ok, result}
+
           {{:error, reason}, _} ->
             {:error, "Left side evaluation failed: #{reason}"}
+
           {_, {:error, reason}} ->
             {:error, "Right side evaluation failed: #{reason}"}
         end
+
       _ ->
         {:error, "Invalid comparison format"}
     end
@@ -151,12 +158,15 @@ defmodule Prana.TestSupport.TestLogicIntegration do
       Regex.match?(~r/^\d+$/, expr) ->
         {value, _} = Integer.parse(expr)
         {:ok, value}
+
       Regex.match?(~r/^\d+\.\d+$/, expr) ->
         {value, _} = Float.parse(expr)
         {:ok, value}
+
       String.starts_with?(expr, "\"") and String.ends_with?(expr, "\"") ->
-        value = String.slice(expr, 1..-2)
+        value = String.slice(expr, 1..-2//1)
         {:ok, value}
+
       true ->
         case Map.get(context, expr) do
           nil -> {:error, "Field #{expr} not found"}
@@ -168,7 +178,7 @@ defmodule Prana.TestSupport.TestLogicIntegration do
   defp apply_comparison(left, right, operator) do
     case operator do
       ">=" -> left >= right
-      "<=" -> left <= right  
+      "<=" -> left <= right
       ">" -> left > right
       "<" -> left < right
       "==" -> left == right
@@ -177,16 +187,19 @@ defmodule Prana.TestSupport.TestLogicIntegration do
   end
 
   defp find_matching_case(switch_value, cases) do
-    case_entry = Enum.find(cases, fn {case_value, _case_config} ->
-      case_value == switch_value or to_string(case_value) == to_string(switch_value)
-    end)
-    
+    case_entry =
+      Enum.find(cases, fn {case_value, _case_config} ->
+        case_value == switch_value or to_string(case_value) == to_string(switch_value)
+      end)
+
     case case_entry do
       {_case_value, {port_name, case_data}} ->
         {:ok, {port_name, case_data}}
+
       {_case_value, case_data} when is_map(case_data) ->
         case_port = determine_case_port(switch_value)
         {:ok, {case_port, case_data}}
+
       nil ->
         :no_match
     end
@@ -195,7 +208,7 @@ defmodule Prana.TestSupport.TestLogicIntegration do
   defp determine_case_port(case_value) do
     case case_value do
       "premium" -> "premium"
-      "standard" -> "standard" 
+      "standard" -> "standard"
       "basic" -> "basic"
       1 -> "premium"
       2 -> "standard"

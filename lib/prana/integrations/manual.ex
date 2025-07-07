@@ -25,7 +25,7 @@ defmodule Prana.Integrations.Manual do
           module: Prana.Integrations.Manual.TriggerAction,
           input_ports: [],
           output_ports: ["success"],
-          default_success_port: "success",
+          
           default_error_port: "success"
         },
         "process_adult" => %Action{
@@ -36,7 +36,7 @@ defmodule Prana.Integrations.Manual do
           module: Prana.Integrations.Manual.ProcessAdultAction,
           input_ports: ["input"],
           output_ports: ["success"],
-          default_success_port: "success",
+          
           default_error_port: "success"
         },
         "process_minor" => %Action{
@@ -47,7 +47,7 @@ defmodule Prana.Integrations.Manual do
           module: Prana.Integrations.Manual.ProcessMinorAction,
           input_ports: ["input"],
           output_ports: ["success"],
-          default_success_port: "success",
+          
           default_error_port: "success"
         },
         "set_data" => %Action{
@@ -58,7 +58,7 @@ defmodule Prana.Integrations.Manual do
           module: Prana.Integrations.Manual.SetDataAction,
           input_ports: ["input"],
           output_ports: ["success"],
-          default_success_port: "success",
+          
           default_error_port: "success"
         },
         "attempt_operation" => %Action{
@@ -69,7 +69,7 @@ defmodule Prana.Integrations.Manual do
           module: Prana.Integrations.Manual.AttemptOperationAction,
           input_ports: ["input"],
           output_ports: ["success"],
-          default_success_port: "success",
+          
           default_error_port: "success"
         },
         "increment_retry" => %Action{
@@ -80,7 +80,7 @@ defmodule Prana.Integrations.Manual do
           module: Prana.Integrations.Manual.IncrementRetryAction,
           input_ports: ["input"],
           output_ports: ["success"],
-          default_success_port: "success",
+          
           default_error_port: "success"
         }
       }

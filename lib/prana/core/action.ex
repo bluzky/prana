@@ -12,7 +12,7 @@ defmodule Prana.Action do
         module: MyApp.HttpRequestAction,
         input_ports: ["input"],
         output_ports: ["success", "error", "timeout"],
-        default_success_port: "success",
+
         default_error_port: "error",
         input_schema: %{
           type: "object",
@@ -68,7 +68,6 @@ defmodule Prana.Action do
           module: atom(),
           input_ports: [String.t()],
           output_ports: [String.t()],
-          default_success_port: String.t(),
           default_error_port: String.t(),
           input_schema: map() | nil,
           output_schema: map() | nil,
@@ -84,7 +83,6 @@ defmodule Prana.Action do
     :module,
     :input_ports,
     :output_ports,
-    :default_success_port,
     :default_error_port,
     :input_schema,
     :output_schema,
