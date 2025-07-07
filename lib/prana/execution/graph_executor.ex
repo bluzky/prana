@@ -379,9 +379,14 @@ defmodule Prana.GraphExecutor do
 
   List of Node structs that are ready for execution.
   """
-  @spec find_ready_nodes(ExecutionGraph.t(), [NodeExecution.t()], map()) :: [Node.t()]
-  def find_ready_nodes(%ExecutionGraph{} = execution_graph, completed_node_executions, execution_context) do
-    completed_node_ids = MapSet.new(completed_node_executions, & &1.node_id)
+  @spec find_ready_nodes(ExecutionGraph.t(), map(), map()) :: [Node.t()]
+  def find_ready_nodes(%ExecutionGraph{} = execution_graph, node_executions, execution_context) do
+    # Extract completed node IDs from map structure
+    completed_node_ids =
+      node_executions
+      |> Enum.map(fn {node_id, executions} -> {node_id, List.last(executions)} end)
+      |> Enum.filter(fn {_, exec} -> exec.status == :completed end)
+      |> MapSet.new(fn {node_id, _} -> node_id end)
 
     execution_graph.workflow.nodes
     |> Enum.reject(fn node -> MapSet.member?(completed_node_ids, node.id) end)
@@ -454,14 +459,20 @@ defmodule Prana.GraphExecutor do
     # Extract multi-port input data for this node from execution graph and runtime state
     routed_input = extract_multi_port_input(node, execution_graph, execution)
 
+    # Get execution tracking indices
+    execution_index = execution.current_execution_index
+    run_index = get_next_run_index(execution, node.id)
+
     # Emit node starting event
     Middleware.call(:node_starting, %{node: node, execution: execution})
 
-    # Execute the node using the new unified interface
-    case NodeExecutor.execute_node(node, execution, routed_input) do
+    # Execute the node using the new tracking interface
+    case NodeExecutor.execute_node(node, execution, routed_input, execution_index, run_index) do
       {:ok, result_node_execution, updated_execution} ->
+        # Increment execution index for next node
+        final_execution = %{updated_execution | current_execution_index: execution_index + 1}
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
-        {result_node_execution, updated_execution}
+        {result_node_execution, final_execution}
 
       {:suspend, suspended_node_execution} ->
         # Handle node suspension - emit middleware event for application handling
@@ -472,18 +483,49 @@ defmodule Prana.GraphExecutor do
           suspend_data: suspended_node_execution.suspension_data
         })
 
-        # Add the suspended node execution to the execution's node_executions list
-        # This is needed for resume_suspended_node/4 to find the suspended node execution
-        updated_execution = %{execution | node_executions: execution.node_executions ++ [suspended_node_execution]}
+        # Increment execution index and add suspended node to execution
+        final_execution = %{execution | current_execution_index: execution_index + 1}
+        updated_execution = add_node_execution_to_map(final_execution, suspended_node_execution)
         {suspended_node_execution, updated_execution}
 
       {:error, {_reason, error_node_execution}} ->
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
-        # Add the failed node execution to the execution's node_executions list
-        # This ensures failed node executions are preserved in the audit trail
-        updated_execution = %{execution | node_executions: execution.node_executions ++ [error_node_execution]}
+        # Increment execution index and add failed node to execution
+        final_execution = %{execution | current_execution_index: execution_index + 1}
+        updated_execution = add_node_execution_to_map(final_execution, error_node_execution)
         {error_node_execution, updated_execution}
     end
+  end
+
+  # Get next run index for a specific node
+  defp get_next_run_index(execution, node_id) do
+    case Map.get(execution.node_executions, node_id, []) do
+      [] ->
+        0
+
+      executions ->
+        max_run_index = Enum.max_by(executions, & &1.run_index).run_index
+        max_run_index + 1
+    end
+  end
+
+  # Add node execution to the map structure
+  defp add_node_execution_to_map(execution, node_execution) do
+    node_id = node_execution.node_id
+    existing_executions = Map.get(execution.node_executions, node_id, [])
+
+    # Remove any existing execution with same run_index (for retries)
+    remaining_executions =
+      Enum.reject(existing_executions, fn ne -> ne.run_index == node_execution.run_index end)
+
+    # Add the new execution (maintain chronological order by execution_index)
+    updated_executions =
+      Enum.sort_by(remaining_executions ++ [node_execution], & &1.execution_index)
+
+    # Update the map
+    updated_node_executions = Map.put(execution.node_executions, node_id, updated_executions)
+
+    %{execution | node_executions: updated_node_executions}
   end
 
   # Note: Output routing and context updates are now handled internally by NodeExecutor
@@ -525,12 +567,20 @@ defmodule Prana.GraphExecutor do
 
   # Build execution context for completion checking with proper active path reconstruction
   defp build_execution_context_for_completion(execution, execution_graph) do
+    # Extract all node executions from map structure
+    all_node_executions =
+      execution.node_executions
+      |> Enum.map(fn {_, executions} ->
+        List.last(executions)
+      end)
+      |> Enum.reject(&is_nil/1)
+
     # Build active paths by analyzing completed executions
-    active_paths = reconstruct_active_paths(execution.node_executions, execution_graph)
+    active_paths = reconstruct_active_paths(all_node_executions, execution_graph)
 
     %{
-      "nodes" => extract_nodes_from_executions(execution.node_executions),
-      "executed_nodes" => Enum.map(execution.node_executions, & &1.node_id),
+      "nodes" => extract_nodes_from_executions(all_node_executions),
+      "executed_nodes" => Enum.map(all_node_executions, & &1.node_id),
       "active_paths" => active_paths
     }
   end
@@ -584,7 +634,10 @@ defmodule Prana.GraphExecutor do
   defp resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data) do
     # Find the suspended node definition and execution
     suspended_node = Map.get(execution_graph.node_map, suspended_node_id)
-    suspended_node_execution = Enum.find(suspended_execution.node_executions, &(&1.node_id == suspended_node_id))
+
+    # Find the suspended node execution from the map structure
+    suspended_node_executions = Map.get(suspended_execution.node_executions, suspended_node_id, [])
+    suspended_node_execution = Enum.find(suspended_node_executions, &(&1.status == :suspended))
 
     if suspended_node && suspended_node_execution do
       # Clear suspension state for resume (runtime state already initialized in resume_workflow)
@@ -667,10 +720,12 @@ defmodule Prana.GraphExecutor do
   # Returns a map with port names as keys and routed data as values
   defp extract_multi_port_input(node, execution_graph, execution) do
     # Get input ports from the action definition, not the node
-    input_ports = case get_action_input_ports(node) do
-      {:ok, ports} -> ports
-      _error -> ["input"]  # fallback to default
-    end
+    input_ports =
+      case get_action_input_ports(node) do
+        {:ok, ports} -> ports
+        # fallback to default
+        _error -> ["input"]
+      end
 
     # Build multi-port input map: port_name => routed_data
     multi_port_input =
@@ -701,7 +756,7 @@ defmodule Prana.GraphExecutor do
     case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
       {:ok, action} ->
         {:ok, action.input_ports || ["input"]}
-      
+
       {:error, _reason} ->
         {:error, :action_not_found}
     end

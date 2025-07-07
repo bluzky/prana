@@ -12,6 +12,27 @@ defmodule Prana.GraphExecutorTest do
   alias Prana.Workflow
   alias Prana.WorkflowSettings
 
+  # Helper functions for handling map-based node_executions
+  defp get_all_node_executions(execution) do
+    case execution.node_executions do
+      node_executions_map when is_map(node_executions_map) ->
+        node_executions_map
+        |> Enum.flat_map(fn {_node_id, executions} -> executions end)
+        |> Enum.sort_by(& &1.execution_index)
+
+      node_executions_list when is_list(node_executions_list) ->
+        node_executions_list
+    end
+  end
+
+  defp count_node_executions(execution) do
+    execution |> get_all_node_executions() |> length()
+  end
+
+  defp get_first_node_execution(execution) do
+    execution |> get_all_node_executions() |> List.first()
+  end
+
   describe "execute_graph/3" do
     setup do
       # Start the IntegrationRegistry GenServer for testing using ExUnit supervision
@@ -72,10 +93,10 @@ defmodule Prana.GraphExecutorTest do
       # Should return successful execution
       assert {:ok, execution} = result
       assert execution.status == :completed
-      assert length(execution.node_executions) == 1
+      assert count_node_executions(execution) == 1
 
       # Check that the node was executed successfully
-      node_execution = hd(execution.node_executions)
+      node_execution = get_first_node_execution(execution)
       assert node_execution.status == :completed
       assert node_execution.node_id == "node_1"
       assert node_execution.output_port == "success"
@@ -98,7 +119,7 @@ defmodule Prana.GraphExecutorTest do
         }
       }
 
-      completed_executions = []
+      completed_executions = %{}
 
       # Updated context structure for conditional branching
       context = %{
@@ -132,9 +153,9 @@ defmodule Prana.GraphExecutorTest do
       }
 
       # node1 is already completed
-      completed_executions = [
-        %NodeExecution{node_id: "node_1", status: :completed}
-      ]
+      completed_executions = %{
+        "node_1" => [%NodeExecution{node_id: "node_1", status: :completed, execution_index: 0, run_index: 0}]
+      }
 
       # Updated context structure for conditional branching
       context = %{
@@ -178,10 +199,11 @@ defmodule Prana.GraphExecutorTest do
         status: :running,
         vars: %{},
         output_data: nil,
-        node_executions: [
-          %NodeExecution{node_id: "node_1", status: :completed},
-          %NodeExecution{node_id: "node_2", status: :completed}
-        ],
+        node_executions: %{
+          "node_1" => [%NodeExecution{node_id: "node_1", status: :completed, execution_index: 0, run_index: 0}],
+          "node_2" => [%NodeExecution{node_id: "node_2", status: :completed, execution_index: 1, run_index: 0}]
+        },
+        current_execution_index: 2,
         started_at: DateTime.utc_now(),
         completed_at: nil,
         error_data: nil,
@@ -216,10 +238,11 @@ defmodule Prana.GraphExecutorTest do
         status: :running,
         vars: %{},
         output_data: nil,
-        node_executions: [
-          %NodeExecution{node_id: "node_1", status: :completed}
+        node_executions: %{
+          "node_1" => [%NodeExecution{node_id: "node_1", status: :completed, execution_index: 0, run_index: 0}]
           # node_2 not completed
-        ],
+        },
+        current_execution_index: 1,
         started_at: DateTime.utc_now(),
         completed_at: nil,
         error_data: nil,

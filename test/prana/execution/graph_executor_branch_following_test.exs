@@ -22,6 +22,22 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   alias Prana.WorkflowCompiler
   alias Prana.WorkflowSettings
 
+  # Helper functions for handling map-based node_executions
+  defp get_all_node_executions(execution) do
+    case execution.node_executions do
+      node_executions_map when is_map(node_executions_map) ->
+        node_executions_map 
+        |> Enum.flat_map(fn {_node_id, executions} -> executions end)
+        |> Enum.sort_by(& &1.execution_index)
+      node_executions_list when is_list(node_executions_list) ->
+        node_executions_list
+    end
+  end
+
+  defp count_node_executions(execution) do
+    get_all_node_executions(execution) |> length()
+  end
+
   describe "branch following execution" do
     setup do
       # Start the IntegrationRegistry GenServer for testing
@@ -169,10 +185,10 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
 
       # Verify execution completed successfully
       assert execution.status == :completed
-      assert length(execution.node_executions) == 6
+      assert count_node_executions(execution) == 6
 
       # Analyze execution order to verify branch following
-      execution_order = Enum.map(execution.node_executions, & &1.node_id)
+      execution_order = Enum.map(get_all_node_executions(execution), & &1.node_id)
 
       # The trigger should be first
       assert List.first(execution_order) == "trigger"

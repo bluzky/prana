@@ -385,7 +385,6 @@ defmodule Prana.NodeExecutorTest do
 
       # Check execution runtime updates (only stored under custom_id)
       assert updated_execution.__runtime["nodes"]["test-1"] == %{"output" => node_execution.output_data, "context" => %{}}
-      assert updated_execution.__runtime["executed_nodes"] == ["test-1"]
     end
 
     test "handles expression evaluation in input_map" do

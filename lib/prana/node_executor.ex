@@ -21,21 +21,23 @@ defmodule Prana.NodeExecutor do
   - `node` - The node to execute
   - `execution` - Current execution state (with __runtime initialized)
   - `routed_input` - Input data routed to this node's input ports
+  - `execution_index` - Global execution order index
+  - `run_index` - Per-node iteration index
 
   ## Returns
   - `{:ok, node_execution, updated_execution}` - Successful execution
   - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
-  @spec execute_node(Node.t(), Prana.Execution.t(), map()) ::
+  @spec execute_node(Node.t(), Prana.Execution.t(), map(), integer(), integer()) ::
           {:ok, NodeExecution.t(), Prana.Execution.t()}
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
-  def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input) do
-    # Create initial node execution with proper execution ID from execution
+  def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input, execution_index \\ 0, run_index \\ 0) do
+    # Create initial node execution with proper execution ID and indices
     node_execution =
       execution.id
-      |> NodeExecution.new(node.id)
+      |> NodeExecution.new(node.id, execution_index, run_index)
       |> NodeExecution.start()
 
     # Build context once for both input preparation and action execution
@@ -367,7 +369,7 @@ defmodule Prana.NodeExecutor do
 
       # Context-aware default port format: {:ok, data, context}
       {:ok, data, context} when is_map(context) ->
-        port = action.default_success_port || get_default_success_port(action)
+        port = get_default_success_port(action)
         {:ok, data, port, context}
 
       # Explicit port format: {:ok, data, port}
