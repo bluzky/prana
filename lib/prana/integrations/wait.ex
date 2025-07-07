@@ -38,7 +38,7 @@ defmodule Prana.Integrations.Wait do
           input_ports: ["input"],
           output_ports: ["success", "timeout", "error"],
           
-          default_error_port: "error"
+          
         }
       }
     }

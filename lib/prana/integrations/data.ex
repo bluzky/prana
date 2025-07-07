@@ -33,7 +33,7 @@ defmodule Prana.Integrations.Data do
           input_ports: ["input_a", "input_b"],
           output_ports: ["success", "error"],
           
-          default_error_port: "error"
+          
         }
       }
     }

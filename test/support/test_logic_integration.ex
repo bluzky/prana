@@ -24,8 +24,7 @@ defmodule Prana.TestSupport.TestLogicIntegration do
           module: __MODULE__,
           function: :if_condition,
           input_ports: ["input"],
-          output_ports: ["true", "false"],
-          default_error_port: "false"
+          output_ports: ["true", "false"]
         },
         "switch" => %Action{
           name: "switch",
@@ -34,8 +33,7 @@ defmodule Prana.TestSupport.TestLogicIntegration do
           module: __MODULE__,
           function: :switch,
           input_ports: ["input"],
-          output_ports: ["premium", "standard", "basic", "default"],
-          default_error_port: "default"
+          output_ports: ["premium", "standard", "basic", "default"]
         }
       }
     }

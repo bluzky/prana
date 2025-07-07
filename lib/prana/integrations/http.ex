@@ -38,7 +38,7 @@ defmodule Prana.Integrations.HTTP do
           input_ports: ["input"],
           output_ports: ["success", "error", "timeout"],
           
-          default_error_port: "error"
+          
         },
         "webhook" => %Action{
           name: "webhook",
@@ -49,7 +49,7 @@ defmodule Prana.Integrations.HTTP do
           input_ports: [],
           output_ports: ["success"],
           
-          default_error_port: nil
+          
         }
       }
     }

@@ -208,7 +208,7 @@ defmodule MyApp.SlackIntegration do
           input_ports: ["input"],
           output_ports: ["success", "error"],
           
-          default_error_port: "error"
+          
         }
       }
     }

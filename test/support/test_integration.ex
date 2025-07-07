@@ -23,8 +23,7 @@ defmodule Prana.TestSupport.TestIntegration do
           type: :action,
           module: Prana.TestSupport.TestIntegration.SimpleTestAction,
           input_ports: ["input"],
-          output_ports: ["success", "error"],
-          default_error_port: "error"
+          output_ports: ["success", "error"]
         },
         "trigger_action" => %Action{
           name: "trigger_action",
@@ -33,8 +32,7 @@ defmodule Prana.TestSupport.TestIntegration do
           type: :trigger,
           module: Prana.TestSupport.TestIntegration.SimpleTestAction,
           input_ports: [],
-          output_ports: ["success"],
-          default_error_port: nil
+          output_ports: ["success"]
         }
       }
     }

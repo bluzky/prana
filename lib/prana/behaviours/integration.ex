@@ -26,7 +26,7 @@ defmodule Prana.Behaviour.Integration do
                 input_ports: ["input"],
                 output_ports: ["success", "error"],
                 
-                default_error_port: "error"
+     
               }
             }
           }

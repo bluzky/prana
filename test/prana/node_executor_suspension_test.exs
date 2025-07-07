@@ -186,8 +186,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "processes suspension tuple correctly" do
       action = %Action{
         name: "test_action",
-        output_ports: ["success", "error"],
-        default_error_port: "error"
+        output_ports: ["success", "error"]
       }
 
       suspend_data = %{workflow_id: "test", data: %{}}

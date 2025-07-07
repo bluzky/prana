@@ -39,7 +39,7 @@ defmodule Prana.Integrations.Workflow do
           input_ports: ["input"],
           output_ports: ["success", "error", "failure", "timeout"],
           
-          default_error_port: "error"
+      
         }
       }
     }

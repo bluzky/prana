@@ -26,7 +26,7 @@ defmodule Prana.Integrations.Manual do
           input_ports: [],
           output_ports: ["success"],
           
-          default_error_port: "success"
+        
         },
         "process_adult" => %Action{
           name: "process_adult",
@@ -37,7 +37,7 @@ defmodule Prana.Integrations.Manual do
           input_ports: ["input"],
           output_ports: ["success"],
           
-          default_error_port: "success"
+        
         },
         "process_minor" => %Action{
           name: "process_minor",
@@ -48,7 +48,7 @@ defmodule Prana.Integrations.Manual do
           input_ports: ["input"],
           output_ports: ["success"],
           
-          default_error_port: "success"
+        
         },
         "set_data" => %Action{
           name: "set_data",
@@ -59,7 +59,7 @@ defmodule Prana.Integrations.Manual do
           input_ports: ["input"],
           output_ports: ["success"],
           
-          default_error_port: "success"
+        
         },
         "attempt_operation" => %Action{
           name: "attempt_operation",
@@ -70,7 +70,7 @@ defmodule Prana.Integrations.Manual do
           input_ports: ["input"],
           output_ports: ["success"],
           
-          default_error_port: "success"
+        
         },
         "increment_retry" => %Action{
           name: "increment_retry",
@@ -81,7 +81,7 @@ defmodule Prana.Integrations.Manual do
           input_ports: ["input"],
           output_ports: ["success"],
           
-          default_error_port: "success"
+        
         }
       }
     }

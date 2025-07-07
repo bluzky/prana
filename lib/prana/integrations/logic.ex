@@ -32,8 +32,7 @@ defmodule Prana.Integrations.Logic do
           type: :logic,
           module: Prana.Integrations.Logic.IfConditionAction,
           input_ports: ["input"],
-          output_ports: ["true", "false"],
-          default_error_port: "false"
+          output_ports: ["true", "false"]
         },
         "switch" => %Action{
           name: "switch",
@@ -42,8 +41,7 @@ defmodule Prana.Integrations.Logic do
           type: :logic,
           module: Prana.Integrations.Logic.SwitchAction,
           input_ports: ["input"],
-          output_ports: ["*"],
-          default_error_port: "default"
+          output_ports: ["*"]
         }
       }
     }
