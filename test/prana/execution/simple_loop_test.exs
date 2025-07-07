@@ -73,11 +73,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "trigger",
           params: %{},
-          output_ports: ["success"],
-          input_ports: [],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -89,11 +84,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "set_data",
           params: %{"counter" => 0, "max_count" => 3},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -105,11 +95,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "increment_counter",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -123,11 +108,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           params: %{
             "condition" => "$input.continue_loop"
           },
-          output_ports: ["true", "false"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -139,11 +119,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "set_data",
           params: %{"result" => "loop_completed"},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         }
       ],
@@ -213,11 +188,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "trigger",
           params: %{},
-          output_ports: ["success"],
-          input_ports: [],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -229,11 +199,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "set_data",
           params: %{"retry_count" => 0, "max_retries" => 3, "success" => false},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -245,11 +210,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "attempt_operation",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -263,11 +223,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           params: %{
             "condition" => "$input.should_retry"
           },
-          output_ports: ["true", "false"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -279,11 +234,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "increment_retry",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -295,11 +245,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "set_data",
           params: %{"result" => "operation_completed"},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         }
       ],

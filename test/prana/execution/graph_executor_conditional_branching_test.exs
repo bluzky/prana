@@ -77,11 +77,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           integration_name: "manual",
           action_name: "trigger",
           params: %{},
-          output_ports: ["success"],
-          input_ports: [],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -97,11 +92,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             "true_data" => %{"status" => "adult", "message" => "You are an adult"},
             "false_data" => %{"status" => "minor", "message" => "You are a minor"}
           },
-          output_ports: ["true", "false"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -113,11 +103,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           integration_name: "manual",
           action_name: "process_adult",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -129,11 +114,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           integration_name: "manual",
           action_name: "process_minor",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         }
       ],
@@ -185,11 +165,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           integration_name: "manual",
           action_name: "trigger",
           params: %{},
-          output_ports: ["success"],
-          input_ports: [],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -209,11 +184,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             },
             "default_data" => %{"discount" => +0.0, "tier" => "unknown"}
           },
-          output_ports: ["premium", "standard", "basic", "default"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -225,11 +195,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           integration_name: "manual",
           action_name: "process_adult",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -241,11 +206,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           integration_name: "manual",
           action_name: "process_adult",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         },
 
@@ -257,11 +217,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           integration_name: "manual",
           action_name: "process_minor",
           params: %{},
-          output_ports: ["success"],
-          input_ports: ["input"],
-          error_handling: %Prana.ErrorHandling{},
-          retry_policy: nil,
-          timeout_seconds: nil,
           metadata: %{}
         }
       ],
@@ -1309,11 +1264,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             integration_name: "manual",
             action_name: "trigger",
             params: %{},
-            output_ports: ["success"],
-            input_ports: [],
-            error_handling: %Prana.ErrorHandling{},
-            retry_policy: nil,
-            timeout_seconds: nil,
             metadata: %{}
           },
           %Node{
@@ -1330,11 +1280,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
               },
               "default_data" => %{"requires_age_check" => false}
             },
-            output_ports: ["premium", "standard", "default"],
-            input_ports: ["input"],
-            error_handling: %Prana.ErrorHandling{},
-            retry_policy: nil,
-            timeout_seconds: nil,
             metadata: %{}
           },
           %Node{
@@ -1348,11 +1293,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
               "true_data" => %{"eligible" => true, "tier" => "premium_adult"},
               "false_data" => %{"eligible" => false, "tier" => "premium_minor"}
             },
-            output_ports: ["true", "false"],
-            input_ports: ["input"],
-            error_handling: %Prana.ErrorHandling{},
-            retry_policy: nil,
-            timeout_seconds: nil,
             metadata: %{}
           },
           %Node{
@@ -1362,11 +1302,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             integration_name: "manual",
             action_name: "process_adult",
             params: %{},
-            output_ports: ["success"],
-            input_ports: ["input"],
-            error_handling: %Prana.ErrorHandling{},
-            retry_policy: nil,
-            timeout_seconds: nil,
             metadata: %{}
           }
         ],

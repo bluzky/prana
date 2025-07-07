@@ -283,9 +283,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Execution ID Test",
         integration_name: "test",
         action_name: "success_action",
-        params: %{"test" => "data"},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{"test" => "data"}
       }
 
       # Use a unique execution ID
@@ -322,9 +320,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Unique Test 1",
         integration_name: "test",
         action_name: "success_action",
-        params: %{"test" => "data1"},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{"test" => "data1"}
       }
 
       node2 = %Node{
@@ -333,9 +329,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Unique Test 2",
         integration_name: "test",
         action_name: "success_action",
-        params: %{"test" => "data2"},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{"test" => "data2"}
       }
 
       # Same workflow execution ID for both nodes
@@ -376,9 +370,7 @@ defmodule Prana.NodeExecutorTest do
         action_name: "success_action",
         params: %{
           "message" => "hello world"
-        },
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        }
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{"user" => "john"})
@@ -421,9 +413,7 @@ defmodule Prana.NodeExecutorTest do
           "name" => "$input.user_name",
           "email" => "$input.contact.email",
           "previous_result" => "$nodes.api_call.user_id"
-        },
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        }
       }
 
       execution =
@@ -464,9 +454,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Error Test",
         integration_name: "test",
         action_name: "error_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -499,9 +487,7 @@ defmodule Prana.NodeExecutorTest do
         action_name: "explicit_port_action",
         params: %{
           "should_succeed" => true
-        },
-        output_ports: ["custom_success", "custom_error"],
-        input_ports: ["input"]
+        }
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -526,9 +512,7 @@ defmodule Prana.NodeExecutorTest do
         action_name: "explicit_port_action",
         params: %{
           "should_succeed" => false
-        },
-        output_ports: ["custom_success", "custom_error"],
-        input_ports: ["input"]
+        }
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -555,9 +539,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Invalid Return Test",
         integration_name: "test",
         action_name: "invalid_return_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -584,9 +566,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Exception Test",
         integration_name: "test",
         action_name: "exception_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -614,9 +594,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Invalid Port Test",
         integration_name: "test",
         action_name: "invalid_port_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -643,9 +621,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Missing Integration",
         integration_name: "nonexistent",
         action_name: "some_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -671,9 +647,7 @@ defmodule Prana.NodeExecutorTest do
         name: "Missing Action",
         integration_name: "test",
         action_name: "nonexistent_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       execution = Execution.new("wf_1", 1, "graph_executor", %{})
@@ -704,9 +678,7 @@ defmodule Prana.NodeExecutorTest do
           "admin_emails" => "$nodes.users.{role: \"admin\"}.email",
           "first_user" => "$nodes.users[0].name",
           "order_id" => "$input.order.id"
-        },
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
+        }
       }
 
       execution =

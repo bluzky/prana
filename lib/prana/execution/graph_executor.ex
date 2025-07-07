@@ -666,8 +666,11 @@ defmodule Prana.GraphExecutor do
   # Extract multi-port input data for a node by computing routing from execution graph and runtime state
   # Returns a map with port names as keys and routed data as values
   defp extract_multi_port_input(node, execution_graph, execution) do
-    # Handle case where input_ports might be nil - default to ["input"]
-    input_ports = node.input_ports || ["input"]
+    # Get input ports from the action definition, not the node
+    input_ports = case get_action_input_ports(node) do
+      {:ok, ports} -> ports
+      _error -> ["input"]  # fallback to default
+    end
 
     # Build multi-port input map: port_name => routed_data
     multi_port_input =
@@ -691,6 +694,17 @@ defmodule Prana.GraphExecutor do
       end)
 
     multi_port_input
+  end
+
+  # Get input ports from the action definition
+  defp get_action_input_ports(node) do
+    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
+      {:ok, action} ->
+        {:ok, action.input_ports || ["input"]}
+      
+      {:error, _reason} ->
+        {:error, :action_not_found}
+    end
   end
 
   # Get incoming connections for a specific node and port

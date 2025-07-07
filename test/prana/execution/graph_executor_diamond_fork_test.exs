@@ -70,9 +70,7 @@ defmodule Prana.Execution.DiamondForkTest do
           name: "Start",
           integration_name: "manual",
           action_name: "trigger",
-          params: %{},
-          output_ports: ["success"],
-          input_ports: []
+          params: %{}
         },
 
         # B: First branch node
@@ -85,9 +83,7 @@ defmodule Prana.Execution.DiamondForkTest do
           params: %{
             "data" => "$input.data",
             "branch" => "B"
-          },
-          output_ports: ["success"],
-          input_ports: ["input"]
+          }
         },
 
         # C: Second branch node
@@ -100,9 +96,7 @@ defmodule Prana.Execution.DiamondForkTest do
           params: %{
             "data" => "$input.data",
             "branch" => "C"
-          },
-          output_ports: ["success"],
-          input_ports: ["input"]
+          }
         },
 
         # Merge: Combine results from both branches
@@ -116,9 +110,7 @@ defmodule Prana.Execution.DiamondForkTest do
             "strategy" => "append",
             "input_a" => "$nodes.branch_b",
             "input_b" => "$nodes.branch_c"
-          },
-          output_ports: ["success", "error"],
-          input_ports: ["input_a", "input_b"]
+          }
         },
 
         # D: Final processing node
@@ -131,9 +123,7 @@ defmodule Prana.Execution.DiamondForkTest do
           params: %{
             "data" => "$input.data",
             "final_step" => "true"
-          },
-          output_ports: ["success"],
-          input_ports: ["input"]
+          }
         }
       ],
       connections: [

@@ -3,19 +3,25 @@ defmodule Prana.WorkflowCompilerTest do
 
   alias Prana.Connection
   alias Prana.ExecutionGraph
+  alias Prana.IntegrationRegistry
   alias Prana.Node
+  alias Prana.TestSupport.TestIntegration
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
-  alias Prana.IntegrationRegistry
-  alias Prana.TestSupport.TestIntegration
 
   setup_all do
     # Start the integration registry
-    {:ok, _pid} = IntegrationRegistry.start_link()
-    
+    {:ok, pid} = IntegrationRegistry.start_link()
+
     # Register required integrations for tests
     :ok = IntegrationRegistry.register_integration(TestIntegration)
-    
+
+    on_exit(fn ->
+      if Process.alive?(pid) do
+        GenServer.stop(pid)
+      end
+    end)
+
     :ok
   end
 
@@ -280,10 +286,10 @@ defmodule Prana.WorkflowCompilerTest do
       validate_node = Enum.find(workflow.nodes, &(&1.custom_id == "validate"))
 
       result = WorkflowCompiler.compile(workflow, validate_node.id)
-      
+
       # Should be an error because validate node is not a trigger
       assert match?({:error, {:node_not_trigger, _, _}}, result) or
-             match?({:error, {:action_lookup_failed, _, _}}, result)
+               match?({:error, {:action_lookup_failed, _, _}}, result)
     end
 
     test "returns error when multiple triggers exist and none specified" do

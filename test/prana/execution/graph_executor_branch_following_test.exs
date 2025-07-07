@@ -49,9 +49,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         name: "Trigger",
         integration_name: "test",
         action_name: "trigger_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: []
+        params: %{}
       }
 
       # Branch A: two sequential nodes
@@ -61,9 +59,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         name: "Branch A Step 1",
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       branch_a2 = %Node{
@@ -72,9 +68,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         name: "Branch A Step 2",
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       # Branch B: two sequential nodes
@@ -84,9 +78,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         name: "Branch B Step 1",
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       branch_b2 = %Node{
@@ -95,9 +87,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         name: "Branch B Step 2",
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       # Merge node (waits for both branches)
@@ -107,9 +97,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         name: "Merge",
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input_a", "input_b"]
+        params: %{}
       }
 
       connections = [

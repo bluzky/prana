@@ -37,9 +37,7 @@ defmodule Prana.GraphExecutorTest do
         name: "Test Node",
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       workflow = %Workflow{

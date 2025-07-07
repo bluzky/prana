@@ -7,15 +7,9 @@ defmodule Prana.Node do
           id: String.t(),
           custom_id: String.t(),
           name: String.t(),
-          description: String.t() | nil,
           integration_name: String.t(),
           action_name: String.t(),
           params: map(),
-          output_ports: [String.t()],
-          input_ports: [String.t()],
-          error_handling: Prana.ErrorHandling.t(),
-          retry_policy: Prana.RetryPolicy.t() | nil,
-          timeout_seconds: integer() | nil,
           metadata: map()
         }
 
@@ -23,15 +17,9 @@ defmodule Prana.Node do
     :id,
     :custom_id,
     :name,
-    :description,
     :integration_name,
     :action_name,
     :params,
-    :output_ports,
-    :input_ports,
-    :error_handling,
-    :retry_policy,
-    :timeout_seconds,
     metadata: %{}
   ]
 
@@ -46,11 +34,6 @@ defmodule Prana.Node do
       integration_name: integration_name,
       action_name: action_name,
       params: params,
-      output_ports: [],
-      input_ports: [],
-      error_handling: %Prana.ErrorHandling{},
-      retry_policy: nil,
-      timeout_seconds: nil,
       metadata: %{}
     }
   end
@@ -63,15 +46,11 @@ defmodule Prana.Node do
       id: Map.get(data, "id") || Map.get(data, :id) || generate_id(),
       custom_id: Map.get(data, "custom_id") || Map.get(data, :custom_id),
       name: Map.get(data, "name") || Map.get(data, :name),
-      description: Map.get(data, "description") || Map.get(data, :description),
       integration_name: Map.get(data, "integration_name") || Map.get(data, :integration_name),
       action_name: Map.get(data, "action_name") || Map.get(data, :action_name),
-      params: Map.get(data, "params") || Map.get(data, :params) || Map.get(data, "input_map") || Map.get(data, :input_map) || %{},
-      output_ports: Map.get(data, "output_ports") || Map.get(data, :output_ports) || [],
-      input_ports: Map.get(data, "input_ports") || Map.get(data, :input_ports) || [],
-      error_handling: parse_error_handling(Map.get(data, "error_handling") || Map.get(data, :error_handling)),
-      retry_policy: parse_retry_policy(Map.get(data, "retry_policy") || Map.get(data, :retry_policy)),
-      timeout_seconds: Map.get(data, "timeout_seconds") || Map.get(data, :timeout_seconds),
+      params:
+        Map.get(data, "params") || Map.get(data, :params) || Map.get(data, "input_map") || Map.get(data, :input_map) ||
+          %{},
       metadata: Map.get(data, "metadata") || Map.get(data, :metadata) || %{}
     }
   end
@@ -102,15 +81,6 @@ defmodule Prana.Node do
     |> String.trim("_")
   end
 
-
-  defp parse_error_handling(nil), do: %Prana.ErrorHandling{}
-  defp parse_error_handling(data) when is_map(data), do: struct(Prana.ErrorHandling, data)
-  defp parse_error_handling(_), do: %Prana.ErrorHandling{}
-
-  defp parse_retry_policy(nil), do: nil
-  defp parse_retry_policy(data) when is_map(data), do: struct(Prana.RetryPolicy, data)
-  defp parse_retry_policy(_), do: nil
-
   defp validate_required_fields(%__MODULE__{} = node) do
     required_fields = [:id, :name, :integration_name, :action_name]
 
@@ -126,7 +96,6 @@ defmodule Prana.Node do
       {:error, "Missing required fields: #{inspect(missing_fields)}"}
     end
   end
-
 
   defp validate_integration_action(%__MODULE__{integration_name: integration, action_name: action}) do
     # This would check with the integration registry in a real implementation
