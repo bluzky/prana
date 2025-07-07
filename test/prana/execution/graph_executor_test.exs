@@ -35,7 +35,6 @@ defmodule Prana.GraphExecutorTest do
         id: "node_1",
         custom_id: "test_node",
         name: "Test Node",
-        type: :action,
         integration_name: "test",
         action_name: "simple_action",
         params: %{},

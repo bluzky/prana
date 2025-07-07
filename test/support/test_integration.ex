@@ -20,11 +20,23 @@ defmodule Prana.TestSupport.TestIntegration do
           name: "simple_action",
           display_name: "Simple Action",
           description: "A simple test action that can succeed or fail",
+          type: :action,
           module: Prana.TestSupport.TestIntegration.SimpleTestAction,
           input_ports: ["input"],
           output_ports: ["success", "error"],
           default_success_port: "success",
           default_error_port: "error"
+        },
+        "trigger_action" => %Action{
+          name: "trigger_action",
+          display_name: "Test Trigger",
+          description: "A simple test trigger",
+          type: :trigger,
+          module: Prana.TestSupport.TestIntegration.SimpleTestAction,
+          input_ports: [],
+          output_ports: ["success"],
+          default_success_port: "success",
+          default_error_port: nil
         }
       }
     }

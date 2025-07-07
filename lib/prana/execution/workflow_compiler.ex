@@ -14,6 +14,7 @@ defmodule Prana.WorkflowCompiler do
   alias Prana.ExecutionGraph
   alias Prana.Node
   alias Prana.Workflow
+  alias Prana.IntegrationRegistry
 
   @doc """
   Compile workflow into an optimized execution graph.
@@ -90,17 +91,32 @@ defmodule Prana.WorkflowCompiler do
       nil ->
         {:error, {:trigger_node_not_found, trigger_node_id}}
 
-      %Node{type: :trigger} = node ->
-        {:ok, node}
-
-      %Node{type: other_type} ->
-        {:error, {:node_not_trigger, trigger_node_id, other_type}}
+      node ->
+        case get_action_type(node) do
+          {:ok, :trigger} -> {:ok, node}
+          {:ok, other_type} -> {:error, {:node_not_trigger, trigger_node_id, other_type}}
+          {:error, reason} -> {:error, {:action_lookup_failed, trigger_node_id, reason}}
+        end
     end
   end
 
   @spec find_trigger_nodes(Workflow.t()) :: [Node.t()]
   defp find_trigger_nodes(%Workflow{nodes: nodes}) do
-    Enum.filter(nodes, fn node -> node.type == :trigger end)
+    Enum.filter(nodes, fn node -> 
+      case get_action_type(node) do
+        {:ok, :trigger} -> true
+        _ -> false
+      end
+    end)
+  end
+
+  # Helper function to get action type from node via integration registry
+  @spec get_action_type(Node.t()) :: {:ok, atom()} | {:error, term()}
+  defp get_action_type(%Node{integration_name: integration_name, action_name: action_name}) do
+    case IntegrationRegistry.get_action(integration_name, action_name) do
+      {:ok, %Prana.Action{type: action_type}} -> {:ok, action_type}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   # ============================================================================

@@ -28,6 +28,7 @@ defmodule Prana.Integrations.Data do
           name: "merge",
           display_name: "Merge Data",
           description: "Combine data from multiple named input ports (diamond pattern coordination)",
+          type: :action,
           module: Prana.Integrations.Data.MergeAction,
           input_ports: ["input_a", "input_b"],
           output_ports: ["success", "error"],

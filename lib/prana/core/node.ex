@@ -3,13 +3,11 @@ defmodule Prana.Node do
   Represents an individual node in a workflow
   """
 
-  @type node_type :: :trigger | :action | :logic | :wait | :output
   @type t :: %__MODULE__{
           id: String.t(),
           custom_id: String.t(),
           name: String.t(),
           description: String.t() | nil,
-          type: node_type(),
           integration_name: String.t(),
           action_name: String.t(),
           params: map(),
@@ -26,7 +24,6 @@ defmodule Prana.Node do
     :custom_id,
     :name,
     :description,
-    :type,
     :integration_name,
     :action_name,
     :params,
@@ -41,12 +38,11 @@ defmodule Prana.Node do
   @doc """
   Creates a new node
   """
-  def new(name, type, integration_name, action_name, params \\ %{}, custom_id \\ nil) do
+  def new(name, integration_name, action_name, params \\ %{}, custom_id \\ nil) do
     %__MODULE__{
       id: generate_id(),
       custom_id: custom_id || generate_custom_id(name),
       name: name,
-      type: type,
       integration_name: integration_name,
       action_name: action_name,
       params: params,
@@ -68,7 +64,6 @@ defmodule Prana.Node do
       custom_id: Map.get(data, "custom_id") || Map.get(data, :custom_id),
       name: Map.get(data, "name") || Map.get(data, :name),
       description: Map.get(data, "description") || Map.get(data, :description),
-      type: parse_type(Map.get(data, "type") || Map.get(data, :type)),
       integration_name: Map.get(data, "integration_name") || Map.get(data, :integration_name),
       action_name: Map.get(data, "action_name") || Map.get(data, :action_name),
       params: Map.get(data, "params") || Map.get(data, :params) || Map.get(data, "input_map") || Map.get(data, :input_map) || %{},
@@ -86,7 +81,6 @@ defmodule Prana.Node do
   """
   def valid?(%__MODULE__{} = node) do
     with :ok <- validate_required_fields(node),
-         :ok <- validate_type(node.type),
          :ok <- validate_integration_action(node) do
       :ok
     else
@@ -108,9 +102,6 @@ defmodule Prana.Node do
     |> String.trim("_")
   end
 
-  defp parse_type(type) when is_binary(type), do: String.to_existing_atom(type)
-  defp parse_type(type) when is_atom(type), do: type
-  defp parse_type(_), do: :action
 
   defp parse_error_handling(nil), do: %Prana.ErrorHandling{}
   defp parse_error_handling(data) when is_map(data), do: struct(Prana.ErrorHandling, data)
@@ -121,7 +112,7 @@ defmodule Prana.Node do
   defp parse_retry_policy(_), do: nil
 
   defp validate_required_fields(%__MODULE__{} = node) do
-    required_fields = [:id, :name, :type, :integration_name, :action_name]
+    required_fields = [:id, :name, :integration_name, :action_name]
 
     missing_fields =
       Enum.reject(required_fields, fn field ->
@@ -136,8 +127,6 @@ defmodule Prana.Node do
     end
   end
 
-  defp validate_type(type) when type in [:trigger, :action, :logic, :wait, :output], do: :ok
-  defp validate_type(type), do: {:error, "Invalid node type: #{inspect(type)}"}
 
   defp validate_integration_action(%__MODULE__{integration_name: integration, action_name: action}) do
     # This would check with the integration registry in a real implementation

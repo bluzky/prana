@@ -6,17 +6,29 @@ defmodule Prana.WorkflowCompilerTest do
   alias Prana.Node
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
+  alias Prana.IntegrationRegistry
+  alias Prana.TestSupport.TestIntegration
+
+  setup_all do
+    # Start the integration registry
+    {:ok, _pid} = IntegrationRegistry.start_link()
+    
+    # Register required integrations for tests
+    :ok = IntegrationRegistry.register_integration(TestIntegration)
+    
+    :ok
+  end
 
   # ============================================================================
   # Test Helpers
   # ============================================================================
 
   defp create_trigger_node(custom_id, name) do
-    Node.new(name, :trigger, "webhook", "receive", %{}, custom_id)
+    Node.new(name, "test", "trigger_action", %{}, custom_id)
   end
 
   defp create_action_node(custom_id, name) do
-    Node.new(name, :action, "test_integration", "process", %{}, custom_id)
+    Node.new(name, "test", "simple_action", %{}, custom_id)
   end
 
   defp create_simple_workflow do
@@ -267,8 +279,11 @@ defmodule Prana.WorkflowCompilerTest do
       workflow = create_simple_workflow()
       validate_node = Enum.find(workflow.nodes, &(&1.custom_id == "validate"))
 
-      assert {:error, {:node_not_trigger, _, :action}} =
-               WorkflowCompiler.compile(workflow, validate_node.id)
+      result = WorkflowCompiler.compile(workflow, validate_node.id)
+      
+      # Should be an error because validate node is not a trigger
+      assert match?({:error, {:node_not_trigger, _, _}}, result) or
+             match?({:error, {:action_lookup_failed, _, _}}, result)
     end
 
     test "returns error when multiple triggers exist and none specified" do

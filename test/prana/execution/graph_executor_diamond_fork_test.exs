@@ -68,7 +68,6 @@ defmodule Prana.Execution.DiamondForkTest do
           id: "start",
           custom_id: "start",
           name: "Start",
-          type: :trigger,
           integration_name: "manual",
           action_name: "trigger",
           params: %{},
@@ -81,7 +80,6 @@ defmodule Prana.Execution.DiamondForkTest do
           id: "branch_b",
           custom_id: "branch_b",
           name: "Branch B",
-          type: :action,
           integration_name: "manual",
           action_name: "process_adult",
           params: %{
@@ -97,7 +95,6 @@ defmodule Prana.Execution.DiamondForkTest do
           id: "branch_c",
           custom_id: "branch_c",
           name: "Branch C",
-          type: :action,
           integration_name: "manual",
           action_name: "process_minor",
           params: %{
@@ -113,7 +110,6 @@ defmodule Prana.Execution.DiamondForkTest do
           id: "merge",
           custom_id: "merge",
           name: "Merge",
-          type: :action,
           integration_name: "data",
           action_name: "merge",
           params: %{
@@ -130,7 +126,6 @@ defmodule Prana.Execution.DiamondForkTest do
           id: "final",
           custom_id: "final",
           name: "Final",
-          type: :action,
           integration_name: "manual",
           action_name: "process_adult",
           params: %{

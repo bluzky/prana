@@ -548,8 +548,8 @@ defmodule Prana.MiddlewareTest do
         execution: %{
           id: "exec_123",
           nodes: [
-            %{id: "node_1", type: :trigger},
-            %{id: "node_2", type: :action}
+            %{id: "node_1"},
+            %{id: "node_2"}
           ]
         },
         context: %{

@@ -59,10 +59,12 @@ defmodule Prana.Action do
 
   """
 
+  @type action_type :: :trigger | :action | :logic | :wait | :output
   @type t :: %__MODULE__{
           name: String.t(),
           display_name: String.t(),
           description: String.t(),
+          type: action_type(),
           module: atom(),
           input_ports: [String.t()],
           output_ports: [String.t()],
@@ -78,6 +80,7 @@ defmodule Prana.Action do
     :name,
     :display_name,
     :description,
+    :type,
     :module,
     :input_ports,
     :output_ports,

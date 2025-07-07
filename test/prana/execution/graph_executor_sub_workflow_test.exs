@@ -51,14 +51,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           %Node{
             id: "trigger",
             custom_id: "trigger",
-            type: :trigger,
             integration_name: "manual",
             action_name: "trigger"
           },
           %Node{
             id: "sub_workflow_node",
             custom_id: "sub_workflow_node",
-            type: :action,
             integration_name: "workflow",
             action_name: "execute_workflow",
             params: %{
@@ -70,7 +68,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           %Node{
             id: "output",
             custom_id: "output",
-            type: :action,
             integration_name: "manual",
             action_name: "process_adult",
             params: %{"data" => "$input"}
@@ -145,14 +142,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           %Node{
             id: "trigger",
             custom_id: "trigger",
-            type: :trigger,
             integration_name: "manual",
             action_name: "trigger"
           },
           %Node{
             id: "fire_forget_sub",
             custom_id: "fire_forget_sub",
-            type: :action,
             integration_name: "workflow",
             action_name: "execute_workflow",
             params: %{
@@ -163,7 +158,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           %Node{
             id: "output",
             custom_id: "output",
-            type: :action,
             integration_name: "manual",
             action_name: "process_adult",
             params: %{"data" => "$input"}
@@ -438,14 +432,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         %Node{
           id: "trigger",
           custom_id: "trigger",
-          type: :trigger,
           integration_name: "manual",
           action_name: "trigger"
         },
         %Node{
           id: "sub_workflow_node",
           custom_id: "sub_workflow_node",
-          type: :action,
           integration_name: "workflow",
           action_name: "execute_workflow",
           params: %{
@@ -456,7 +448,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         %Node{
           id: "output",
           custom_id: "output",
-          type: :action,
           integration_name: "manual",
           action_name: "process_adult"
         }
@@ -486,14 +477,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         %Node{
           id: "trigger",
           custom_id: "trigger",
-          type: :trigger,
           integration_name: "manual",
           action_name: "trigger"
         },
         %Node{
           id: "first_sub_workflow",
           custom_id: "first_sub_workflow",
-          type: :action,
           integration_name: "workflow",
           action_name: "execute_workflow",
           params: %{
@@ -504,7 +493,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         %Node{
           id: "second_sub_workflow",
           custom_id: "second_sub_workflow",
-          type: :action,
           integration_name: "workflow",
           action_name: "execute_workflow",
           params: %{
@@ -515,7 +503,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         %Node{
           id: "output",
           custom_id: "output",
-          type: :action,
           integration_name: "manual",
           action_name: "process_adult"
         }

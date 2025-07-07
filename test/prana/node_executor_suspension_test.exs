@@ -52,7 +52,6 @@ defmodule Prana.NodeExecutorSuspensionTest do
       node = %Node{
         id: "sub_workflow_node",
         custom_id: "sub_workflow_node",
-        type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{
@@ -92,7 +91,6 @@ defmodule Prana.NodeExecutorSuspensionTest do
       node = %Node{
         id: "notification_node",
         custom_id: "notification_node",
-        type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{
@@ -122,7 +120,6 @@ defmodule Prana.NodeExecutorSuspensionTest do
       node = %Node{
         id: "invalid_node",
         custom_id: "invalid_node",
-        type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{
@@ -154,7 +151,6 @@ defmodule Prana.NodeExecutorSuspensionTest do
       node = %Node{
         id: "timing_node",
         custom_id: "timing_node",
-        type: :action,
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{

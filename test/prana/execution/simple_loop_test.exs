@@ -1,7 +1,7 @@
 defmodule Prana.Execution.SimpleLoopTest do
   @moduledoc """
   Unit tests for simple loop patterns using existing Logic integration
-  
+
   Tests loop patterns using conditional branching with loop-back connections:
   - Counter-based while loops
   - Condition-based do-while loops
@@ -70,7 +70,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "start",
           custom_id: "start",
           name: "Start",
-          type: :trigger,
           integration_name: "manual",
           action_name: "trigger",
           params: %{},
@@ -87,7 +86,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "init_counter",
           custom_id: "init_counter",
           name: "Initialize Counter",
-          type: :action,
           integration_name: "manual",
           action_name: "set_data",
           params: %{"counter" => 0, "max_count" => 3},
@@ -104,7 +102,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "increment",
           custom_id: "increment",
           name: "Increment Counter",
-          type: :action,
           integration_name: "manual",
           action_name: "increment_counter",
           params: %{},
@@ -121,7 +118,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "loop_condition",
           custom_id: "loop_condition",
           name: "Loop Condition",
-          type: :logic,
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
@@ -140,7 +136,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "complete",
           custom_id: "complete",
           name: "Complete",
-          type: :action,
           integration_name: "manual",
           action_name: "set_data",
           params: %{"result" => "loop_completed"},
@@ -215,7 +210,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "start",
           custom_id: "start",
           name: "Start",
-          type: :trigger,
           integration_name: "manual",
           action_name: "trigger",
           params: %{},
@@ -232,7 +226,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "init_retry",
           custom_id: "init_retry",
           name: "Initialize Retry",
-          type: :action,
           integration_name: "manual",
           action_name: "set_data",
           params: %{"retry_count" => 0, "max_retries" => 3, "success" => false},
@@ -249,7 +242,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "attempt_operation",
           custom_id: "attempt_operation",
           name: "Attempt Operation",
-          type: :action,
           integration_name: "manual",
           action_name: "attempt_operation",
           params: %{},
@@ -266,7 +258,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "retry_check",
           custom_id: "retry_check",
           name: "Retry Check",
-          type: :logic,
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
@@ -285,7 +276,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "increment_retry",
           custom_id: "increment_retry",
           name: "Increment Retry",
-          type: :action,
           integration_name: "manual",
           action_name: "increment_retry",
           params: %{},
@@ -302,7 +292,6 @@ defmodule Prana.Execution.SimpleLoopTest do
           id: "complete",
           custom_id: "complete",
           name: "Complete",
-          type: :action,
           integration_name: "manual",
           action_name: "set_data",
           params: %{"result" => "operation_completed"},
@@ -382,39 +371,35 @@ defmodule Prana.Execution.SimpleLoopTest do
   describe "simple counter loop" do
     test "executes counter-based loop correctly" do
       workflow = create_simple_counter_loop_workflow()
-      
+
       # Compile workflow into execution graph
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       # Create execution context
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
         metadata: %{}
       }
-      
+
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
-      
+
       # Verify execution completed successfully
       assert execution.status == :completed
-      
+
       # Verify that multiple iterations occurred
       # The increment node should have been executed multiple times
-      increment_executions = 
-        execution.node_executions
-        |> Enum.filter(&(&1.node_id == "increment"))
-        |> Enum.count()
-      
+      increment_executions =
+        Enum.count(execution.node_executions, &(&1.node_id == "increment"))
+
       # Should have 3 iterations (counter: 0 -> 1 -> 2 -> 3, then exit)
       assert increment_executions == 3
-      
+
       # Verify the final complete node was executed
-      complete_executions = 
-        execution.node_executions
-        |> Enum.filter(&(&1.node_id == "complete"))
-        |> Enum.count()
-      
+      complete_executions =
+        Enum.count(execution.node_executions, &(&1.node_id == "complete"))
+
       assert complete_executions == 1
     end
   end
@@ -422,39 +407,35 @@ defmodule Prana.Execution.SimpleLoopTest do
   describe "simple retry loop" do
     test "executes retry pattern correctly" do
       workflow = create_retry_loop_workflow()
-      
+
       # Compile workflow into execution graph
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       # Create execution context
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
         metadata: %{}
       }
-      
+
       # Execute the workflow
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
-      
+
       # Verify execution completed successfully
       assert execution.status == :completed
-      
+
       # Verify that retry attempts occurred
       # The attempt_operation node should have been executed multiple times
-      attempt_executions = 
-        execution.node_executions
-        |> Enum.filter(&(&1.node_id == "attempt_operation"))
-        |> Enum.count()
-      
+      attempt_executions =
+        Enum.count(execution.node_executions, &(&1.node_id == "attempt_operation"))
+
       # Should have multiple attempts based on the retry logic
       assert attempt_executions > 1
-      
+
       # Verify the final complete node was executed
-      complete_executions = 
-        execution.node_executions
-        |> Enum.filter(&(&1.node_id == "complete"))
-        |> Enum.count()
-      
+      complete_executions =
+        Enum.count(execution.node_executions, &(&1.node_id == "complete"))
+
       assert complete_executions == 1
     end
   end
@@ -462,31 +443,33 @@ defmodule Prana.Execution.SimpleLoopTest do
   describe "loop termination" do
     test "prevents infinite loops with proper condition design" do
       workflow = create_simple_counter_loop_workflow()
-      
+
       # Compile workflow into execution graph
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       # Create execution context
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
         metadata: %{}
       }
-      
+
       # Execute the workflow with a timeout to prevent infinite loops
-      task = Task.async(fn ->
-        GraphExecutor.execute_graph(execution_graph, context)
-      end)
-      
+      task =
+        Task.async(fn ->
+          GraphExecutor.execute_graph(execution_graph, context)
+        end)
+
       # Should complete within reasonable time (5 seconds)
       result = Task.await(task, 5000)
-      
+
       assert {:ok, execution} = result
       assert execution.status == :completed
-      
+
       # Total node executions should be reasonable (not infinite)
       total_executions = length(execution.node_executions)
-      assert total_executions < 20  # Should be much less for a 3-iteration loop
+      # Should be much less for a 3-iteration loop
+      assert total_executions < 20
     end
   end
 end
