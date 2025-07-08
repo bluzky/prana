@@ -49,14 +49,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         name: "Parent Workflow",
         nodes: [
           %Node{
-            id: "trigger",
-            custom_id: "trigger",
+            key: "trigger",
             integration_name: "manual",
             action_name: "trigger"
           },
           %Node{
-            id: "sub_workflow_node",
-            custom_id: "sub_workflow_node",
+            key: "sub_workflow_node",
             integration_name: "workflow",
             action_name: "execute_workflow",
             params: %{
@@ -66,8 +64,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             }
           },
           %Node{
-            id: "output",
-            custom_id: "output",
+            key: "output",
             integration_name: "manual",
             action_name: "process_adult",
             params: %{"data" => "$input"}
@@ -114,8 +111,8 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert length(completed_nodes) == 1
       assert length(suspended_nodes) == 1
 
-      trigger_execution = Enum.find(completed_nodes, &(&1.node_id == "trigger"))
-      sub_execution = Enum.find(suspended_nodes, &(&1.node_id == "sub_workflow_node"))
+      trigger_execution = Enum.find(completed_nodes, &(&1.node_key == "trigger"))
+      sub_execution = Enum.find(suspended_nodes, &(&1.node_key == "sub_workflow_node"))
 
       assert trigger_execution.status == :completed
       assert sub_execution.status == :suspended
@@ -141,14 +138,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         name: "Fire and Forget Workflow",
         nodes: [
           %Node{
-            id: "trigger",
-            custom_id: "trigger",
+            key: "trigger",
             integration_name: "manual",
             action_name: "trigger"
           },
           %Node{
-            id: "fire_forget_sub",
-            custom_id: "fire_forget_sub",
+            key: "fire_forget_sub",
             integration_name: "workflow",
             action_name: "execute_workflow",
             params: %{
@@ -157,8 +152,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
             }
           },
           %Node{
-            id: "output",
-            custom_id: "output",
+            key: "output",
             integration_name: "manual",
             action_name: "process_adult",
             params: %{"data" => "$input"}
@@ -201,8 +195,8 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert length(completed_nodes) == 1
       assert length(suspended_nodes) == 1
 
-      trigger_execution = Enum.find(completed_nodes, &(&1.node_id == "trigger"))
-      fire_forget_execution = Enum.find(suspended_nodes, &(&1.node_id == "fire_forget_sub"))
+      trigger_execution = Enum.find(completed_nodes, &(&1.node_key == "trigger"))
+      fire_forget_execution = Enum.find(suspended_nodes, &(&1.node_key == "fire_forget_sub"))
 
       assert trigger_execution.status == :completed
       assert fire_forget_execution.status == :suspended
@@ -229,11 +223,11 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert completed_execution.status == :completed
 
       # All nodes should be completed
-      assert (completed_execution.node_executions |> Map.values() |> List.flatten() |> length()) == 3
+      assert completed_execution.node_executions |> Map.values() |> List.flatten() |> length() == 3
 
       # Verify fire-and-forget node completed with triggered status
       all_completed_executions = completed_execution.node_executions |> Map.values() |> List.flatten()
-      fire_forget_completed = Enum.find(all_completed_executions, &(&1.node_id == "fire_forget_sub"))
+      fire_forget_completed = Enum.find(all_completed_executions, &(&1.node_key == "fire_forget_sub"))
       assert fire_forget_completed.status == :completed
       assert fire_forget_completed.output_data.sub_workflow_triggered == true
       assert fire_forget_completed.output_data.workflow_id == "background_task"
@@ -283,11 +277,11 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert completed_execution.resume_token == nil
 
       # Verify all nodes executed
-      assert (completed_execution.node_executions |> Map.values() |> List.flatten() |> length()) == 3
+      assert completed_execution.node_executions |> Map.values() |> List.flatten() |> length() == 3
 
       # Verify output node received sub-workflow results
       all_completed_executions = completed_execution.node_executions |> Map.values() |> List.flatten()
-      output_execution = Enum.find(all_completed_executions, &(&1.node_id == "output"))
+      output_execution = Enum.find(all_completed_executions, &(&1.node_key == "output"))
       assert output_execution.status == :completed
     end
 
@@ -434,14 +428,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       name: "Simple Sub-workflow Test",
       nodes: [
         %Node{
-          id: "trigger",
-          custom_id: "trigger",
+          key: "trigger",
           integration_name: "manual",
           action_name: "trigger"
         },
         %Node{
-          id: "sub_workflow_node",
-          custom_id: "sub_workflow_node",
+          key: "sub_workflow_node",
           integration_name: "workflow",
           action_name: "execute_workflow",
           params: %{
@@ -450,8 +442,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           }
         },
         %Node{
-          id: "output",
-          custom_id: "output",
+          key: "output",
           integration_name: "manual",
           action_name: "process_adult"
         }
@@ -479,14 +470,12 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       name: "Nested Sub-workflow Test",
       nodes: [
         %Node{
-          id: "trigger",
-          custom_id: "trigger",
+          key: "trigger",
           integration_name: "manual",
           action_name: "trigger"
         },
         %Node{
-          id: "first_sub_workflow",
-          custom_id: "first_sub_workflow",
+          key: "first_sub_workflow",
           integration_name: "workflow",
           action_name: "execute_workflow",
           params: %{
@@ -495,8 +484,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           }
         },
         %Node{
-          id: "second_sub_workflow",
-          custom_id: "second_sub_workflow",
+          key: "second_sub_workflow",
           integration_name: "workflow",
           action_name: "execute_workflow",
           params: %{
@@ -505,8 +493,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
           }
         },
         %Node{
-          id: "output",
-          custom_id: "output",
+          key: "output",
           integration_name: "manual",
           action_name: "process_adult"
         }
@@ -520,18 +507,19 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
   end
 
   defp build_resume_context(suspended_execution, resume_data) do
-    executed_nodes = suspended_execution.node_executions |> Map.values() |> List.flatten() |> Enum.map(& &1.node_id)
+    executed_nodes = suspended_execution.node_executions |> Map.values() |> List.flatten() |> Enum.map(& &1.node_key)
 
     # Find suspended node and add resume data
     suspended_node_id = suspended_execution.suspended_node_id
 
     all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+
     nodes =
       Enum.reduce(all_executions, %{}, fn node_exec, acc ->
-        if node_exec.node_id == suspended_node_id do
-          Map.put(acc, node_exec.node_id, resume_data)
+        if node_exec.node_key == suspended_node_id do
+          Map.put(acc, node_exec.node_key, resume_data)
         else
-          Map.put(acc, node_exec.node_id, node_exec.output_data || %{})
+          Map.put(acc, node_exec.node_key, node_exec.output_data || %{})
         end
       end)
 

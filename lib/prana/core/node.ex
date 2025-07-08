@@ -4,9 +4,9 @@ defmodule Prana.Node do
   """
 
   @type t :: %__MODULE__{
-          id: String.t(),
-          custom_id: String.t(),
+          # id: String.t(),
           name: String.t(),
+          key: String.t(),
           integration_name: String.t(),
           action_name: String.t(),
           params: map(),
@@ -14,8 +14,9 @@ defmodule Prana.Node do
         }
 
   defstruct [
-    :id,
-    :custom_id,
+    # :id,
+    # key is unique identifier for the node accross workflow
+    :key,
     :name,
     :integration_name,
     :action_name,
@@ -26,10 +27,10 @@ defmodule Prana.Node do
   @doc """
   Creates a new node
   """
-  def new(name, integration_name, action_name, params \\ %{}, custom_id \\ nil) do
+  def new(name, integration_name, action_name, params \\ %{}, key \\ nil) do
     %__MODULE__{
-      id: generate_id(),
-      custom_id: custom_id || generate_custom_id(name),
+      # id: generate_id(),
+      key: key || generate_custom_id(name) || generate_id(),
       name: name,
       integration_name: integration_name,
       action_name: action_name,
@@ -43,9 +44,8 @@ defmodule Prana.Node do
   """
   def from_map(data) when is_map(data) do
     %__MODULE__{
-      id: Map.get(data, "id") || Map.get(data, :id) || generate_id(),
-      custom_id: Map.get(data, "custom_id") || Map.get(data, :custom_id),
       name: Map.get(data, "name") || Map.get(data, :name),
+      key: Map.get(data, "key") || Map.get(data, :key),
       integration_name: Map.get(data, "integration_name") || Map.get(data, :integration_name),
       action_name: Map.get(data, "action_name") || Map.get(data, :action_name),
       params:
@@ -82,7 +82,7 @@ defmodule Prana.Node do
   end
 
   defp validate_required_fields(%__MODULE__{} = node) do
-    required_fields = [:id, :name, :integration_name, :action_name]
+    required_fields = [:key, :name, :integration_name, :action_name]
 
     missing_fields =
       Enum.reject(required_fields, fn field ->

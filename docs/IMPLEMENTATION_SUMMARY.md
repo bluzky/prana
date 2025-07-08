@@ -142,7 +142,7 @@ prana/
 - `from_map/1` - Load workflow from data
 - `get_entry_nodes/1` - Find nodes with no incoming connections
 - `get_connections_from/3` - Get connections from specific node/port
-- `get_node_by_id/2`, `get_node_by_custom_id/2` - Node lookup
+- `get_node_by_key/2` - Node lookup
 - `add_node/2`, `add_node!/2` - Add nodes with uniqueness validation
 - `add_connection/2` - Add connections
 - `valid?/1` - Validate workflow structure

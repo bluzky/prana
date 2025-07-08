@@ -91,7 +91,7 @@
 
 - **Core Functions**:
   - Workflow management: `new/2`, `from_map/1`, `get_entry_nodes/1`
-  - Node operations: `get_node_by_id/2`, `add_node/2`, connection helpers
+  - Node operations: `get_node_by_key/2`, `add_node/2`, connection helpers
   - Validation: `valid?/1` for workflows and nodes
   - Registry operations: `register_integration/1`, `get_action/2`
   - Middleware: `call/2`, runtime management functions

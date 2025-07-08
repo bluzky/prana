@@ -161,7 +161,7 @@ defmodule Prana.Execution do
 
   ## Parameters
   - `execution` - The execution to suspend
-  - `node_id` - ID of the node that caused the suspension
+  - `node_key` - ID of the node that caused the suspension
   - `suspension_type` - Type of suspension (:webhook, :interval, etc.)
   - `suspension_data` - Typed suspension data structure
   - `resume_token` - Optional resume token for webhook lookups (defaults to generated token)
@@ -180,13 +180,13 @@ defmodule Prana.Execution do
       # Explicit resume token for webhook scenarios
       suspend(execution, "node_123", :webhook, suspension_data, "custom_resume_token_123")
   """
-  def suspend(%__MODULE__{} = execution, node_id, suspension_type, suspension_data, resume_token \\ nil) do
+  def suspend(%__MODULE__{} = execution, node_key, suspension_type, suspension_data, resume_token \\ nil) do
     final_resume_token = resume_token || generate_resume_token()
 
     %{
       execution
       | status: :suspended,
-        suspended_node_id: node_id,
+        suspended_node_id: node_key,
         suspension_type: suspension_type,
         suspension_data: suspension_data,
         suspended_at: DateTime.utc_now(),
@@ -271,7 +271,7 @@ defmodule Prana.Execution do
   ## Example
 
       case get_suspension_info(execution) do
-        {:ok, %{type: :webhook, data: data, node_id: node_id}} ->
+        {:ok, %{type: :webhook, data: data, node_key: node_key}} ->
           # Handle webhook suspension
         :not_suspended ->
           # Execution not suspended
@@ -279,15 +279,15 @@ defmodule Prana.Execution do
   """
   def get_suspension_info(%__MODULE__{
         status: :suspended,
-        suspended_node_id: node_id,
+        suspended_node_id: node_key,
         suspension_type: type,
         suspension_data: data,
         suspended_at: suspended_at
       })
-      when not is_nil(node_id) and not is_nil(type) and not is_nil(data) do
+      when not is_nil(node_key) and not is_nil(type) and not is_nil(data) do
     {:ok,
      %{
-       node_id: node_id,
+       node_key: node_key,
        type: type,
        data: data,
        suspended_at: suspended_at
@@ -352,15 +352,15 @@ defmodule Prana.Execution do
     # Get LAST completed execution of each node (highest run_index)
     node_structured =
       execution.node_executions
-      |> Enum.map(fn {node_id, executions} ->
+      |> Enum.map(fn {node_key, executions} ->
         last_execution =
           executions
           |> Enum.reverse()
           |> Enum.find(&(&1.status == :completed))
 
         case last_execution do
-          nil -> {node_id, nil}
-          exec -> {node_id, %{"output" => exec.output_data, "context" => exec.context_data}}
+          nil -> {node_key, nil}
+          exec -> {node_key, %{"output" => exec.output_data, "context" => exec.context_data}}
         end
       end)
       |> Enum.reject(fn {_, data} -> is_nil(data) end)
@@ -398,10 +398,10 @@ defmodule Prana.Execution do
       execution.__runtime["nodes"]["api_call"]  # Contains %{user_id: 123}
   """
   def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :completed} = completed_node_execution) do
-    node_id = completed_node_execution.node_id
+    node_key = completed_node_execution.node_key
 
     # Get existing executions for this node
-    existing_executions = Map.get(execution.node_executions, node_id, [])
+    existing_executions = Map.get(execution.node_executions, node_key, [])
 
     # Remove any existing execution with same run_index (for retries)
     remaining_executions =
@@ -412,7 +412,7 @@ defmodule Prana.Execution do
       Enum.sort_by(remaining_executions ++ [completed_node_execution], & &1.execution_index)
 
     # Update the map
-    updated_node_executions = Map.put(execution.node_executions, node_id, updated_executions)
+    updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     # Update runtime state if present
     updated_runtime =
@@ -427,7 +427,7 @@ defmodule Prana.Execution do
             "context" => completed_node_execution.context_data
           }
 
-          updated_node_map = Map.put(runtime["nodes"] || %{}, node_id, node_data)
+          updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
           Map.put(runtime, "nodes", updated_node_map)
       end
 
@@ -457,10 +457,10 @@ defmodule Prana.Execution do
       execution.__runtime["nodes"]["api_call"]  # Not present (failed nodes don't provide output)
   """
   def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :failed} = failed_node_execution) do
-    node_id = failed_node_execution.node_id
+    node_key = failed_node_execution.node_key
 
     # Get existing executions for this node
-    existing_executions = Map.get(execution.node_executions, node_id, [])
+    existing_executions = Map.get(execution.node_executions, node_key, [])
 
     # Remove any existing execution with same run_index (for retries)
     remaining_executions =
@@ -471,7 +471,7 @@ defmodule Prana.Execution do
       Enum.sort_by(remaining_executions ++ [failed_node_execution], & &1.execution_index)
 
     # Update the map
-    updated_node_executions = Map.put(execution.node_executions, node_id, updated_executions)
+    updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     %{execution | node_executions: updated_node_executions}
   end

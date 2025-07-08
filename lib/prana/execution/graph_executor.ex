@@ -64,7 +64,7 @@ defmodule Prana.GraphExecutor do
 
     # Ephemeral runtime state (rebuilt on load)
     __runtime: %{
-      "nodes" => %{node_id => output_data},     # completed node outputs
+      "nodes" => %{node_key => output_data},     # completed node outputs
       "env" => map(),                           # environment data
       "active_paths" => %{path_key => true},    # conditional branching state
       "executed_nodes" => [String.t()]          # execution order tracking
@@ -265,7 +265,7 @@ defmodule Prana.GraphExecutor do
 
           # Suspend the entire execution with structured suspension data
           suspended_execution =
-            Execution.suspend(updated_execution, selected_node.id, suspension_type, suspend_data)
+            Execution.suspend(updated_execution, selected_node.key, suspension_type, suspend_data)
 
           Middleware.call(:execution_suspended, %{
             execution: suspended_execution,
@@ -335,7 +335,7 @@ defmodule Prana.GraphExecutor do
       # Prefer nodes with fewer dependencies
       ready_nodes
       |> Enum.sort_by(fn node ->
-        dependency_count = length(Map.get(execution_graph.dependency_graph, node.id, []))
+        dependency_count = length(Map.get(execution_graph.dependency_graph, node.key, []))
         dependency_count
       end)
       |> List.first()
@@ -343,7 +343,7 @@ defmodule Prana.GraphExecutor do
       # Among continuing nodes, prefer those with fewer dependencies (closer to completion)
       continuing_nodes
       |> Enum.sort_by(fn node ->
-        dependency_count = length(Map.get(execution_graph.dependency_graph, node.id, []))
+        dependency_count = length(Map.get(execution_graph.dependency_graph, node.key, []))
         dependency_count
       end)
       |> List.first()
@@ -352,7 +352,7 @@ defmodule Prana.GraphExecutor do
 
   # Check if a node continues an active branch (has incoming connection from active path)
   defp node_continues_active_branch?(node, execution_graph, active_paths) do
-    incoming_connections = get_incoming_connections_for_node(execution_graph, node.id)
+    incoming_connections = get_incoming_connections_for_node(execution_graph, node.key)
 
     Enum.any?(incoming_connections, fn conn ->
       path_key = "#{conn.from}_#{conn.from_port}"
@@ -384,12 +384,12 @@ defmodule Prana.GraphExecutor do
     # Extract completed node IDs from map structure
     completed_node_ids =
       node_executions
-      |> Enum.map(fn {node_id, executions} -> {node_id, List.last(executions)} end)
+      |> Enum.map(fn {node_key, executions} -> {node_key, List.last(executions)} end)
       |> Enum.filter(fn {_, exec} -> exec.status == :completed end)
-      |> MapSet.new(fn {node_id, _} -> node_id end)
+      |> MapSet.new(fn {node_key, _} -> node_key end)
 
     execution_graph.workflow.nodes
-    |> Enum.reject(fn node -> MapSet.member?(completed_node_ids, node.id) end)
+    |> Enum.reject(fn node -> MapSet.member?(completed_node_ids, node.key) end)
     |> Enum.filter(fn node ->
       dependencies_satisfied?(node, execution_graph.dependency_graph, completed_node_ids)
     end)
@@ -398,7 +398,7 @@ defmodule Prana.GraphExecutor do
 
   # Check if all dependencies for a node are satisfied
   defp dependencies_satisfied?(node, dependencies, completed_node_ids) do
-    node_dependencies = Map.get(dependencies, node.id, [])
+    node_dependencies = Map.get(dependencies, node.key, [])
 
     Enum.all?(node_dependencies, fn dep_node_id ->
       MapSet.member?(completed_node_ids, dep_node_id)
@@ -422,7 +422,7 @@ defmodule Prana.GraphExecutor do
   # Check if a node is on an active conditional execution path
   defp node_on_active_conditional_path?(node, execution_graph, execution_context) do
     # Get all incoming connections to this node using optimized lookup
-    incoming_connections = get_incoming_connections_for_node(execution_graph, node.id)
+    incoming_connections = get_incoming_connections_for_node(execution_graph, node.key)
 
     if Enum.empty?(incoming_connections) do
       # Entry/trigger nodes are always on active path
@@ -439,18 +439,18 @@ defmodule Prana.GraphExecutor do
   end
 
   # Get incoming connections for a specific node using optimized lookup
-  defp get_incoming_connections_for_node(execution_graph, node_id) do
+  defp get_incoming_connections_for_node(execution_graph, node_key) do
     # Use reverse connection map if available, otherwise fall back to filtering
     case Map.get(execution_graph, :reverse_connection_map) do
       nil ->
         # Fallback: filter all connections (less efficient but functional)
         Enum.filter(execution_graph.workflow.connections, fn conn ->
-          conn.to == node_id
+          conn.to == node_key
         end)
 
       reverse_map ->
         # Optimized: direct lookup
-        Map.get(reverse_map, node_id, [])
+        Map.get(reverse_map, node_key, [])
     end
   end
 
@@ -461,7 +461,7 @@ defmodule Prana.GraphExecutor do
 
     # Get execution tracking indices
     execution_index = execution.current_execution_index
-    run_index = get_next_run_index(execution, node.id)
+    run_index = get_next_run_index(execution, node.key)
 
     # Emit node starting event
     Middleware.call(:node_starting, %{node: node, execution: execution})
@@ -498,8 +498,8 @@ defmodule Prana.GraphExecutor do
   end
 
   # Get next run index for a specific node
-  defp get_next_run_index(execution, node_id) do
-    case Map.get(execution.node_executions, node_id, []) do
+  defp get_next_run_index(execution, node_key) do
+    case Map.get(execution.node_executions, node_key, []) do
       [] ->
         0
 
@@ -511,8 +511,8 @@ defmodule Prana.GraphExecutor do
 
   # Add node execution to the map structure
   defp add_node_execution_to_map(execution, node_execution) do
-    node_id = node_execution.node_id
-    existing_executions = Map.get(execution.node_executions, node_id, [])
+    node_key = node_execution.node_key
+    existing_executions = Map.get(execution.node_executions, node_key, [])
 
     # Remove any existing execution with same run_index (for retries)
     remaining_executions =
@@ -523,7 +523,7 @@ defmodule Prana.GraphExecutor do
       Enum.sort_by(remaining_executions ++ [node_execution], & &1.execution_index)
 
     # Update the map
-    updated_node_executions = Map.put(execution.node_executions, node_id, updated_executions)
+    updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     %{execution | node_executions: updated_node_executions}
   end
@@ -532,8 +532,8 @@ defmodule Prana.GraphExecutor do
   # and the Execution.complete_node/2 function. No separate routing logic needed.
 
   # Get connections from a specific node and port using O(1) lookup (still needed for active path reconstruction)
-  defp get_connections_from_node_port(execution_graph, node_id, output_port) do
-    Map.get(execution_graph.connection_map, {node_id, output_port}, [])
+  defp get_connections_from_node_port(execution_graph, node_key, output_port) do
+    Map.get(execution_graph.connection_map, {node_key, output_port}, [])
   end
 
   # Note: Execution progress updates are now handled internally by NodeExecutor
@@ -580,7 +580,7 @@ defmodule Prana.GraphExecutor do
 
     %{
       "nodes" => extract_nodes_from_executions(all_node_executions),
-      "executed_nodes" => Enum.map(all_node_executions, & &1.node_id),
+      "executed_nodes" => Enum.map(all_node_executions, & &1.node_key),
       "active_paths" => active_paths
     }
   end
@@ -595,7 +595,7 @@ defmodule Prana.GraphExecutor do
         connections =
           get_connections_from_node_port(
             execution_graph,
-            node_execution.node_id,
+            node_execution.node_key,
             node_execution.output_port
           )
 
@@ -624,7 +624,7 @@ defmodule Prana.GraphExecutor do
           %{"error" => node_exec.error_data, "status" => node_exec.status}
         end
 
-      Map.put(acc, node_exec.node_id, result_data)
+      Map.put(acc, node_exec.node_key, result_data)
     end)
   end
 
@@ -652,7 +652,7 @@ defmodule Prana.GraphExecutor do
           {:error, reason}
       end
     else
-      {:error, %{type: "suspended_node_not_found", node_id: suspended_node_id}}
+      {:error, %{type: "suspended_node_not_found", node_key: suspended_node_id}}
     end
   end
 
@@ -684,7 +684,7 @@ defmodule Prana.GraphExecutor do
           {:cont, {:ok, updated_prep_data}}
 
         {:error, reason} ->
-          {:halt, {:error, %{type: "action_preparation_failed", node_id: node.id, reason: reason}}}
+          {:halt, {:error, %{type: "action_preparation_failed", node_key: node.key, reason: reason}}}
       end
     end)
 
@@ -731,7 +731,7 @@ defmodule Prana.GraphExecutor do
     multi_port_input =
       Enum.reduce(input_ports, %{}, fn input_port, acc ->
         # Find all connections that target this node's input port
-        incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.id, input_port)
+        incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.key, input_port)
 
         # Collect data from all connections targeting this port
         port_data =
@@ -763,11 +763,11 @@ defmodule Prana.GraphExecutor do
   end
 
   # Get incoming connections for a specific node and port
-  defp get_incoming_connections_for_node_port(execution_graph, node_id, input_port) do
+  defp get_incoming_connections_for_node_port(execution_graph, node_key, input_port) do
     # Use reverse connection map for O(1) lookup (exists after proper compilation)
     # For manually created ExecutionGraphs in tests, fall back to empty list
     reverse_map = Map.get(execution_graph, :reverse_connection_map, %{})
-    all_incoming = Map.get(reverse_map, node_id, [])
+    all_incoming = Map.get(reverse_map, node_key, [])
 
     # Filter for connections targeting the specific input port
     Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)

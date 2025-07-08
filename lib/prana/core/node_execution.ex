@@ -8,7 +8,7 @@ defmodule Prana.NodeExecution do
   @type t :: %__MODULE__{
           id: String.t(),
           execution_id: String.t(),
-          node_id: String.t(),
+          node_key: String.t(),
           status: status(),
           params: map(),
           output_data: map() | nil,
@@ -29,7 +29,7 @@ defmodule Prana.NodeExecution do
   defstruct [
     :id,
     :execution_id,
-    :node_id,
+    :node_key,
     :status,
     :output_data,
     :output_port,
@@ -50,11 +50,11 @@ defmodule Prana.NodeExecution do
   @doc """
   Creates a new node execution
   """
-  def new(execution_id, node_id, execution_index \\  0, run_index \\  0) do
+  def new(execution_id, node_key, execution_index \\ 0, run_index \\ 0) do
     %__MODULE__{
       id: generate_id(),
       execution_id: execution_id,
-      node_id: node_id,
+      node_key: node_key,
       status: :pending,
       output_data: nil,
       output_port: nil,

@@ -16,7 +16,7 @@ defmodule Prana.ExecutionTest do
         node_executions: %{
           "node_1" => [
             %NodeExecution{
-              node_id: "node_1",
+              node_key: "node_1",
               status: :completed,
               output_data: %{user_id: 123},
               output_port: "success",
@@ -27,7 +27,7 @@ defmodule Prana.ExecutionTest do
           ],
           "node_2" => [
             %NodeExecution{
-              node_id: "node_2",
+              node_key: "node_2",
               status: :completed,
               output_data: %{email: "test@example.com"},
               output_port: "primary",
@@ -38,7 +38,7 @@ defmodule Prana.ExecutionTest do
           ],
           "node_3" => [
             %NodeExecution{
-              node_id: "node_3",
+              node_key: "node_3",
               status: :failed,
               error_data: %{error: "network timeout"},
               output_port: nil,
@@ -90,7 +90,7 @@ defmodule Prana.ExecutionTest do
         node_executions: %{
           "node_1" => [
             %NodeExecution{
-              node_id: "node_1",
+              node_key: "node_1",
               status: :pending,
               output_data: nil,
               output_port: nil,
@@ -101,7 +101,7 @@ defmodule Prana.ExecutionTest do
           ],
           "node_2" => [
             %NodeExecution{
-              node_id: "node_2",
+              node_key: "node_2",
               status: :running,
               output_data: nil,
               output_port: nil,
@@ -112,7 +112,7 @@ defmodule Prana.ExecutionTest do
           ],
           "node_3" => [
             %NodeExecution{
-              node_id: "node_3",
+              node_key: "node_3",
               status: :completed,
               output_data: %{result: "success"},
               output_port: "done",
@@ -196,7 +196,7 @@ defmodule Prana.ExecutionTest do
       assert map_size(result.node_executions) == 1
       [integrated_node] = result.node_executions["node_1"]
       assert integrated_node == completed_node_execution
-      assert integrated_node.node_id == "node_1"
+      assert integrated_node.node_key == "node_1"
       assert integrated_node.status == :completed
       assert integrated_node.output_data == output_data
     end
@@ -242,7 +242,7 @@ defmodule Prana.ExecutionTest do
             %NodeExecution{
               id: "ne_1",
               execution_id: "exec_1",
-              node_id: "node_1",
+              node_key: "node_1",
               status: :running,
               started_at: ~U[2024-01-01 10:00:00Z],
               execution_index: 0,
@@ -303,7 +303,7 @@ defmodule Prana.ExecutionTest do
       # Should integrate the failed node execution
       assert map_size(result.node_executions) == 1
       [failed_node] = result.node_executions["node_1"]
-      assert failed_node.node_id == "node_1"
+      assert failed_node.node_key == "node_1"
       assert failed_node.status == :failed
       assert failed_node.error_data == error_data
     end
@@ -319,7 +319,7 @@ defmodule Prana.ExecutionTest do
         node_executions: %{
           "node_1" => [
             %NodeExecution{
-              node_id: "node_1",
+              node_key: "node_1",
               status: :completed,
               output_data: %{user_id: 123},
               output_port: "success",

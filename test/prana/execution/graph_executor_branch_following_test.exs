@@ -26,16 +26,17 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   defp get_all_node_executions(execution) do
     case execution.node_executions do
       node_executions_map when is_map(node_executions_map) ->
-        node_executions_map 
+        node_executions_map
         |> Enum.flat_map(fn {_node_id, executions} -> executions end)
         |> Enum.sort_by(& &1.execution_index)
+
       node_executions_list when is_list(node_executions_list) ->
         node_executions_list
     end
   end
 
   defp count_node_executions(execution) do
-    get_all_node_executions(execution) |> length()
+    execution |> get_all_node_executions() |> length()
   end
 
   describe "branch following execution" do
@@ -60,8 +61,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # With branch-following, one branch should complete fully before the other starts
 
       trigger_node = %Node{
-        id: "trigger",
-        custom_id: "trigger",
+        key: "trigger",
         name: "Trigger",
         integration_name: "test",
         action_name: "trigger_action",
@@ -70,8 +70,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
 
       # Branch A: two sequential nodes
       branch_a1 = %Node{
-        id: "branch_a1",
-        custom_id: "branch_a1",
+        key: "branch_a1",
         name: "Branch A Step 1",
         integration_name: "test",
         action_name: "simple_action",
@@ -79,8 +78,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       }
 
       branch_a2 = %Node{
-        id: "branch_a2",
-        custom_id: "branch_a2",
+        key: "branch_a2",
         name: "Branch A Step 2",
         integration_name: "test",
         action_name: "simple_action",
@@ -89,8 +87,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
 
       # Branch B: two sequential nodes
       branch_b1 = %Node{
-        id: "branch_b1",
-        custom_id: "branch_b1",
+        key: "branch_b1",
         name: "Branch B Step 1",
         integration_name: "test",
         action_name: "simple_action",
@@ -98,8 +95,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       }
 
       branch_b2 = %Node{
-        id: "branch_b2",
-        custom_id: "branch_b2",
+        key: "branch_b2",
         name: "Branch B Step 2",
         integration_name: "test",
         action_name: "simple_action",
@@ -108,8 +104,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
 
       # Merge node (waits for both branches)
       merge_node = %Node{
-        id: "merge",
-        custom_id: "merge",
+        key: "merge",
         name: "Merge",
         integration_name: "test",
         action_name: "simple_action",
@@ -172,7 +167,8 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         metadata: %{}
       }
 
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} =
+        WorkflowCompiler.compile(workflow, "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -188,7 +184,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       assert count_node_executions(execution) == 6
 
       # Analyze execution order to verify branch following
-      execution_order = Enum.map(get_all_node_executions(execution), & &1.node_id)
+      execution_order = Enum.map(get_all_node_executions(execution), & &1.node_key)
 
       # The trigger should be first
       assert List.first(execution_order) == "trigger"
@@ -235,9 +231,9 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # Test the node selection logic directly
 
       # Create nodes
-      start_node = %Node{id: "start", custom_id: "start"}
-      continuing_node = %Node{id: "continuing", custom_id: "continuing"}
-      new_branch_node = %Node{id: "new_branch", custom_id: "new_branch"}
+      start_node = %Node{key: "start"}
+      continuing_node = %Node{key: "continuing"}
+      new_branch_node = %Node{key: "new_branch"}
 
       # Create mock execution graph with connections
       connections = [
@@ -274,15 +270,15 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # Should select the continuing node over the new branch
       selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_graph, execution_context)
 
-      assert selected.id == "continuing",
-             "Expected to select continuing node, but got #{selected.id}"
+      assert selected.key == "continuing",
+             "Expected to select continuing node, but got #{selected.key}"
     end
 
     test "select_node_for_branch_following falls back to dependency-based selection" do
       # Test when no active branches exist
 
-      node_with_deps = %Node{id: "with_deps", custom_id: "with_deps"}
-      node_no_deps = %Node{id: "no_deps", custom_id: "no_deps"}
+      node_with_deps = %Node{key: "with_deps"}
+      node_no_deps = %Node{key: "no_deps"}
 
       execution_graph = %ExecutionGraph{
         workflow: %Workflow{connections: []},
@@ -305,8 +301,8 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # Should prefer node with fewer dependencies
       selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_graph, execution_context)
 
-      assert selected.id == "no_deps",
-             "Expected to select node with fewer dependencies, but got #{selected.id}"
+      assert selected.key == "no_deps",
+             "Expected to select node with fewer dependencies, but got #{selected.key}"
     end
   end
 end

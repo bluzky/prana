@@ -65,46 +65,39 @@ defmodule Prana.Workflow do
   Gets entry nodes (nodes with no incoming connections)
   """
   def get_entry_nodes(%__MODULE__{nodes: nodes, connections: connections}) do
-    target_node_ids = MapSet.new(connections, & &1.to)
-    Enum.reject(nodes, &MapSet.member?(target_node_ids, &1.id))
+    target_node_keys = MapSet.new(connections, & &1.to)
+    Enum.reject(nodes, &MapSet.member?(target_node_keys, &1.key))
   end
 
   @doc """
   Gets connections from a specific node and port
   """
-  def get_connections_from(%__MODULE__{connections: connections}, node_id, port) do
-    Enum.filter(connections, &(&1.from == node_id && &1.from_port == port))
+  def get_connections_from(%__MODULE__{connections: connections}, node_key, port) do
+    Enum.filter(connections, &(&1.from == node_key && &1.from_port == port))
   end
 
   @doc """
   Gets a node by ID
   """
-  def get_node_by_id(%__MODULE__{nodes: nodes}, node_id) do
-    Enum.find(nodes, &(&1.id == node_id))
+  def get_node_by_key(%__MODULE__{nodes: nodes}, node_key) do
+    Enum.find(nodes, &(&1.key == node_key))
   end
 
   @doc """
-  Gets a node by custom ID
-  """
-  def get_node_by_custom_id(%__MODULE__{nodes: nodes}, custom_id) do
-    Enum.find(nodes, &(&1.custom_id == custom_id))
-  end
-
-  @doc """
-  Adds a node to the workflow with custom_id uniqueness validation
+  Adds a node to the workflow with key uniqueness validation
   """
   def add_node(%__MODULE__{nodes: nodes} = workflow, %Prana.Node{} = node) do
-    case Enum.find(nodes, &(&1.custom_id == node.custom_id)) do
+    case Enum.find(nodes, &(&1.key == node.key)) do
       nil ->
         {:ok, %{workflow | nodes: nodes ++ [node]}}
 
       existing_node ->
-        {:error, "Node with custom_id '#{node.custom_id}' already exists: '#{existing_node.name}'"}
+        {:error, "Node with key '#{node.key}' already exists: '#{existing_node.name}'"}
     end
   end
 
   @doc """
-  Adds a node to the workflow, raising on duplicate custom_id
+  Adds a node to the workflow, raising on duplicate key
   """
   def add_node!(%__MODULE__{} = workflow, %Prana.Node{} = node) do
     case add_node(workflow, node) do
@@ -169,24 +162,24 @@ defmodule Prana.Workflow do
   end
 
   defp validate_custom_id_uniqueness(nodes) do
-    custom_ids = Enum.map(nodes, & &1.custom_id)
+    custom_ids = Enum.map(nodes, & &1.key)
     unique_custom_ids = Enum.uniq(custom_ids)
 
     if length(custom_ids) == length(unique_custom_ids) do
       :ok
     else
       duplicates = custom_ids -- unique_custom_ids
-      {:error, "Duplicate custom_id values found: #{inspect(duplicates)}"}
+      {:error, "Duplicate key values found: #{inspect(duplicates)}"}
     end
   end
 
   defp validate_connections(connections, nodes) do
-    node_ids = MapSet.new(nodes, & &1.id)
+    node_keys = MapSet.new(nodes, & &1.key)
 
     invalid_connections =
       Enum.reject(connections, fn conn ->
-        MapSet.member?(node_ids, conn.from) &&
-          MapSet.member?(node_ids, conn.to)
+        MapSet.member?(node_keys, conn.from) &&
+          MapSet.member?(node_keys, conn.to)
       end)
 
     if Enum.empty?(invalid_connections) do

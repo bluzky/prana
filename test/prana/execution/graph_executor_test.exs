@@ -53,8 +53,7 @@ defmodule Prana.GraphExecutorTest do
     test "executes a simple workflow successfully" do
       # Create a simple workflow with one node
       node = %Node{
-        id: "node_1",
-        custom_id: "test_node",
+        key: "test_node",
         name: "Test Node",
         integration_name: "test",
         action_name: "simple_action",
@@ -98,15 +97,15 @@ defmodule Prana.GraphExecutorTest do
       # Check that the node was executed successfully
       node_execution = get_first_node_execution(execution)
       assert node_execution.status == :completed
-      assert node_execution.node_id == "node_1"
+      assert node_execution.node_key == "node_1"
       assert node_execution.output_port == "success"
     end
   end
 
   describe "find_ready_nodes/3" do
     test "finds nodes with no dependencies" do
-      node1 = %Node{id: "node_1", custom_id: "node1"}
-      node2 = %Node{id: "node_2", custom_id: "node2"}
+      node1 = %Node{key: "node1"}
+      node2 = %Node{key: "node2"}
 
       workflow = %Workflow{nodes: [node1, node2], connections: []}
 
@@ -138,8 +137,8 @@ defmodule Prana.GraphExecutorTest do
     end
 
     test "finds nodes after dependencies are satisfied" do
-      node1 = %Node{id: "node_1", custom_id: "node1"}
-      node2 = %Node{id: "node_2", custom_id: "node2"}
+      node1 = %Node{key: "node1"}
+      node2 = %Node{key: "node2"}
 
       workflow = %Workflow{nodes: [node1, node2], connections: []}
 
@@ -154,7 +153,7 @@ defmodule Prana.GraphExecutorTest do
 
       # node1 is already completed
       completed_executions = %{
-        "node_1" => [%NodeExecution{node_id: "node_1", status: :completed, execution_index: 0, run_index: 0}]
+        "node_1" => [%NodeExecution{node_key: "node_1", status: :completed, execution_index: 0, run_index: 0}]
       }
 
       # Updated context structure for conditional branching
@@ -176,8 +175,8 @@ defmodule Prana.GraphExecutorTest do
 
   describe "workflow_complete?/2" do
     test "returns true when all nodes are completed" do
-      node1 = %Node{id: "node_1"}
-      node2 = %Node{id: "node_2"}
+      node1 = %Node{key: "node_1"}
+      node2 = %Node{key: "node_2"}
 
       workflow = %Workflow{nodes: [node1, node2], connections: []}
 
@@ -200,8 +199,8 @@ defmodule Prana.GraphExecutorTest do
         vars: %{},
         output_data: nil,
         node_executions: %{
-          "node_1" => [%NodeExecution{node_id: "node_1", status: :completed, execution_index: 0, run_index: 0}],
-          "node_2" => [%NodeExecution{node_id: "node_2", status: :completed, execution_index: 1, run_index: 0}]
+          "node_1" => [%NodeExecution{node_key: "node_1", status: :completed, execution_index: 0, run_index: 0}],
+          "node_2" => [%NodeExecution{node_key: "node_2", status: :completed, execution_index: 1, run_index: 0}]
         },
         current_execution_index: 2,
         started_at: DateTime.utc_now(),
@@ -214,8 +213,8 @@ defmodule Prana.GraphExecutorTest do
     end
 
     test "returns false when some nodes are not completed" do
-      node1 = %Node{id: "node_1"}
-      node2 = %Node{id: "node_2"}
+      node1 = %Node{key: "node_1"}
+      node2 = %Node{key: "node_2"}
 
       workflow = %Workflow{nodes: [node1, node2], connections: []}
 
@@ -239,7 +238,7 @@ defmodule Prana.GraphExecutorTest do
         vars: %{},
         output_data: nil,
         node_executions: %{
-          "node_1" => [%NodeExecution{node_id: "node_1", status: :completed, execution_index: 0, run_index: 0}]
+          "node_1" => [%NodeExecution{node_key: "node_1", status: :completed, execution_index: 0, run_index: 0}]
           # node_2 not completed
         },
         current_execution_index: 1,

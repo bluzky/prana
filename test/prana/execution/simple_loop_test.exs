@@ -67,8 +67,7 @@ defmodule Prana.Execution.SimpleLoopTest do
       nodes: [
         # Start/trigger node
         %Node{
-          id: "start",
-          custom_id: "start",
+          key: "start",
           name: "Start",
           integration_name: "manual",
           action_name: "trigger",
@@ -78,8 +77,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Initialize counter
         %Node{
-          id: "init_counter",
-          custom_id: "init_counter",
+          key: "init_counter",
           name: "Initialize Counter",
           integration_name: "manual",
           action_name: "set_data",
@@ -89,8 +87,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Loop body - increment counter
         %Node{
-          id: "increment",
-          custom_id: "increment",
+          key: "increment",
           name: "Increment Counter",
           integration_name: "manual",
           action_name: "increment_counter",
@@ -100,8 +97,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Loop condition - check if counter < max_count
         %Node{
-          id: "loop_condition",
-          custom_id: "loop_condition",
+          key: "loop_condition",
           name: "Loop Condition",
           integration_name: "logic",
           action_name: "if_condition",
@@ -113,8 +109,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Final result node
         %Node{
-          id: "complete",
-          custom_id: "complete",
+          key: "complete",
           name: "Complete",
           integration_name: "manual",
           action_name: "set_data",
@@ -182,8 +177,7 @@ defmodule Prana.Execution.SimpleLoopTest do
       nodes: [
         # Start/trigger node
         %Node{
-          id: "start",
-          custom_id: "start",
+          key: "start",
           name: "Start",
           integration_name: "manual",
           action_name: "trigger",
@@ -193,8 +187,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Initialize retry state
         %Node{
-          id: "init_retry",
-          custom_id: "init_retry",
+          key: "init_retry",
           name: "Initialize Retry",
           integration_name: "manual",
           action_name: "set_data",
@@ -204,8 +197,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Attempt operation (simulated to fail first 2 times)
         %Node{
-          id: "attempt_operation",
-          custom_id: "attempt_operation",
+          key: "attempt_operation",
           name: "Attempt Operation",
           integration_name: "manual",
           action_name: "attempt_operation",
@@ -215,8 +207,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Check if retry needed
         %Node{
-          id: "retry_check",
-          custom_id: "retry_check",
+          key: "retry_check",
           name: "Retry Check",
           integration_name: "logic",
           action_name: "if_condition",
@@ -228,8 +219,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Increment retry counter
         %Node{
-          id: "increment_retry",
-          custom_id: "increment_retry",
+          key: "increment_retry",
           name: "Increment Retry",
           integration_name: "manual",
           action_name: "increment_retry",
@@ -239,8 +229,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
         # Complete (success or failure)
         %Node{
-          id: "complete",
-          custom_id: "complete",
+          key: "complete",
           name: "Complete",
           integration_name: "manual",
           action_name: "set_data",

@@ -71,8 +71,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       nodes: [
         # Start/trigger node
         %Node{
-          id: "start",
-          custom_id: "start",
+          key: "start",
           name: "Start",
           integration_name: "manual",
           action_name: "trigger",
@@ -82,8 +81,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
         # IF condition node
         %Node{
-          id: "age_check",
-          custom_id: "age_check",
+          key: "age_check",
           name: "Age Check",
           integration_name: "logic",
           action_name: "if_condition",
@@ -97,8 +95,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
         # True branch - adult processing
         %Node{
-          id: "adult_process",
-          custom_id: "adult_process",
+          key: "adult_process",
           name: "Adult Processing",
           integration_name: "manual",
           action_name: "process_adult",
@@ -108,8 +105,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
         # False branch - minor processing
         %Node{
-          id: "minor_process",
-          custom_id: "minor_process",
+          key: "minor_process",
           name: "Minor Processing",
           integration_name: "manual",
           action_name: "process_minor",
@@ -159,8 +155,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       nodes: [
         # Start/trigger node
         %Node{
-          id: "start",
-          custom_id: "start",
+          key: "start",
           name: "Start",
           integration_name: "manual",
           action_name: "trigger",
@@ -170,8 +165,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
         # Switch node
         %Node{
-          id: "user_type_switch",
-          custom_id: "user_type_switch",
+          key: "user_type_switch",
           name: "User Type Switch",
           integration_name: "logic",
           action_name: "switch",
@@ -189,8 +183,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
         # Premium processing
         %Node{
-          id: "premium_process",
-          custom_id: "premium_process",
+          key: "premium_process",
           name: "Premium Processing",
           integration_name: "manual",
           action_name: "process_adult",
@@ -200,8 +193,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
         # Standard processing
         %Node{
-          id: "standard_process",
-          custom_id: "standard_process",
+          key: "standard_process",
           name: "Standard Processing",
           integration_name: "manual",
           action_name: "process_adult",
@@ -211,8 +203,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
         # Basic processing
         %Node{
-          id: "basic_process",
-          custom_id: "basic_process",
+          key: "basic_process",
           name: "Basic Processing",
           integration_name: "manual",
           action_name: "process_minor",
@@ -291,9 +282,9 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, %{}, initial_context)
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
-      assert ready_node_ids == ["start"]
+      assert ready_node_keys == ["start"]
     end
 
     test "finds condition node ready after start completes" do
@@ -304,7 +295,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       start_execution = %NodeExecution{
         id: "start_exec",
         execution_id: "test",
-        node_id: "start",
+        node_key: "start",
         status: :completed,
         output_data: %{"age" => 25},
         output_port: "success",
@@ -327,9 +318,9 @@ defmodule Prana.Execution.ConditionalBranchingTest do
 
       node_executions_map = %{"start" => [start_execution]}
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, node_executions_map, context_after_start)
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
-      assert ready_node_ids == ["age_check"]
+      assert ready_node_keys == ["age_check"]
     end
 
     test "conditional path filtering prevents both branches from being ready" do
@@ -340,7 +331,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       start_execution = %NodeExecution{
         id: "start_exec",
         execution_id: "test",
-        node_id: "start",
+        node_key: "start",
         status: :completed,
         output_data: %{"age" => 25},
         output_port: "success",
@@ -356,7 +347,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       condition_execution = %NodeExecution{
         id: "condition_exec",
         execution_id: "test",
-        node_id: "age_check",
+        node_key: "age_check",
         status: :completed,
         output_data: %{"status" => "adult", "message" => "You are an adult"},
         output_port: "true",
@@ -386,6 +377,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       }
 
       node_executions_map = %{"start" => [start_execution], "age_check" => [condition_execution]}
+
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
@@ -393,11 +385,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           context_with_active_path
         )
 
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
       # Only adult_process should be ready (not minor_process)
-      assert ready_node_ids == ["adult_process"]
-      refute "minor_process" in ready_node_ids
+      assert ready_node_keys == ["adult_process"]
+      refute "minor_process" in ready_node_keys
     end
 
     test "false branch executes when condition is false" do
@@ -408,7 +400,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       start_execution = %NodeExecution{
         id: "start_exec",
         execution_id: "test",
-        node_id: "start",
+        node_key: "start",
         status: :completed,
         output_data: %{"age" => 16},
         output_port: "success",
@@ -424,7 +416,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       condition_execution = %NodeExecution{
         id: "condition_exec",
         execution_id: "test",
-        node_id: "age_check",
+        node_key: "age_check",
         status: :completed,
         output_data: %{"status" => "minor", "message" => "You are a minor"},
         output_port: "false",
@@ -454,6 +446,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       }
 
       node_executions_map = %{"start" => [start_execution], "age_check" => [condition_execution]}
+
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
@@ -461,11 +454,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           context_with_false_path
         )
 
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
       # Only minor_process should be ready (not adult_process)
-      assert ready_node_ids == ["minor_process"]
-      refute "adult_process" in ready_node_ids
+      assert ready_node_keys == ["minor_process"]
+      refute "adult_process" in ready_node_keys
     end
   end
 
@@ -491,7 +484,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       start_execution = %NodeExecution{
         id: "start_exec",
         execution_id: "test",
-        node_id: "start",
+        node_key: "start",
         status: :completed,
         output_data: %{"user_type" => "premium"},
         output_port: "success",
@@ -507,7 +500,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       switch_execution = %NodeExecution{
         id: "switch_exec",
         execution_id: "test",
-        node_id: "user_type_switch",
+        node_key: "user_type_switch",
         status: :completed,
         output_data: %{"discount" => 0.2, "tier" => "premium"},
         output_port: "premium",
@@ -536,6 +529,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       }
 
       node_executions_map = %{"start" => [start_execution], "user_type_switch" => [switch_execution]}
+
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
@@ -543,12 +537,12 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           context_with_premium_path
         )
 
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
       # Only premium_process should be ready
-      assert ready_node_ids == ["premium_process"]
-      refute "standard_process" in ready_node_ids
-      refute "basic_process" in ready_node_ids
+      assert ready_node_keys == ["premium_process"]
+      refute "standard_process" in ready_node_keys
+      refute "basic_process" in ready_node_keys
     end
 
     test "standard path executes for standard users" do
@@ -559,7 +553,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       start_execution = %NodeExecution{
         id: "start_exec",
         execution_id: "test",
-        node_id: "start",
+        node_key: "start",
         status: :completed,
         output_data: %{"user_type" => "standard"},
         output_port: "success",
@@ -575,7 +569,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       switch_execution = %NodeExecution{
         id: "switch_exec",
         execution_id: "test",
-        node_id: "user_type_switch",
+        node_key: "user_type_switch",
         status: :completed,
         output_data: %{"discount" => 0.1, "tier" => "standard"},
         output_port: "standard",
@@ -604,6 +598,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       }
 
       node_executions_map = %{"start" => [start_execution], "user_type_switch" => [switch_execution]}
+
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
@@ -611,12 +606,12 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           context_with_standard_path
         )
 
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
       # Only standard_process should be ready
-      assert ready_node_ids == ["standard_process"]
-      refute "premium_process" in ready_node_ids
-      refute "basic_process" in ready_node_ids
+      assert ready_node_keys == ["standard_process"]
+      refute "premium_process" in ready_node_keys
+      refute "basic_process" in ready_node_keys
     end
 
     test "only one branch executes in switch statement" do
@@ -640,10 +635,10 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           context_no_active_paths
         )
 
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
       # Only start should be ready (no conditional paths active yet)
-      assert ready_node_ids == ["start"]
+      assert ready_node_keys == ["start"]
     end
   end
 
@@ -661,7 +656,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         %NodeExecution{
           id: "start_exec",
           execution_id: "test",
-          node_id: "start",
+          node_key: "start",
           status: :completed,
           output_data: %{"age" => 25},
           output_port: "success",
@@ -675,7 +670,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         %NodeExecution{
           id: "condition_exec",
           execution_id: "test",
-          node_id: "age_check",
+          node_key: "age_check",
           status: :completed,
           output_data: %{"status" => "adult"},
           output_port: "true",
@@ -689,7 +684,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         %NodeExecution{
           id: "adult_exec",
           execution_id: "test",
-          node_id: "adult_process",
+          node_key: "adult_process",
           status: :completed,
           output_data: %{"processed_as" => "adult"},
           output_port: "success",
@@ -733,7 +728,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         %NodeExecution{
           id: "start_exec",
           execution_id: "test",
-          node_id: "start",
+          node_key: "start",
           status: :completed,
           output_data: %{"age" => 25},
           output_port: "success",
@@ -780,7 +775,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       condition_result = %NodeExecution{
         id: "condition_exec",
         execution_id: "test",
-        node_id: "age_check",
+        node_key: "age_check",
         status: :completed,
         output_data: %{"status" => "adult", "message" => "You are an adult"},
         output_port: "true",
@@ -828,7 +823,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       node_execution = %NodeExecution{
         id: "test_exec",
         execution_id: "test",
-        node_id: "age_check",
+        node_key: "age_check",
         status: :completed,
         output_data: %{"status" => "adult"},
         output_port: "true",
@@ -843,10 +838,10 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       # Use the private function logic (simulate what store_node_result_in_context does)
       result_data = node_execution.output_data
       nodes = Map.get(initial_context, "nodes", %{})
-      updated_nodes = Map.put(nodes, node_execution.node_id, result_data)
+      updated_nodes = Map.put(nodes, node_execution.node_key, result_data)
 
       executed_nodes = Map.get(initial_context, "executed_nodes", [])
-      updated_executed_nodes = [node_execution.node_id | executed_nodes]
+      updated_executed_nodes = [node_execution.node_key | executed_nodes]
 
       updated_context =
         initial_context
@@ -1063,10 +1058,10 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, %{}, legacy_context)
-      ready_node_ids = Enum.map(ready_nodes, & &1.id)
+      ready_node_keys = Enum.map(ready_nodes, & &1.key)
 
       # Should still find start node (backward compatibility)
-      assert ready_node_ids == ["start"]
+      assert ready_node_keys == ["start"]
     end
 
     test "handles failed condition node execution" do
@@ -1077,7 +1072,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       failed_condition = %NodeExecution{
         id: "condition_exec",
         execution_id: "test",
-        node_id: "age_check",
+        node_key: "age_check",
         status: :failed,
         output_data: nil,
         # Failed nodes have nil output_port
@@ -1121,7 +1116,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         %NodeExecution{
           id: "start_exec",
           execution_id: "test",
-          node_id: "start",
+          node_key: "start",
           status: :completed,
           output_data: %{"age" => "invalid"},
           output_port: "success",
@@ -1135,7 +1130,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         %NodeExecution{
           id: "condition_exec",
           execution_id: "test",
-          node_id: "age_check",
+          node_key: "age_check",
           status: :failed,
           output_data: nil,
           output_port: nil,
@@ -1278,8 +1273,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         version: 1,
         nodes: [
           %Node{
-            id: "start",
-            custom_id: "start",
+            key: "start",
             name: "Start",
             integration_name: "manual",
             action_name: "trigger",
@@ -1287,8 +1281,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             metadata: %{}
           },
           %Node{
-            id: "user_type_check",
-            custom_id: "user_type_check",
+            key: "user_type_check",
             name: "User Type Check",
             integration_name: "logic",
             action_name: "switch",
@@ -1303,8 +1296,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             metadata: %{}
           },
           %Node{
-            id: "premium_age_check",
-            custom_id: "premium_age_check",
+            key: "premium_age_check",
             name: "Premium Age Check",
             integration_name: "logic",
             action_name: "if_condition",
@@ -1316,8 +1308,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
             metadata: %{}
           },
           %Node{
-            id: "standard_process",
-            custom_id: "standard_process",
+            key: "standard_process",
             name: "Standard Process",
             integration_name: "manual",
             action_name: "process_adult",

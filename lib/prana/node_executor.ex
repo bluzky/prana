@@ -37,7 +37,7 @@ defmodule Prana.NodeExecutor do
     # Create initial node execution with proper execution ID and indices
     node_execution =
       execution.id
-      |> NodeExecution.new(node.id, execution_index, run_index)
+      |> NodeExecution.new(node.key, execution_index, run_index)
       |> NodeExecution.start()
 
     # Build context once for both input preparation and action execution
