@@ -76,7 +76,7 @@ defmodule Prana.GraphExecutorTest do
         dependency_graph: %{},
         connection_map: %{},
         reverse_connection_map: %{},
-        node_map: %{"node_1" => node},
+        node_map: %{"test_node" => node},
         total_nodes: 1
       }
 
@@ -97,15 +97,15 @@ defmodule Prana.GraphExecutorTest do
       # Check that the node was executed successfully
       node_execution = get_first_node_execution(execution)
       assert node_execution.status == :completed
-      assert node_execution.node_key == "node_1"
+      assert node_execution.node_key == "test_node"
       assert node_execution.output_port == "success"
     end
   end
 
   describe "find_ready_nodes/3" do
     test "finds nodes with no dependencies" do
-      node1 = %Node{key: "node1"}
-      node2 = %Node{key: "node2"}
+      node1 = %Node{key: "node_1"}
+      node2 = %Node{key: "node_2"}
 
       workflow = %Workflow{nodes: [node1, node2], connections: []}
 
@@ -133,12 +133,12 @@ defmodule Prana.GraphExecutorTest do
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
 
       assert length(ready_nodes) == 1
-      assert hd(ready_nodes).id == "node_1"
+      assert hd(ready_nodes).key == "node_1"
     end
 
     test "finds nodes after dependencies are satisfied" do
-      node1 = %Node{key: "node1"}
-      node2 = %Node{key: "node2"}
+      node1 = %Node{key: "node_1"}
+      node2 = %Node{key: "node_2"}
 
       workflow = %Workflow{nodes: [node1, node2], connections: []}
 
@@ -169,7 +169,7 @@ defmodule Prana.GraphExecutorTest do
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
 
       assert length(ready_nodes) == 1
-      assert hd(ready_nodes).id == "node_2"
+      assert hd(ready_nodes).key == "node_2"
     end
   end
 
