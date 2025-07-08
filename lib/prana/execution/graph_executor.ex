@@ -180,7 +180,7 @@ defmodule Prana.GraphExecutor do
 
     # Initialize active_nodes with trigger node key for newly run execution
     active_nodes = MapSet.new([execution_graph.trigger_node.key])
-    
+
     # Initialize runtime state once at the start of execution
     env_data = Map.get(context, :env, %{})
     execution = Execution.rebuild_runtime(execution, env_data)
@@ -229,7 +229,7 @@ defmodule Prana.GraphExecutor do
   defp execute_workflow_loop(execution, execution_graph) do
     # Get active nodes from runtime state
     active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
-    
+
     if MapSet.size(active_nodes) == 0 do
       final_execution = Execution.complete(execution, %{})
       {:ok, final_execution}
@@ -254,7 +254,9 @@ defmodule Prana.GraphExecutor do
 
     if Enum.empty?(ready_nodes) do
       # No ready nodes but workflow not complete - likely an error condition
-      {:error, %{type: "execution_stalled", message: "No ready nodes found but workflow not complete"}}
+      error_data = %{type: "execution_stalled", message: "No ready nodes found but workflow not complete"}
+      failed_execution = Execution.fail(execution, error_data)
+      {:error, failed_execution}
     else
       # Select single node to execute, prioritizing branch completion
       selected_node = select_node_for_branch_following(ready_nodes, execution_graph, execution.__runtime)
@@ -264,7 +266,14 @@ defmodule Prana.GraphExecutor do
           # Output routing and context updates are now handled internally by NodeExecutor
           # and the Execution.complete_node/2 function
           # Update active_nodes based on completed node's outputs
-          final_execution = update_active_nodes_on_completion(updated_execution, selected_node.key, node_execution.output_port, execution_graph)
+          final_execution =
+            update_active_nodes_on_completion(
+              updated_execution,
+              selected_node.key,
+              node_execution.output_port,
+              execution_graph
+            )
+
           {:ok, final_execution}
 
         {%NodeExecution{status: :suspended} = node_execution, updated_execution} ->
@@ -392,7 +401,7 @@ defmodule Prana.GraphExecutor do
   def find_ready_nodes(%ExecutionGraph{} = execution_graph, node_executions, execution_context) do
     # Get active nodes from execution context
     active_nodes = execution_context["active_nodes"] || MapSet.new()
-    
+
     # Extract completed node IDs from map structure for dependency checking
     completed_node_ids =
       node_executions
@@ -542,108 +551,6 @@ defmodule Prana.GraphExecutor do
     %{execution | node_executions: updated_node_executions}
   end
 
-  # Note: Output routing and context updates are now handled internally by NodeExecutor
-  # and the Execution.complete_node/2 function. No separate routing logic needed.
-
-  # Get connections from a specific node and port using O(1) lookup (still needed for active path reconstruction)
-  defp get_connections_from_node_port(execution_graph, node_key, output_port) do
-    Map.get(execution_graph.connection_map, {node_key, output_port}, [])
-  end
-
-  # Note: Execution progress updates are now handled internally by NodeExecutor
-
-  @doc """
-  Check if workflow execution is complete.
-
-  A workflow is complete when there are no more nodes ready to execute
-  and all nodes on executed conditional paths have been processed.
-  For conditional workflows, only nodes on active execution paths
-  need to be completed, not all reachable nodes.
-
-  ## Parameters
-
-  - `execution` - Current Execution struct
-  - `execution_graph` - ExecutionGraph with nodes and dependencies
-
-  ## Returns
-
-  Boolean indicating if workflow execution is complete.
-  """
-  @spec workflow_complete?(Execution.t(), ExecutionGraph.t()) :: boolean()
-  def workflow_complete?(%Execution{} = execution, %ExecutionGraph{} = execution_graph) do
-    # Build execution context that properly tracks active paths
-    execution_context = build_execution_context_for_completion(execution, execution_graph)
-    ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, execution_context)
-
-    # Workflow is complete if no more nodes are ready to execute
-    Enum.empty?(ready_nodes)
-  end
-
-  # Build execution context for completion checking with proper active path reconstruction
-  defp build_execution_context_for_completion(execution, execution_graph) do
-    # Extract all node executions from map structure
-    all_node_executions =
-      execution.node_executions
-      |> Enum.map(fn {_, executions} ->
-        List.last(executions)
-      end)
-      |> Enum.reject(&is_nil/1)
-
-    # Build active paths by analyzing completed executions
-    active_paths = reconstruct_active_paths(all_node_executions, execution_graph)
-
-    %{
-      "nodes" => extract_nodes_from_executions(all_node_executions),
-      "executed_nodes" => Enum.map(all_node_executions, & &1.node_key),
-      "active_paths" => active_paths
-    }
-  end
-
-  # Reconstruct active paths from completed node executions
-  defp reconstruct_active_paths(node_executions, execution_graph) do
-    # For each completed node execution that has an output_port,
-    # mark the paths from that node as active
-    Enum.reduce(node_executions, %{}, fn node_execution, acc_paths ->
-      if node_execution.output_port do
-        # Find connections from this node's output port using O(1) lookup
-        connections =
-          get_connections_from_node_port(
-            execution_graph,
-            node_execution.node_key,
-            node_execution.output_port
-          )
-
-        # Mark each connection path as active
-        Enum.reduce(connections, acc_paths, fn connection, path_acc ->
-          path_key = "#{connection.from}_#{connection.from_port}"
-          Map.put(path_acc, path_key, true)
-        end)
-      else
-        # Failed executions don't create active paths
-        acc_paths
-      end
-    end)
-  end
-
-  # Extract node results from node executions
-  defp extract_nodes_from_executions(node_executions) do
-    Enum.reduce(node_executions, %{}, fn node_exec, acc ->
-      result_data =
-        if node_exec.status == :completed do
-          %{
-            "output" => node_exec.output_data,
-            "context" => node_exec.context_data
-          }
-        else
-          %{"error" => node_exec.error_data, "status" => node_exec.status}
-        end
-
-      Map.put(acc, node_exec.node_key, result_data)
-    end)
-  end
-
-  # Note: Initial context creation is no longer needed with unified execution architecture
-
   # Complete a suspended node execution with resume data
   defp resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data) do
     # Find the suspended node definition and execution
@@ -694,7 +601,7 @@ defmodule Prana.GraphExecutor do
           {:cont, {:ok, acc_prep_data}}
 
         {:ok, node_prep_data} ->
-          updated_prep_data = Map.put(acc_prep_data, node.custom_id, node_prep_data)
+          updated_prep_data = Map.put(acc_prep_data, node.key, node_prep_data)
           {:cont, {:ok, updated_prep_data}}
 
         {:error, reason} ->
@@ -825,19 +732,20 @@ defmodule Prana.GraphExecutor do
   defp update_active_nodes_on_completion(execution, completed_node_key, output_port, execution_graph) do
     # Get current active_nodes from runtime
     current_active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
-    
+
     # Remove completed node from active_nodes
     updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
-    
+
     # Add target nodes from completed node's output connections
-    updated_active_nodes = if output_port do
-      connections = Map.get(execution_graph.connection_map, {completed_node_key, output_port}, [])
-      target_nodes = Enum.map(connections, & &1.to) |> MapSet.new()
-      MapSet.union(updated_active_nodes, target_nodes)
-    else
-      updated_active_nodes
-    end
-    
+    updated_active_nodes =
+      if output_port do
+        connections = Map.get(execution_graph.connection_map, {completed_node_key, output_port}, [])
+        target_nodes = MapSet.new(connections, & &1.to)
+        MapSet.union(updated_active_nodes, target_nodes)
+      else
+        updated_active_nodes
+      end
+
     # Update runtime state
     put_in(execution.__runtime["active_nodes"], updated_active_nodes)
   end

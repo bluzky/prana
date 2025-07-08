@@ -2,7 +2,6 @@ defmodule Prana.GraphExecutorTest do
   # Cannot be async due to named GenServer
   use ExUnit.Case, async: false
 
-  alias Prana.Execution
   alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
@@ -129,7 +128,8 @@ defmodule Prana.GraphExecutorTest do
         "nodes" => %{},
         "executed_nodes" => [],
         "active_paths" => %{},
-        "active_nodes" => MapSet.new(["node_1", "node_2"])  # Both nodes are active to check
+        # Both nodes are active to check
+        "active_nodes" => MapSet.new(["node_1", "node_2"])
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
@@ -167,7 +167,8 @@ defmodule Prana.GraphExecutorTest do
         "nodes" => %{"node_1" => %{"status" => "completed"}},
         "executed_nodes" => ["node_1"],
         "active_paths" => %{"node_1_success" => true},
-        "active_nodes" => MapSet.new(["node_2"])  # node_2 should be active since node_1 completed
+        # node_2 should be active since node_1 completed
+        "active_nodes" => MapSet.new(["node_2"])
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
@@ -176,10 +177,4 @@ defmodule Prana.GraphExecutorTest do
       assert hd(ready_nodes).key == "node_2"
     end
   end
-
-  # Note: workflow_complete?/2 is no longer needed with active_nodes system
-  # Workflow completion is naturally determined by empty active_nodes in execution loop
-
-  # Note: route_node_output/3 tests removed - routing is now handled internally by NodeExecutor
-  # Output routing and context updates are automatically managed by the unified execution architecture
 end
