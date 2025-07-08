@@ -229,6 +229,91 @@ defmodule Prana.Execution do
     status in [:pending, :running, :suspended]
   end
 
+  # Rebuild active_nodes from execution state with loop support
+  defp rebuild_active_nodes(execution, execution_graph) do
+    # 1. Always include the suspended node if present
+    base_active_nodes = if execution.suspended_node_id do
+      MapSet.new([execution.suspended_node_id])
+    else
+      MapSet.new()
+    end
+
+    # 2. Get all completed nodes with their execution info
+    completed_nodes = get_completed_nodes_with_execution_info(execution)
+
+    # 3. Find nodes that have received fresh input since their last execution
+    nodes_with_fresh_input = 
+      execution_graph.node_map
+      |> Map.keys()
+      |> Enum.filter(fn node_key ->
+        has_fresh_input_since_last_execution?(node_key, completed_nodes, execution_graph)
+      end)
+      |> MapSet.new()
+
+    MapSet.union(base_active_nodes, nodes_with_fresh_input)
+  end
+
+  # Check if a node has received fresh input since its last execution
+  defp has_fresh_input_since_last_execution?(node_key, completed_nodes, execution_graph) do
+    # Get incoming connections to this node
+    incoming_connections = get_incoming_connections_for_node(execution_graph, node_key)
+
+    # Get the last execution info for this node (if any)
+    last_execution = Map.get(completed_nodes, node_key)
+
+    # Check if any incoming connection has fresh data
+    Enum.any?(incoming_connections, fn conn ->
+      source_execution = Map.get(completed_nodes, conn.from)
+
+      case {last_execution, source_execution} do
+        {nil, %{}} -> 
+          # Node never executed, but has input from completed node
+          true
+
+        {%{execution_index: last_idx}, %{execution_index: source_idx}} ->
+          # Node was executed, check if source completed AFTER this node's last execution
+          source_idx > last_idx
+
+        {%{}, nil} -> 
+          # Node was executed but source hasn't completed - no fresh input
+          false
+
+        _ -> 
+          false
+      end
+    end)
+  end
+
+  # Get completed nodes with their execution information
+  defp get_completed_nodes_with_execution_info(execution) do
+    execution.node_executions
+    |> Enum.map(fn {node_key, executions} ->
+      last_execution = List.last(executions)
+      if last_execution && last_execution.status == :completed do
+        {node_key, last_execution}
+      else
+        {node_key, nil}
+      end
+    end)
+    |> Map.new()
+  end
+
+  # Get incoming connections for a specific node
+  defp get_incoming_connections_for_node(execution_graph, node_key) do
+    # Use reverse connection map if available, otherwise fall back to filtering
+    case Map.get(execution_graph, :reverse_connection_map) do
+      nil ->
+        # Fallback: filter all connections (less efficient but functional)
+        Enum.filter(execution_graph.workflow.connections, fn conn ->
+          conn.to == node_key
+        end)
+
+      reverse_map ->
+        # Optimized: direct lookup
+        Map.get(reverse_map, node_key, [])
+    end
+  end
+
   @doc """
   Checks if execution is suspended
   """
@@ -346,7 +431,7 @@ defmodule Prana.Execution do
       execution.__runtime["active_paths"]  # %{"path_1" => true, "path_2" => true}
       execution.__runtime["executed_nodes"] # ["node_1", "node_2"]
   """
-  def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
+  def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}, execution_graph \\ nil) do
     # Get LAST completed execution of each node (highest run_index)
     node_structured =
       execution.node_executions
@@ -364,10 +449,18 @@ defmodule Prana.Execution do
       |> Enum.reject(fn {_, data} -> is_nil(data) end)
       |> Map.new()
 
-    # Build runtime state (simplified for now)
+    # Rebuild active_nodes if execution_graph is provided
+    active_nodes = if execution_graph do
+      rebuild_active_nodes(execution, execution_graph)
+    else
+      MapSet.new()  # Default empty for cases without execution_graph
+    end
+
+    # Build runtime state
     runtime = %{
       "nodes" => node_structured,
-      "env" => env_data
+      "env" => env_data,
+      "active_nodes" => active_nodes
     }
 
     %{execution | __runtime: runtime}

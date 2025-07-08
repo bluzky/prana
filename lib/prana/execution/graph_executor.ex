@@ -119,7 +119,7 @@ defmodule Prana.GraphExecutor do
       ) do
     # Initialize runtime state once for resume (execution loaded from storage)
     env_data = Map.get(execution_context, :env, %{})
-    prepared_execution = Execution.rebuild_runtime(suspended_execution, env_data)
+    prepared_execution = Execution.rebuild_runtime(suspended_execution, env_data, execution_graph)
 
     # Find the suspended node and complete it with the resume data
     suspended_node_id = prepared_execution.suspended_node_id
@@ -178,12 +178,12 @@ defmodule Prana.GraphExecutor do
     execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", execution_graph.workflow.variables)
     execution = Execution.start(execution)
 
-    # Initialize active_nodes with trigger node key for newly run execution
-    active_nodes = MapSet.new([execution_graph.trigger_node.key])
-
     # Initialize runtime state once at the start of execution
     env_data = Map.get(context, :env, %{})
     execution = Execution.rebuild_runtime(execution, env_data)
+
+    # For new executions, initialize active_nodes with trigger node key
+    active_nodes = MapSet.new([execution_graph.trigger_node.key])
     execution = put_in(execution.__runtime["active_nodes"], active_nodes)
 
     # Emit execution started event
@@ -229,6 +229,9 @@ defmodule Prana.GraphExecutor do
   defp execute_workflow_loop(execution, execution_graph) do
     # Get active nodes from runtime state
     active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
+
+    # Continue execution with updated state
+    # Note: Execution.__runtime is updated internally by NodeExecutor
 
     if MapSet.size(active_nodes) == 0 do
       final_execution = Execution.complete(execution, %{})
@@ -423,9 +426,14 @@ defmodule Prana.GraphExecutor do
   defp dependencies_satisfied?(node, dependencies, completed_node_ids) do
     node_dependencies = Map.get(dependencies, node.key, [])
 
-    Enum.all?(node_dependencies, fn dep_node_id ->
-      MapSet.member?(completed_node_ids, dep_node_id)
-    end)
+    # No dependencies node always ready
+    if Enum.empty?(node_dependencies) do
+      true
+    else
+      Enum.all?(node_dependencies, fn dep_node_id ->
+        MapSet.member?(completed_node_ids, dep_node_id)
+      end)
+    end
   end
 
   # Filter nodes based on conditional branching logic

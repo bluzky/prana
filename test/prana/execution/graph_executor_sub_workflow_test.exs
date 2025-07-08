@@ -124,10 +124,10 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Verify middleware events were emitted
       assert_receive {:middleware_event, :execution_started, _}
-      assert_receive {:middleware_event, :node_starting, %{node: %{id: "trigger"}}}
-      assert_receive {:middleware_event, :node_completed, %{node: %{id: "trigger"}}}
-      assert_receive {:middleware_event, :node_starting, %{node: %{id: "sub_workflow_node"}}}
-      assert_receive {:middleware_event, :node_suspended, %{node: %{id: "sub_workflow_node"}}}
+      assert_receive {:middleware_event, :node_starting, %{node: %{key: "trigger"}}}
+      assert_receive {:middleware_event, :node_completed, %{node: %{key: "trigger"}}}
+      assert_receive {:middleware_event, :node_starting, %{node: %{key: "sub_workflow_node"}}}
+      assert_receive {:middleware_event, :node_suspended, %{node: %{key: "sub_workflow_node"}}}
       assert_receive {:middleware_event, :execution_suspended, _}
     end
 
@@ -401,22 +401,22 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert event_data.execution.workflow_id == "simple_sub_workflow"
 
       assert_receive {:middleware_event, :node_starting, event_data}
-      assert event_data.node.id == "trigger"
+      assert event_data.node.key == "trigger"
 
       assert_receive {:middleware_event, :node_completed, event_data}
-      assert event_data.node.id == "trigger"
+      assert event_data.node.key == "trigger"
 
       assert_receive {:middleware_event, :node_starting, event_data}
-      assert event_data.node.id == "sub_workflow_node"
+      assert event_data.node.key == "sub_workflow_node"
 
       assert_receive {:middleware_event, :node_suspended, event_data}
-      assert event_data.node.id == "sub_workflow_node"
+      assert event_data.node.key == "sub_workflow_node"
       assert event_data.suspension_type == :sub_workflow_sync
       assert event_data.suspend_data.workflow_id == "child_workflow"
 
       assert_receive {:middleware_event, :execution_suspended, event_data}
       assert event_data.execution.status == :suspended
-      assert event_data.suspended_node.id == "sub_workflow_node"
+      assert event_data.suspended_node.key == "sub_workflow_node"
     end
   end
 

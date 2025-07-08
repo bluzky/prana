@@ -307,7 +307,8 @@ defmodule Prana.Execution.SimpleLoopTest do
       workflow = create_simple_counter_loop_workflow()
 
       # Compile workflow into execution graph
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
+      {:ok, execution_graph} =
+        WorkflowCompiler.compile(workflow, "start")
 
       # Create execution context
       context = %{
@@ -379,7 +380,7 @@ defmodule Prana.Execution.SimpleLoopTest do
       workflow = create_simple_counter_loop_workflow()
 
       # Compile workflow into execution graph
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
+      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
 
       # Create execution context
       context = %{
