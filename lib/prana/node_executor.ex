@@ -41,7 +41,8 @@ defmodule Prana.NodeExecutor do
       |> NodeExecution.start()
 
     # Build context once for both input preparation and action execution
-    context = build_expression_context(execution, routed_input)
+    context =
+      build_expression_context(execution, routed_input)
 
     with {:ok, prepared_params} <- prepare_params(node, context),
          {:ok, action} <- get_action(node) do
