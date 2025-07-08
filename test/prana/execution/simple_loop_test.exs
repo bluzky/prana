@@ -12,8 +12,8 @@ defmodule Prana.Execution.SimpleLoopTest do
   use ExUnit.Case, async: false
 
   alias Prana.Connection
-  alias Prana.Execution
-  alias Prana.ExecutionGraph
+  # alias Prana.Execution
+  # alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.Integrations.Logic
   alias Prana.Integrations.Manual
@@ -336,14 +336,14 @@ defmodule Prana.Execution.SimpleLoopTest do
       # Verify that multiple iterations occurred
       # The increment node should have been executed multiple times
       increment_executions =
-        Enum.count(execution.node_executions, &(&1.node_id == "increment"))
+        length(Map.get(execution.node_executions, "increment", []))
 
       # Should have 3 iterations (counter: 0 -> 1 -> 2 -> 3, then exit)
       assert increment_executions == 3
 
       # Verify the final complete node was executed
       complete_executions =
-        Enum.count(execution.node_executions, &(&1.node_id == "complete"))
+        length(Map.get(execution.node_executions, "complete", []))
 
       assert complete_executions == 1
     end
@@ -372,14 +372,14 @@ defmodule Prana.Execution.SimpleLoopTest do
       # Verify that retry attempts occurred
       # The attempt_operation node should have been executed multiple times
       attempt_executions =
-        Enum.count(execution.node_executions, &(&1.node_id == "attempt_operation"))
+        length(Map.get(execution.node_executions, "attempt_operation", []))
 
       # Should have multiple attempts based on the retry logic
       assert attempt_executions > 1
 
       # Verify the final complete node was executed
       complete_executions =
-        Enum.count(execution.node_executions, &(&1.node_id == "complete"))
+        length(Map.get(execution.node_executions, "complete", []))
 
       assert complete_executions == 1
     end
@@ -412,7 +412,7 @@ defmodule Prana.Execution.SimpleLoopTest do
       assert execution.status == :completed
 
       # Total node executions should be reasonable (not infinite)
-      total_executions = length(execution.node_executions)
+      total_executions = execution.node_executions |> Map.values() |> List.flatten() |> length()
       # Should be much less for a 3-iteration loop
       assert total_executions < 20
     end

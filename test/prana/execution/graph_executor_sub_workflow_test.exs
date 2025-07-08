@@ -107,8 +107,9 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert suspended_execution.suspended_node_id == "sub_workflow_node"
 
       # Verify node executions - trigger should be completed, sub_workflow suspended
-      completed_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :completed))
-      suspended_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :suspended))
+      all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+      completed_nodes = Enum.filter(all_executions, &(&1.status == :completed))
+      suspended_nodes = Enum.filter(all_executions, &(&1.status == :suspended))
 
       assert length(completed_nodes) == 1
       assert length(suspended_nodes) == 1
@@ -193,8 +194,9 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert suspended_execution.suspended_node_id == "fire_forget_sub"
 
       # Verify node executions - trigger completed, fire_forget_sub suspended
-      completed_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :completed))
-      suspended_nodes = Enum.filter(suspended_execution.node_executions, &(&1.status == :suspended))
+      all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+      completed_nodes = Enum.filter(all_executions, &(&1.status == :completed))
+      suspended_nodes = Enum.filter(all_executions, &(&1.status == :suspended))
 
       assert length(completed_nodes) == 1
       assert length(suspended_nodes) == 1
@@ -227,10 +229,11 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert completed_execution.status == :completed
 
       # All nodes should be completed
-      assert length(completed_execution.node_executions) == 3
+      assert (completed_execution.node_executions |> Map.values() |> List.flatten() |> length()) == 3
 
       # Verify fire-and-forget node completed with triggered status
-      fire_forget_completed = Enum.find(completed_execution.node_executions, &(&1.node_id == "fire_forget_sub"))
+      all_completed_executions = completed_execution.node_executions |> Map.values() |> List.flatten()
+      fire_forget_completed = Enum.find(all_completed_executions, &(&1.node_id == "fire_forget_sub"))
       assert fire_forget_completed.status == :completed
       assert fire_forget_completed.output_data.sub_workflow_triggered == true
       assert fire_forget_completed.output_data.workflow_id == "background_task"
@@ -280,10 +283,11 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       assert completed_execution.resume_token == nil
 
       # Verify all nodes executed
-      assert length(completed_execution.node_executions) == 3
+      assert (completed_execution.node_executions |> Map.values() |> List.flatten() |> length()) == 3
 
       # Verify output node received sub-workflow results
-      output_execution = Enum.find(completed_execution.node_executions, &(&1.node_id == "output"))
+      all_completed_executions = completed_execution.node_executions |> Map.values() |> List.flatten()
+      output_execution = Enum.find(all_completed_executions, &(&1.node_id == "output"))
       assert output_execution.status == :completed
     end
 
@@ -516,13 +520,14 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
   end
 
   defp build_resume_context(suspended_execution, resume_data) do
-    executed_nodes = Enum.map(suspended_execution.node_executions, & &1.node_id)
+    executed_nodes = suspended_execution.node_executions |> Map.values() |> List.flatten() |> Enum.map(& &1.node_id)
 
     # Find suspended node and add resume data
     suspended_node_id = suspended_execution.suspended_node_id
 
+    all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
     nodes =
-      Enum.reduce(suspended_execution.node_executions, %{}, fn node_exec, acc ->
+      Enum.reduce(all_executions, %{}, fn node_exec, acc ->
         if node_exec.node_id == suspended_node_id do
           Map.put(acc, node_exec.node_id, resume_data)
         else

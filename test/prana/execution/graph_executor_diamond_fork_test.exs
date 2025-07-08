@@ -207,7 +207,8 @@ defmodule Prana.Execution.DiamondForkTest do
       assert {:ok, %Execution{status: :completed} = execution} = result
 
       # Verify all nodes executed by checking node_executions
-      executed_node_ids = Enum.map(execution.node_executions, & &1.node_id)
+      all_executions = execution.node_executions |> Map.values() |> List.flatten()
+      executed_node_ids = Enum.map(all_executions, & &1.node_id)
       assert "start" in executed_node_ids
       assert "branch_b" in executed_node_ids
       assert "branch_c" in executed_node_ids
@@ -215,7 +216,7 @@ defmodule Prana.Execution.DiamondForkTest do
       assert "final" in executed_node_ids
 
       # Verify sequential execution order by checking node_executions order
-      node_execution_order = Enum.map(execution.node_executions, & &1.node_id)
+      node_execution_order = Enum.map(all_executions, & &1.node_id)
       start_index = Enum.find_index(node_execution_order, &(&1 == "start"))
       branch_b_index = Enum.find_index(node_execution_order, &(&1 == "branch_b"))
       branch_c_index = Enum.find_index(node_execution_order, &(&1 == "branch_c"))
@@ -244,7 +245,8 @@ defmodule Prana.Execution.DiamondForkTest do
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
 
       # Verify merge node executed successfully
-      merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
+      all_executions = execution.node_executions |> Map.values() |> List.flatten()
+      merge_execution = Enum.find(all_executions, &(&1.node_id == "merge"))
       assert merge_execution != nil
       assert merge_execution.status == :completed
       assert merge_execution.output_port == "success"
@@ -269,13 +271,14 @@ defmodule Prana.Execution.DiamondForkTest do
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
 
       # Verify final node executed successfully
-      final_execution = Enum.find(execution.node_executions, &(&1.node_id == "final"))
+      all_executions = execution.node_executions |> Map.values() |> List.flatten()
+      final_execution = Enum.find(all_executions, &(&1.node_id == "final"))
       assert final_execution != nil
       assert final_execution.status == :completed
       assert final_execution.output_port == "success"
 
       # Verify merge node also executed successfully
-      merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
+      merge_execution = Enum.find(all_executions, &(&1.node_id == "merge"))
       assert merge_execution != nil
       assert merge_execution.status == :completed
     end
@@ -303,7 +306,8 @@ defmodule Prana.Execution.DiamondForkTest do
       case result do
         {:ok, %Execution{status: :failed} = execution} ->
           # Verify execution stopped at failing branch
-          executed_node_ids = Enum.map(execution.node_executions, & &1.node_id)
+          all_executions = execution.node_executions |> Map.values() |> List.flatten()
+          executed_node_ids = Enum.map(all_executions, & &1.node_id)
           assert "start" in executed_node_ids
           assert "branch_b" in executed_node_ids
 
@@ -316,7 +320,8 @@ defmodule Prana.Execution.DiamondForkTest do
           assert failed_execution.status == :failed
 
           # Verify the failed node is branch_b
-          failed_node = Enum.find(failed_execution.node_executions, &(&1.status == :failed))
+          all_failed_executions = failed_execution.node_executions |> Map.values() |> List.flatten()
+          failed_node = Enum.find(all_failed_executions, &(&1.status == :failed))
           assert failed_node != nil
           assert failed_node.node_id == "branch_b"
       end
@@ -339,7 +344,8 @@ defmodule Prana.Execution.DiamondForkTest do
       case result do
         {:ok, %Execution{status: :failed} = execution} ->
           # Verify execution includes first successful branch but stops at second branch
-          executed_node_ids = Enum.map(execution.node_executions, & &1.node_id)
+          all_executions = execution.node_executions |> Map.values() |> List.flatten()
+          executed_node_ids = Enum.map(all_executions, & &1.node_id)
           assert "start" in executed_node_ids
           assert "branch_b" in executed_node_ids
           assert "branch_c" in executed_node_ids
@@ -353,7 +359,8 @@ defmodule Prana.Execution.DiamondForkTest do
           assert failed_execution.status == :failed
 
           # Verify the failed node is branch_c
-          failed_node = Enum.find(failed_execution.node_executions, &(&1.status == :failed))
+          all_failed_executions = failed_execution.node_executions |> Map.values() |> List.flatten()
+          failed_node = Enum.find(all_failed_executions, &(&1.status == :failed))
           assert failed_node != nil
           assert failed_node.node_id == "branch_c"
       end
@@ -376,15 +383,16 @@ defmodule Prana.Execution.DiamondForkTest do
       case result do
         {:ok, %Execution{status: :failed} = execution} ->
           # Verify merge node did not execute
-          merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
+          all_executions = execution.node_executions |> Map.values() |> List.flatten()
+          merge_execution = Enum.find(all_executions, &(&1.node_id == "merge"))
           assert merge_execution == nil
 
           # Verify final node did not execute
-          final_execution = Enum.find(execution.node_executions, &(&1.node_id == "final"))
+          final_execution = Enum.find(all_executions, &(&1.node_id == "final"))
           assert final_execution == nil
 
           # Verify failed node has error result
-          failed_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_b"))
+          failed_execution = Enum.find(all_executions, &(&1.node_id == "branch_b"))
           assert failed_execution != nil
           assert failed_execution.status == :failed
 
@@ -393,7 +401,8 @@ defmodule Prana.Execution.DiamondForkTest do
           assert failed_execution.status == :failed
 
           # Verify the failed node is branch_b
-          failed_node = Enum.find(failed_execution.node_executions, &(&1.status == :failed))
+          all_failed_executions = failed_execution.node_executions |> Map.values() |> List.flatten()
+          failed_node = Enum.find(all_failed_executions, &(&1.status == :failed))
           assert failed_node != nil
           assert failed_node.node_id == "branch_b"
       end
@@ -419,7 +428,8 @@ defmodule Prana.Execution.DiamondForkTest do
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
 
       # Verify all nodes are tracked in node_executions
-      executed_node_ids = Enum.map(execution.node_executions, & &1.node_id)
+      all_executions = execution.node_executions |> Map.values() |> List.flatten()
+      executed_node_ids = Enum.map(all_executions, & &1.node_id)
       expected_nodes = ["start", "branch_b", "branch_c", "merge", "final"]
 
       assert length(executed_node_ids) == length(expected_nodes)
@@ -444,9 +454,10 @@ defmodule Prana.Execution.DiamondForkTest do
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
 
       # Verify merge node has access to branch results
-      branch_b_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_b"))
-      branch_c_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_c"))
-      merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
+      all_executions = execution.node_executions |> Map.values() |> List.flatten()
+      branch_b_execution = Enum.find(all_executions, &(&1.node_id == "branch_b"))
+      branch_c_execution = Enum.find(all_executions, &(&1.node_id == "branch_c"))
+      merge_execution = Enum.find(all_executions, &(&1.node_id == "merge"))
 
       assert branch_b_execution != nil
       assert branch_c_execution != nil
@@ -474,8 +485,9 @@ defmodule Prana.Execution.DiamondForkTest do
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
 
       # Verify final node has access to all previous results
-      final_execution = Enum.find(execution.node_executions, &(&1.node_id == "final"))
-      merge_execution = Enum.find(execution.node_executions, &(&1.node_id == "merge"))
+      all_executions = execution.node_executions |> Map.values() |> List.flatten()
+      final_execution = Enum.find(all_executions, &(&1.node_id == "final"))
+      merge_execution = Enum.find(all_executions, &(&1.node_id == "merge"))
 
       assert final_execution != nil
       assert merge_execution != nil
@@ -485,9 +497,9 @@ defmodule Prana.Execution.DiamondForkTest do
       assert final_execution.output_port == "success"
 
       # Verify all diamond pattern nodes are accessible in execution
-      start_execution = Enum.find(execution.node_executions, &(&1.node_id == "start"))
-      branch_b_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_b"))
-      branch_c_execution = Enum.find(execution.node_executions, &(&1.node_id == "branch_c"))
+      start_execution = Enum.find(all_executions, &(&1.node_id == "start"))
+      branch_b_execution = Enum.find(all_executions, &(&1.node_id == "branch_b"))
+      branch_c_execution = Enum.find(all_executions, &(&1.node_id == "branch_c"))
 
       assert start_execution != nil
       assert branch_b_execution != nil

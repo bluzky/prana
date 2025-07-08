@@ -290,7 +290,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "active_paths" => %{}
       }
 
-      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, [], initial_context)
+      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, %{}, initial_context)
       ready_node_ids = Enum.map(ready_nodes, & &1.id)
 
       assert ready_node_ids == ["start"]
@@ -325,7 +325,8 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "active_paths" => %{"start_success" => true}
       }
 
-      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, [start_execution], context_after_start)
+      node_executions_map = %{"start" => [start_execution]}
+      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, node_executions_map, context_after_start)
       ready_node_ids = Enum.map(ready_nodes, & &1.id)
 
       assert ready_node_ids == ["age_check"]
@@ -384,10 +385,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         }
       }
 
+      node_executions_map = %{"start" => [start_execution], "age_check" => [condition_execution]}
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
-          [start_execution, condition_execution],
+          node_executions_map,
           context_with_active_path
         )
 
@@ -451,10 +453,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         }
       }
 
+      node_executions_map = %{"start" => [start_execution], "age_check" => [condition_execution]}
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
-          [start_execution, condition_execution],
+          node_executions_map,
           context_with_false_path
         )
 
@@ -532,10 +535,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         }
       }
 
+      node_executions_map = %{"start" => [start_execution], "user_type_switch" => [switch_execution]}
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
-          [start_execution, switch_execution],
+          node_executions_map,
           context_with_premium_path
         )
 
@@ -599,10 +603,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         }
       }
 
+      node_executions_map = %{"start" => [start_execution], "user_type_switch" => [switch_execution]}
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
-          [start_execution, switch_execution],
+          node_executions_map,
           context_with_standard_path
         )
 
@@ -631,7 +636,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
-          [],
+          %{},
           context_no_active_paths
         )
 
@@ -652,7 +657,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
 
       # Simulate complete execution of adult path
-      completed_executions = [
+      completed_executions_list = [
         %NodeExecution{
           id: "start_exec",
           execution_id: "test",
@@ -697,6 +702,12 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         }
       ]
 
+      completed_executions = %{
+        "start" => [Enum.at(completed_executions_list, 0)],
+        "age_check" => [Enum.at(completed_executions_list, 1)],
+        "adult_process" => [Enum.at(completed_executions_list, 2)]
+      }
+
       execution = %Execution{
         id: "test_execution",
         workflow_id: "if_else_test",
@@ -718,7 +729,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
 
       # Simulate partial execution (only start completed)
-      partial_executions = [
+      partial_executions_list = [
         %NodeExecution{
           id: "start_exec",
           execution_id: "test",
@@ -734,6 +745,10 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           metadata: %{}
         }
       ]
+
+      partial_executions = %{
+        "start" => [Enum.at(partial_executions_list, 0)]
+      }
 
       execution = %Execution{
         id: "test_execution",
@@ -782,7 +797,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         id: "test_execution",
         workflow_id: "if_else_test",
         status: :running,
-        node_executions: [condition_result],
+        node_executions: %{"age_check" => [condition_result]},
         __runtime: %{
           "nodes" => %{"age_check" => %{"status" => "adult", "message" => "You are an adult"}},
           "env" => %{},
@@ -1047,7 +1062,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "nodes" => %{}
       }
 
-      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, [], legacy_context)
+      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, %{}, legacy_context)
       ready_node_ids = Enum.map(ready_nodes, & &1.id)
 
       # Should still find start node (backward compatibility)
@@ -1080,7 +1095,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         id: "test_execution",
         workflow_id: "if_else_test",
         status: :running,
-        node_executions: [failed_condition],
+        node_executions: %{"age_check" => [failed_condition]},
         __runtime: %{
           "nodes" => %{"age_check" => %{"error" => %{"type" => "condition_evaluation_error"}, "status" => :failed}},
           "env" => %{},
@@ -1102,7 +1117,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
 
       # Execution with failed condition node
-      failed_executions = [
+      failed_executions_list = [
         %NodeExecution{
           id: "start_exec",
           execution_id: "test",
@@ -1132,6 +1147,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           metadata: %{}
         }
       ]
+
+      failed_executions = %{
+        "start" => [Enum.at(failed_executions_list, 0)],
+        "age_check" => [Enum.at(failed_executions_list, 1)]
+      }
 
       execution = %Execution{
         id: "test_execution",
@@ -1168,7 +1188,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         workflow_id: "empty_test",
         status: :running,
         output_data: nil,
-        node_executions: [],
+        node_executions: %{},
         started_at: DateTime.utc_now(),
         completed_at: nil,
         error_data: nil,
