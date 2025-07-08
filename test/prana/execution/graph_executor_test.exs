@@ -128,7 +128,8 @@ defmodule Prana.GraphExecutorTest do
         "metadata" => %{},
         "nodes" => %{},
         "executed_nodes" => [],
-        "active_paths" => %{}
+        "active_paths" => %{},
+        "active_nodes" => MapSet.new(["node_1", "node_2"])  # Both nodes are active to check
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
@@ -165,7 +166,8 @@ defmodule Prana.GraphExecutorTest do
         "metadata" => %{},
         "nodes" => %{"node_1" => %{"status" => "completed"}},
         "executed_nodes" => ["node_1"],
-        "active_paths" => %{"node_1_success" => true}
+        "active_paths" => %{"node_1_success" => true},
+        "active_nodes" => MapSet.new(["node_2"])  # node_2 should be active since node_1 completed
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
@@ -175,84 +177,8 @@ defmodule Prana.GraphExecutorTest do
     end
   end
 
-  describe "workflow_complete?/2" do
-    test "returns true when all nodes are completed" do
-      node1 = %Node{key: "node_1"}
-      node2 = %Node{key: "node_2"}
-
-      workflow = %Workflow{nodes: [node1, node2], connections: []}
-
-      execution_graph = %ExecutionGraph{
-        workflow: workflow,
-        dependency_graph: %{
-          "node_1" => [],
-          "node_2" => []
-        },
-        connection_map: %{},
-        node_map: %{},
-        trigger_node: node1,
-        total_nodes: 2
-      }
-
-      execution = %Execution{
-        id: "test_exec",
-        workflow_id: "test",
-        status: :running,
-        vars: %{},
-        output_data: nil,
-        node_executions: %{
-          "node_1" => [%NodeExecution{node_key: "node_1", status: :completed, execution_index: 0, run_index: 0}],
-          "node_2" => [%NodeExecution{node_key: "node_2", status: :completed, execution_index: 1, run_index: 0}]
-        },
-        current_execution_index: 2,
-        started_at: DateTime.utc_now(),
-        completed_at: nil,
-        error_data: nil,
-        metadata: %{}
-      }
-
-      assert GraphExecutor.workflow_complete?(execution, execution_graph) == true
-    end
-
-    test "returns false when some nodes are not completed" do
-      node1 = %Node{key: "node_1"}
-      node2 = %Node{key: "node_2"}
-
-      workflow = %Workflow{nodes: [node1, node2], connections: []}
-
-      execution_graph = %ExecutionGraph{
-        workflow: workflow,
-        dependency_graph: %{
-          "node_1" => [],
-          # node_2 depends on node_1
-          "node_2" => ["node_1"]
-        },
-        connection_map: %{},
-        node_map: %{},
-        trigger_node: node1,
-        total_nodes: 2
-      }
-
-      execution = %Execution{
-        id: "test_exec",
-        workflow_id: "test",
-        status: :running,
-        vars: %{},
-        output_data: nil,
-        node_executions: %{
-          "node_1" => [%NodeExecution{node_key: "node_1", status: :completed, execution_index: 0, run_index: 0}]
-          # node_2 not completed
-        },
-        current_execution_index: 1,
-        started_at: DateTime.utc_now(),
-        completed_at: nil,
-        error_data: nil,
-        metadata: %{}
-      }
-
-      assert GraphExecutor.workflow_complete?(execution, execution_graph) == false
-    end
-  end
+  # Note: workflow_complete?/2 is no longer needed with active_nodes system
+  # Workflow completion is naturally determined by empty active_nodes in execution loop
 
   # Note: route_node_output/3 tests removed - routing is now handled internally by NodeExecutor
   # Output routing and context updates are automatically managed by the unified execution architecture
