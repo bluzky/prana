@@ -111,6 +111,7 @@ defmodule Prana.GraphExecutorTest do
 
       execution_graph = %ExecutionGraph{
         workflow: workflow,
+        node_map: %{"node_1" => node1, "node_2" => node2},
         dependency_graph: %{
           "node_1" => [],
           # node2 depends on node1
@@ -144,6 +145,7 @@ defmodule Prana.GraphExecutorTest do
 
       execution_graph = %ExecutionGraph{
         workflow: workflow,
+        node_map: %{"node_1" => node1, "node_2" => node2},
         dependency_graph: %{
           "node_1" => [],
           # node2 depends on node1

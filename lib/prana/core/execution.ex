@@ -44,7 +44,6 @@ defmodule Prana.Execution do
           workflow_version: integer(),
           parent_execution_id: String.t() | nil,
           root_execution_id: String.t() | nil,
-          trigger_node_id: String.t() | nil,
           execution_mode: execution_mode(),
           status: status(),
           trigger_type: String.t(),
@@ -77,7 +76,6 @@ defmodule Prana.Execution do
     :workflow_version,
     :parent_execution_id,
     :root_execution_id,
-    :trigger_node_id,
     :execution_mode,
     :status,
     :trigger_type,
@@ -103,7 +101,7 @@ defmodule Prana.Execution do
   @doc """
   Creates a new execution
   """
-  def new(workflow_id, workflow_version, trigger_type, vars, trigger_node_id \\ nil) do
+  def new(workflow_id, workflow_version, trigger_type, vars) do
     execution_id = generate_id()
 
     %__MODULE__{
@@ -112,7 +110,6 @@ defmodule Prana.Execution do
       workflow_version: workflow_version,
       parent_execution_id: nil,
       root_execution_id: execution_id,
-      trigger_node_id: trigger_node_id,
       execution_mode: :async,
       status: :pending,
       trigger_type: trigger_type,
@@ -332,6 +329,7 @@ defmodule Prana.Execution do
   - `"env"` - Environment data from application
   - `"active_paths"` - Active conditional branching paths
   - `"executed_nodes"` - Chronological list of executed node IDs
+  - `"active_nodes"` - List of node that is actively to check for executable. They are nodes without input or node with fresh input data. Or nodes that are waiting for all inputs to be ready.
 
   ## Example
 

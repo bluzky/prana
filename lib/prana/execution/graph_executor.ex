@@ -388,7 +388,8 @@ defmodule Prana.GraphExecutor do
       |> Enum.filter(fn {_, exec} -> exec.status == :completed end)
       |> MapSet.new(fn {node_key, _} -> node_key end)
 
-    execution_graph.workflow.nodes
+    execution_graph.node_map
+    |> Map.values()
     |> Enum.reject(fn node -> MapSet.member?(completed_node_ids, node.key) end)
     |> Enum.filter(fn node ->
       dependencies_satisfied?(node, execution_graph.dependency_graph, completed_node_ids)
@@ -661,7 +662,7 @@ defmodule Prana.GraphExecutor do
   # and stores the preparation data in the execution struct.
   defp prepare_workflow_actions(execution_graph, execution) do
     # Prepare all actions and collect preparation data
-    case prepare_all_actions(execution_graph.workflow.nodes) do
+    case prepare_all_actions(Map.values(execution_graph.node_map)) do
       {:ok, preparation_data} ->
         # Store preparation data in execution
         enriched_execution = %{execution | preparation_data: preparation_data}
@@ -733,13 +734,8 @@ defmodule Prana.GraphExecutor do
         # Find all connections that target this node's input port
         incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.key, input_port)
 
-        # Collect data from all connections targeting this port
-        port_data =
-          Enum.reduce(incoming_connections, nil, fn connection, _acc ->
-            # Get the structured node data and extract output
-            source_node_data = execution.__runtime["nodes"][connection.from]
-            if source_node_data, do: source_node_data["output"]
-          end)
+        # For same input port with multiple connections, use most recent execution_index
+        port_data = resolve_input_port_data(incoming_connections, execution)
 
         if port_data do
           Map.put(acc, input_port, port_data)
@@ -749,6 +745,45 @@ defmodule Prana.GraphExecutor do
       end)
 
     multi_port_input
+  end
+
+  # Resolve input port data when multiple connections target the same port
+  # Uses execution_index to select the most recent execution
+  defp resolve_input_port_data(connections, execution) do
+    # Find the connection with the most recent execution_index
+    connections
+    |> Enum.map(fn connection ->
+      # Get the latest execution for this source node
+      node_executions = Map.get(execution.node_executions, connection.from, [])
+      latest_execution = List.last(node_executions)
+
+      if latest_execution && latest_execution.output_port == connection.from_port do
+        # Valid connection with matching output port
+        source_node_data = execution.__runtime["nodes"][connection.from]
+        output_data = if source_node_data, do: source_node_data["output"]
+        {connection, latest_execution, output_data}
+        # Invalid or no execution
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] ->
+        # No valid connections
+        nil
+
+      [{_, _, output_data}] ->
+        # Single connection, use its data
+        output_data
+
+      connection_data_list ->
+        # Multiple connections, select by highest execution_index
+        {_, _, output_data} =
+          Enum.max_by(connection_data_list, fn {_, execution, _} ->
+            execution.execution_index
+          end)
+
+        output_data
+    end
   end
 
   # Get input ports from the action definition

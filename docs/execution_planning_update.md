@@ -11,7 +11,7 @@ The execution planning functionality is now implemented in the **WorkflowCompile
 # Raw Workflow → WorkflowCompiler → ExecutionGraph → GraphExecutor
 workflow = %Workflow{nodes: [...], connections: [...]}
 
-{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_id)
+{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
 
 {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
 ```
@@ -26,8 +26,8 @@ workflow = %Workflow{nodes: [...], connections: [...]}
 ### Implementation in WorkflowCompiler
 ```elixir
 # In WorkflowCompiler.compile/2
-def compile(%Workflow{} = workflow, trigger_node_id \\ nil) do
-  with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_id),
+def compile(%Workflow{} = workflow, trigger_node_key \\ nil) do
+  with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_key),
        {:ok, reachable_nodes} <- find_reachable_nodes(workflow, trigger_node) do
     # Build optimized execution graph
   end
@@ -52,16 +52,16 @@ defp get_trigger_node(%Workflow{} = workflow, nil) do
 end
 
 # Specific trigger node validation
-defp get_trigger_node(%Workflow{} = workflow, trigger_node_id) do
-  case Workflow.get_node_by_key(workflow, trigger_node_id) do
+defp get_trigger_node(%Workflow{} = workflow, trigger_node_key) do
+  case Workflow.get_node_by_key(workflow, trigger_node_key) do
     nil ->
-      {:error, {:trigger_node_not_found, trigger_node_id}}
+      {:error, {:trigger_node_not_found, trigger_node_key}}
 
     %Node{type: :trigger} = node ->
       {:ok, node}
 
     %Node{type: other_type} ->
-      {:error, {:node_not_trigger, trigger_node_id, other_type}}
+      {:error, {:node_not_trigger, trigger_node_key, other_type}}
   end
 end
 ```
@@ -304,7 +304,7 @@ end
 # {:ok, plan} = ExecutionPlanner.plan_execution(workflow, options)
 
 # New approach
-{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_id)
+{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
 {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
 ```
 
