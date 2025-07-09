@@ -43,8 +43,10 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # Start the IntegrationRegistry GenServer for testing
       {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
-      # Register test integration
+      # Register test integration and data integration for merge
       :ok = IntegrationRegistry.register_integration(TestIntegration)
+      Code.ensure_loaded(Prana.Integrations.Data)
+      :ok = IntegrationRegistry.register_integration(Prana.Integrations.Data)
 
       on_exit(fn ->
         if Process.alive?(registry_pid) do
@@ -105,8 +107,8 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       merge_node = %Node{
         key: "merge",
         name: "Merge",
-        integration_name: "test",
-        action_name: "simple_action",
+        integration_name: "data",
+        action_name: "merge",
         params: %{}
       }
 
