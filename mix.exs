@@ -24,6 +24,7 @@ defmodule Prana.MixProject do
       {:nested2, "~> 0.1"},
       {:req, "~> 0.5"},
       {:skema, "~> 1.0"},
+      {:nimble_parsec, "~> 1.4"},
       {:styler, "~> 0.11", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
 
