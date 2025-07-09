@@ -231,13 +231,9 @@ defmodule Prana.Execution do
 
   # Rebuild active_nodes from execution state with loop support
   defp rebuild_active_nodes(execution, execution_graph) do
-    # 1. Always include the suspended node if present
-    base_active_nodes =
-      if execution.suspended_node_id do
-        MapSet.new([execution.suspended_node_id])
-      else
-        MapSet.new()
-      end
+    # 1. Do not include suspended nodes in active nodes during runtime rebuild
+    # Suspended nodes will be resumed and completed, so they shouldn't be active
+    base_active_nodes = MapSet.new()
 
     # 2. Get all completed nodes with their execution info
     completed_nodes = get_completed_nodes_with_execution_info(execution)

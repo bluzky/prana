@@ -250,16 +250,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         "execution_time_ms" => 2500
       }
 
-      execution_context = %{
-        "input" => %{"user_id" => 456},
-        "nodes" => %{
-          "trigger" => %{},
-          "sub_workflow_node" => resume_data
-        },
-        "variables" => %{},
-        "executed_nodes" => ["trigger", "sub_workflow_node"],
-        "active_paths" => %{"trigger_success" => true, "sub_workflow_node_success" => true}
-      }
+      execution_context = build_resume_context(suspended_execution, resume_data)
 
       result =
         GraphExecutor.resume_workflow(
