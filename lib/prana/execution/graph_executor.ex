@@ -232,25 +232,51 @@ defmodule Prana.GraphExecutor do
   # Main workflow execution loop - continues until workflow is complete or error occurs.
   # Uses Execution.__runtime for all workflow-level coordination.
   defp execute_workflow_loop(execution, execution_graph) do
-    # Get active nodes from runtime state
-    active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
+    # Check for infinite loop protection
+    # Note: iteration_count is persisted in metadata to survive suspension/resume cycles
+    iteration_count = execution.__runtime["iteration_count"] || 0
+    max_iterations = execution.__runtime["max_iterations"] || 100
 
-    # Continue execution with updated state
-    # Note: Execution.__runtime is updated internally by NodeExecutor
+    if iteration_count >= max_iterations do
+      reason = %{
+        type: "infinite_loop_detected",
+        message: "Execution exceeded maximum iterations limit",
+        details: %{
+          iteration_count: iteration_count,
+          max_iterations: max_iterations,
+          active_nodes: execution.__runtime["active_nodes"]
+        }
+      }
 
-    if MapSet.size(active_nodes) == 0 do
-      final_execution = Execution.complete(execution, %{})
-      {:ok, final_execution}
+      failed_execution = Execution.fail(execution, reason)
+      {:error, failed_execution}
     else
-      case find_and_execute_ready_nodes(execution, execution_graph) do
-        {:ok, updated_execution} ->
-          execute_workflow_loop(updated_execution, execution_graph)
+      # Increment iteration counter in both runtime and persistent metadata
+      new_count = iteration_count + 1
+      execution = execution
+        |> put_in([Access.key(:__runtime), "iteration_count"], new_count)
+        |> put_in([Access.key(:metadata), "iteration_count"], new_count)
 
-        {:suspend, suspended_execution} ->
-          {:suspend, suspended_execution}
+      # Get active nodes from runtime state
+      active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
 
-        {:error, failed_execution} ->
-          {:error, failed_execution}
+      # Continue execution with updated state
+      # Note: Execution.__runtime is updated internally by NodeExecutor
+
+      if MapSet.size(active_nodes) == 0 do
+        final_execution = Execution.complete(execution, %{})
+        {:ok, final_execution}
+      else
+        case find_and_execute_ready_nodes(execution, execution_graph) do
+          {:ok, updated_execution} ->
+            execute_workflow_loop(updated_execution, execution_graph)
+
+          {:suspend, suspended_execution} ->
+            {:suspend, suspended_execution}
+
+          {:error, failed_execution} ->
+            {:error, failed_execution}
+        end
       end
     end
   end

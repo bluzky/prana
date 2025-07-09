@@ -232,17 +232,18 @@ defmodule Prana.Execution do
   # Rebuild active_nodes from execution state with loop support
   defp rebuild_active_nodes(execution, execution_graph) do
     # 1. Always include the suspended node if present
-    base_active_nodes = if execution.suspended_node_id do
-      MapSet.new([execution.suspended_node_id])
-    else
-      MapSet.new()
-    end
+    base_active_nodes =
+      if execution.suspended_node_id do
+        MapSet.new([execution.suspended_node_id])
+      else
+        MapSet.new()
+      end
 
     # 2. Get all completed nodes with their execution info
     completed_nodes = get_completed_nodes_with_execution_info(execution)
 
     # 3. Find nodes that have received fresh input since their last execution
-    nodes_with_fresh_input = 
+    nodes_with_fresh_input =
       execution_graph.node_map
       |> Map.keys()
       |> Enum.filter(fn node_key ->
@@ -266,7 +267,7 @@ defmodule Prana.Execution do
       source_execution = Map.get(completed_nodes, conn.from)
 
       case {last_execution, source_execution} do
-        {nil, %{}} -> 
+        {nil, %{}} ->
           # Node never executed, but has input from completed node
           true
 
@@ -274,11 +275,11 @@ defmodule Prana.Execution do
           # Node was executed, check if source completed AFTER this node's last execution
           source_idx > last_idx
 
-        {%{}, nil} -> 
+        {%{}, nil} ->
           # Node was executed but source hasn't completed - no fresh input
           false
 
-        _ -> 
+        _ ->
           false
       end
     end)
@@ -286,16 +287,15 @@ defmodule Prana.Execution do
 
   # Get completed nodes with their execution information
   defp get_completed_nodes_with_execution_info(execution) do
-    execution.node_executions
-    |> Enum.map(fn {node_key, executions} ->
+    Map.new(execution.node_executions, fn {node_key, executions} ->
       last_execution = List.last(executions)
+
       if last_execution && last_execution.status == :completed do
         {node_key, last_execution}
       else
         {node_key, nil}
       end
     end)
-    |> Map.new()
   end
 
   # Get incoming connections for a specific node
@@ -450,17 +450,26 @@ defmodule Prana.Execution do
       |> Map.new()
 
     # Rebuild active_nodes if execution_graph is provided
-    active_nodes = if execution_graph do
-      rebuild_active_nodes(execution, execution_graph)
-    else
-      MapSet.new()  # Default empty for cases without execution_graph
-    end
+    active_nodes =
+      if execution_graph do
+        rebuild_active_nodes(execution, execution_graph)
+      else
+        # Default empty for cases without execution_graph
+        MapSet.new()
+      end
 
     # Build runtime state
+    max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
+
+    # Get iteration count from persistent metadata (survives suspension/resume)
+    current_iteration_count = execution.metadata["iteration_count"] || 0
+
     runtime = %{
       "nodes" => node_structured,
       "env" => env_data,
-      "active_nodes" => active_nodes
+      "active_nodes" => active_nodes,
+      "iteration_count" => current_iteration_count,
+      "max_iterations" => max_iterations
     }
 
     %{execution | __runtime: runtime}
