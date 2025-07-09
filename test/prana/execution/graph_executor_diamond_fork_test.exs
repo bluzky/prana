@@ -211,7 +211,9 @@ defmodule Prana.Execution.DiamondForkTest do
       assert "final" in executed_node_keys
 
       # Verify sequential execution order by checking node_executions order
-      node_execution_order = Enum.map(all_executions, & &1.node_key)
+      # Sort by execution_index to get chronological order
+      sorted_executions = Enum.sort_by(all_executions, & &1.execution_index)
+      node_execution_order = Enum.map(sorted_executions, & &1.node_key)
       start_index = Enum.find_index(node_execution_order, &(&1 == "start"))
       branch_b_index = Enum.find_index(node_execution_order, &(&1 == "branch_b"))
       branch_c_index = Enum.find_index(node_execution_order, &(&1 == "branch_c"))

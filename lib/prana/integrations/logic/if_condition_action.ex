@@ -4,12 +4,10 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   Expected params:
   - condition: expression to evaluate (e.g., "$input.age >= 18")
-  - true_data: optional data to pass on true branch (defaults to params)
-  - false_data: optional data to pass on false branch (defaults to params)
 
   Returns:
-  - {:ok, data, "true"} if condition is true
-  - {:ok, data, "false"} if condition is false
+  - {:ok, %{}, "true"} if condition is true
+  - {:ok, %{}, "false"} if condition is false
   - {:error, reason} if evaluation fails
   """
 
