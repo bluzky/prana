@@ -66,7 +66,7 @@ defmodule Prana.GraphExecutor do
     __runtime: %{
       "nodes" => %{node_key => output_data},     # completed node outputs
       "env" => map(),                           # environment data
-      "active_paths" => %{path_key => true},    # conditional branching state
+      "active_nodes" => MapSet.t(String.t()),   # nodes ready for execution
       "executed_nodes" => [String.t()]          # execution order tracking
     }
   }

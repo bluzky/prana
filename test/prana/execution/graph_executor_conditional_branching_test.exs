@@ -278,7 +278,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "metadata" => %{},
         "nodes" => %{},
         "executed_nodes" => [],
-        "active_paths" => %{}
+        "active_nodes" => MapSet.new(["start"])
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, %{}, initial_context)
@@ -313,7 +313,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "metadata" => %{},
         "nodes" => %{"start" => %{"age" => 25}},
         "executed_nodes" => ["start"],
-        "active_paths" => %{"start_success" => true}
+        "active_nodes" => MapSet.new(["age_check"])
       }
 
       node_executions_map = %{"start" => [start_execution]}
@@ -369,11 +369,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           "age_check" => %{"status" => "adult", "message" => "You are an adult"}
         },
         "executed_nodes" => ["start", "age_check"],
-        "active_paths" => %{
-          "start_success" => true,
-          # Only true path is active
-          "age_check_true" => true
-        }
+        "active_nodes" =>
+          MapSet.new([
+            # Only adult process should be active since true path was taken
+            "adult_process"
+          ])
       }
 
       node_executions_map = %{"start" => [start_execution], "age_check" => [condition_execution]}
@@ -438,11 +438,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           "age_check" => %{"status" => "minor", "message" => "You are a minor"}
         },
         "executed_nodes" => ["start", "age_check"],
-        "active_paths" => %{
-          "start_success" => true,
-          # Only false path is active
-          "age_check_false" => true
-        }
+        "active_nodes" =>
+          MapSet.new([
+            # Only minor process should be active since false path was taken
+            "minor_process"
+          ])
       }
 
       node_executions_map = %{"start" => [start_execution], "age_check" => [condition_execution]}
@@ -522,10 +522,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           "user_type_switch" => %{"discount" => 0.2, "tier" => "premium"}
         },
         "executed_nodes" => ["start", "user_type_switch"],
-        "active_paths" => %{
-          "start_success" => true,
-          "user_type_switch_premium" => true
-        }
+        "active_nodes" =>
+          MapSet.new([
+            # Premium process should be active since premium path was taken
+            "premium_process"
+          ])
       }
 
       node_executions_map = %{"start" => [start_execution], "user_type_switch" => [switch_execution]}
@@ -591,10 +592,11 @@ defmodule Prana.Execution.ConditionalBranchingTest do
           "user_type_switch" => %{"discount" => 0.1, "tier" => "standard"}
         },
         "executed_nodes" => ["start", "user_type_switch"],
-        "active_paths" => %{
-          "start_success" => true,
-          "user_type_switch_standard" => true
-        }
+        "active_nodes" =>
+          MapSet.new([
+            # Standard process should be active since standard path was taken
+            "standard_process"
+          ])
       }
 
       node_executions_map = %{"start" => [start_execution], "user_type_switch" => [switch_execution]}
@@ -619,20 +621,20 @@ defmodule Prana.Execution.ConditionalBranchingTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
 
       # Test with no active paths (should find no ready nodes except start)
-      context_no_active_paths = %{
+      context_no_active_nodes = %{
         "input" => %{"user_type" => "basic"},
         "variables" => %{},
         "metadata" => %{},
         "nodes" => %{},
         "executed_nodes" => [],
-        "active_paths" => %{}
+        "active_nodes" => MapSet.new(["start"])
       }
 
       ready_nodes =
         GraphExecutor.find_ready_nodes(
           execution_graph,
           %{},
-          context_no_active_paths
+          context_no_active_nodes
         )
 
       ready_node_keys = Enum.map(ready_nodes, & &1.key)
@@ -676,14 +678,14 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         __runtime: %{
           "nodes" => %{"age_check" => %{"status" => "adult", "message" => "You are an adult"}},
           "env" => %{},
-          "active_paths" => %{"age_check_true" => true},
+          "active_nodes" => MapSet.new(["age_check_true"]),
           "executed_nodes" => ["age_check"]
         }
       }
 
-      # The active paths should be set correctly after node completion
-      assert execution.__runtime["active_paths"]["age_check_true"] == true
-      refute Map.has_key?(execution.__runtime["active_paths"], "age_check_false")
+      # The active nodes should be set correctly after node completion
+      assert MapSet.member?(execution.__runtime["active_nodes"], "age_check_true")
+      refute MapSet.member?(execution.__runtime["active_nodes"], "age_check_false")
 
       # The node output should be stored
       assert execution.__runtime["nodes"]["age_check"]["status"] == "adult"
@@ -696,7 +698,7 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         "metadata" => %{},
         "nodes" => %{},
         "executed_nodes" => [],
-        "active_paths" => %{}
+        "active_nodes" => MapSet.new()
       }
 
       # Simulate storing a node result
@@ -924,26 +926,6 @@ defmodule Prana.Execution.ConditionalBranchingTest do
   # ============================================================================
 
   describe "edge cases and error handling" do
-    test "handles workflow with no conditional paths (backward compatibility)" do
-      # Test that workflows without active_paths still work
-      workflow = create_basic_if_else_workflow()
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-
-      # Context without active_paths field (legacy)
-      legacy_context = %{
-        "input" => %{"age" => 25},
-        "variables" => %{},
-        "metadata" => %{},
-        "nodes" => %{}
-      }
-
-      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, %{}, legacy_context)
-      ready_node_keys = Enum.map(ready_nodes, & &1.key)
-
-      # Should still find start node (backward compatibility)
-      assert ready_node_keys == ["start"]
-    end
-
     test "handles failed condition node execution" do
       workflow = create_basic_if_else_workflow()
       {:ok, _execution_graph} = WorkflowCompiler.compile(workflow, "start")
@@ -974,13 +956,13 @@ defmodule Prana.Execution.ConditionalBranchingTest do
         __runtime: %{
           "nodes" => %{"age_check" => %{"error" => %{"type" => "condition_evaluation_error"}, "status" => :failed}},
           "env" => %{},
-          "active_paths" => %{},
+          "active_nodes" => MapSet.new(),
           "executed_nodes" => ["age_check"]
         }
       }
 
-      # Failed nodes should not create active paths
-      assert Map.get(execution.__runtime, "active_paths", %{}) == %{}
+      # Failed nodes should not create active nodes
+      assert MapSet.size(Map.get(execution.__runtime, "active_nodes", MapSet.new())) == 0
 
       # Error should be stored in nodes context
       assert execution.__runtime["nodes"]["age_check"]["error"]["type"] == "condition_evaluation_error"
