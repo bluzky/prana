@@ -32,23 +32,23 @@ defmodule Prana.GraphExecutorTest do
     execution |> get_all_node_executions() |> List.first()
   end
 
+  setup do
+    # Start the IntegrationRegistry GenServer for testing using ExUnit supervision
+    {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
+
+    # Register test integration for the test
+    :ok = IntegrationRegistry.register_integration(TestIntegration)
+
+    on_exit(fn ->
+      if Process.alive?(registry_pid) do
+        GenServer.stop(registry_pid)
+      end
+    end)
+
+    :ok
+  end
+
   describe "execute_graph/3" do
-    setup do
-      # Start the IntegrationRegistry GenServer for testing using ExUnit supervision
-      {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
-
-      # Register test integration for the test
-      :ok = IntegrationRegistry.register_integration(TestIntegration)
-
-      on_exit(fn ->
-        if Process.alive?(registry_pid) do
-          GenServer.stop(registry_pid)
-        end
-      end)
-
-      :ok
-    end
-
     test "executes a simple workflow successfully" do
       # Create a simple workflow with one node
       node = %Node{
@@ -115,6 +115,10 @@ defmodule Prana.GraphExecutorTest do
           "node_1" => [],
           # node2 depends on node1
           "node_2" => ["node_1"]
+        },
+        reverse_connection_map: %{
+          "node_1" => [],
+          "node_2" => []
         }
       }
 
@@ -128,8 +132,8 @@ defmodule Prana.GraphExecutorTest do
         "nodes" => %{},
         "executed_nodes" => [],
         "active_paths" => %{},
-        # Both nodes are active to check
-        "active_nodes" => MapSet.new(["node_1", "node_2"])
+        # Only node_1 is active since node_2 depends on it
+        "active_nodes" => MapSet.new(["node_1"])
       }
 
       ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
@@ -151,6 +155,10 @@ defmodule Prana.GraphExecutorTest do
           "node_1" => [],
           # node2 depends on node1
           "node_2" => ["node_1"]
+        },
+        reverse_connection_map: %{
+          "node_1" => [],
+          "node_2" => []
         }
       }
 
