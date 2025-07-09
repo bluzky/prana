@@ -235,6 +235,7 @@ defmodule Prana.GraphExecutor do
     # Get active nodes from runtime state
     active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
 
+    IO.inspect(active_nodes, label: "active nodes")
     # Continue execution with updated state
     # Note: Execution.__runtime is updated internally by NodeExecutor
 
@@ -258,7 +259,10 @@ defmodule Prana.GraphExecutor do
   # Find ready nodes and execute following branch-completion strategy.
   # Uses Execution.__runtime for tracking active paths and executed nodes.
   defp find_and_execute_ready_nodes(execution, execution_graph) do
-    ready_nodes = find_ready_nodes(execution_graph, execution.node_executions, execution.__runtime)
+    ready_nodes =
+      execution_graph
+      |> find_ready_nodes(execution.node_executions, execution.__runtime)
+      |> IO.inspect(label: "Ready nodes")
 
     if Enum.empty?(ready_nodes) do
       # No ready nodes but workflow not complete - likely an error condition
@@ -392,26 +396,43 @@ defmodule Prana.GraphExecutor do
       |> Enum.map(fn {node_key, executions} -> {node_key, List.last(executions)} end)
       |> Enum.filter(fn {_, exec} -> exec.status == :completed end)
       |> MapSet.new(fn {node_key, _} -> node_key end)
+      |> IO.inspect(label: "compelted nodes")
 
     # Only check active nodes instead of all nodes
     active_nodes
     |> Enum.map(fn node_key -> execution_graph.node_map[node_key] end)
     |> Enum.reject(&is_nil/1)
     |> Enum.filter(fn node ->
-      dependencies_satisfied?(node, execution_graph.dependency_graph, completed_node_ids)
+      dependencies_satisfied?(node, execution_graph, completed_node_ids)
     end)
   end
 
-  # Check if all dependencies for a node are satisfied
-  defp dependencies_satisfied?(node, dependencies, completed_node_ids) do
-    node_dependencies = Map.get(dependencies, node.key, [])
+  # Check if all input ports for a node are satisfied (port-based logic)
+  defp dependencies_satisfied?(node, execution_graph, completed_node_ids) do
+    # Get input ports for this node
+    input_ports = case get_action_input_ports(node) do
+      {:ok, ports} -> ports
+      _error -> ["input"]  # fallback to default
+    end
 
-    # No dependencies node always ready
-    if Enum.empty?(node_dependencies) do
+    # For each input port, check if at least one source connection is satisfied
+    Enum.all?(input_ports, fn input_port ->
+      input_port_satisfied?(node.key, input_port, execution_graph, completed_node_ids)
+    end)
+  end
+
+  # Check if a specific input port is satisfied (at least one source available)
+  defp input_port_satisfied?(node_key, input_port, execution_graph, completed_node_ids) do
+    # Get all incoming connections for this node and port
+    incoming_connections = get_incoming_connections_for_node_port(execution_graph, node_key, input_port)
+    
+    # If no incoming connections, port is satisfied (no dependencies)
+    if Enum.empty?(incoming_connections) do
       true
     else
-      Enum.all?(node_dependencies, fn dep_node_id ->
-        MapSet.member?(completed_node_ids, dep_node_id)
+      # At least one source node must be completed
+      Enum.any?(incoming_connections, fn conn ->
+        MapSet.member?(completed_node_ids, conn.from)
       end)
     end
   end

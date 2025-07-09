@@ -85,13 +85,15 @@ defmodule Prana.Execution.SimpleLoopTest do
           metadata: %{}
         },
 
-        # Loop body - increment counter
+        # Loop body - increment counter using runIndex
         %Node{
           key: "increment",
           name: "Increment Counter",
           integration_name: "manual",
-          action_name: "increment_counter",
-          params: %{},
+          action_name: "set_data",
+          params: %{
+            "counter" => "$context.run_index"
+          },
           metadata: %{}
         },
 
@@ -102,7 +104,7 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
-            "condition" => "$input.continue_loop"
+            "condition" => "$input.counter < 3"
           },
           metadata: %{}
         },
@@ -308,7 +310,9 @@ defmodule Prana.Execution.SimpleLoopTest do
 
       # Compile workflow into execution graph
       {:ok, execution_graph} =
-        WorkflowCompiler.compile(workflow, "start")
+        workflow
+        |> WorkflowCompiler.compile("start")
+        |> IO.inspect(label: "Execution Graph")
 
       # Create execution context
       context = %{

@@ -25,6 +25,7 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   @impl true
   def execute(params, context) do
     condition = Map.get(params, "condition")
+    IO.inspect(condition, label: "IF Condition Action - Evaluating condition")
 
     if condition do
       case evaluate_condition(condition, context) do
