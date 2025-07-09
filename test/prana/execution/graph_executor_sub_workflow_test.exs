@@ -368,7 +368,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         node_executions: []
       }
 
-      execution_graph = %ExecutionGraph{workflow: %Workflow{nodes: []}}
+      execution_graph = %ExecutionGraph{workflow: %Workflow{nodes: []}, node_map: %{}}
 
       result =
         GraphExecutor.resume_workflow(

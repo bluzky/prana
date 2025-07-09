@@ -182,9 +182,14 @@ defmodule Prana.GraphExecutor do
     env_data = Map.get(context, :env, %{})
     execution = Execution.rebuild_runtime(execution, env_data)
 
-    # For new executions, initialize active_nodes with trigger node key
+    # For new executions, initialize active_nodes with trigger node and node_depth map
     active_nodes = MapSet.new([execution_graph.trigger_node.key])
-    execution = put_in(execution.__runtime["active_nodes"], active_nodes)
+    node_depth = %{execution_graph.trigger_node.key => 0}
+
+    execution =
+      execution
+      |> put_in([Access.key(:__runtime), "active_nodes"], active_nodes)
+      |> put_in([Access.key(:__runtime), "node_depth"], node_depth)
 
     # Emit execution started event
     Middleware.call(:execution_started, %{execution: execution})
@@ -262,7 +267,7 @@ defmodule Prana.GraphExecutor do
       {:error, failed_execution}
     else
       # Select single node to execute, prioritizing branch completion
-      selected_node = select_node_for_branch_following(ready_nodes, execution_graph, execution.__runtime)
+      selected_node = select_node_for_branch_following(ready_nodes, execution.__runtime)
 
       case execute_single_node_with_events(selected_node, execution_graph, execution) do
         {%NodeExecution{status: :completed} = node_execution, updated_execution} ->
@@ -340,46 +345,22 @@ defmodule Prana.GraphExecutor do
 
   Single Node struct selected for execution.
   """
-  @spec select_node_for_branch_following([Node.t()], ExecutionGraph.t(), map()) :: Node.t()
-  def select_node_for_branch_following(ready_nodes, execution_graph, execution_context) do
-    active_paths = Map.get(execution_context, "active_paths", %{})
+  @spec select_node_for_branch_following([Node.t()], map()) :: Node.t()
+  def select_node_for_branch_following(ready_nodes, execution_context) do
+    node_depth = Map.get(execution_context, "node_depth", %{})
 
-    # Strategy 1: Find nodes that continue active branches
-    continuing_nodes =
-      Enum.filter(ready_nodes, fn node ->
-        node_continues_active_branch?(node, execution_graph, active_paths)
-      end)
-
-    # Prioritize nodes continuing active branches
-    if Enum.empty?(continuing_nodes) do
-      # No continuing nodes, select any ready node (start new branch)
-      # Prefer nodes with fewer dependencies
-      ready_nodes
-      |> Enum.sort_by(fn node ->
-        dependency_count = length(Map.get(execution_graph.dependency_graph, node.key, []))
-        dependency_count
-      end)
-      |> List.first()
-    else
-      # Among continuing nodes, prefer those with fewer dependencies (closer to completion)
-      continuing_nodes
-      |> Enum.sort_by(fn node ->
-        dependency_count = length(Map.get(execution_graph.dependency_graph, node.key, []))
-        dependency_count
-      end)
-      |> List.first()
-    end
-  end
-
-  # Check if a node continues an active branch (has incoming connection from active path)
-  defp node_continues_active_branch?(node, execution_graph, active_paths) do
-    incoming_connections = get_incoming_connections_for_node(execution_graph, node.key)
-
-    Enum.any?(incoming_connections, fn conn ->
-      path_key = "#{conn.from}_#{conn.from_port}"
-      Map.get(active_paths, path_key, false)
+    # Sort nodes by depth (deepest first) to ensure branch following
+    ready_nodes
+    |> Enum.sort_by(fn node ->
+      depth = Map.get(node_depth, node.key, 0)
+      # Use negative depth for descending sort (deepest first)
+      -depth
     end)
+    |> List.first()
   end
+
+  # This function is no longer needed with depth-based approach
+  # defp node_continues_active_branch? - removed
 
   @doc """
   Find nodes that are ready to execute based on their dependencies and conditional paths.
@@ -419,7 +400,6 @@ defmodule Prana.GraphExecutor do
     |> Enum.filter(fn node ->
       dependencies_satisfied?(node, execution_graph.dependency_graph, completed_node_ids)
     end)
-    |> filter_conditional_branches(execution_graph, execution_context)
   end
 
   # Check if all dependencies for a node are satisfied
@@ -433,55 +413,6 @@ defmodule Prana.GraphExecutor do
       Enum.all?(node_dependencies, fn dep_node_id ->
         MapSet.member?(completed_node_ids, dep_node_id)
       end)
-    end
-  end
-
-  # Filter nodes based on conditional branching logic
-  defp filter_conditional_branches(ready_nodes, execution_graph, execution_context) do
-    # Apply conditional filtering if context has active_paths
-    if is_map(execution_context) and Map.has_key?(execution_context, "active_paths") do
-      # Filter nodes that are on active conditional paths
-      Enum.filter(ready_nodes, fn node ->
-        node_on_active_conditional_path?(node, execution_graph, execution_context)
-      end)
-    else
-      # No conditional path tracking, return all ready nodes
-      ready_nodes
-    end
-  end
-
-  # Check if a node is on an active conditional execution path
-  defp node_on_active_conditional_path?(node, execution_graph, execution_context) do
-    # Get all incoming connections to this node using optimized lookup
-    incoming_connections = get_incoming_connections_for_node(execution_graph, node.key)
-
-    if Enum.empty?(incoming_connections) do
-      # Entry/trigger nodes are always on active path
-      true
-    else
-      # Node is on active path if ANY incoming connection is from an active path
-      active_paths = Map.get(execution_context, "active_paths", %{})
-
-      Enum.any?(incoming_connections, fn conn ->
-        path_key = "#{conn.from}_#{conn.from_port}"
-        Map.get(active_paths, path_key, false)
-      end)
-    end
-  end
-
-  # Get incoming connections for a specific node using optimized lookup
-  defp get_incoming_connections_for_node(execution_graph, node_key) do
-    # Use reverse connection map if available, otherwise fall back to filtering
-    case Map.get(execution_graph, :reverse_connection_map) do
-      nil ->
-        # Fallback: filter all connections (less efficient but functional)
-        Enum.filter(execution_graph.workflow.connections, fn conn ->
-          conn.to == node_key
-        end)
-
-      reverse_map ->
-        # Optimized: direct lookup
-        Map.get(reverse_map, node_key, [])
     end
   end
 
@@ -736,25 +667,43 @@ defmodule Prana.GraphExecutor do
     Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)
   end
 
-  # Update active_nodes when a node completes
+  # Update active_nodes and node_depth when a node completes
   defp update_active_nodes_on_completion(execution, completed_node_key, output_port, execution_graph) do
-    # Get current active_nodes from runtime
+    # Get current active_nodes and node_depth from runtime
     current_active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
+    current_node_depth = execution.__runtime["node_depth"] || %{}
 
     # Remove completed node from active_nodes
     updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
 
-    # Add target nodes from completed node's output connections
-    updated_active_nodes =
+    # Get completed node's depth
+    completed_node_depth = Map.get(current_node_depth, completed_node_key, 0)
+
+    # Add target nodes from completed node's output connections and assign depths
+    {final_active_nodes, final_node_depth} =
       if output_port do
         connections = Map.get(execution_graph.connection_map, {completed_node_key, output_port}, [])
         target_nodes = MapSet.new(connections, & &1.to)
-        MapSet.union(updated_active_nodes, target_nodes)
+
+        # Add target nodes to active_nodes
+        updated_active_nodes = MapSet.union(updated_active_nodes, target_nodes)
+
+        # Assign depth = completed_node_depth + 1 to all target nodes
+        target_depth = completed_node_depth + 1
+
+        updated_node_depth =
+          Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
+            Map.put(depth_map, node_key, target_depth)
+          end)
+
+        {updated_active_nodes, updated_node_depth}
       else
-        updated_active_nodes
+        {updated_active_nodes, current_node_depth}
       end
 
     # Update runtime state
-    put_in(execution.__runtime["active_nodes"], updated_active_nodes)
+    execution
+    |> put_in([Access.key(:__runtime), "active_nodes"], final_active_nodes)
+    |> put_in([Access.key(:__runtime), "node_depth"], final_node_depth)
   end
 end
