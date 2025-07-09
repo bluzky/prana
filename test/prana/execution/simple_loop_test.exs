@@ -92,7 +92,7 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "manual",
           action_name: "set_data",
           params: %{
-            "counter" => "$context.run_index"
+            "counter" => "{{$execution.run_index + 1}}"
           },
           metadata: %{}
         },
@@ -104,7 +104,7 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
-            "condition" => "$input.counter < 3"
+            "condition" => "{{$input.input.counter < 3}}"
           },
           metadata: %{}
         },
@@ -214,7 +214,7 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
-            "condition" => "$input.should_retry"
+            "condition" => "{{$input.should_retry}}"
           },
           metadata: %{}
         },
@@ -310,9 +310,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
       # Compile workflow into execution graph
       {:ok, execution_graph} =
-        workflow
-        |> WorkflowCompiler.compile("start")
-        |> IO.inspect(label: "Execution Graph")
+        WorkflowCompiler.compile(workflow, "start")
 
       # Create execution context
       context = %{

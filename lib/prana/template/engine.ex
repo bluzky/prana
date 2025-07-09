@@ -83,6 +83,24 @@ defmodule Prana.Template.Engine do
     end
   end
 
+  def process_map(template_map, context) do
+    processed =
+      Enum.reduce(template_map, %{}, fn
+        {key, value}, acc when is_binary(value) ->
+          case render(value, context) do
+            {:ok, processed_value} -> Map.put(acc, key, processed_value)
+            {:error, reason} -> throw({:error, "Error processing key '#{key}': #{reason}"})
+          end
+
+        {k, v}, acc ->
+          Map.put(acc, k, v)
+      end)
+
+    {:ok, processed}
+  catch
+    {:error, reason} -> {:error, reason}
+  end
+
   # Private functions
 
   defp is_pure_expression_blocks?(blocks) do

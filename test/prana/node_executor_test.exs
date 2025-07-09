@@ -287,7 +287,7 @@ defmodule Prana.NodeExecutorTest do
 
   describe "execute_node/5 - basic execution" do
     test "executes node with simple success", %{execution: execution} do
-      node = Node.new("test_node", "test", "basic_success", %{"value" => "$input.value"})
+      node = Node.new("test_node", "test", "basic_success", %{"value" => "{{$input.value}}"})
       routed_input = %{"value" => 10}
 
       assert {:ok, node_execution, updated_execution} =
@@ -398,9 +398,9 @@ defmodule Prana.NodeExecutorTest do
     test "executes node with expression params", %{execution: execution} do
       node =
         Node.new("test_node", "test", "basic_success", %{
-          "value" => "$input.amount",
-          "user_id" => "$nodes.previous_node.output.user_id",
-          "env_var" => "$env.environment"
+          "value" => "{{$input.amount}}",
+          "user_id" => "{{$nodes.previous_node.output.user_id}}",
+          "env_var" => "{{$env.environment}}"
         })
 
       routed_input = %{"amount" => 100}
@@ -637,8 +637,8 @@ defmodule Prana.NodeExecutorTest do
     test "processes expression parameters" do
       node = %Node{
         params: %{
-          "simple" => "$input.value",
-          "nested" => "$nodes.api.output.result",
+          "simple" => "{{$input.value}}",
+          "nested" => "{{ $nodes.api.output.result }}",
           "literal" => "literal_value"
         }
       }
@@ -857,12 +857,12 @@ defmodule Prana.NodeExecutorTest do
     test "builds proper expression context", %{execution: execution} do
       node =
         Node.new("test_node", "test", "basic_success", %{
-          "input_value" => "$input.value",
-          "node_data" => "$nodes.previous_node.output.user_id",
-          "env_data" => "$env.environment",
-          "var_data" => "$vars.api_url",
-          "workflow_id" => "$workflow.id",
-          "execution_id" => "$execution.id"
+          "input_value" => "{{$input.value}}",
+          "node_data" => "{{$nodes.previous_node.output.user_id}}",
+          "env_data" => "{{$env.environment}}",
+          "var_data" => "{{$vars.api_url}}",
+          "workflow_id" => "{{$workflow.id}}",
+          "execution_id" => "{{$execution.id}}"
         })
 
       routed_input = %{"value" => 42}

@@ -8,8 +8,6 @@ defmodule Prana.NodeExecutor do
   - Output processing and port determination
   - Basic error handling
   """
-
-  alias Prana.ExpressionEngine
   alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecution
@@ -42,7 +40,7 @@ defmodule Prana.NodeExecutor do
 
     # Build context once for both input preparation and action execution
     context =
-      build_expression_context(execution, routed_input)
+      build_expression_context(node_execution, execution, routed_input)
 
     with {:ok, prepared_params} <- prepare_params(node, context),
          {:ok, action} <- get_action(node) do
@@ -110,7 +108,7 @@ defmodule Prana.NodeExecutor do
         resume_data
       ) do
     # Build context for resume (same as execute_node)
-    context = build_expression_context(execution, %{})
+    context = build_expression_context(suspended_node_execution, execution, %{})
 
     # Get the original params from the suspended node execution
     params = suspended_node_execution.params || %{}
@@ -171,7 +169,7 @@ defmodule Prana.NodeExecutor do
 
   # Evaluate params expressions using context
   def prepare_params(%Node{params: params}, context) when is_map(params) do
-    case ExpressionEngine.process_map(params, context) do
+    case Prana.Template.Engine.process_map(params, context) do
       {:ok, processed_map} ->
         {:ok, processed_map || %{}}
 
@@ -434,8 +432,8 @@ defmodule Prana.NodeExecutor do
 
   # Private helper functions
 
-  @spec build_expression_context(Prana.Execution.t(), map()) :: map()
-  defp build_expression_context(%Prana.Execution{} = execution, routed_input) do
+  @spec build_expression_context(Prana.NodeExecution.t(), Prana.Execution.t(), map()) :: map()
+  defp build_expression_context(node_execution, %Prana.Execution{} = execution, routed_input) do
     # Build standardized expression context with all built-in variables
     %{
       # routed input by port
@@ -453,6 +451,8 @@ defmodule Prana.NodeExecutor do
       },
       # execution metadata
       "$execution" => %{
+        "run_index" => node_execution.run_index,
+        "execution_index" => node_execution.execution_index,
         "id" => execution.id,
         "mode" => execution.execution_mode,
         "preparation" => execution.preparation_data
