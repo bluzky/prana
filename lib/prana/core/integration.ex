@@ -18,8 +18,8 @@ defmodule Prana.Integration do
             module: MyApp.SlackSendMessageAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error",
+            
+           
             input_schema: %{
               type: "object",
               required: ["channel", "message"],

@@ -13,7 +13,6 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   use ExUnit.Case, async: false
 
   alias Prana.Connection
-  alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
   alias Prana.Node
@@ -22,13 +21,32 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   alias Prana.WorkflowCompiler
   alias Prana.WorkflowSettings
 
+  # Helper functions for handling map-based node_executions
+  defp get_all_node_executions(execution) do
+    case execution.node_executions do
+      node_executions_map when is_map(node_executions_map) ->
+        node_executions_map
+        |> Enum.flat_map(fn {_node_id, executions} -> executions end)
+        |> Enum.sort_by(& &1.execution_index)
+
+      node_executions_list when is_list(node_executions_list) ->
+        node_executions_list
+    end
+  end
+
+  defp count_node_executions(execution) do
+    execution |> get_all_node_executions() |> length()
+  end
+
   describe "branch following execution" do
     setup do
       # Start the IntegrationRegistry GenServer for testing
       {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
-      # Register test integration
+      # Register test integration and data integration for merge
       :ok = IntegrationRegistry.register_integration(TestIntegration)
+      Code.ensure_loaded(Prana.Integrations.Data)
+      :ok = IntegrationRegistry.register_integration(Prana.Integrations.Data)
 
       on_exit(fn ->
         if Process.alive?(registry_pid) do
@@ -44,78 +62,54 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # With branch-following, one branch should complete fully before the other starts
 
       trigger_node = %Node{
-        id: "trigger",
-        custom_id: "trigger",
+        key: "trigger",
         name: "Trigger",
-        type: :trigger,
         integration_name: "test",
-        action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: []
+        action_name: "trigger_action",
+        params: %{}
       }
 
       # Branch A: two sequential nodes
       branch_a1 = %Node{
-        id: "branch_a1",
-        custom_id: "branch_a1",
+        key: "branch_a1",
         name: "Branch A Step 1",
-        type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       branch_a2 = %Node{
-        id: "branch_a2",
-        custom_id: "branch_a2",
+        key: "branch_a2",
         name: "Branch A Step 2",
-        type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       # Branch B: two sequential nodes
       branch_b1 = %Node{
-        id: "branch_b1",
-        custom_id: "branch_b1",
+        key: "branch_b1",
         name: "Branch B Step 1",
-        type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       branch_b2 = %Node{
-        id: "branch_b2",
-        custom_id: "branch_b2",
+        key: "branch_b2",
         name: "Branch B Step 2",
-        type: :action,
         integration_name: "test",
         action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input"]
+        params: %{}
       }
 
       # Merge node (waits for both branches)
       merge_node = %Node{
-        id: "merge",
-        custom_id: "merge",
+        key: "merge",
         name: "Merge",
-        type: :action,
-        integration_name: "test",
-        action_name: "simple_action",
-        params: %{},
-        output_ports: ["success"],
-        input_ports: ["input_a", "input_b"]
+        integration_name: "data",
+        action_name: "merge",
+        params: %{}
       }
 
       connections = [
@@ -174,7 +168,8 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         metadata: %{}
       }
 
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} =
+        WorkflowCompiler.compile(workflow, "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -187,10 +182,10 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
 
       # Verify execution completed successfully
       assert execution.status == :completed
-      assert length(execution.node_executions) == 6
+      assert count_node_executions(execution) == 6
 
       # Analyze execution order to verify branch following
-      execution_order = Enum.map(execution.node_executions, & &1.node_id)
+      execution_order = Enum.map(get_all_node_executions(execution), & &1.node_key)
 
       # The trigger should be first
       assert List.first(execution_order) == "trigger"
@@ -233,82 +228,51 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
                "Expected one branch to complete before other starts, but got interleaved execution."
     end
 
-    test "select_node_for_branch_following prioritizes continuing active branches" do
+    test "select_node_for_branch_following prioritizes nodes by depth" do
       # Test the node selection logic directly
 
       # Create nodes
-      start_node = %Node{id: "start", custom_id: "start"}
-      continuing_node = %Node{id: "continuing", custom_id: "continuing"}
-      new_branch_node = %Node{id: "new_branch", custom_id: "new_branch"}
+      shallow_node = %Node{key: "shallow"}
+      deep_node = %Node{key: "deep"}
 
-      # Create mock execution graph with connections
-      connections = [
-        %Connection{
-          from: "start",
-          from_port: "success",
-          to: "continuing",
-          to_port: "input"
-        }
-      ]
-
-      execution_graph = %ExecutionGraph{
-        workflow: %Workflow{connections: connections},
-        dependency_graph: %{
-          "continuing" => ["start"],
-          "new_branch" => []
-        },
-        connection_map: %{},
-        reverse_connection_map: %{
-          "continuing" => [hd(connections)]
-        },
-        node_map: %{},
-        trigger_node: start_node,
-        total_nodes: 3
-      }
-
-      # Context with active path from start node
+      # Context with node depths
       execution_context = %{
-        "active_paths" => %{"start_success" => true}
+        "node_depth" => %{
+          "shallow" => 1,
+          "deep" => 3
+        }
       }
 
-      ready_nodes = [continuing_node, new_branch_node]
+      ready_nodes = [shallow_node, deep_node]
 
-      # Should select the continuing node over the new branch
-      selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_graph, execution_context)
+      # Should select the deeper node (higher depth = more advanced in execution)
+      selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_context)
 
-      assert selected.id == "continuing",
-             "Expected to select continuing node, but got #{selected.id}"
+      assert selected.key == "deep",
+             "Expected to select deeper node, but got #{selected.key}"
     end
 
-    test "select_node_for_branch_following falls back to dependency-based selection" do
-      # Test when no active branches exist
+    test "select_node_for_branch_following handles nodes with same depth" do
+      # Test when nodes have the same depth (should select first one)
 
-      node_with_deps = %Node{id: "with_deps", custom_id: "with_deps"}
-      node_no_deps = %Node{id: "no_deps", custom_id: "no_deps"}
+      node_a = %Node{key: "node_a"}
+      node_b = %Node{key: "node_b"}
 
-      execution_graph = %ExecutionGraph{
-        workflow: %Workflow{connections: []},
-        dependency_graph: %{
-          "with_deps" => ["some_other_node"],
-          "no_deps" => []
-        },
-        connection_map: %{},
-        reverse_connection_map: %{},
-        node_map: %{},
-        trigger_node: node_no_deps,
-        total_nodes: 2
+      # Context with same depth for both nodes
+      execution_context = %{
+        "node_depth" => %{
+          "node_a" => 2,
+          "node_b" => 2
+        }
       }
 
-      # No active paths
-      execution_context = %{"active_paths" => %{}}
+      ready_nodes = [node_a, node_b]
 
-      ready_nodes = [node_with_deps, node_no_deps]
+      # Should select the first node when depths are equal
+      selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_context)
 
-      # Should prefer node with fewer dependencies
-      selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_graph, execution_context)
-
-      assert selected.id == "no_deps",
-             "Expected to select node with fewer dependencies, but got #{selected.id}"
+      assert selected.key == "node_a",
+             "Expected to select first node when depths are equal, but got #{selected.key}"
     end
   end
 end

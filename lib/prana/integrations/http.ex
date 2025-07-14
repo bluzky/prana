@@ -33,21 +33,19 @@ defmodule Prana.Integrations.HTTP do
           name: "request",
           display_name: "HTTP Request",
           description: "Make HTTP requests with configurable method, headers, and body",
+          type: :action,
           module: Prana.Integrations.HTTP.RequestAction,
           input_ports: ["input"],
-          output_ports: ["success", "error", "timeout"],
-          default_success_port: "success",
-          default_error_port: "error"
+          output_ports: ["success", "error", "timeout"]
         },
         "webhook" => %Action{
           name: "webhook",
           display_name: "Webhook Trigger",
           description: "Configure webhook endpoint for triggering workflow execution",
+          type: :trigger,
           module: Prana.Integrations.HTTP.WebhookAction,
           input_ports: [],
-          output_ports: ["success"],
-          default_success_port: "success",
-          default_error_port: nil
+          output_ports: ["success"]
         }
       }
     }

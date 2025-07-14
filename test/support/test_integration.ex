@@ -20,11 +20,19 @@ defmodule Prana.TestSupport.TestIntegration do
           name: "simple_action",
           display_name: "Simple Action",
           description: "A simple test action that can succeed or fail",
+          type: :action,
           module: Prana.TestSupport.TestIntegration.SimpleTestAction,
           input_ports: ["input"],
-          output_ports: ["success", "error"],
-          default_success_port: "success",
-          default_error_port: "error"
+          output_ports: ["success", "error"]
+        },
+        "trigger_action" => %Action{
+          name: "trigger_action",
+          display_name: "Test Trigger",
+          description: "A simple test trigger",
+          type: :trigger,
+          module: Prana.TestSupport.TestIntegration.SimpleTestAction,
+          input_ports: [],
+          output_ports: ["success"]
         }
       }
     }
@@ -35,25 +43,27 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
   @moduledoc """
   Simple test action using Action behavior pattern.
   """
-  
+
   use Prana.Actions.SimpleAction
 
   @impl true
   def execute(params, _context) do
     if Map.get(params, "force_error", false) do
       # Simulate a failure
-      {:error, %{
-        type: "test_error",
-        message: "Simulated test failure",
-        details: %{input: params}
-      }}
+      {:error,
+       %{
+         type: "test_error",
+         message: "Simulated test failure",
+         details: %{input: params}
+       }}
     else
       # Normal success case
-      {:ok, %{
-        original_input: params,
-        processed: true,
-        timestamp: DateTime.utc_now()
-      }}
+      {:ok,
+       %{
+         original_input: params,
+         processed: true,
+         timestamp: DateTime.utc_now()
+       }}
     end
   end
 end

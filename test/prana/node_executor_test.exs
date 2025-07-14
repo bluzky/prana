@@ -6,174 +6,140 @@ defmodule Prana.NodeExecutorTest do
   alias Prana.Integration
   alias Prana.IntegrationRegistry
   alias Prana.Node
+  alias Prana.NodeExecution
   alias Prana.NodeExecutor
 
-  # Test Action behavior modules
-  defmodule TestSuccessAction do
+  # Test action modules
+  defmodule TestActions do
+    # Basic success action
     @moduledoc false
-    @behaviour Prana.Behaviour.Action
-
-    @impl true
-    def prepare(_node) do
-      {:ok, %{}}
-    end
-
-    @impl true
-    def execute(params, _context) do
-      {:ok, %{message: "success", input: params}}
-    end
-
-    @impl true
-    def resume(_params, _context, _resume_data) do
-      {:error, "Test actions do not support suspension/resume"}
-    end
-  end
-
-  defmodule TestErrorAction do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Action
-
-    @impl true
-    def prepare(_node) do
-      {:ok, %{}}
-    end
-
-    @impl true
-    def execute(_params, _context) do
-      {:error, "something went wrong"}
-    end
-
-    @impl true
-    def resume(_params, _context, _resume_data) do
-      {:error, "Test actions do not support suspension/resume"}
-    end
-  end
-
-  defmodule TestTransformAction do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Action
-
-    @impl true
-    def prepare(_node) do
-      {:ok, %{}}
-    end
-
-    @impl true
-    def execute(params, _context) do
-      # Use safe approach for now
-      name =
-        case Map.get(params, "name") do
-          nil -> ""
-          name when is_binary(name) -> name
-          _ -> ""
-        end
-
-      transformed = %{
-        original: params,
-        uppercase_name: String.upcase(name),
-        timestamp: System.system_time(:second)
-      }
-
-      {:ok, transformed}
-    end
-
-    @impl true
-    def resume(_params, _context, _resume_data) do
-      {:error, "Test actions do not support suspension/resume"}
-    end
-  end
-
-  defmodule TestExplicitPortAction do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Action
-
-    @impl true
-    def prepare(_node) do
-      {:ok, %{}}
-    end
-
-    @impl true
-    def execute(params, _context) do
-      should_succeed = if is_map(params), do: Map.get(params, "should_succeed", false), else: false
-
-      if should_succeed == true do
-        {:ok, %{result: "explicit success"}, "custom_success"}
-      else
-        {:error, "explicit failure", "custom_error"}
+    defmodule BasicSuccess do
+      @moduledoc false
+      def execute(input, _context) do
+        value = input["value"] || 0
+        {:ok, %{result: value * 2}}
       end
-    rescue
-      _ ->
-        {:error, "action failed", "custom_error"}
+
+      def resume(_params, _context, resume_data) do
+        {:ok, resume_data}
+      end
     end
 
-    @impl true
-    def resume(_params, _context, _resume_data) do
-      {:error, "Test actions do not support suspension/resume"}
+    # Action with explicit port
+    defmodule ExplicitPort do
+      @moduledoc false
+      def execute(input, _context) do
+        if input["premium"] do
+          {:ok, %{status: "premium"}, "premium"}
+        else
+          {:ok, %{status: "basic"}, "basic"}
+        end
+      end
+
+      def resume(_params, _context, resume_data) do
+        {:ok, resume_data, "resumed"}
+      end
+    end
+
+    # Action with context
+    defmodule WithContext do
+      @moduledoc false
+      def execute(input, _context) do
+        {:ok, %{data: input}, "success", %{processing_time: 100}}
+      end
+
+      def resume(_params, _context, resume_data) do
+        {:ok, resume_data, "success", %{resumed: true}}
+      end
+    end
+
+    # Action that returns error
+    defmodule ErrorAction do
+      @moduledoc false
+      def execute(_input, _context) do
+        {:error, "Something went wrong"}
+      end
+
+      def resume(_params, _context, _resume_data) do
+        {:error, "Resume failed"}
+      end
+    end
+
+    # Action that returns error with port
+    defmodule ErrorWithPort do
+      @moduledoc false
+      def execute(_input, _context) do
+        {:error, "Invalid input", "validation_error"}
+      end
+
+      def resume(_params, _context, _resume_data) do
+        {:error, "Resume validation failed", "validation_error"}
+      end
+    end
+
+    # Action that suspends
+    defmodule SuspendAction do
+      @moduledoc false
+      def execute(_input, _context) do
+        {:suspend, :sub_workflow_sync, %{workflow_id: "child_workflow"}}
+      end
+
+      def resume(_params, _context, resume_data) do
+        {:ok, resume_data, "resumed"}
+      end
+    end
+
+    # Action that throws exception
+    defmodule ExceptionAction do
+      @moduledoc false
+      def execute(_input, _context) do
+        raise "Test exception"
+      end
+
+      def resume(_params, _context, _resume_data) do
+        raise "Resume exception"
+      end
+    end
+
+    # Action with invalid return format
+    defmodule InvalidReturn do
+      @moduledoc false
+      def execute(_input, _context) do
+        "invalid_return"
+      end
+
+      def resume(_params, _context, _resume_data) do
+        "invalid_resume_return"
+      end
+    end
+
+    # Action with dynamic ports
+    defmodule DynamicPorts do
+      @moduledoc false
+      def execute(input, _context) do
+        port_name = "dynamic_#{input["type"]}"
+        {:ok, %{port_used: port_name}, port_name}
+      end
+
+      def resume(_params, _context, resume_data) do
+        {:ok, resume_data, "resumed"}
+      end
+    end
+
+    # Action with invalid port
+    defmodule InvalidPort do
+      @moduledoc false
+      def execute(_input, _context) do
+        {:ok, %{result: "test"}, "nonexistent_port"}
+      end
+
+      def resume(_params, _context, _resume_data) do
+        {:ok, %{result: "test"}, "nonexistent_port"}
+      end
     end
   end
 
-  defmodule TestInvalidReturnAction do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Action
-
-    @impl true
-    def prepare(_node) do
-      {:ok, %{}}
-    end
-
-    @impl true
-    def execute(_params, _context) do
-      # Return invalid format (direct value instead of tuple)
-      "direct_string_value"
-    end
-
-    @impl true
-    def resume(_params, _context, _resume_data) do
-      {:error, "Test actions do not support suspension/resume"}
-    end
-  end
-
-  defmodule TestExceptionAction do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Action
-
-    @impl true
-    def prepare(_node) do
-      {:ok, %{}}
-    end
-
-    @impl true
-    def execute(_params, _context) do
-      raise "Test exception"
-    end
-
-    @impl true
-    def resume(_params, _context, _resume_data) do
-      {:error, "Test actions do not support suspension/resume"}
-    end
-  end
-
-  defmodule TestInvalidPortAction do
-    @moduledoc false
-    @behaviour Prana.Behaviour.Action
-
-    @impl true
-    def prepare(_node) do
-      {:ok, %{}}
-    end
-
-    @impl true
-    def execute(_params, _context) do
-      {:ok, %{data: "test"}, "nonexistent_port"}
-    end
-
-    @impl true
-    def resume(_params, _context, _resume_data) do
-      {:error, "Test actions do not support suspension/resume"}
-    end
-  end
-
-  # Test integration module
+  # Test integration for action registration
   defmodule TestIntegration do
     @moduledoc false
     @behaviour Prana.Behaviour.Integration
@@ -182,79 +148,99 @@ defmodule Prana.NodeExecutorTest do
       %Integration{
         name: "test",
         display_name: "Test Integration",
-        description: "Integration for testing",
+        description: "Test integration for NodeExecutor tests",
         version: "1.0.0",
         category: "test",
         actions: %{
-          "success_action" => %Action{
-            name: "success_action",
-            display_name: "Success Action",
-            description: "Always succeeds",
-            module: TestSuccessAction,
+          "basic_success" => %Action{
+            name: "basic_success",
+            display_name: "Basic Success",
+            description: "Basic success action",
+            type: :action,
+            module: TestActions.BasicSuccess,
             input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
+            output_ports: ["output"]
+          },
+          "explicit_port" => %Action{
+            name: "explicit_port",
+            display_name: "Explicit Port",
+            description: "Action with explicit port selection",
+            type: :action,
+            module: TestActions.ExplicitPort,
+            input_ports: ["input"],
+            output_ports: ["premium", "basic"]
+          },
+          "with_context" => %Action{
+            name: "with_context",
+            display_name: "With Context",
+            description: "Action that returns context data",
+            type: :action,
+            module: TestActions.WithContext,
+            input_ports: ["input"],
+            output_ports: ["success"]
           },
           "error_action" => %Action{
             name: "error_action",
             display_name: "Error Action",
-            description: "Always fails",
-            module: TestErrorAction,
+            description: "Action that returns error",
+            type: :action,
+            module: TestActions.ErrorAction,
             input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
+            output_ports: ["output", "error"]
           },
-          "transform_action" => %Action{
-            name: "transform_action",
-            display_name: "Transform Action",
-            description: "Transforms input data",
-            module: TestTransformAction,
+          "error_with_port" => %Action{
+            name: "error_with_port",
+            display_name: "Error With Port",
+            description: "Action that returns error with port",
+            type: :action,
+            module: TestActions.ErrorWithPort,
             input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
+            output_ports: ["output", "validation_error"]
           },
-          "explicit_port_action" => %Action{
-            name: "explicit_port_action",
-            display_name: "Explicit Port Action",
-            description: "Returns explicit port",
-            module: TestExplicitPortAction,
+          "suspend_action" => %Action{
+            name: "suspend_action",
+            display_name: "Suspend Action",
+            description: "Action that suspends execution",
+            type: :action,
+            module: TestActions.SuspendAction,
             input_ports: ["input"],
-            output_ports: ["custom_success", "custom_error"],
-            default_success_port: "custom_success",
-            default_error_port: "custom_error"
-          },
-          "invalid_return_action" => %Action{
-            name: "invalid_return_action",
-            display_name: "Invalid Return Action",
-            description: "Returns invalid format",
-            module: TestInvalidReturnAction,
-            input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
+            output_ports: ["success", "resumed"]
           },
           "exception_action" => %Action{
             name: "exception_action",
             display_name: "Exception Action",
-            description: "Raises an exception",
-            module: TestExceptionAction,
+            description: "Action that throws exception",
+            type: :action,
+            module: TestActions.ExceptionAction,
             input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
+            output_ports: ["output", "error"]
           },
-          "invalid_port_action" => %Action{
-            name: "invalid_port_action",
-            display_name: "Invalid Port Action",
-            description: "Returns non-existent port",
-            module: TestInvalidPortAction,
+          "invalid_return" => %Action{
+            name: "invalid_return",
+            display_name: "Invalid Return",
+            description: "Action with invalid return format",
+            type: :action,
+            module: TestActions.InvalidReturn,
             input_ports: ["input"],
-            output_ports: ["success", "error"],
-            default_success_port: "success",
-            default_error_port: "error"
+            output_ports: ["output"]
+          },
+          "dynamic_ports" => %Action{
+            name: "dynamic_ports",
+            display_name: "Dynamic Ports",
+            description: "Action with dynamic port support",
+            type: :action,
+            module: TestActions.DynamicPorts,
+            input_ports: ["input"],
+            output_ports: ["*"]
+          },
+          "invalid_port" => %Action{
+            name: "invalid_port",
+            display_name: "Invalid Port",
+            description: "Action that returns invalid port",
+            type: :action,
+            module: TestActions.InvalidPort,
+            input_ports: ["input"],
+            output_ports: ["output"]
           }
         }
       }
@@ -262,9 +248,33 @@ defmodule Prana.NodeExecutorTest do
   end
 
   setup do
-    # Start IntegrationRegistry and register test integration
-    {:ok, registry_pid} = IntegrationRegistry.start_link([])
+    # Start registry for tests
+    {:ok, registry_pid} = IntegrationRegistry.start_link()
+
+    # Register test integration
     :ok = IntegrationRegistry.register_integration(TestIntegration)
+
+    # Create test execution
+    execution = %Execution{
+      id: "test_execution",
+      workflow_id: "test_workflow",
+      workflow_version: 1,
+      execution_mode: :async,
+      status: :running,
+      vars: %{"api_url" => "https://api.test.com"},
+      node_executions: %{},
+      __runtime: %{
+        "nodes" => %{
+          "previous_node" => %{
+            "output" => %{"user_id" => 123},
+            "context" => %{"batch_size" => 10}
+          }
+        },
+        "env" => %{"environment" => "test"},
+        "active_paths" => %{},
+        "executed_nodes" => []
+      }
+    }
 
     on_exit(fn ->
       if Process.alive?(registry_pid) do
@@ -272,689 +282,615 @@ defmodule Prana.NodeExecutorTest do
       end
     end)
 
-    :ok
+    {:ok, execution: execution}
   end
 
-  describe "execute_node/3" do
-    test "uses proper execution ID from context" do
-      node = %Node{
-        id: "test-exec-id",
-        custom_id: "exec_id_test",
-        name: "Execution ID Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "success_action",
-        params: %{"test" => "data"},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
+  describe "execute_node/5 - basic execution" do
+    test "executes node with simple success", %{execution: execution} do
+      node = Node.new("test_node", "test", "basic_success", %{"value" => "{{$input.value}}"})
+      routed_input = %{"value" => 10}
 
-      # Use a unique execution ID
-      unique_execution_id = Base.encode16("exec-" <> :crypto.strong_rand_bytes(8))
+      assert {:ok, node_execution, updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: unique_execution_id}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Verify the node execution has its own unique ID (different from execution_id)
-      assert is_binary(node_execution.id)
-      # Generated ID length
-      assert byte_size(node_execution.id) == 16
-      # Node execution ID ≠ workflow execution ID
-      assert node_execution.id != unique_execution_id
-
-      # Verify the node execution is properly linked to the workflow execution
-      assert node_execution.execution_id == unique_execution_id
-      assert node_execution.node_id == "test-exec-id"
       assert node_execution.status == :completed
+      assert node_execution.output_data == %{result: 20}
+      assert node_execution.output_port == "output"
+      assert node_execution.execution_index == 1
+      assert node_execution.run_index == 0
+      assert node_execution.params == %{"value" => 10}
+      assert is_integer(node_execution.duration_ms)
 
-      # Verify the execution ID is not hardcoded
-      refute node_execution.execution_id == "exec-id"
+      # Check updated execution
+      assert updated_execution.node_executions["test_node"] == [node_execution]
+      assert updated_execution.__runtime["nodes"]["test_node"]["output"] == %{result: 20}
     end
 
-    test "each node execution gets unique ID even within same workflow execution" do
-      node1 = %Node{
-        id: "test-node-1",
-        custom_id: "unique_test_1",
-        name: "Unique Test 1",
-        type: :action,
-        integration_name: "test",
-        action_name: "success_action",
-        params: %{"test" => "data1"},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
+    test "executes node with explicit port selection", %{execution: execution} do
+      node = Node.new("test_node", "test", "explicit_port", %{"premium" => true})
+      routed_input = %{"premium" => true}
 
-      node2 = %Node{
-        id: "test-node-2",
-        custom_id: "unique_test_2",
-        name: "Unique Test 2",
-        type: :action,
-        integration_name: "test",
-        action_name: "success_action",
-        params: %{"test" => "data2"},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
+      assert {:ok, node_execution, updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      # Same workflow execution ID for both nodes
-      shared_execution_id = Base.encode16("exec-" <> :crypto.strong_rand_bytes(8))
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: shared_execution_id}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      # Execute both nodes
-      assert {:ok, node_execution1, updated_execution} = NodeExecutor.execute_node(node1, execution, routed_input)
-      assert {:ok, node_execution2, _final_execution} = NodeExecutor.execute_node(node2, updated_execution, routed_input)
-
-      # Both node executions should have different unique IDs
-      assert node_execution1.id != node_execution2.id
-      assert is_binary(node_execution1.id)
-      assert is_binary(node_execution2.id)
-      assert byte_size(node_execution1.id) == 16
-      assert byte_size(node_execution2.id) == 16
-
-      # But both should share the same workflow execution_id
-      assert node_execution1.execution_id == shared_execution_id
-      assert node_execution2.execution_id == shared_execution_id
-
-      # And they should reference their respective nodes
-      assert node_execution1.node_id == "test-node-1"
-      assert node_execution2.node_id == "test-node-2"
+      assert node_execution.status == :completed
+      assert node_execution.output_data == %{status: "premium"}
+      assert node_execution.output_port == "premium"
+      assert updated_execution.__runtime["nodes"]["test_node"]["output"] == %{status: "premium"}
     end
 
-    test "executes simple node successfully" do
-      node = %Node{
-        id: "test-1",
-        custom_id: "simple_test",
-        name: "Simple Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "success_action",
-        params: %{
-          "message" => "hello world"
-        },
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
+    test "executes node with context data", %{execution: execution} do
+      node = Node.new("test_node", "test", "with_context", %{"data" => "test"})
+      routed_input = %{"data" => "test"}
 
-      execution = Execution.new("wf_1", 1, "graph_executor", %{"user" => "john"})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-1"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{"user" => "john"}
+      assert {:ok, node_execution, updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      assert {:ok, node_execution, updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Check node execution
-      assert node_execution.node_id == "test-1"
       assert node_execution.status == :completed
+      assert node_execution.output_data == %{data: %{"data" => "test"}}
       assert node_execution.output_port == "success"
+      assert node_execution.context_data == %{processing_time: 100}
+      assert updated_execution.__runtime["nodes"]["test_node"]["context"] == %{processing_time: 100}
+    end
 
-      assert node_execution.output_data == %{
-               message: "success",
-               input: %{
-                 "message" => "hello world"
-               }
+    test "handles action errors", %{execution: execution} do
+      node = Node.new("test_node", "test", "error_action", %{})
+      routed_input = %{}
+
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+
+      assert failed_execution.status == :failed
+
+      assert failed_execution.error_data == %{
+               "type" => "action_error",
+               "error" => "Something went wrong",
+               "port" => "error"
              }
 
-      assert node_execution.error_data == nil
-      assert is_integer(node_execution.duration_ms)
-      assert node_execution.retry_count == 0
-
-      # Check execution runtime updates (only stored under custom_id)
-      assert updated_execution.__runtime["nodes"]["test-1"] == %{"output" => node_execution.output_data, "context" => %{}}
-      assert updated_execution.__runtime["executed_nodes"] == ["test-1"]
+      assert reason == failed_execution.error_data
     end
 
-    test "handles expression evaluation in input_map" do
-      node = %Node{
-        id: "test-2",
-        custom_id: "expression_test",
-        name: "Expression Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "transform_action",
-        params: %{
-          "name" => "$input.user_name",
-          "email" => "$input.contact.email",
-          "previous_result" => "$nodes.api_call.user_id"
-        },
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
+    test "handles action errors with explicit port", %{execution: execution} do
+      node = Node.new("test_node", "test", "error_with_port", %{})
+      routed_input = %{}
 
-      execution =
-        Execution.new("wf_1", 1, "graph_executor", %{
-          "user_name" => "alice",
-          "contact" => %{"email" => "alice@example.com"}
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+
+      assert failed_execution.status == :failed
+
+      assert failed_execution.error_data == %{
+               "type" => "action_error",
+               "error" => "Invalid input",
+               "port" => "validation_error"
+             }
+
+      assert reason == failed_execution.error_data
+    end
+
+    test "handles node suspension", %{execution: execution} do
+      node = Node.new("test_node", "test", "suspend_action", %{})
+      routed_input = %{}
+
+      assert {:suspend, suspended_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+
+      assert suspended_execution.status == :suspended
+      assert suspended_execution.suspension_type == :sub_workflow_sync
+      assert suspended_execution.suspension_data == %{workflow_id: "child_workflow"}
+      assert suspended_execution.output_data == nil
+      assert suspended_execution.output_port == nil
+    end
+  end
+
+  describe "execute_node/5 - parameter preparation" do
+    test "executes node with nil params", %{execution: execution} do
+      node = Node.new("test_node", "test", "basic_success", nil)
+      routed_input = %{"value" => 10}
+
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+
+      assert node_execution.params == %{}
+    end
+
+    test "executes node with expression params", %{execution: execution} do
+      node =
+        Node.new("test_node", "test", "basic_success", %{
+          "value" => "{{$input.amount}}",
+          "user_id" => "{{$nodes.previous_node.output.user_id}}",
+          "env_var" => "{{$env.environment}}"
         })
 
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-2"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      # Simulate api_call node already completed
-      execution = %{execution | __runtime: Map.put(execution.__runtime, "nodes", %{"api_call" => %{"user_id" => 123}})}
+      routed_input = %{"amount" => 100}
 
-      routed_input = %{
-        "user_name" => "alice",
-        "contact" => %{"email" => "alice@example.com"}
-      }
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Check that expressions were evaluated
-      expected_input = %{
-        "name" => "alice",
-        "email" => "alice@example.com",
-        "previous_result" => 123
-      }
-
-      # Check that expressions were evaluated correctly in the output
-      assert node_execution.output_data.original == expected_input
-      assert node_execution.output_data.uppercase_name == "ALICE"
+      assert node_execution.params == %{
+               "value" => 100,
+               "user_id" => 123,
+               "env_var" => "test"
+             }
     end
+  end
 
-    test "handles action errors with default error port" do
-      node = %Node{
-        id: "test-3",
-        custom_id: "error_test",
-        name: "Error Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "error_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-3"}
-      execution = Execution.rebuild_runtime(execution, %{})
+  describe "execute_node/5 - action retrieval" do
+    test "handles nonexistent integration", %{execution: execution} do
+      node = Node.new("test_node", "nonexistent", "action", %{})
       routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      # Check error reason (now a map)
-      assert reason["type"] == "action_error"
-      assert reason["error"] == "something went wrong"
-      assert reason["port"] == "error"
-
-      # Check node execution
-      assert node_execution.status == :failed
-      assert node_execution.node_id == "test-3"
-      assert node_execution.error_data == reason
-      assert node_execution.output_data == nil
-      assert node_execution.output_port == nil
-    end
-
-    test "handles explicit port returns" do
-      node = %Node{
-        id: "test-4",
-        custom_id: "explicit_port_test",
-        name: "Explicit Port Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "explicit_port_action",
-        params: %{
-          "should_succeed" => true
-        },
-        output_ports: ["custom_success", "custom_error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-4"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      assert node_execution.output_port == "custom_success"
-      assert node_execution.output_data == %{result: "explicit success"}
-      assert node_execution.status == :completed
-    end
-
-    test "handles explicit port errors" do
-      node = %Node{
-        id: "test-5",
-        custom_id: "explicit_error_test",
-        name: "Explicit Error Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "explicit_port_action",
-        params: %{
-          "should_succeed" => false
-        },
-        output_ports: ["custom_success", "custom_error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-5"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Check error reason (map format)
-      assert reason["type"] == "action_error"
-      assert reason["error"] == "explicit failure"
-      assert reason["port"] == "custom_error"
-
-      assert node_execution.status == :failed
-      assert node_execution.error_data == reason
-    end
-
-    test "handles invalid action return format" do
-      node = %Node{
-        id: "test-6",
-        custom_id: "invalid_return_test",
-        name: "Invalid Return Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "invalid_return_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-6"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Check error reason (map format)
-      assert reason["type"] == "invalid_action_return_format"
-      assert reason["result"] == "\"direct_string_value\""
-      assert String.contains?(reason["message"], "Actions must return")
-
-      assert node_execution.status == :failed
-      assert node_execution.error_data == reason
-    end
-
-    test "handles action execution exceptions" do
-      node = %Node{
-        id: "test-7",
-        custom_id: "exception_test",
-        name: "Exception Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "exception_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-7"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Check error reason (map format)
-      assert reason["type"] == "action_execution_failed"
-      assert String.contains?(reason["error"], "Test exception")
-      assert reason["module"] == TestExceptionAction
-      # Note: function field may be nil for Action behavior pattern
-
-      assert node_execution.status == :failed
-      assert node_execution.error_data == reason
-    end
-
-    test "handles invalid output port" do
-      node = %Node{
-        id: "test-8",
-        custom_id: "invalid_port_test",
-        name: "Invalid Port Test",
-        type: :action,
-        integration_name: "test",
-        action_name: "invalid_port_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-8"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Check error reason (map format)
-      assert reason["type"] == "invalid_output_port"
-      assert reason["port"] == "nonexistent_port"
-      assert reason["available_ports"] == ["success", "error"]
-
-      assert node_execution.status == :failed
-      assert node_execution.error_data == reason
-    end
-
-    test "handles integration not found" do
-      node = %Node{
-        id: "test-9",
-        custom_id: "missing_integration",
-        name: "Missing Integration",
-        type: :action,
-        integration_name: "nonexistent",
-        action_name: "some_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-9"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      routed_input = %{}
-
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
-
-      # Check error reason (map format)
+      assert failed_execution.status == :failed
       assert reason["type"] == "action_not_found"
       assert reason["integration_name"] == "nonexistent"
-      assert reason["action_name"] == "some_action"
-
-      assert node_execution.status == :failed
+      assert reason["action_name"] == "action"
     end
 
-    test "handles action not found" do
-      node = %Node{
-        id: "test-10",
-        custom_id: "missing_action",
-        name: "Missing Action",
-        type: :action,
-        integration_name: "test",
-        action_name: "nonexistent_action",
-        params: %{},
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
-
-      execution = Execution.new("wf_1", 1, "graph_executor", %{})
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-10"}
-      execution = Execution.rebuild_runtime(execution, %{})
+    test "handles nonexistent action", %{execution: execution} do
+      node = Node.new("test_node", "test", "nonexistent_action", %{})
       routed_input = %{}
 
-      assert {:error, {reason, node_execution}} = NodeExecutor.execute_node(node, execution, routed_input)
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      # Check error reason (map format)
+      assert failed_execution.status == :failed
       assert reason["type"] == "action_not_found"
       assert reason["integration_name"] == "test"
       assert reason["action_name"] == "nonexistent_action"
+    end
+  end
 
-      assert node_execution.status == :failed
+  describe "execute_node/5 - action execution errors" do
+    test "handles action exceptions", %{execution: execution} do
+      node = Node.new("test_node", "test", "exception_action", %{})
+      routed_input = %{}
+
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+
+      assert failed_execution.status == :failed
+      assert reason["type"] == "action_execution_failed"
+      assert reason["module"] == TestActions.ExceptionAction
+      assert reason["action"] == "exception_action"
+      assert String.contains?(reason["error"], "RuntimeError")
     end
 
-    test "handles complex expression evaluation with wildcards and filtering" do
-      node = %Node{
-        id: "test-11",
-        custom_id: "complex_expressions",
-        name: "Complex Expressions",
-        type: :action,
-        integration_name: "test",
-        action_name: "success_action",
-        params: %{
-          "all_emails" => "$nodes.users.*.email",
-          "admin_emails" => "$nodes.users.{role: \"admin\"}.email",
-          "first_user" => "$nodes.users[0].name",
-          "order_id" => "$input.order.id"
-        },
-        output_ports: ["success", "error"],
-        input_ports: ["input"]
-      }
+    test "handles invalid return format", %{execution: execution} do
+      node = Node.new("test_node", "test", "invalid_return", %{})
+      routed_input = %{}
 
-      execution =
-        Execution.new("wf_1", 1, "graph_executor", %{
-          "order" => %{"id" => "ORD-123"}
-        })
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      execution = Execution.start(execution)
-      execution = %{execution | id: "exec-11"}
-      execution = Execution.rebuild_runtime(execution, %{})
-      # Simulate users node already completed
-      execution = %{
-        execution
-        | __runtime:
-            Map.put(execution.__runtime, "nodes", %{
-              "users" => [
-                %{"name" => "Alice", "email" => "alice@test.com", "role" => "admin"},
-                %{"name" => "Bob", "email" => "bob@test.com", "role" => "user"},
-                %{"name" => "Carol", "email" => "carol@test.com", "role" => "admin"}
-              ]
-            })
-      }
+      assert failed_execution.status == :failed
+      assert reason["type"] == "invalid_action_return_format"
+      assert reason["result"] == "\"invalid_return\""
+      assert String.contains?(reason["message"], "Actions must return")
+    end
 
-      routed_input = %{
-        "order" => %{"id" => "ORD-123"}
-      }
+    test "handles dynamic ports", %{execution: execution} do
+      node = Node.new("test_node", "test", "dynamic_ports", %{"type" => "premium"})
+      routed_input = %{"type" => "premium"}
 
-      assert {:ok, node_execution, _updated_execution} = NodeExecutor.execute_node(node, execution, routed_input)
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
-      expected_input = %{
-        "all_emails" => ["alice@test.com", "bob@test.com", "carol@test.com"],
-        "admin_emails" => ["alice@test.com", "carol@test.com"],
-        "first_user" => "Alice",
-        "order_id" => "ORD-123"
-      }
-
-      # Check that expressions were evaluated correctly in the output
-      assert node_execution.output_data.input == expected_input
       assert node_execution.status == :completed
+      assert node_execution.output_port == "dynamic_premium"
+      assert node_execution.output_data == %{port_used: "dynamic_premium"}
+    end
+
+    test "handles invalid port names", %{execution: execution} do
+      node = Node.new("test_node", "test", "invalid_port", %{})
+      routed_input = %{}
+
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+
+      assert failed_execution.status == :failed
+      assert reason["type"] == "invalid_output_port"
+      assert reason["port"] == "nonexistent_port"
+      assert reason["available_ports"] == ["output"]
+    end
+  end
+
+  describe "resume_node/4" do
+    test "resumes suspended node successfully", %{execution: execution} do
+      # Create a suspended node execution
+      node = Node.new("test_node", "test", "suspend_action", %{})
+
+      # First execute to get suspended state
+      {:suspend, suspended_execution} =
+        NodeExecutor.execute_node(node, execution, %{}, 1, 0)
+
+      # Now resume
+      resume_data = %{result: "resumed_successfully"}
+      resume_node = Node.new("test_node", "test", "suspend_action", %{})
+
+      assert {:ok, completed_execution, updated_execution} =
+               NodeExecutor.resume_node(resume_node, execution, suspended_execution, resume_data)
+
+      assert completed_execution.status == :completed
+      assert completed_execution.output_data == resume_data
+      assert completed_execution.output_port == "resumed"
+      assert updated_execution.__runtime["nodes"]["test_node"]["output"] == resume_data
+    end
+
+    test "resumes with context data", %{execution: execution} do
+      # Create a suspended node execution
+      node = Node.new("test_node", "test", "with_context", %{})
+
+      suspended_execution = %NodeExecution{
+        id: "suspended_node_exec",
+        execution_id: execution.id,
+        node_key: "test_node",
+        status: :suspended,
+        params: %{"original" => "param"},
+        suspension_type: :custom,
+        suspension_data: %{},
+        execution_index: 1,
+        run_index: 0
+      }
+
+      resume_data = %{result: "resumed_with_context"}
+
+      assert {:ok, completed_execution, updated_execution} =
+               NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
+
+      assert completed_execution.status == :completed
+      assert completed_execution.output_data == resume_data
+      assert completed_execution.output_port == "success"
+      assert completed_execution.context_data == %{resumed: true}
+      assert updated_execution.__runtime["nodes"]["test_node"]["context"] == %{resumed: true}
+    end
+
+    test "handles resume errors", %{execution: execution} do
+      node = Node.new("test_node", "test", "error_action", %{})
+
+      suspended_execution = %NodeExecution{
+        id: "suspended_node_exec",
+        execution_id: execution.id,
+        node_key: "test_node",
+        status: :suspended,
+        params: %{},
+        suspension_type: :custom,
+        suspension_data: %{},
+        execution_index: 1,
+        run_index: 0
+      }
+
+      resume_data = %{result: "should_fail"}
+
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
+
+      assert failed_execution.status == :failed
+      assert reason["type"] == "action_error"
+      assert reason["error"] == "Resume failed"
+    end
+
+    test "handles resume action exceptions", %{execution: execution} do
+      node = Node.new("test_node", "test", "exception_action", %{})
+
+      suspended_execution = %NodeExecution{
+        id: "suspended_node_exec",
+        execution_id: execution.id,
+        node_key: "test_node",
+        status: :suspended,
+        params: %{},
+        suspension_type: :custom,
+        suspension_data: %{},
+        execution_index: 1,
+        run_index: 0
+      }
+
+      resume_data = %{result: "should_throw"}
+
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
+
+      assert failed_execution.status == :failed
+      assert reason["type"] == "action_resume_failed"
+      assert reason["module"] == TestActions.ExceptionAction
+      assert reason["action"] == "exception_action"
+    end
+
+    test "handles nonexistent action during resume", %{execution: execution} do
+      node = Node.new("test_node", "nonexistent", "action", %{})
+
+      suspended_execution = %NodeExecution{
+        id: "suspended_node_exec",
+        execution_id: execution.id,
+        node_key: "test_node",
+        status: :suspended,
+        params: %{},
+        suspension_type: :custom,
+        suspension_data: %{},
+        execution_index: 1,
+        run_index: 0
+      }
+
+      resume_data = %{}
+
+      assert {:error, {reason, failed_execution}} =
+               NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
+
+      assert failed_execution.status == :failed
+      assert reason["type"] == "action_not_found"
+      assert reason["integration_name"] == "nonexistent"
+      assert reason["action_name"] == "action"
     end
   end
 
   describe "prepare_params/2" do
-    test "evaluates expressions correctly" do
-      node = %Node{
-        id: "test",
-        params: %{
-          "simple" => "$input.name",
-          "nested" => "$input.user.email",
-          "from_nodes" => "$nodes.prev_step.result"
-        }
-      }
+    test "returns empty map for nil params" do
+      node = %Node{params: nil}
+      context = %{}
 
-      routed_input = %{
-        "name" => "john",
-        "user" => %{"email" => "john@example.com"}
-      }
-
-      context = %{
-        "$input" => routed_input,
-        "$nodes" => %{
-          "prev_step" => %{"result" => "success"}
-        },
-        "$env" => %{},
-        "$vars" => %{},
-        "$workflow" => %{"id" => "wf_1", "version" => 1},
-        "$execution" => %{"id" => "exec-test", "mode" => "sync", "preparation" => %{}}
-      }
-
-      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
-
-      assert prepared == %{
-               "simple" => "john",
-               "nested" => "john@example.com",
-               "from_nodes" => "success"
-             }
+      assert {:ok, %{}} = NodeExecutor.prepare_params(node, context)
     end
 
-    test "handles missing expression data gracefully" do
+    test "processes expression parameters" do
       node = %Node{
-        id: "test",
         params: %{
-          "missing" => "$input.nonexistent.field"
+          "simple" => "{{$input.value}}",
+          "nested" => "{{ $nodes.api.output.result }}",
+          "literal" => "literal_value"
         }
       }
 
       context = %{
-        "$input" => %{},
-        "$nodes" => %{},
-        "$env" => %{},
-        "$vars" => %{},
-        "$workflow" => %{"id" => "wf_1", "version" => 1},
-        "$execution" => %{"id" => "exec-test", "mode" => "sync", "preparation" => %{}}
+        "$input" => %{"value" => 42},
+        "$nodes" => %{"api" => %{"output" => %{"result" => "success"}}},
+        "$env" => %{}
       }
 
-      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
+      assert {:ok, processed} = NodeExecutor.prepare_params(node, context)
 
-      assert prepared == %{
-               "missing" => nil
-             }
-    end
-
-    test "handles expression evaluation errors" do
-      # This would test cases where ExpressionEngine itself fails
-      # For now, we'll test with invalid input_map structure
-      node = %Node{
-        id: "test",
-        params: %{
-          "test" => "$invalid..expression"
-        }
-      }
-
-      context = %{
-        "$input" => %{},
-        "$nodes" => %{},
-        "$env" => %{},
-        "$vars" => %{},
-        "$workflow" => %{"id" => "wf_1", "version" => 1},
-        "$execution" => %{"id" => "exec-test", "mode" => "sync", "preparation" => %{}}
-      }
-
-      # Most invalid expressions just return nil, but we can test edge cases
-      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
-
-      assert prepared == %{
-               "test" => nil
+      assert processed == %{
+               "simple" => 42,
+               "nested" => "success",
+               "literal" => "literal_value"
              }
     end
   end
 
-  # Note: update_context/3 functionality is now handled internally by NodeExecutor
-  # Context updates happen automatically when execute_node/3 completes successfully
-
   describe "get_action/1" do
-    test "successfully retrieves action from registry" do
-      node = %Node{
-        integration_name: "test",
-        action_name: "success_action"
-      }
+    test "retrieves action successfully" do
+      node = %Node{integration_name: "test", action_name: "basic_success"}
 
       assert {:ok, action} = NodeExecutor.get_action(node)
-      assert action.name == "success_action"
-      assert action.module == TestSuccessAction
-      assert action.module == TestSuccessAction
+      assert action.name == "basic_success"
+      assert action.module == TestActions.BasicSuccess
     end
 
-    test "handles integration not found" do
-      node = %Node{
-        integration_name: "nonexistent",
-        action_name: "some_action"
-      }
+    test "handles nonexistent integration" do
+      node = %Node{integration_name: "nonexistent", action_name: "action"}
 
       assert {:error, reason} = NodeExecutor.get_action(node)
       assert reason["type"] == "action_not_found"
       assert reason["integration_name"] == "nonexistent"
-      assert reason["action_name"] == "some_action"
+      assert reason["action_name"] == "action"
     end
 
-    test "handles action not found in existing integration" do
-      node = %Node{
-        integration_name: "test",
-        action_name: "nonexistent_action"
-      }
+    test "handles nonexistent action" do
+      node = %Node{integration_name: "test", action_name: "nonexistent"}
 
       assert {:error, reason} = NodeExecutor.get_action(node)
       assert reason["type"] == "action_not_found"
       assert reason["integration_name"] == "test"
-      assert reason["action_name"] == "nonexistent_action"
+      assert reason["action_name"] == "nonexistent"
     end
   end
 
-  describe "build_expression_context/2" do
-    test "builds correct expression context" do
-      # This tests the private function indirectly through prepare_params
-      node = %Node{
-        id: "test",
-        params: %{
-          "from_input" => "$input.user_id",
-          "from_nodes" => "$nodes.step1.result",
-          "from_env" => "$env.api_key"
-        }
+  describe "invoke_action/3" do
+    test "invokes action successfully" do
+      action = %Action{
+        name: "test_action",
+        module: TestActions.BasicSuccess,
+        output_ports: ["output"]
       }
 
-      context = %{
-        "$input" => %{"user_id" => 123},
-        "$nodes" => %{"step1" => %{"result" => "data"}},
-        "$env" => %{"api_key" => "secret"},
-        "$vars" => %{"user_id" => 123},
-        "$workflow" => %{"id" => "wf_1", "version" => 1},
-        "$execution" => %{"id" => "exec-test", "mode" => "async", "preparation" => %{}}
+      input = %{"value" => 5}
+      context = %{}
+
+      assert {:ok, result, port} = NodeExecutor.invoke_action(action, input, context)
+      assert result == %{result: 10}
+      assert port == "output"
+    end
+
+    test "handles action exceptions" do
+      action = %Action{
+        name: "exception_action",
+        module: TestActions.ExceptionAction,
+        output_ports: ["output"]
       }
 
-      assert {:ok, prepared} = NodeExecutor.prepare_params(node, context)
+      input = %{}
+      context = %{}
 
-      assert prepared == %{
-               "from_input" => 123,
-               "from_nodes" => "data",
-               "from_env" => "secret"
+      assert {:error, reason} = NodeExecutor.invoke_action(action, input, context)
+      assert reason["type"] == "action_execution_failed"
+      assert reason["module"] == TestActions.ExceptionAction
+      assert reason["action"] == "exception_action"
+    end
+  end
+
+  describe "invoke_resume_action/4" do
+    test "invokes resume action successfully" do
+      action = %Action{
+        name: "test_action",
+        module: TestActions.ExplicitPort,
+        output_ports: ["resumed"]
+      }
+
+      params = %{"original" => "param"}
+      context = %{}
+      resume_data = %{"result" => "resumed"}
+
+      assert {:ok, result, port} = NodeExecutor.invoke_resume_action(action, params, context, resume_data)
+      assert result == resume_data
+      assert port == "resumed"
+    end
+
+    test "handles resume action exceptions" do
+      action = %Action{
+        name: "exception_action",
+        module: TestActions.ExceptionAction,
+        output_ports: ["output"]
+      }
+
+      params = %{}
+      context = %{}
+      resume_data = %{}
+
+      assert {:error, reason} = NodeExecutor.invoke_resume_action(action, params, context, resume_data)
+      assert reason["type"] == "action_resume_failed"
+      assert reason["module"] == TestActions.ExceptionAction
+      assert reason["action"] == "exception_action"
+    end
+  end
+
+  describe "process_action_result/2" do
+    test "processes basic success result" do
+      action = %Action{output_ports: ["output"]}
+      result = {:ok, %{data: "test"}}
+
+      assert {:ok, data, port} = NodeExecutor.process_action_result(result, action)
+      assert data == %{data: "test"}
+      assert port == "output"
+    end
+
+    test "processes explicit port result" do
+      action = %Action{output_ports: ["premium", "basic"]}
+      result = {:ok, %{data: "test"}, "premium"}
+
+      assert {:ok, data, port} = NodeExecutor.process_action_result(result, action)
+      assert data == %{data: "test"}
+      assert port == "premium"
+    end
+
+    test "processes context-aware result" do
+      action = %Action{output_ports: ["output"]}
+      result = {:ok, %{data: "test"}, %{context: "data"}}
+
+      assert {:ok, data, port, context} = NodeExecutor.process_action_result(result, action)
+      assert data == %{data: "test"}
+      assert port == "output"
+      assert context == %{context: "data"}
+    end
+
+    test "processes context-aware result with explicit port" do
+      action = %Action{output_ports: ["success"]}
+      result = {:ok, %{data: "test"}, "success", %{context: "data"}}
+
+      assert {:ok, data, port, context} = NodeExecutor.process_action_result(result, action)
+      assert data == %{data: "test"}
+      assert port == "success"
+      assert context == %{context: "data"}
+    end
+
+    test "processes suspension result" do
+      action = %Action{output_ports: ["output"]}
+      result = {:suspend, :sub_workflow_sync, %{workflow_id: "child"}}
+
+      assert {:suspend, type, data} = NodeExecutor.process_action_result(result, action)
+      assert type == :sub_workflow_sync
+      assert data == %{workflow_id: "child"}
+    end
+
+    test "processes error result" do
+      action = %Action{output_ports: ["output", "error"]}
+      result = {:error, "test_error"}
+
+      assert {:error, error} = NodeExecutor.process_action_result(result, action)
+      assert error["type"] == "action_error"
+      assert error["error"] == "test_error"
+      assert error["port"] == "error"
+    end
+
+    test "processes error result with explicit port" do
+      action = %Action{output_ports: ["output", "validation_error"]}
+      result = {:error, "validation failed", "validation_error"}
+
+      assert {:error, error} = NodeExecutor.process_action_result(result, action)
+      assert error["type"] == "action_error"
+      assert error["error"] == "validation failed"
+      assert error["port"] == "validation_error"
+    end
+
+    test "handles dynamic ports" do
+      action = %Action{output_ports: ["*"]}
+      result = {:ok, %{data: "test"}, "dynamic_port"}
+
+      assert {:ok, data, port} = NodeExecutor.process_action_result(result, action)
+      assert data == %{data: "test"}
+      assert port == "dynamic_port"
+    end
+
+    test "handles invalid port names" do
+      action = %Action{output_ports: ["output"]}
+      result = {:ok, %{data: "test"}, "invalid_port"}
+
+      assert {:error, error} = NodeExecutor.process_action_result(result, action)
+      assert error["type"] == "invalid_output_port"
+      assert error["port"] == "invalid_port"
+      assert error["available_ports"] == ["output"]
+    end
+
+    test "handles invalid return format" do
+      action = %Action{output_ports: ["output"]}
+      result = "invalid_format"
+
+      assert {:error, error} = NodeExecutor.process_action_result(result, action)
+      assert error["type"] == "invalid_action_return_format"
+      assert error["result"] == "\"invalid_format\""
+      assert String.contains?(error["message"], "Actions must return")
+    end
+  end
+
+  describe "context building" do
+    test "builds proper expression context", %{execution: execution} do
+      node =
+        Node.new("test_node", "test", "basic_success", %{
+          "input_value" => "{{$input.value}}",
+          "node_data" => "{{$nodes.previous_node.output.user_id}}",
+          "env_data" => "{{$env.environment}}",
+          "var_data" => "{{$vars.api_url}}",
+          "workflow_id" => "{{$workflow.id}}",
+          "execution_id" => "{{$execution.id}}"
+        })
+
+      routed_input = %{"value" => 42}
+
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+
+      assert node_execution.params == %{
+               "input_value" => 42,
+               "node_data" => 123,
+               "env_data" => "test",
+               "var_data" => "https://api.test.com",
+               "workflow_id" => "test_workflow",
+               "execution_id" => "test_execution"
              }
     end
   end
 
-  describe "JSON serialization compatibility" do
-    test "all error data can be serialized to JSON" do
-      # Test various error scenarios to ensure JSON compatibility
-      test_cases = [
-        # Action error
-        %{
-          "type" => "action_error",
-          "error" => "test error",
-          "port" => "error"
-        },
-        # Invalid port
-        %{
-          "type" => "invalid_output_port",
-          "port" => "bad_port",
-          "available_ports" => ["success", "error"]
-        },
-        # Action not found
-        %{
-          "type" => "action_not_found",
-          "integration_name" => "test",
-          "action_name" => "missing"
-        }
-      ]
+  describe "execution indices" do
+    test "properly sets execution and run indices", %{execution: execution} do
+      node = Node.new("test_node", "test", "basic_success", %{})
+      routed_input = %{"value" => 10}
 
-      for error_data <- test_cases do
-        # Should not raise any errors
-        assert is_binary(Jason.encode!(error_data))
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input, 5, 2)
 
-        # Should round-trip correctly
-        json_string = Jason.encode!(error_data)
-        assert ^error_data = Jason.decode!(json_string)
-      end
+      assert node_execution.execution_index == 5
+      assert node_execution.run_index == 2
     end
   end
 end

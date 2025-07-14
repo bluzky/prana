@@ -63,5 +63,4 @@ defmodule Prana.Connection do
       {:error, "Missing required connection fields: #{inspect(missing_fields)}"}
     end
   end
-
 end

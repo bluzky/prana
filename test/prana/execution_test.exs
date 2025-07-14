@@ -13,29 +13,42 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [
-          %NodeExecution{
-            node_id: "node_1",
-            status: :completed,
-            output_data: %{user_id: 123},
-            output_port: "success",
-            started_at: ~U[2024-01-01 10:00:00Z]
-          },
-          %NodeExecution{
-            node_id: "node_2",
-            status: :completed,
-            output_data: %{email: "test@example.com"},
-            output_port: "primary",
-            started_at: ~U[2024-01-01 10:01:00Z]
-          },
-          %NodeExecution{
-            node_id: "node_3",
-            status: :failed,
-            error_data: %{error: "network timeout"},
-            output_port: nil,
-            started_at: ~U[2024-01-01 10:02:00Z]
-          }
-        ]
+        node_executions: %{
+          "node_1" => [
+            %NodeExecution{
+              node_key: "node_1",
+              status: :completed,
+              output_data: %{user_id: 123},
+              output_port: "success",
+              started_at: ~U[2024-01-01 10:00:00Z],
+              execution_index: 0,
+              run_index: 0
+            }
+          ],
+          "node_2" => [
+            %NodeExecution{
+              node_key: "node_2",
+              status: :completed,
+              output_data: %{email: "test@example.com"},
+              output_port: "primary",
+              started_at: ~U[2024-01-01 10:01:00Z],
+              execution_index: 1,
+              run_index: 0
+            }
+          ],
+          "node_3" => [
+            %NodeExecution{
+              node_key: "node_3",
+              status: :failed,
+              error_data: %{error: "network timeout"},
+              output_port: nil,
+              started_at: ~U[2024-01-01 10:02:00Z],
+              execution_index: 2,
+              run_index: 0
+            }
+          ]
+        },
+        current_execution_index: 3
       }
 
       env_data = %{"api_key" => "test_key", "base_url" => "https://api.test.com"}
@@ -51,12 +64,7 @@ defmodule Prana.ExecutionTest do
 
       assert result.__runtime["env"] == env_data
 
-      assert result.__runtime["active_paths"] == %{
-               "node_1_success" => true,
-               "node_2_primary" => true
-             }
-
-      assert result.__runtime["executed_nodes"] == ["node_1", "node_2", "node_3"]
+      # Note: active_paths and executed_nodes not included in simplified rebuild_runtime
     end
 
     test "rebuild_runtime/2 handles empty node executions" do
@@ -64,15 +72,14 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: []
+        node_executions: %{},
+        current_execution_index: 0
       }
 
       result = Execution.rebuild_runtime(execution, %{})
 
       assert result.__runtime["nodes"] == %{}
       assert result.__runtime["env"] == %{}
-      assert result.__runtime["active_paths"] == %{}
-      assert result.__runtime["executed_nodes"] == []
     end
 
     test "rebuild_runtime/2 filters out non-completed nodes from runtime state" do
@@ -80,39 +87,48 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [
-          %NodeExecution{
-            node_id: "node_1",
-            status: :pending,
-            output_data: nil,
-            output_port: nil,
-            started_at: ~U[2024-01-01 10:00:00Z]
-          },
-          %NodeExecution{
-            node_id: "node_2",
-            status: :running,
-            output_data: nil,
-            output_port: nil,
-            started_at: ~U[2024-01-01 10:01:00Z]
-          },
-          %NodeExecution{
-            node_id: "node_3",
-            status: :completed,
-            output_data: %{result: "success"},
-            output_port: "done",
-            started_at: ~U[2024-01-01 10:02:00Z]
-          }
-        ]
+        node_executions: %{
+          "node_1" => [
+            %NodeExecution{
+              node_key: "node_1",
+              status: :pending,
+              output_data: nil,
+              output_port: nil,
+              started_at: ~U[2024-01-01 10:00:00Z],
+              execution_index: 0,
+              run_index: 0
+            }
+          ],
+          "node_2" => [
+            %NodeExecution{
+              node_key: "node_2",
+              status: :running,
+              output_data: nil,
+              output_port: nil,
+              started_at: ~U[2024-01-01 10:01:00Z],
+              execution_index: 1,
+              run_index: 0
+            }
+          ],
+          "node_3" => [
+            %NodeExecution{
+              node_key: "node_3",
+              status: :completed,
+              output_data: %{result: "success"},
+              output_port: "done",
+              started_at: ~U[2024-01-01 10:02:00Z],
+              execution_index: 2,
+              run_index: 0
+            }
+          ]
+        },
+        current_execution_index: 3
       }
 
       result = Execution.rebuild_runtime(execution, %{})
 
       # Only completed nodes should be in nodes map
       assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}, "context" => %{}}}
-      assert result.__runtime["active_paths"] == %{"node_3_done" => true}
-
-      # But all nodes should be in executed_nodes (chronological order)
-      assert result.__runtime["executed_nodes"] == ["node_1", "node_2", "node_3"]
     end
   end
 
@@ -122,19 +138,18 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [],
+        node_executions: %{},
+        current_execution_index: 0,
         __runtime: %{
           "nodes" => %{},
-          "env" => %{},
-          "active_paths" => %{},
-          "executed_nodes" => []
+          "env" => %{}
         }
       }
 
       # Create and complete a NodeExecution first
       node_execution =
         "exec_1"
-        |> NodeExecution.new("node_1")
+        |> NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
@@ -142,16 +157,15 @@ defmodule Prana.ExecutionTest do
 
       result = Execution.complete_node(execution, completed_node_execution)
 
-      # Verify persistent state
-      completed_node = Enum.find(result.node_executions, &(&1.node_id == "node_1"))
+      # Verify persistent state (map structure)
+      assert Map.has_key?(result.node_executions, "node_1")
+      [completed_node] = result.node_executions["node_1"]
       assert completed_node.status == :completed
       assert completed_node.output_data == output_data
       assert completed_node.output_port == "success"
 
       # Verify runtime state
       assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data, "context" => %{}}
-      assert result.__runtime["executed_nodes"] == ["node_1"]
-      assert result.__runtime["active_paths"]["node_1_success"] == true
     end
 
     test "integrates completed node execution into execution state" do
@@ -159,19 +173,18 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [],
+        node_executions: %{},
+        current_execution_index: 0,
         __runtime: %{
           "nodes" => %{},
-          "env" => %{},
-          "active_paths" => %{},
-          "executed_nodes" => []
+          "env" => %{}
         }
       }
 
       # Create and complete a NodeExecution independently
       node_execution =
         "exec_1"
-        |> NodeExecution.new("node_1")
+        |> NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
@@ -180,10 +193,10 @@ defmodule Prana.ExecutionTest do
       result = Execution.complete_node(execution, completed_node_execution)
 
       # Should integrate the completed node execution
-      assert length(result.node_executions) == 1
-      integrated_node = hd(result.node_executions)
+      assert map_size(result.node_executions) == 1
+      [integrated_node] = result.node_executions["node_1"]
       assert integrated_node == completed_node_execution
-      assert integrated_node.node_id == "node_1"
+      assert integrated_node.node_key == "node_1"
       assert integrated_node.status == :completed
       assert integrated_node.output_data == output_data
     end
@@ -193,14 +206,15 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [],
+        node_executions: %{},
+        current_execution_index: 0,
         __runtime: nil
       }
 
       # Create and complete a NodeExecution first
       node_execution =
         "exec_1"
-        |> NodeExecution.new("node_1")
+        |> NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       completed_node_execution = NodeExecution.complete(node_execution, %{data: "test"}, "success")
@@ -208,8 +222,8 @@ defmodule Prana.ExecutionTest do
       result = Execution.complete_node(execution, completed_node_execution)
 
       # Should still update persistent state
-      assert length(result.node_executions) == 1
-      integrated_node = hd(result.node_executions)
+      assert map_size(result.node_executions) == 1
+      [integrated_node] = result.node_executions["node_1"]
       assert integrated_node.status == :completed
 
       # Runtime should remain nil
@@ -223,40 +237,43 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [
-          %NodeExecution{
-            id: "ne_1",
-            execution_id: "exec_1",
-            node_id: "node_1",
-            status: :running,
-            started_at: ~U[2024-01-01 10:00:00Z]
-          }
-        ],
+        node_executions: %{
+          "node_1" => [
+            %NodeExecution{
+              id: "ne_1",
+              execution_id: "exec_1",
+              node_key: "node_1",
+              status: :running,
+              started_at: ~U[2024-01-01 10:00:00Z],
+              execution_index: 0,
+              run_index: 0
+            }
+          ]
+        },
+        current_execution_index: 1,
         __runtime: %{
           "nodes" => %{},
-          "env" => %{},
-          "active_paths" => %{},
-          "executed_nodes" => []
+          "env" => %{}
         }
       }
 
       # Create and fail a NodeExecution first
-      running_node_execution = Enum.find(execution.node_executions, &(&1.node_id == "node_1"))
+      [running_node_execution] = execution.node_executions["node_1"]
       error_data = %{error: "network timeout"}
       failed_node_execution = NodeExecution.fail(running_node_execution, error_data)
 
       result = Execution.fail_node(execution, failed_node_execution)
 
       # Verify persistent state
-      failed_node = Enum.find(result.node_executions, &(&1.node_id == "node_1"))
+      [failed_node] = result.node_executions["node_1"]
       assert failed_node.status == :failed
       assert failed_node.error_data == error_data
       assert failed_node.output_port == nil
 
       # Verify runtime state (failed nodes don't add to nodes map)
       assert result.__runtime["nodes"] == %{}
-      assert result.__runtime["executed_nodes"] == ["node_1"]
-      assert result.__runtime["active_paths"] == %{}
+      # Note: executed_nodes not included in simplified rebuild_runtime
+      # Note: active_paths not included in simplified rebuild_runtime
     end
 
     test "creates new node execution if none exists" do
@@ -264,19 +281,18 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [],
+        node_executions: %{},
+        current_execution_index: 0,
         __runtime: %{
           "nodes" => %{},
-          "env" => %{},
-          "active_paths" => %{},
-          "executed_nodes" => []
+          "env" => %{}
         }
       }
 
       # Create and fail a NodeExecution first
       node_execution =
         "exec_1"
-        |> NodeExecution.new("node_1")
+        |> NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       error_data = %{error: "test error"}
@@ -285,9 +301,9 @@ defmodule Prana.ExecutionTest do
       result = Execution.fail_node(execution, failed_node_execution)
 
       # Should integrate the failed node execution
-      assert length(result.node_executions) == 1
-      failed_node = hd(result.node_executions)
-      assert failed_node.node_id == "node_1"
+      assert map_size(result.node_executions) == 1
+      [failed_node] = result.node_executions["node_1"]
+      assert failed_node.node_key == "node_1"
       assert failed_node.status == :failed
       assert failed_node.error_data == error_data
     end
@@ -300,27 +316,30 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [
-          %NodeExecution{
-            node_id: "node_1",
-            status: :completed,
-            output_data: %{user_id: 123},
-            output_port: "success",
-            started_at: ~U[2024-01-01 10:00:00Z]
-          }
-        ],
+        node_executions: %{
+          "node_1" => [
+            %NodeExecution{
+              node_key: "node_1",
+              status: :completed,
+              output_data: %{user_id: 123},
+              output_port: "success",
+              started_at: ~U[2024-01-01 10:00:00Z],
+              execution_index: 0,
+              run_index: 0
+            }
+          ]
+        },
+        current_execution_index: 1,
         __runtime: %{
           "nodes" => %{"node_1" => %{"output" => %{user_id: 123}, "context" => %{}}},
-          "env" => %{"api_key" => "test"},
-          "active_paths" => %{"node_1_success" => true},
-          "executed_nodes" => ["node_1"]
+          "env" => %{"api_key" => "test"}
         }
       }
 
       # Complete another node
       node_execution_2 =
         "exec_1"
-        |> NodeExecution.new("node_2")
+        |> NodeExecution.new("node_2", 0, 0)
         |> NodeExecution.start()
 
       completed_node_execution_2 = NodeExecution.complete(node_execution_2, %{email: "test@example.com"}, "primary")
@@ -330,13 +349,14 @@ defmodule Prana.ExecutionTest do
       # Verify state synchronization
       assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}, "context" => %{}}
       assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}, "context" => %{}}
-      assert result.__runtime["executed_nodes"] == ["node_1", "node_2"]
-      assert result.__runtime["active_paths"]["node_1_success"] == true
-      assert result.__runtime["active_paths"]["node_2_primary"] == true
+      # Note: executed_nodes not included in simplified rebuild_runtime
+      # Note: active_paths not included in simplified rebuild_runtime
 
       # Verify persistent state
-      assert length(result.node_executions) == 2
-      completed_nodes = Enum.filter(result.node_executions, &(&1.status == :completed))
+      assert map_size(result.node_executions) == 2
+      # All nodes in the map are completed (map size check above is sufficient)
+      all_executions = result.node_executions |> Map.values() |> List.flatten()
+      completed_nodes = Enum.filter(all_executions, &(&1.status == :completed))
       assert length(completed_nodes) == 2
     end
 
@@ -346,20 +366,19 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
-        node_executions: [],
+        node_executions: %{},
+        current_execution_index: 0,
         __runtime: %{
           "nodes" => %{},
-          "env" => %{"api_key" => "test"},
-          "active_paths" => %{},
-          "executed_nodes" => []
+          "env" => %{"api_key" => "test"}
         }
       }
 
       # Build incrementally using the new interface
-      node_exec_1 = "exec_1" |> NodeExecution.new("node_1") |> NodeExecution.start()
+      node_exec_1 = "exec_1" |> NodeExecution.new("node_1", 0, 0) |> NodeExecution.start()
       completed_node_1 = NodeExecution.complete(node_exec_1, %{user_id: 123}, "success")
 
-      node_exec_2 = "exec_1" |> NodeExecution.new("node_2") |> NodeExecution.start()
+      node_exec_2 = "exec_1" |> NodeExecution.new("node_2", 0, 0) |> NodeExecution.start()
       completed_node_2 = NodeExecution.complete(node_exec_2, %{email: "test@example.com"}, "primary")
 
       incremental_result =
@@ -368,7 +387,7 @@ defmodule Prana.ExecutionTest do
         |> Execution.complete_node(completed_node_2)
         |> then(fn exec ->
           # Create and fail node execution for node_3
-          node_exec_3 = "exec_1" |> NodeExecution.new("node_3") |> NodeExecution.start()
+          node_exec_3 = "exec_1" |> NodeExecution.new("node_3", 0, 0) |> NodeExecution.start()
           failed_node_3 = NodeExecution.fail(node_exec_3, %{error: "timeout"})
           Execution.fail_node(exec, failed_node_3)
         end)
@@ -387,8 +406,8 @@ defmodule Prana.ExecutionTest do
       # Runtime states should be identical
       assert rebuilt_result.__runtime["nodes"] == incremental_result.__runtime["nodes"]
       assert rebuilt_result.__runtime["env"] == incremental_result.__runtime["env"]
-      assert rebuilt_result.__runtime["active_paths"] == incremental_result.__runtime["active_paths"]
-      assert rebuilt_result.__runtime["executed_nodes"] == incremental_result.__runtime["executed_nodes"]
+      # Note: active_paths not included in simplified rebuild_runtime
+      # Note: executed_nodes not included in simplified rebuild_runtime
     end
   end
 end

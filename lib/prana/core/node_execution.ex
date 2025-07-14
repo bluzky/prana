@@ -8,7 +8,7 @@ defmodule Prana.NodeExecution do
   @type t :: %__MODULE__{
           id: String.t(),
           execution_id: String.t(),
-          node_id: String.t(),
+          node_key: String.t(),
           status: status(),
           params: map(),
           output_data: map() | nil,
@@ -21,13 +21,15 @@ defmodule Prana.NodeExecution do
           suspension_type: atom() | nil,
           suspension_data: term() | nil,
           metadata: map(),
-          context_data: map()
+          context_data: map(),
+          execution_index: integer(),
+          run_index: integer()
         }
 
   defstruct [
     :id,
     :execution_id,
-    :node_id,
+    :node_key,
     :status,
     :output_data,
     :output_port,
@@ -40,17 +42,19 @@ defmodule Prana.NodeExecution do
     params: %{},
     retry_count: 0,
     metadata: %{},
-    context_data: %{}
+    context_data: %{},
+    execution_index: 0,
+    run_index: 0
   ]
 
   @doc """
   Creates a new node execution
   """
-  def new(execution_id, node_id) do
+  def new(execution_id, node_key, execution_index \\ 0, run_index \\ 0) do
     %__MODULE__{
       id: generate_id(),
       execution_id: execution_id,
-      node_id: node_id,
+      node_key: node_key,
       status: :pending,
       output_data: nil,
       output_port: nil,
@@ -62,7 +66,9 @@ defmodule Prana.NodeExecution do
       suspension_type: nil,
       suspension_data: nil,
       metadata: %{},
-      context_data: %{}
+      context_data: %{},
+      execution_index: execution_index,
+      run_index: run_index
     }
   end
 

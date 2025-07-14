@@ -8,8 +8,6 @@ defmodule Prana.NodeExecutor do
   - Output processing and port determination
   - Basic error handling
   """
-
-  alias Prana.ExpressionEngine
   alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecution
@@ -21,25 +19,28 @@ defmodule Prana.NodeExecutor do
   - `node` - The node to execute
   - `execution` - Current execution state (with __runtime initialized)
   - `routed_input` - Input data routed to this node's input ports
+  - `execution_index` - Global execution order index
+  - `run_index` - Per-node iteration index
 
   ## Returns
   - `{:ok, node_execution, updated_execution}` - Successful execution
   - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
-  @spec execute_node(Node.t(), Prana.Execution.t(), map()) ::
+  @spec execute_node(Node.t(), Prana.Execution.t(), map(), integer(), integer()) ::
           {:ok, NodeExecution.t(), Prana.Execution.t()}
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
-  def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input) do
-    # Create initial node execution with proper execution ID from execution
+  def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input, execution_index \\ 0, run_index \\ 0) do
+    # Create initial node execution with proper execution ID and indices
     node_execution =
       execution.id
-      |> NodeExecution.new(node.id)
+      |> NodeExecution.new(node.key, execution_index, run_index)
       |> NodeExecution.start()
 
     # Build context once for both input preparation and action execution
-    context = build_expression_context(execution, routed_input)
+    context =
+      build_expression_context(node_execution, execution, routed_input)
 
     with {:ok, prepared_params} <- prepare_params(node, context),
          {:ok, action} <- get_action(node) do
@@ -107,40 +108,41 @@ defmodule Prana.NodeExecutor do
         resume_data
       ) do
     # Build context for resume (same as execute_node)
-    context = build_expression_context(execution, %{})
+    context = build_expression_context(suspended_node_execution, execution, %{})
 
     # Get the original params from the suspended node execution
     params = suspended_node_execution.params || %{}
 
-    with {:ok, action} <- get_action(node) do
-      case invoke_resume_action(action, params, context, resume_data) do
-        {:ok, output_data, output_port} ->
-          # Complete the suspended node execution
-          completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+    case get_action(node) do
+      {:ok, action} ->
+        case invoke_resume_action(action, params, context, resume_data) do
+          {:ok, output_data, output_port} ->
+            # Complete the suspended node execution
+            completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
 
-          # Integrate it into the execution state
-          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+            # Integrate it into the execution state
+            updated_execution = Prana.Execution.complete_node(execution, completed_execution)
 
-          {:ok, completed_execution, updated_execution}
+            {:ok, completed_execution, updated_execution}
 
-        {:ok, output_data, output_port, context} ->
-          # Complete with context data
-          completed_execution =
-            suspended_node_execution
-            |> NodeExecution.complete(output_data, output_port)
-            |> NodeExecution.update_context(context)
+          {:ok, output_data, output_port, context} ->
+            # Complete with context data
+            completed_execution =
+              suspended_node_execution
+              |> NodeExecution.complete(output_data, output_port)
+              |> NodeExecution.update_context(context)
 
-          # Integrate it into the execution state
-          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
+            # Integrate it into the execution state
+            updated_execution = Prana.Execution.complete_node(execution, completed_execution)
 
-          {:ok, completed_execution, updated_execution}
+            {:ok, completed_execution, updated_execution}
 
-        {:error, reason} ->
-          # Resume failed
-          failed_execution = NodeExecution.fail(suspended_node_execution, reason)
-          {:error, {reason, failed_execution}}
-      end
-    else
+          {:error, reason} ->
+            # Resume failed
+            failed_execution = NodeExecution.fail(suspended_node_execution, reason)
+            {:error, {reason, failed_execution}}
+        end
+
       {:error, reason} ->
         # Action retrieval failed
         failed_execution = NodeExecution.fail(suspended_node_execution, reason)
@@ -167,7 +169,7 @@ defmodule Prana.NodeExecutor do
 
   # Evaluate params expressions using context
   def prepare_params(%Node{params: params}, context) when is_map(params) do
-    case ExpressionEngine.process_map(params, context) do
+    case Prana.Template.Engine.process_map(params, context) do
       {:ok, processed_map} ->
         {:ok, processed_map || %{}}
 
@@ -366,7 +368,7 @@ defmodule Prana.NodeExecutor do
 
       # Context-aware default port format: {:ok, data, context}
       {:ok, data, context} when is_map(context) ->
-        port = action.default_success_port || get_default_success_port(action)
+        port = get_default_success_port(action)
         {:ok, data, port, context}
 
       # Explicit port format: {:ok, data, port}
@@ -402,12 +404,12 @@ defmodule Prana.NodeExecutor do
 
       # Default success format: {:ok, data}
       {:ok, data} ->
-        port = action.default_success_port || get_default_success_port(action)
+        port = get_default_success_port(action)
         {:ok, data, port}
 
       # Default error format: {:error, error}
       {:error, error} ->
-        port = action.default_error_port || get_default_error_port(action)
+        port = get_default_error_port(action)
 
         {:error,
          %{
@@ -430,8 +432,8 @@ defmodule Prana.NodeExecutor do
 
   # Private helper functions
 
-  @spec build_expression_context(Prana.Execution.t(), map()) :: map()
-  defp build_expression_context(%Prana.Execution{} = execution, routed_input) do
+  @spec build_expression_context(Prana.NodeExecution.t(), Prana.Execution.t(), map()) :: map()
+  defp build_expression_context(node_execution, %Prana.Execution{} = execution, routed_input) do
     # Build standardized expression context with all built-in variables
     %{
       # routed input by port
@@ -449,6 +451,8 @@ defmodule Prana.NodeExecutor do
       },
       # execution metadata
       "$execution" => %{
+        "run_index" => node_execution.run_index,
+        "execution_index" => node_execution.execution_index,
         "id" => execution.id,
         "mode" => execution.execution_mode,
         "preparation" => execution.preparation_data
@@ -459,11 +463,10 @@ defmodule Prana.NodeExecutor do
   @spec get_default_success_port(Prana.Action.t()) :: String.t()
   defp get_default_success_port(%Prana.Action{output_ports: ports}) do
     cond do
-      "success" in ports -> "success"
       "output" in ports -> "output"
       length(ports) > 0 -> List.first(ports)
       # fallback
-      true -> "success"
+      true -> "output"
     end
   end
 

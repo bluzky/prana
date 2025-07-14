@@ -26,8 +26,8 @@ defmodule MyApp.CustomIntegration do
           function: :my_action,
           input_ports: ["input"],
           output_ports: ["success", "error"],
-          default_success_port: "success",
-          default_error_port: "error"
+          
+
         }
       }
     }
@@ -65,7 +65,7 @@ def my_action(input) do
   end
 end
 ```
-- Uses the action's `default_error_port` or "error" port
+
 - Error data is wrapped in a structured format by NodeExecutor
 
 #### 3. Explicit Port Selection

@@ -11,7 +11,7 @@ The execution planning functionality is now implemented in the **WorkflowCompile
 # Raw Workflow → WorkflowCompiler → ExecutionGraph → GraphExecutor
 workflow = %Workflow{nodes: [...], connections: [...]}
 
-{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_id)
+{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
 
 {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
 ```
@@ -26,8 +26,8 @@ workflow = %Workflow{nodes: [...], connections: [...]}
 ### Implementation in WorkflowCompiler
 ```elixir
 # In WorkflowCompiler.compile/2
-def compile(%Workflow{} = workflow, trigger_node_id \\ nil) do
-  with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_id),
+def compile(%Workflow{} = workflow, trigger_node_key \\ nil) do
+  with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_key),
        {:ok, reachable_nodes} <- find_reachable_nodes(workflow, trigger_node) do
     # Build optimized execution graph
   end
@@ -52,16 +52,16 @@ defp get_trigger_node(%Workflow{} = workflow, nil) do
 end
 
 # Specific trigger node validation
-defp get_trigger_node(%Workflow{} = workflow, trigger_node_id) do
-  case Workflow.get_node_by_id(workflow, trigger_node_id) do
+defp get_trigger_node(%Workflow{} = workflow, trigger_node_key) do
+  case Workflow.get_node_by_key(workflow, trigger_node_key) do
     nil ->
-      {:error, {:trigger_node_not_found, trigger_node_id}}
+      {:error, {:trigger_node_not_found, trigger_node_key}}
 
     %Node{type: :trigger} = node ->
       {:ok, node}
 
     %Node{type: other_type} ->
-      {:error, {:node_not_trigger, trigger_node_id, other_type}}
+      {:error, {:node_not_trigger, trigger_node_key, other_type}}
   end
 end
 ```
@@ -96,8 +96,8 @@ defp find_reachable_nodes(%Workflow{} = workflow, %Node{} = trigger_node) do
   reachable_node_ids = traverse_graph(workflow, queue, visited)
 
   reachable_nodes =
-    Enum.filter(workflow.nodes, fn node -> 
-      MapSet.member?(reachable_node_ids, node.id) 
+    Enum.filter(workflow.nodes, fn node ->
+      MapSet.member?(reachable_node_ids, node.id)
     end)
 
   {:ok, reachable_nodes}
@@ -216,10 +216,10 @@ end
 def execute_graph(%ExecutionGraph{} = execution_graph, input_data, context) do
   # Use pre-compiled optimization maps for fast execution
   ready_nodes = find_ready_nodes(execution_graph, completed_executions, context)
-  
+
   # O(1) connection lookups during data routing
   connections = Map.get(execution_graph.connection_map, {node_id, port}, [])
-  
+
   # Branch-following execution with intelligent node selection
   selected_node = select_node_for_branch_following(ready_nodes, execution_graph, context)
 end
@@ -262,11 +262,11 @@ context = %{workflow_loader: &my_loader/1}
 case WorkflowCompiler.compile(workflow, "invalid_trigger") do
   {:error, {:trigger_node_not_found, trigger_id}} ->
     IO.puts("Trigger node '#{trigger_id}' not found")
-    
+
   {:error, {:multiple_triggers_found, names}} ->
     IO.puts("Multiple triggers found: #{inspect(names)}")
     IO.puts("Please specify which trigger to use")
-    
+
   {:ok, execution_graph} ->
     # Proceed with execution
 end
@@ -279,7 +279,7 @@ end
 - **Pre-computation**: Build optimization maps once during compilation
 - **Memory efficiency**: Smaller execution graphs with only relevant data
 
-### Execution Performance  
+### Execution Performance
 - **O(1) lookups**: Instant connection and node access
 - **Branch-following**: Predictable execution patterns
 - **Optimized context**: Batch updates reduce memory allocations
@@ -304,7 +304,7 @@ end
 # {:ok, plan} = ExecutionPlanner.plan_execution(workflow, options)
 
 # New approach
-{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_id)
+{:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
 {:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
 ```
 
@@ -317,12 +317,12 @@ end
 
 The workflow compilation and execution system provides:
 
-✅ **WorkflowCompiler**: Transforms workflows into optimized ExecutionGraphs  
-✅ **Single trigger execution**: Start from specific trigger node with validation  
-✅ **Graph pruning**: Only execute reachable nodes for efficiency  
-✅ **O(1) performance**: Pre-built optimization maps for instant lookups  
-✅ **Branch-following**: Predictable execution patterns with intelligent node selection  
-✅ **Resource efficiency**: Lower memory and CPU usage through optimization  
-✅ **Production ready**: Comprehensive testing and performance validation  
+✅ **WorkflowCompiler**: Transforms workflows into optimized ExecutionGraphs
+✅ **Single trigger execution**: Start from specific trigger node with validation
+✅ **Graph pruning**: Only execute reachable nodes for efficiency
+✅ **O(1) performance**: Pre-built optimization maps for instant lookups
+✅ **Branch-following**: Predictable execution patterns with intelligent node selection
+✅ **Resource efficiency**: Lower memory and CPU usage through optimization
+✅ **Production ready**: Comprehensive testing and performance validation
 
 This architecture provides the foundation for reliable, efficient workflow execution with excellent performance characteristics and clear separation of concerns between compilation and execution phases.

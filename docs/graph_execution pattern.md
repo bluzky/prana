@@ -325,7 +325,7 @@ end
 
 **Execution Requirements**:
 - **Workflow Suspension**: Pause execution and persist state to database
-- **Event Routing**: Match external events to waiting workflows  
+- **Event Routing**: Match external events to waiting workflows
 - **State Persistence**: Survive server restarts during wait periods
 - **Timeout Management**: Handle abandoned workflows with configurable timeouts
 - **Event Sources**: Support both internal UI and external webhook triggers
@@ -357,7 +357,7 @@ end
 
 ---
 
-### 6.2 Sub-workflow Orchestration 
+### 6.2 Sub-workflow Orchestration
 **Pattern**: A → ExecuteSubWorkflow → (wait for completion) → B
 **Description**: Parent workflow triggers sub-workflow and waits for its completion before continuing.
 
@@ -565,8 +565,6 @@ end
 
 #### GraphExecutor Enhancements:
 - **✅ Enhanced `find_ready_nodes/3`**: Conditional path filtering
-- **✅ Updated `route_node_output/3`**: Active path marking
-- **✅ Modified `workflow_complete?/2`**: Ready node-based completion
 - **✅ Enhanced context management**: Execution tracking throughout workflow
 
 #### Test Coverage:
@@ -669,7 +667,7 @@ end
    - Parent-child workflow coordination with built-in status tracking
    - Direct integration with existing Prana execution engine
 
-2. **Phase 4.2: External System Polling** (📋 MEDIUM PRIORITY)  
+2. **Phase 4.2: External System Polling** (📋 MEDIUM PRIORITY)
    - **Complexity**: Medium | **Value**: Medium | **Dependencies**: ExpressionEngine
    - Generic API polling with condition-based termination
    - Leverages existing expression evaluation capabilities

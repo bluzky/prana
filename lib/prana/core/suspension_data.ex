@@ -224,8 +224,7 @@ defmodule Prana.Core.SuspensionData do
 
   defp validate_required_fields(data, required_fields, type_name) do
     missing_fields =
-      required_fields
-      |> Enum.reject(&Map.has_key?(data, &1))
+      Enum.reject(required_fields, &Map.has_key?(data, &1))
 
     case missing_fields do
       [] ->

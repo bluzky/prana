@@ -1,23 +1,23 @@
 defmodule Prana.SchemaUtils do
   @moduledoc """
   Utilities for extracting metadata from Skema schemas for UI generation and introspection.
-  
+
   This module provides functions to extract field information, validation rules,
   and generate form configurations from Skema schema modules.
   """
 
   @doc """
   Extract field information from a Skema schema module.
-  
+
   Returns a map containing field metadata including:
   - Field types
   - Required fields
   - Default values
   - Validation rules
   - Nested schemas
-  
+
   ## Examples
-  
+
       iex> Prana.SchemaUtils.extract_field_info(MySchema)
       %{
         fields: [
@@ -39,11 +39,11 @@ defmodule Prana.SchemaUtils do
       }
   """
   def extract_field_info(schema_module) do
-    try do
-      # Access the schema definition through Skema's introspection
-      schema_definition = schema_module.__schema__()
-      
-      fields = Enum.map(schema_definition.fields, fn {field_name, field_config} ->
+    # Access the schema definition through Skema's introspection
+    schema_definition = schema_module.__schema__()
+
+    fields =
+      Enum.map(schema_definition.fields, fn {field_name, field_config} ->
         %{
           name: field_name,
           type: field_config.type,
@@ -53,26 +53,25 @@ defmodule Prana.SchemaUtils do
           nested_schema: extract_nested_schema(field_config)
         }
       end)
-      
-      %{
-        schema_module: schema_module,
-        fields: fields,
-        required_fields: Enum.filter(fields, & &1.required) |> Enum.map(& &1.name)
-      }
-    rescue
-      error ->
-        {:error, "Failed to extract field info: #{inspect(error)}"}
-    end
+
+    %{
+      schema_module: schema_module,
+      fields: fields,
+      required_fields: fields |> Enum.filter(& &1.required) |> Enum.map(& &1.name)
+    }
+  rescue
+    error ->
+      {:error, "Failed to extract field info: #{inspect(error)}"}
   end
 
   @doc """
   Generate form configuration from a Skema schema module.
-  
+
   Returns a form configuration suitable for UI generation, including
   field types, validation rules, and display information.
-  
+
   ## Examples
-  
+
       iex> Prana.SchemaUtils.generate_form_config(MySchema)
       %{
         form_id: "my_schema_form",
@@ -95,13 +94,13 @@ defmodule Prana.SchemaUtils do
     case extract_field_info(schema_module) do
       %{fields: fields} ->
         form_fields = Enum.map(fields, &convert_field_to_form_config/1)
-        
+
         %{
           form_id: generate_form_id(schema_module),
           schema_module: schema_module,
           fields: form_fields
         }
-      
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -109,34 +108,34 @@ defmodule Prana.SchemaUtils do
 
   @doc """
   Extract validation rules from a field configuration.
-  
+
   Returns a list of validation rules that can be used for both
   server-side validation and client-side UI generation.
   """
   def extract_validation_rules(field_config) do
     rules = []
-    
+
     # Add type-specific validation
     rules = if Map.get(field_config, :type), do: [{:type, field_config.type} | rules], else: rules
-    
+
     # Add required validation
     rules = if Map.get(field_config, :required), do: [{:required, true} | rules], else: rules
-    
+
     # Add format validation
     rules = if Map.get(field_config, :format), do: [{:format, field_config.format} | rules], else: rules
-    
+
     # Add inclusion validation
     rules = if Map.get(field_config, :in), do: [{:inclusion, field_config.in} | rules], else: rules
-    
+
     # Add number validation
     rules = if Map.get(field_config, :number), do: [{:number, field_config.number} | rules], else: rules
-    
+
     rules
   end
 
   @doc """
   Check if a field has a nested schema.
-  
+
   Returns the nested schema module if present, nil otherwise.
   """
   def extract_nested_schema(field_config) do
@@ -145,9 +144,8 @@ defmodule Prana.SchemaUtils do
         # Check if this is a nested schema module
         if function_exported?(module, :__schema__, 0) do
           module
-        else
-          nil
         end
+
       _ ->
         nil
     end
@@ -155,7 +153,7 @@ defmodule Prana.SchemaUtils do
 
   @doc """
   Get schema metadata including validation rules and field types.
-  
+
   Returns comprehensive metadata about a schema that can be used
   for documentation, validation, and UI generation.
   """
@@ -168,11 +166,11 @@ defmodule Prana.SchemaUtils do
           fields: fields,
           field_count: length(fields),
           required_fields: info.required_fields,
-          optional_fields: Enum.filter(fields, &(!&1.required)) |> Enum.map(& &1.name),
-          nested_schemas: Enum.filter(fields, & &1.nested_schema) |> Enum.map(& &1.nested_schema),
+          optional_fields: fields |> Enum.filter(&(!&1.required)) |> Enum.map(& &1.name),
+          nested_schemas: fields |> Enum.filter(& &1.nested_schema) |> Enum.map(& &1.nested_schema),
           validation_summary: summarize_validation_rules(fields)
         }
-      
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -200,12 +198,7 @@ defmodule Prana.SchemaUtils do
   defp map_field_type_to_form_type(_), do: "text"
 
   defp humanize_field_name(field_name) do
-    field_name
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.split()
-    |> Enum.map(&String.capitalize/1)
-    |> Enum.join(" ")
+    field_name |> to_string() |> String.replace("_", " ") |> String.split() |> Enum.map_join(" ", &String.capitalize/1)
   end
 
   defp generate_placeholder(field) do
@@ -257,15 +250,18 @@ defmodule Prana.SchemaUtils do
   defp summarize_validation_rules(fields) do
     %{
       has_required_fields: Enum.any?(fields, & &1.required),
-      has_format_validation: Enum.any?(fields, fn field -> 
-        Enum.any?(field.validation, fn {key, _} -> key == :format end)
-      end),
-      has_inclusion_validation: Enum.any?(fields, fn field ->
-        Enum.any?(field.validation, fn {key, _} -> key == :inclusion end)
-      end),
-      has_number_validation: Enum.any?(fields, fn field ->
-        Enum.any?(field.validation, fn {key, _} -> key == :number end)
-      end)
+      has_format_validation:
+        Enum.any?(fields, fn field ->
+          Enum.any?(field.validation, fn {key, _} -> key == :format end)
+        end),
+      has_inclusion_validation:
+        Enum.any?(fields, fn field ->
+          Enum.any?(field.validation, fn {key, _} -> key == :inclusion end)
+        end),
+      has_number_validation:
+        Enum.any?(fields, fn field ->
+          Enum.any?(field.validation, fn {key, _} -> key == :number end)
+        end)
     }
   end
 end

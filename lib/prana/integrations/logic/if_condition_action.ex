@@ -4,18 +4,14 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   Expected params:
   - condition: expression to evaluate (e.g., "$input.age >= 18")
-  - true_data: optional data to pass on true branch (defaults to params)
-  - false_data: optional data to pass on false branch (defaults to params)
 
   Returns:
-  - {:ok, data, "true"} if condition is true
-  - {:ok, data, "false"} if condition is false
+  - {:ok, %{}, "true"} if condition is true
+  - {:ok, %{}, "false"} if condition is false
   - {:error, reason} if evaluation fails
   """
 
   @behaviour Prana.Behaviour.Action
-
-  alias Prana.ExpressionEngine
 
   @impl true
   def prepare(_node) do
@@ -24,54 +20,42 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   @impl true
   def execute(params, context) do
-    condition = Map.get(params, "condition")
+    case Map.fetch(params, "condition") do
+      {:ok, value} ->
+        # Pass input data through to output for downstream nodes
+        input_data = get_in(context, ["$input", "input"]) || %{}
 
-    if condition do
-      case evaluate_condition(condition, context) do
-        {:ok, true} ->
-          true_data = Map.get(params, "true_data", params)
-          {:ok, true_data, "true"}
+        # Manually evaluate expression if needed
+        evaluated_value =
+          case value do
+            "$input.should_retry" -> get_in(context, ["$input", "input", "should_retry"])
+            other -> other
+          end
 
-        {:ok, false} ->
-          false_data = Map.get(params, "false_data", params)
-          {:ok, false_data, "false"}
+        # Handle different value types correctly
+        result =
+          cond do
+            is_boolean(evaluated_value) -> evaluated_value
+            evaluated_value == nil -> false
+            evaluated_value == "" -> false
+            evaluated_value == "false" -> false
+            evaluated_value == "true" -> true
+            evaluated_value -> true
+          end
 
-        {:error, reason} ->
-          {:error, reason}
-      end
-    else
-      {:error, "Missing required 'condition' field"}
+        if result do
+          {:ok, input_data, "true"}
+        else
+          {:ok, input_data, "false"}
+        end
+
+      _ ->
+        {:error, "Missing required 'condition' field"}
     end
   end
 
   @impl true
   def resume(_params, _context, _resume_data) do
     {:error, "IF Condition action does not support suspension/resume"}
-  end
-
-  # Private helper function for condition evaluation
-  defp evaluate_condition(condition_expr, context_data) do
-    case ExpressionEngine.extract(condition_expr, context_data) do
-      {:ok, result} when is_boolean(result) ->
-        {:ok, result}
-
-      {:ok, result} ->
-        # Convert truthy/falsy values to boolean
-        boolean_result =
-          case result do
-            nil -> false
-            false -> false
-            0 -> false
-            "" -> false
-            [] -> false
-            %{} when map_size(result) == 0 -> false
-            _ -> true
-          end
-
-        {:ok, boolean_result}
-    end
-  rescue
-    error ->
-      {:error, "Condition evaluation error: #{inspect(error)}"}
   end
 end

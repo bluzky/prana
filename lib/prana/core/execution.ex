@@ -44,7 +44,6 @@ defmodule Prana.Execution do
           workflow_version: integer(),
           parent_execution_id: String.t() | nil,
           root_execution_id: String.t() | nil,
-          trigger_node_id: String.t() | nil,
           execution_mode: execution_mode(),
           status: status(),
           trigger_type: String.t(),
@@ -53,7 +52,8 @@ defmodule Prana.Execution do
           output_data: map() | nil,
           context_data: map(),
           error_data: map() | nil,
-          node_executions: [Prana.NodeExecution.t()],
+          node_executions: %{String.t() => [Prana.NodeExecution.t()]},
+          current_execution_index: integer(),
           preparation_data: map(),
           suspended_node_id: String.t() | nil,
           suspension_type: SuspensionData.suspension_type() | nil,
@@ -63,9 +63,11 @@ defmodule Prana.Execution do
           started_at: DateTime.t() | nil,
           completed_at: DateTime.t() | nil,
           metadata: map(),
-          __runtime: %{
-            String.t() => any()
-          } | nil
+          __runtime:
+            %{
+              String.t() => any()
+            }
+            | nil
         }
 
   defstruct [
@@ -74,7 +76,6 @@ defmodule Prana.Execution do
     :workflow_version,
     :parent_execution_id,
     :root_execution_id,
-    :trigger_node_id,
     :execution_mode,
     :status,
     :trigger_type,
@@ -84,6 +85,7 @@ defmodule Prana.Execution do
     :context_data,
     :error_data,
     :node_executions,
+    :current_execution_index,
     :suspended_node_id,
     :suspension_type,
     :suspension_data,
@@ -99,7 +101,7 @@ defmodule Prana.Execution do
   @doc """
   Creates a new execution
   """
-  def new(workflow_id, workflow_version, trigger_type, vars, trigger_node_id \\ nil) do
+  def new(workflow_id, workflow_version, trigger_type, vars) do
     execution_id = generate_id()
 
     %__MODULE__{
@@ -108,7 +110,6 @@ defmodule Prana.Execution do
       workflow_version: workflow_version,
       parent_execution_id: nil,
       root_execution_id: execution_id,
-      trigger_node_id: trigger_node_id,
       execution_mode: :async,
       status: :pending,
       trigger_type: trigger_type,
@@ -117,7 +118,8 @@ defmodule Prana.Execution do
       output_data: nil,
       context_data: %{},
       error_data: nil,
-      node_executions: [],
+      node_executions: %{},
+      current_execution_index: 0,
       preparation_data: %{},
       suspended_node_id: nil,
       suspension_type: nil,
@@ -156,7 +158,7 @@ defmodule Prana.Execution do
 
   ## Parameters
   - `execution` - The execution to suspend
-  - `node_id` - ID of the node that caused the suspension
+  - `node_key` - ID of the node that caused the suspension
   - `suspension_type` - Type of suspension (:webhook, :interval, etc.)
   - `suspension_data` - Typed suspension data structure
   - `resume_token` - Optional resume token for webhook lookups (defaults to generated token)
@@ -175,13 +177,13 @@ defmodule Prana.Execution do
       # Explicit resume token for webhook scenarios
       suspend(execution, "node_123", :webhook, suspension_data, "custom_resume_token_123")
   """
-  def suspend(%__MODULE__{} = execution, node_id, suspension_type, suspension_data, resume_token \\ nil) do
+  def suspend(%__MODULE__{} = execution, node_key, suspension_type, suspension_data, resume_token \\ nil) do
     final_resume_token = resume_token || generate_resume_token()
 
     %{
       execution
       | status: :suspended,
-        suspended_node_id: node_id,
+        suspended_node_id: node_key,
         suspension_type: suspension_type,
         suspension_data: suspension_data,
         suspended_at: DateTime.utc_now(),
@@ -227,6 +229,87 @@ defmodule Prana.Execution do
     status in [:pending, :running, :suspended]
   end
 
+  # Rebuild active_nodes from execution state with loop support
+  defp rebuild_active_nodes(execution, execution_graph) do
+    # 1. Do not include suspended nodes in active nodes during runtime rebuild
+    # Suspended nodes will be resumed and completed, so they shouldn't be active
+    base_active_nodes = MapSet.new()
+
+    # 2. Get all completed nodes with their execution info
+    completed_nodes = get_completed_nodes_with_execution_info(execution)
+
+    # 3. Find nodes that have received fresh input since their last execution
+    nodes_with_fresh_input =
+      execution_graph.node_map
+      |> Map.keys()
+      |> Enum.filter(fn node_key ->
+        has_fresh_input_since_last_execution?(node_key, completed_nodes, execution_graph)
+      end)
+      |> MapSet.new()
+
+    MapSet.union(base_active_nodes, nodes_with_fresh_input)
+  end
+
+  # Check if a node has received fresh input since its last execution
+  defp has_fresh_input_since_last_execution?(node_key, completed_nodes, execution_graph) do
+    # Get incoming connections to this node
+    incoming_connections = get_incoming_connections_for_node(execution_graph, node_key)
+
+    # Get the last execution info for this node (if any)
+    last_execution = Map.get(completed_nodes, node_key)
+
+    # Check if any incoming connection has fresh data
+    Enum.any?(incoming_connections, fn conn ->
+      source_execution = Map.get(completed_nodes, conn.from)
+
+      case {last_execution, source_execution} do
+        {nil, %{}} ->
+          # Node never executed, but has input from completed node
+          true
+
+        {%{execution_index: last_idx}, %{execution_index: source_idx}} ->
+          # Node was executed, check if source completed AFTER this node's last execution
+          source_idx > last_idx
+
+        {%{}, nil} ->
+          # Node was executed but source hasn't completed - no fresh input
+          false
+
+        _ ->
+          false
+      end
+    end)
+  end
+
+  # Get completed nodes with their execution information
+  defp get_completed_nodes_with_execution_info(execution) do
+    Map.new(execution.node_executions, fn {node_key, executions} ->
+      last_execution = List.last(executions)
+
+      if last_execution && last_execution.status == :completed do
+        {node_key, last_execution}
+      else
+        {node_key, nil}
+      end
+    end)
+  end
+
+  # Get incoming connections for a specific node
+  defp get_incoming_connections_for_node(execution_graph, node_key) do
+    # Use reverse connection map if available, otherwise fall back to filtering
+    case Map.get(execution_graph, :reverse_connection_map) do
+      nil ->
+        # Fallback: filter all connections (less efficient but functional)
+        Enum.filter(execution_graph.workflow.connections, fn conn ->
+          conn.to == node_key
+        end)
+
+      reverse_map ->
+        # Optimized: direct lookup
+        Map.get(reverse_map, node_key, [])
+    end
+  end
+
   @doc """
   Checks if execution is suspended
   """
@@ -266,7 +349,7 @@ defmodule Prana.Execution do
   ## Example
 
       case get_suspension_info(execution) do
-        {:ok, %{type: :webhook, data: data, node_id: node_id}} ->
+        {:ok, %{type: :webhook, data: data, node_key: node_key}} ->
           # Handle webhook suspension
         :not_suspended ->
           # Execution not suspended
@@ -274,15 +357,15 @@ defmodule Prana.Execution do
   """
   def get_suspension_info(%__MODULE__{
         status: :suspended,
-        suspended_node_id: node_id,
+        suspended_node_id: node_key,
         suspension_type: type,
         suspension_data: data,
         suspended_at: suspended_at
       })
-      when not is_nil(node_id) and not is_nil(type) and not is_nil(data) do
+      when not is_nil(node_key) and not is_nil(type) and not is_nil(data) do
     {:ok,
      %{
-       node_id: node_id,
+       node_key: node_key,
        type: type,
        data: data,
        suspended_at: suspended_at
@@ -313,172 +396,180 @@ defmodule Prana.Execution do
 
   @doc """
   Rebuilds runtime state from persistent execution data and environment context.
-  
+
   This function reconstructs the ephemeral runtime state from the persistent
   node_executions audit trail and provided environment data.
-  
+
   ## Parameters
   - `execution` - The execution to rebuild runtime state for
   - `env_data` - Environment context data from the application
-  
+
   ## Returns
   Updated execution with rebuilt __runtime state containing:
   - `"nodes"` - Map of completed node outputs for routing
   - `"env"` - Environment data from application
   - `"active_paths"` - Active conditional branching paths
   - `"executed_nodes"` - Chronological list of executed node IDs
-  
+  - `"active_nodes"` - List of node that is actively to check for executable. They are nodes without input or node with fresh input data. Or nodes that are waiting for all inputs to be ready.
+
   ## Example
-  
+
       # Load from storage (has nil __runtime)
       execution = Repo.get(Execution, execution_id)
-      
+
       # Rebuild runtime state
       env_data = %{"api_key" => "abc123", "base_url" => "https://api.example.com"}
       execution = rebuild_runtime(execution, env_data)
-      
+
       # Now ready for execution/resume
       execution.__runtime["nodes"]         # %{"node_1" => %{...}, "node_2" => %{...}}
       execution.__runtime["env"]           # %{"api_key" => "abc123", ...}
       execution.__runtime["active_paths"]  # %{"path_1" => true, "path_2" => true}
       execution.__runtime["executed_nodes"] # ["node_1", "node_2"]
   """
-  def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
-    # Build node structured data for $nodes.{id}.output and $nodes.{id}.context patterns
-    node_structured = 
+  def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}, execution_graph \\ nil) do
+    # Get LAST completed execution of each node (highest run_index)
+    node_structured =
       execution.node_executions
-      |> Enum.filter(fn node_exec -> node_exec.status == :completed end)
-      |> Enum.reduce(%{}, fn node_exec, acc ->
-        node_data = %{
-          "output" => node_exec.output_data,
-          "context" => node_exec.context_data
-        }
-        Map.put(acc, node_exec.node_id, node_data)
+      |> Enum.map(fn {node_key, executions} ->
+        last_execution =
+          executions
+          |> Enum.reverse()
+          |> Enum.find(&(&1.status == :completed))
+
+        case last_execution do
+          nil -> {node_key, nil}
+          exec -> {node_key, %{"output" => exec.output_data, "context" => exec.context_data}}
+        end
       end)
-    
-    # Build active paths from node executions with output ports
-    active_paths = 
-      execution.node_executions
-      |> Enum.filter(fn node_exec -> node_exec.status == :completed and not is_nil(node_exec.output_port) end)
-      |> Enum.reduce(%{}, fn node_exec, acc ->
-        path_key = "#{node_exec.node_id}_#{node_exec.output_port}"
-        Map.put(acc, path_key, true)
-      end)
-    
-    # Build executed nodes list in chronological order
-    executed_nodes = 
-      execution.node_executions
-      |> Enum.sort_by(& &1.started_at, DateTime)
-      |> Enum.map(& &1.node_id)
-    
+      |> Enum.reject(fn {_, data} -> is_nil(data) end)
+      |> Map.new()
+
+    # Rebuild active_nodes if execution_graph is provided
+    active_nodes =
+      if execution_graph do
+        rebuild_active_nodes(execution, execution_graph)
+      else
+        # Default empty for cases without execution_graph
+        MapSet.new()
+      end
+
     # Build runtime state
+    max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
+
+    # Get iteration count from persistent metadata (survives suspension/resume)
+    current_iteration_count = execution.metadata["iteration_count"] || 0
+
     runtime = %{
       "nodes" => node_structured,
       "env" => env_data,
-      "active_paths" => active_paths,
-      "executed_nodes" => executed_nodes
+      "active_nodes" => active_nodes,
+      "iteration_count" => current_iteration_count,
+      "max_iterations" => max_iterations
     }
-    
+
     %{execution | __runtime: runtime}
   end
 
-
   @doc """
   Adds a completed node execution to the execution and updates runtime state.
-  
+
   This function integrates an already-completed NodeExecution into the execution's
   audit trail and synchronizes the runtime state for optimal performance.
-  
+
   ## Parameters
   - `execution` - The execution to update
   - `completed_node_execution` - The completed NodeExecution to add
-  
+
   ## Returns
   Updated execution with synchronized persistent and runtime state
-  
+
   ## Example
-  
+
       completed_node_exec = NodeExecution.complete(node_exec, %{user_id: 123}, "success")
       execution = complete_node(execution, completed_node_exec)
-      
+
       # Both persistent and runtime state updated
       execution.node_executions  # Contains the completed NodeExecution
       execution.__runtime["nodes"]["api_call"]  # Contains %{user_id: 123}
   """
   def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :completed} = completed_node_execution) do
-    node_id = completed_node_execution.node_id
-    output_data = completed_node_execution.output_data
-    output_port = completed_node_execution.output_port
-    
-    # Remove any existing node execution for this node (to handle retries/updates)
-    remaining_executions = 
-      Enum.reject(execution.node_executions, fn ne -> ne.node_id == node_id end)
-    
-    # Add the completed node execution to the list (append to maintain chronological order)
-    updated_node_executions = remaining_executions ++ [completed_node_execution]
-    
+    node_key = completed_node_execution.node_key
+
+    # Get existing executions for this node
+    existing_executions = Map.get(execution.node_executions, node_key, [])
+
+    # Remove any existing execution with same run_index (for retries)
+    remaining_executions =
+      Enum.reject(existing_executions, fn ne -> ne.run_index == completed_node_execution.run_index end)
+
+    # Add the completed execution (maintain chronological order by execution_index)
+    updated_executions =
+      Enum.sort_by(remaining_executions ++ [completed_node_execution], & &1.execution_index)
+
+    # Update the map
+    updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
+
     # Update runtime state if present
-    updated_runtime = 
+    updated_runtime =
       case execution.__runtime do
-        nil -> nil
+        nil ->
+          nil
+
         runtime ->
-          # Update structured node data
+          # Update with latest execution output
           node_data = %{
-            "output" => output_data,
+            "output" => completed_node_execution.output_data,
             "context" => completed_node_execution.context_data
           }
-          updated_node_map = Map.put(runtime["nodes"] || %{}, node_id, node_data)
-          
-          runtime
-          |> Map.put("nodes", updated_node_map)
-          |> Map.put("executed_nodes", (runtime["executed_nodes"] || []) ++ [node_id])
-          |> Map.put("active_paths", Map.put(runtime["active_paths"] || %{}, "#{node_id}_#{output_port}", true))
+
+          updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
+          Map.put(runtime, "nodes", updated_node_map)
       end
-    
+
     %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
   end
 
   @doc """
   Adds a failed node execution to the execution and updates runtime state.
-  
+
   This function integrates an already-failed NodeExecution into the execution's
   audit trail and synchronizes the runtime state.
-  
+
   ## Parameters
   - `execution` - The execution to update
   - `failed_node_execution` - The failed NodeExecution to add
-  
+
   ## Returns
   Updated execution with synchronized persistent and runtime state
-  
+
   ## Example
-  
+
       failed_node_exec = NodeExecution.fail(node_exec, %{error: "Network timeout"})
       execution = fail_node(execution, failed_node_exec)
-      
+
       # Both persistent and runtime state updated
       execution.node_executions  # Contains the failed NodeExecution
       execution.__runtime["nodes"]["api_call"]  # Not present (failed nodes don't provide output)
   """
   def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :failed} = failed_node_execution) do
-    node_id = failed_node_execution.node_id
-    
-    # Remove any existing node execution for this node (to handle retries/updates)
-    remaining_executions = 
-      Enum.reject(execution.node_executions, fn ne -> ne.node_id == node_id end)
-    
-    # Add the failed node execution to the list (append to maintain chronological order)
-    updated_node_executions = remaining_executions ++ [failed_node_execution]
-    
-    # Update runtime state if present (add to executed nodes but not to nodes map)
-    updated_runtime = 
-      case execution.__runtime do
-        nil -> nil
-        runtime ->
-          Map.put(runtime, "executed_nodes", runtime["executed_nodes"] ++ [node_id])
-      end
-    
-    %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
+    node_key = failed_node_execution.node_key
+
+    # Get existing executions for this node
+    existing_executions = Map.get(execution.node_executions, node_key, [])
+
+    # Remove any existing execution with same run_index (for retries)
+    remaining_executions =
+      Enum.reject(existing_executions, fn ne -> ne.run_index == failed_node_execution.run_index end)
+
+    # Add the failed execution
+    updated_executions =
+      Enum.sort_by(remaining_executions ++ [failed_node_execution], & &1.execution_index)
+
+    # Update the map
+    updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
+
+    %{execution | node_executions: updated_node_executions}
   end
 
   defp generate_resume_token do

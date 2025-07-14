@@ -50,9 +50,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
   describe "execute_node/3 with suspension" do
     test "handles synchronous sub-workflow suspension", %{execution: execution} do
       node = %Node{
-        id: "sub_workflow_node",
-        custom_id: "sub_workflow_node",
-        type: :action,
+        key: "sub_workflow_node",
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{
@@ -71,7 +69,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert {:suspend, suspended_node_execution} = result
 
       # Verify suspended node execution
-      assert suspended_node_execution.node_id == "sub_workflow_node"
+      assert suspended_node_execution.node_key == "sub_workflow_node"
       assert suspended_node_execution.status == :suspended
       assert suspended_node_execution.output_data == nil
       assert suspended_node_execution.output_port == nil
@@ -90,9 +88,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
     test "handles fire-and-forget sub-workflow execution", %{execution: execution} do
       node = %Node{
-        id: "notification_node",
-        custom_id: "notification_node",
-        type: :action,
+        key: "notification_node",
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{
@@ -107,7 +103,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert {:suspend, suspended_node_execution} = result
 
       # Verify suspended node execution
-      assert suspended_node_execution.node_id == "notification_node"
+      assert suspended_node_execution.node_key == "notification_node"
       assert suspended_node_execution.status == :suspended
 
       # Verify suspension data stored in NodeExecution
@@ -120,9 +116,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
     test "handles sub-workflow validation errors", %{execution: execution} do
       node = %Node{
-        id: "invalid_node",
-        custom_id: "invalid_node",
-        type: :action,
+        key: "invalid_node",
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{
@@ -144,7 +138,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert error_data["port"] == "error"
 
       # Verify failed node execution
-      assert failed_node_execution.node_id == "invalid_node"
+      assert failed_node_execution.node_key == "invalid_node"
       assert failed_node_execution.status == :failed
       assert failed_node_execution.error_data == error_data
       assert failed_node_execution.output_port == nil
@@ -152,9 +146,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
     test "preserves node execution timing for suspended nodes", %{execution: execution} do
       node = %Node{
-        id: "timing_node",
-        custom_id: "timing_node",
-        type: :action,
+        key: "timing_node",
         integration_name: "workflow",
         action_name: "execute_workflow",
         params: %{
@@ -190,9 +182,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "processes suspension tuple correctly" do
       action = %Action{
         name: "test_action",
-        output_ports: ["success", "error"],
-        default_success_port: "success",
-        default_error_port: "error"
+        output_ports: ["success", "error"]
       }
 
       suspend_data = %{workflow_id: "test", data: %{}}

@@ -75,37 +75,37 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     # Extract sub-workflow execution results
     execution_mode = Map.get(params, "execution_mode", "sync")
     failure_strategy = Map.get(params, "failure_strategy", "fail_parent")
-    
+
     # Process sub-workflow completion data
     case resume_data do
       %{"sub_workflow_output" => output, "status" => "completed"} ->
         # Sub-workflow completed successfully
         {:ok, output, "success"}
-      
+
       %{"sub_workflow_output" => output} ->
         # Sub-workflow completed successfully (no explicit status)
         {:ok, output, "success"}
-      
+
       %{"status" => "failed", "error" => error} when failure_strategy == "fail_parent" ->
         # Sub-workflow failed and should fail parent
         {:error, %{type: "sub_workflow_failed", error: error}, "error"}
-      
+
       %{"status" => "failed", "error" => error} when failure_strategy == "continue" ->
         # Sub-workflow failed but parent should continue
         {:ok, %{sub_workflow_failed: true, error: error}, "failure"}
-      
+
       %{"status" => "timeout"} when failure_strategy == "fail_parent" ->
         # Sub-workflow timed out and should fail parent
         {:error, %{type: "sub_workflow_timeout", message: "Sub-workflow execution timed out"}, "error"}
-      
+
       %{"status" => "timeout"} when failure_strategy == "continue" ->
         # Sub-workflow timed out but parent should continue
         {:ok, %{sub_workflow_timeout: true}, "timeout"}
-      
+
       # For fire-and-forget, any resume data indicates successful trigger
       _ when execution_mode == "fire_and_forget" ->
         {:ok, resume_data, "success"}
-      
+
       # Default case - treat as successful completion
       _ ->
         {:ok, resume_data, "success"}

@@ -1,7 +1,7 @@
 defmodule Prana.Integrations.Logic do
   @moduledoc """
   Core Logic Integration - Provides conditional branching and logic operations
-  
+
   Supports:
   - IF conditions with true/false routing
   - Switch statements with multiple case routing
@@ -29,24 +29,21 @@ defmodule Prana.Integrations.Logic do
           name: "if_condition",
           display_name: "IF Condition",
           description: "Evaluate a condition and route to true or false branch",
+          type: :logic,
           module: Prana.Integrations.Logic.IfConditionAction,
           input_ports: ["input"],
-          output_ports: ["true", "false"],
-          default_success_port: "true",
-          default_error_port: "false"
+          output_ports: ["true", "false"]
         },
         "switch" => %Action{
           name: "switch",
           display_name: "Switch",
           description: "Multi-case routing based on simple condition expressions",
+          type: :logic,
           module: Prana.Integrations.Logic.SwitchAction,
           input_ports: ["input"],
-          output_ports: ["*"],
-          default_success_port: "default",
-          default_error_port: "default"
+          output_ports: ["*"]
         }
       }
     }
   end
-
 end
