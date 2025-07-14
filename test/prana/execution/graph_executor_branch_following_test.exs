@@ -112,6 +112,17 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         params: %{}
       }
 
+      workflow = %Workflow{
+        id: "branch_following_test",
+        name: "Branch Following Test",
+        nodes: [trigger_node, branch_a1, branch_a2, branch_b1, branch_b2, merge_node],
+        connections: %{},
+        variables: %{},
+        settings: %WorkflowSettings{},
+        metadata: %{}
+      }
+
+      # Add connections using the proper add_connection function
       connections = [
         # Trigger to both branch starts
         %Connection{
@@ -158,15 +169,12 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         }
       ]
 
-      workflow = %Workflow{
-        id: "branch_following_test",
-        name: "Branch Following Test",
-        nodes: [trigger_node, branch_a1, branch_a2, branch_b1, branch_b2, merge_node],
-        connections: connections,
-        variables: %{},
-        settings: %WorkflowSettings{},
-        metadata: %{}
-      }
+      # Add all connections to the workflow
+      workflow = 
+        Enum.reduce(connections, workflow, fn connection, acc_workflow ->
+          {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
+          updated_workflow
+        end)
 
       {:ok, execution_graph} =
         WorkflowCompiler.compile(workflow, "trigger")

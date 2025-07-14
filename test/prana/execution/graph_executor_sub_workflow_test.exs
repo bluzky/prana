@@ -10,6 +10,19 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
 
+  # Helper function to convert list-based connections to map-based
+  defp convert_connections_to_map(workflow) do
+    connections_list = workflow.connections
+    
+    # Convert to proper map structure using add_connection
+    workflow_with_empty_connections = %{workflow | connections: %{}}
+    
+    Enum.reduce(connections_list, workflow_with_empty_connections, fn connection, acc_workflow ->
+      {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
+      updated_workflow
+    end)
+  end
+
   setup do
     # Start registry and register integrations
     {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
@@ -87,7 +100,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       }
 
       # Compile workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       # Execute workflow
       context = %{variables: %{}}
@@ -175,7 +188,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       }
 
       # Compile and execute
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       result = GraphExecutor.execute_graph(execution_graph, %{})
 
@@ -237,7 +250,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
   describe "resume_workflow/4" do
     test "resumes suspended workflow with sub-workflow results" do
       # Create and suspend a workflow first
-      workflow = create_simple_sub_workflow()
+      workflow = create_simple_sub_workflow() |> convert_connections_to_map()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute until suspension
@@ -278,7 +291,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
     test "handles resume with nested suspension" do
       # Test case where resumed workflow triggers another suspension
-      workflow = create_nested_sub_workflow()
+      workflow = create_nested_sub_workflow() |> convert_connections_to_map()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute until first suspension
@@ -377,7 +390,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
   describe "middleware integration" do
     test "emits correct middleware events for sub-workflow coordination" do
-      workflow = create_simple_sub_workflow()
+      workflow = create_simple_sub_workflow() |> convert_connections_to_map()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute until suspension

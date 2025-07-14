@@ -2,6 +2,25 @@
 
 This guide explains how to compose workflows using Prana's built-in integrations and actions. Learn to create complex workflow patterns by combining nodes, connections, and data flow.
 
+## ⚡ Connection Structure (Performance Optimized)
+
+Prana uses a **double-indexed connection structure** for ultra-fast execution:
+
+```elixir
+connections: %{
+  "source_node" => %{
+    "output_port" => [%Connection{...}],
+    "error_port" => [%Connection{...}]
+  }
+}
+```
+
+**Benefits**:
+- **O(1) connection lookups** instead of O(n) scans
+- **Ultra-fast routing** during workflow execution  
+- **Scalable performance** for large workflows
+- **Direct port access** for conditional branching
+
 ## Workflow Structure
 
 A workflow consists of:
@@ -19,9 +38,13 @@ A workflow consists of:
   nodes: [
     # List of nodes
   ],
-  connections: [
-    # List of connections between nodes
-  ],
+  connections: %{
+    # Double-indexed connections for O(1) lookups
+    "source_node" => %{
+      "output_port" => [%Connection{...}],
+      "error_port" => [%Connection{...}]
+    }
+  },
   variables: %{
     # Optional shared variables
   }
@@ -67,20 +90,28 @@ Simple sequential execution where each node processes the output of the previous
       }
     }
   ],
-  connections: [
-    %Connection{
-      from: "start",
-      to: "process_user",
-      from_port: "success",
-      to_port: "input"
+  connections: %{
+    "start" => %{
+      "success" => [
+        %Connection{
+          from: "start",
+          to: "process_user", 
+          from_port: "success",
+          to_port: "input"
+        }
+      ]
     },
-    %Connection{
-      from: "process_user",
-      to: "send_welcome",
-      from_port: "success",
-      to_port: "input"
+    "process_user" => %{
+      "success" => [
+        %Connection{
+          from: "process_user",
+          to: "send_welcome",
+          from_port: "success", 
+          to_port: "input"
+        }
+      ]
     }
-  ]
+  }
 }
 ```
 

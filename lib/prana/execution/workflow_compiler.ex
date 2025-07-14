@@ -160,8 +160,10 @@ defmodule Prana.WorkflowCompiler do
   @spec find_connected_nodes(Workflow.t(), String.t()) :: [String.t()]
   defp find_connected_nodes(%Workflow{connections: connections}, from_node_key) do
     connections
-    |> Enum.filter(fn conn -> conn.from == from_node_key end)
-    |> Enum.map(fn conn -> conn.to end)
+    |> Map.get(from_node_key, %{})
+    |> Enum.flat_map(fn {_port, conns} -> 
+         Enum.map(conns, & &1.to)
+       end)
     |> Enum.uniq()
   end
 
@@ -172,9 +174,21 @@ defmodule Prana.WorkflowCompiler do
 
     # Filter connections to only include those between reachable nodes
     reachable_connections =
-      Enum.filter(workflow.connections, fn conn ->
-        MapSet.member?(reachable_node_keys, conn.from) and MapSet.member?(reachable_node_keys, conn.to)
-      end)
+      reachable_node_keys
+      |> Map.new(fn node_key ->
+           node_connections = Map.get(workflow.connections, node_key, %{})
+           
+           # Filter connections to only include reachable targets
+           filtered_ports = 
+             Map.new(node_connections, fn {port, conns} ->
+               filtered_conns = Enum.filter(conns, fn conn ->
+                 MapSet.member?(reachable_node_keys, conn.to)
+               end)
+               {port, filtered_conns}
+             end)
+           
+           {node_key, filtered_ports}
+         end)
 
     # Create new workflow with compiled nodes and connections
     %{workflow | nodes: reachable_nodes, connections: reachable_connections}
@@ -189,25 +203,37 @@ defmodule Prana.WorkflowCompiler do
   # that must complete before the key node can execute.
   @spec build_dependency_graph(Workflow.t()) :: map()
   defp build_dependency_graph(%Workflow{connections: connections}) do
-    Enum.reduce(connections, %{}, fn conn, acc ->
-      Map.update(acc, conn.to, [conn.from], fn deps ->
-        Enum.uniq([conn.from | deps])
-      end)
-    end)
+    connections
+    |> Enum.flat_map(fn {_node, ports} -> 
+         Enum.flat_map(ports, fn {_port, conns} -> conns end)
+       end)
+    |> Enum.reduce(%{}, fn conn, acc ->
+         Map.update(acc, conn.to, [conn.from], fn deps ->
+           Enum.uniq([conn.from | deps])
+         end)
+       end)
   end
 
   # Build connection map for fast lookup of outgoing connections.
   @spec build_connection_map(Workflow.t()) :: map()
   defp build_connection_map(%Workflow{connections: connections}) do
-    Enum.group_by(connections, fn conn ->
-      {conn.from, conn.from_port}
-    end)
+    connections
+    |> Enum.flat_map(fn {node_key, ports} ->
+         Enum.map(ports, fn {port, conns} ->
+           {{node_key, port}, conns}
+         end)
+       end)
+    |> Map.new()
   end
 
   # Build reverse connection map for fast lookup of incoming connections.
   @spec build_reverse_connection_map(Workflow.t()) :: map()
   defp build_reverse_connection_map(%Workflow{connections: connections}) do
-    Enum.group_by(connections, fn conn -> conn.to end)
+    connections
+    |> Enum.flat_map(fn {_node, ports} -> 
+         Enum.flat_map(ports, fn {_port, conns} -> conns end)
+       end)
+    |> Enum.group_by(fn conn -> conn.to end)
   end
 
   # Build node map for fast lookup of nodes by ID.
