@@ -203,10 +203,7 @@ defmodule Prana.Execution.SimpleLoopTest do
           name: "Attempt Operation",
           integration_name: "manual",
           action_name: "attempt_operation",
-          params: %{
-            "retry_count" => "{{ $input.retry_count }}",
-            "max_retries" => "{{ $input.max_retries }}"
-          },
+          params: %{},
           metadata: %{}
         },
 
@@ -217,7 +214,7 @@ defmodule Prana.Execution.SimpleLoopTest do
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
-            "condition" => "{{$input.should_retry}}"
+            "condition" => "$input.should_retry"
           },
           metadata: %{}
         },
@@ -228,10 +225,7 @@ defmodule Prana.Execution.SimpleLoopTest do
           name: "Increment Retry",
           integration_name: "manual",
           action_name: "increment_retry",
-          params: %{
-            "retry_count" => "{{ $input.retry_count }}",
-            "max_retries" => "{{ $input.max_retries }}"
-          },
+          params: %{},
           metadata: %{}
         },
 

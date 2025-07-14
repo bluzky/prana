@@ -29,3 +29,5 @@ prana-*.tar
 .tags
 
 .ctags.d
+
+.serena/
