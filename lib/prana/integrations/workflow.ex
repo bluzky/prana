@@ -1,14 +1,14 @@
 defmodule Prana.Integrations.Workflow do
   @moduledoc """
   Workflow Integration - Provides sub-workflow orchestration capabilities
-  
+
   Supports:
   - Synchronous sub-workflow execution (parent waits for completion)
   - Fire-and-forget sub-workflow execution (trigger and continue)
   - Parent-child workflow coordination
   - Error propagation from sub-workflows to parent
   - Timeout handling for long-running sub-workflows
-  
+
   This integration implements the unified suspension/resume mechanism
   described in ADR-003 for sub-workflow orchestration.
   """
@@ -37,12 +37,9 @@ defmodule Prana.Integrations.Workflow do
           type: :action,
           module: Prana.Integrations.Workflow.ExecuteWorkflowAction,
           input_ports: ["input"],
-          output_ports: ["success", "error", "failure", "timeout"],
-          
-      
+          output_ports: ["success", "error", "failure", "timeout"]
         }
       }
     }
   end
-
 end

@@ -1,7 +1,7 @@
 defmodule Prana.Template.Evaluator do
   @moduledoc """
   Expression evaluator for template expressions.
-  
+
   Evaluates parsed expression ASTs by integrating with Prana.ExpressionEngine
   for variable path resolution and implementing arithmetic/boolean operations.
   """
@@ -11,17 +11,17 @@ defmodule Prana.Template.Evaluator do
 
   @doc """
   Evaluate a parsed expression AST against a context.
-  
+
   ## Parameters
   - `ast` - Parsed expression AST from ExpressionParser
   - `context` - Context map for variable resolution
-  
+
   ## Returns
   - `{:ok, value}` - Successfully evaluated value
   - `{:error, reason}` - Evaluation error
-  
+
   ## Examples
-  
+
       context = %{"$input" => %{"age" => 25, "name" => "John"}}
       
       # Variable access
@@ -70,21 +70,23 @@ defmodule Prana.Template.Evaluator do
 
   # Handle both string and atom operators for compatibility
   defp apply_operator(op, left, right) when is_binary(op) do
-    atom_op = case op do
-      "+" -> :+
-      "-" -> :-
-      "*" -> :*
-      "/" -> :/
-      ">" -> :>
-      "<" -> :<
-      ">=" -> :>=
-      "<=" -> :<=
-      "==" -> :==
-      "!=" -> :!=
-      "&&" -> :&&
-      "||" -> :||
-      _ -> String.to_atom(op)
-    end
+    atom_op =
+      case op do
+        "+" -> :+
+        "-" -> :-
+        "*" -> :*
+        "/" -> :/
+        ">" -> :>
+        "<" -> :<
+        ">=" -> :>=
+        "<=" -> :<=
+        "==" -> :==
+        "!=" -> :!=
+        "&&" -> :&&
+        "||" -> :||
+        _ -> String.to_atom(op)
+      end
+
     apply_operator(atom_op, left, right)
   end
 
@@ -161,7 +163,7 @@ defmodule Prana.Template.Evaluator do
     case {coerce_to_number(left), coerce_to_number(right)} do
       {{:ok, left_num}, {:ok, right_num}} ->
         apply_operator(op, left_num, right_num)
-      
+
       _ ->
         {:error, "Cannot compare #{inspect(left)} and #{inspect(right)}"}
     end
@@ -185,7 +187,7 @@ defmodule Prana.Template.Evaluator do
     case apply_single_filter(value, filter) do
       {:ok, filtered_value} ->
         apply_filters(filtered_value, remaining_filters)
-      
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -206,9 +208,12 @@ defmodule Prana.Template.Evaluator do
   defp truthy?(_), do: true
 
   defp coerce_to_number(value) when is_number(value), do: {:ok, value}
+
   defp coerce_to_number(value) when is_binary(value) do
     case Float.parse(value) do
-      {num, ""} -> {:ok, num}
+      {num, ""} ->
+        {:ok, num}
+
       _ ->
         case Integer.parse(value) do
           {num, ""} -> {:ok, num}
@@ -216,5 +221,6 @@ defmodule Prana.Template.Evaluator do
         end
     end
   end
+
   defp coerce_to_number(_), do: {:error, "Cannot convert to number"}
 end

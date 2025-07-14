@@ -36,9 +36,7 @@ defmodule Prana.Integrations.Wait do
           type: :wait,
           module: Prana.Integrations.Wait.WaitAction,
           input_ports: ["input"],
-          output_ports: ["success", "timeout", "error"],
-          
-          
+          output_ports: ["success", "timeout", "error"]
         }
       }
     }

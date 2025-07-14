@@ -12,7 +12,7 @@ defmodule Prana.Integrations.DataTest do
       assert definition.display_name == "Data"
       assert definition.category == "core"
       assert Map.has_key?(definition.actions, "merge")
-      
+
       # Check that the action points to the correct module
       merge_action = definition.actions["merge"]
       assert merge_action.module == MergeAction

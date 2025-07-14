@@ -1,16 +1,16 @@
 defmodule Prana.Template.ExpressionParser do
   @moduledoc """
   Simple expression parser for template expressions.
-  
+
   For now, this is a simplified version that focuses on the basic patterns.
   Can be enhanced with NimbleParsec later for more complex expressions.
   """
 
   @doc """
   Parse an expression string into an AST.
-  
+
   ## Examples
-  
+
       iex> parse("$input.age + 10")
       {:ok, %{type: :binary_op, operator: "+", left: %{type: :variable, path: "$input.age"}, right: 10}}
       
@@ -20,17 +20,17 @@ defmodule Prana.Template.ExpressionParser do
   @spec parse(String.t()) :: {:ok, map()} | {:error, String.t()}
   def parse(expression_string) when is_binary(expression_string) do
     expression_string = String.trim(expression_string)
-    
+
     # Simple parsing approach - can be enhanced later
     cond do
       # Check for filters first (contains |)
       String.contains?(expression_string, "|") ->
         parse_filtered_expression(expression_string)
-      
+
       # Check for binary operations
       has_binary_operator?(expression_string) ->
         parse_binary_expression(expression_string)
-      
+
       # Simple variable or literal
       true ->
         parse_simple_expression(expression_string)
@@ -53,7 +53,7 @@ defmodule Prana.Template.ExpressionParser do
              {:ok, filters} <- parse_filters(String.trim(filters_part)) do
           {:ok, %{type: :filtered, expression: base_ast, filters: filters}}
         end
-      
+
       _ ->
         {:error, "Invalid filter expression"}
     end
@@ -62,24 +62,24 @@ defmodule Prana.Template.ExpressionParser do
   defp parse_filters(filters_str) do
     # Split on | but respect parentheses and quotes
     filter_parts = split_filters_smart(filters_str)
-    
-    filters = 
+
+    filters =
       Enum.map(filter_parts, fn filter_str ->
         filter_str = String.trim(filter_str)
-        
+
         case Regex.run(~r/^(\w+)(?:\(([^)]*)\))?$/, filter_str) do
           [_, name] ->
             %{name: name, args: []}
-          
+
           [_, name, args_str] ->
             args = parse_filter_args(args_str)
             %{name: name, args: args}
-          
+
           _ ->
             %{name: filter_str, args: []}
         end
       end)
-    
+
     {:ok, filters}
   end
 
@@ -124,6 +124,7 @@ defmodule Prana.Template.ExpressionParser do
   end
 
   defp parse_filter_args(""), do: []
+
   defp parse_filter_args(args_str) do
     # Smart argument parsing - handle quoted strings with commas
     args_str
@@ -167,14 +168,14 @@ defmodule Prana.Template.ExpressionParser do
   defp parse_binary_expression(expr) do
     # Find the main operator (rightmost for left-associativity)
     operators = ["||", "&&", "==", "!=", ">=", "<=", ">", "<", "+", "-", "*", "/"]
-    
+
     case find_main_operator(expr, operators) do
       {operator, left_part, right_part} ->
         with {:ok, left_ast} <- parse(String.trim(left_part)),
              {:ok, right_ast} <- parse(String.trim(right_part)) do
           {:ok, %{type: :binary_op, operator: operator, left: left_ast, right: right_ast}}
         end
-      
+
       nil ->
         parse_simple_expression(expr)
     end
@@ -186,7 +187,7 @@ defmodule Prana.Template.ExpressionParser do
       case String.split(expr, op, parts: 2) do
         [left, right] when left != expr ->
           {:halt, {op, left, right}}
-        
+
         _ ->
           {:cont, acc}
       end
@@ -195,40 +196,40 @@ defmodule Prana.Template.ExpressionParser do
 
   defp parse_simple_expression(expr) do
     expr = String.trim(expr)
-    
+
     cond do
       # Variable path: $input.field -> should access context["$input"]["field"]
       String.starts_with?(expr, "$") ->
         {:ok, %{type: :variable, path: expr}}
-      
+
       # String literal
       String.starts_with?(expr, "\"") and String.ends_with?(expr, "\"") ->
         content = String.slice(expr, 1..-2//1)
         {:ok, content}
-      
+
       String.starts_with?(expr, "'") and String.ends_with?(expr, "'") ->
         content = String.slice(expr, 1..-2//1)
         {:ok, content}
-      
+
       # Boolean literal
       expr == "true" ->
         {:ok, true}
-      
+
       expr == "false" ->
         {:ok, false}
-      
+
       # Number literal
       Regex.match?(~r/^\d+$/, expr) ->
         {:ok, String.to_integer(expr)}
-      
+
       Regex.match?(~r/^\d+\.\d+$/, expr) ->
         {:ok, String.to_float(expr)}
-      
+
       # Parentheses
       String.starts_with?(expr, "(") and String.ends_with?(expr, ")") ->
         inner = String.slice(expr, 1..-2//1)
         parse(inner)
-      
+
       # Default to string
       true ->
         {:ok, expr}
@@ -237,7 +238,7 @@ defmodule Prana.Template.ExpressionParser do
 
   defp parse_literal(str) do
     str = String.trim(str)
-    
+
     cond do
       str == "true" -> true
       str == "false" -> false

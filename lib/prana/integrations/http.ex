@@ -36,9 +36,7 @@ defmodule Prana.Integrations.HTTP do
           type: :action,
           module: Prana.Integrations.HTTP.RequestAction,
           input_ports: ["input"],
-          output_ports: ["success", "error", "timeout"],
-          
-          
+          output_ports: ["success", "error", "timeout"]
         },
         "webhook" => %Action{
           name: "webhook",
@@ -47,9 +45,7 @@ defmodule Prana.Integrations.HTTP do
           type: :trigger,
           module: Prana.Integrations.HTTP.WebhookAction,
           input_ports: [],
-          output_ports: ["success"],
-          
-          
+          output_ports: ["success"]
         }
       }
     }

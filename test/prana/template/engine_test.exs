@@ -13,7 +13,7 @@ defmodule Prana.Template.EngineTest do
           "verified" => true
         }
       }
-      
+
       {:ok, context: context}
     end
 
@@ -36,7 +36,7 @@ defmodule Prana.Template.EngineTest do
     test "handles missing variables by returning nil/empty string", %{context: context} do
       # Mixed template with missing field - nil becomes empty string
       assert {:ok, "Hello !"} = Engine.render("Hello {{ $input.missing_field }}!", context)
-      
+
       # Pure expression with missing field - returns nil
       assert {:ok, nil} = Engine.render("{{ $input.missing_field }}", context)
     end
@@ -48,22 +48,22 @@ defmodule Prana.Template.EngineTest do
     test "pure expressions return original data types", %{context: context} do
       # String value
       assert {:ok, "John"} = Engine.render("{{ $input.user.name }}", context)
-      
+
       # Integer value  
       assert {:ok, 35} = Engine.render("{{ $input.user.age }}", context)
-      
+
       # Boolean value
       assert {:ok, true} = Engine.render("{{ $input.verified }}", context)
-      
+
       # Float value
       assert {:ok, 99.99} = Engine.render("{{ $input.price }}", context)
-      
+
       # Arithmetic result (number)
       assert {:ok, 45} = Engine.render("{{ $input.user.age + 10 }}", context)
-      
+
       # Boolean expression result
       assert {:ok, true} = Engine.render("{{ $input.user.age >= 18 }}", context)
-      
+
       # Filter result (string from filter)
       assert {:ok, "JOHN"} = Engine.render("{{ $input.user.name | upper_case }}", context)
     end
@@ -71,10 +71,10 @@ defmodule Prana.Template.EngineTest do
     test "whitespace around expressions makes them mixed templates", %{context: context} do
       # Space before - mixed template, returns string
       assert {:ok, " John"} = Engine.render(" {{ $input.user.name }}", context)
-      
+
       # Space after - mixed template, returns string
       assert {:ok, "John "} = Engine.render("{{ $input.user.name }} ", context)
-      
+
       # Multiple expressions - mixed template, returns string
       assert {:ok, "John is 35"} = Engine.render("{{ $input.user.name }} is {{ $input.user.age }}", context)
     end

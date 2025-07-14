@@ -11,10 +11,10 @@ defmodule Prana.Template.Filters.CollectionFilters do
       name: "collection_filters",
       description: "Collection manipulation filters",
       filters: [
-        %{name: "length", function: {__MODULE__,:length}, description: "Get length/count of a collection"},
-        %{name: "first", function: {__MODULE__,:first}, description: "Get first item from a collection"},
-        %{name: "last", function: {__MODULE__,:last}, description: "Get last item from a collection"},
-        %{name: "join", function: {__MODULE__,:join}, description: "Join array elements with separator"}
+        %{name: "length", function: {__MODULE__, :length}, description: "Get length/count of a collection"},
+        %{name: "first", function: {__MODULE__, :first}, description: "Get first item from a collection"},
+        %{name: "last", function: {__MODULE__, :last}, description: "Get last item from a collection"},
+        %{name: "join", function: {__MODULE__, :join}, description: "Join array elements with separator"}
       ]
     }
   end

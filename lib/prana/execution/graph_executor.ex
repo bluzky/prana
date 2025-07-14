@@ -253,7 +253,9 @@ defmodule Prana.GraphExecutor do
     else
       # Increment iteration counter in both runtime and persistent metadata
       new_count = iteration_count + 1
-      execution = execution
+
+      execution =
+        execution
         |> put_in([Access.key(:__runtime), "iteration_count"], new_count)
         |> put_in([Access.key(:metadata), "iteration_count"], new_count)
 

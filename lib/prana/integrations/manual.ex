@@ -24,9 +24,7 @@ defmodule Prana.Integrations.Manual do
           type: :trigger,
           module: Prana.Integrations.Manual.TriggerAction,
           input_ports: [],
-          output_ports: ["success"],
-          
-        
+          output_ports: ["success"]
         },
         "process_adult" => %Action{
           name: "process_adult",
@@ -35,9 +33,7 @@ defmodule Prana.Integrations.Manual do
           type: :action,
           module: Prana.Integrations.Manual.ProcessAdultAction,
           input_ports: ["input"],
-          output_ports: ["success"],
-          
-        
+          output_ports: ["success"]
         },
         "process_minor" => %Action{
           name: "process_minor",
@@ -46,9 +42,7 @@ defmodule Prana.Integrations.Manual do
           type: :action,
           module: Prana.Integrations.Manual.ProcessMinorAction,
           input_ports: ["input"],
-          output_ports: ["success"],
-          
-        
+          output_ports: ["success"]
         },
         "set_data" => %Action{
           name: "set_data",
@@ -57,9 +51,7 @@ defmodule Prana.Integrations.Manual do
           type: :action,
           module: Prana.Integrations.Manual.SetDataAction,
           input_ports: ["input"],
-          output_ports: ["success"],
-          
-        
+          output_ports: ["success"]
         },
         "attempt_operation" => %Action{
           name: "attempt_operation",
@@ -68,9 +60,7 @@ defmodule Prana.Integrations.Manual do
           type: :action,
           module: Prana.Integrations.Manual.AttemptOperationAction,
           input_ports: ["input"],
-          output_ports: ["success"],
-          
-        
+          output_ports: ["success"]
         },
         "increment_retry" => %Action{
           name: "increment_retry",
@@ -79,9 +69,7 @@ defmodule Prana.Integrations.Manual do
           type: :action,
           module: Prana.Integrations.Manual.IncrementRetryAction,
           input_ports: ["input"],
-          output_ports: ["success"],
-          
-        
+          output_ports: ["success"]
         }
       }
     }

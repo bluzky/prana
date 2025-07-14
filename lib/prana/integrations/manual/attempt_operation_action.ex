@@ -10,21 +10,20 @@ defmodule Prana.Integrations.Manual.AttemptOperationAction do
     # Get values directly from input context
     retry_count = get_in(context, ["$input", "input", "retry_count"]) || 0
     max_retries = get_in(context, ["$input", "input", "max_retries"]) || 3
-    
-    
+
     # Simulate success after 2 retries
     success = retry_count >= 2
-    
+
     # Set should_retry flag based on success and retry count
     should_retry = !success and retry_count < max_retries
-    
+
     result = %{
       "retry_count" => retry_count,
       "max_retries" => max_retries,
       "success" => success,
       "should_retry" => should_retry
     }
-    
+
     {:ok, result}
   end
 end

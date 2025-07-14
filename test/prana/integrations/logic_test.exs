@@ -1,10 +1,10 @@
 defmodule Prana.Integrations.LogicTest do
   use ExUnit.Case, async: false
 
+  alias Prana.IntegrationRegistry
   alias Prana.Integrations.Logic
   alias Prana.Integrations.Logic.IfConditionAction
   alias Prana.Integrations.Logic.SwitchAction
-  alias Prana.IntegrationRegistry
 
   describe "Logic Integration definition" do
     test "returns correct integration definition" do
@@ -89,8 +89,8 @@ defmodule Prana.Integrations.LogicTest do
       context = %{}
       resume_data = %{}
 
-      assert {:error, "IF Condition action does not support suspension/resume"} = 
-        IfConditionAction.resume(params, context, resume_data)
+      assert {:error, "IF Condition action does not support suspension/resume"} =
+               IfConditionAction.resume(params, context, resume_data)
     end
   end
 
@@ -102,6 +102,7 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => "match2", "port" => "port2"}
         ]
       }
+
       context = %{}
 
       assert {:ok, nil, "port1"} = SwitchAction.execute(params, context)
@@ -114,6 +115,7 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => "match2", "port" => "port2"}
         ]
       }
+
       context = %{}
 
       assert {:ok, nil, "port2"} = SwitchAction.execute(params, context)
@@ -126,6 +128,7 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => "match2", "port" => "port2"}
         ]
       }
+
       context = %{}
 
       assert {:ok, nil, "port2"} = SwitchAction.execute(params, context)
@@ -137,6 +140,7 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => "match1"}
         ]
       }
+
       context = %{}
 
       assert {:ok, nil, "default"} = SwitchAction.execute(params, context)
@@ -149,26 +153,27 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => nil, "port" => "port2"}
         ]
       }
+
       context = %{}
 
-      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} = 
-        SwitchAction.execute(params, context)
+      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} =
+               SwitchAction.execute(params, context)
     end
 
     test "execute/2 returns error when cases is empty" do
       params = %{"cases" => []}
       context = %{}
 
-      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} = 
-        SwitchAction.execute(params, context)
+      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} =
+               SwitchAction.execute(params, context)
     end
 
     test "execute/2 handles missing cases parameter" do
       params = %{}
       context = %{}
 
-      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} = 
-        SwitchAction.execute(params, context)
+      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} =
+               SwitchAction.execute(params, context)
     end
 
     test "execute/2 processes cases in order" do
@@ -179,6 +184,7 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => "second_match", "port" => "port3"}
         ]
       }
+
       context = %{}
 
       # Should return port2 as it's the first matching case
@@ -194,6 +200,7 @@ defmodule Prana.Integrations.LogicTest do
           %{"condition" => "fallback", "port" => "default_port"}
         ]
       }
+
       context = %{}
 
       # Should return active_port as it's the first non-empty condition

@@ -91,11 +91,10 @@ defmodule Prana.Behaviour.Action do
       end
   """
 
-
   @type suspension_type :: :webhook | :interval | :schedule | :sub_workflow | atom()
   @type suspend_data :: term()
   @type preparation_data :: map()
-  @type params :: map() 
+  @type params :: map()
   @type output_data :: term()
   @type resume_input :: map()
 
@@ -214,12 +213,12 @@ defmodule Prana.Behaviour.Action do
   @doc """
   Validates params for this action using schema.
   """
-  @callback validate_params(params :: map()) :: 
-    {:ok, validated_map :: map()} | {:error, reasons :: [String.t()]}
+  @callback validate_params(params :: map()) ::
+              {:ok, validated_map :: map()} | {:error, reasons :: [String.t()]}
 
   @doc """
   Returns true if this action supports suspension/resume operations.
-  
+
   Default implementation returns false. Override to return true for actions
   that implement suspension/resume functionality.
   """
