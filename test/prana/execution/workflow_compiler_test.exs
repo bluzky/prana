@@ -226,7 +226,7 @@ defmodule Prana.WorkflowCompilerTest do
       assert graph.total_nodes == 3
       assert graph.trigger_node.key == "webhook"
       assert length(graph.workflow.nodes) == 3
-      assert length(graph.workflow.connections) == 2
+      assert length(Workflow.all_connections(graph.workflow)) == 2
     end
 
     test "compiles parallel workflow" do
@@ -313,14 +313,14 @@ defmodule Prana.WorkflowCompilerTest do
 
       # Original workflow has 4 nodes
       assert length(workflow.nodes) == 4
-      assert length(workflow.connections) == 2
+      assert length(Workflow.all_connections(workflow)) == 2
 
       {:ok, graph} = WorkflowCompiler.compile(workflow)
 
       # Compiled graph should only have reachable nodes (2 nodes)
       assert graph.total_nodes == 2
       assert length(graph.workflow.nodes) == 2
-      assert length(graph.workflow.connections) == 1
+      assert length(Workflow.all_connections(graph.workflow)) == 1
 
       # Should only contain webhook and validate nodes
       node_keys = Enum.map(graph.workflow.nodes, & &1.key)
@@ -341,7 +341,7 @@ defmodule Prana.WorkflowCompilerTest do
       # All nodes should be preserved
       assert graph.total_nodes == 3
       assert length(graph.workflow.nodes) == 3
-      assert length(graph.workflow.connections) == 2
+      assert length(Workflow.all_connections(graph.workflow)) == 2
     end
   end
 

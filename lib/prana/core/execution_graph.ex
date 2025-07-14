@@ -13,17 +13,29 @@ defmodule Prana.ExecutionGraph do
       # Original workflow: 7 nodes, 2 unreachable
       workflow = %Workflow{
         nodes: [webhook, validate, save, email, log, orphan_a, orphan_b],
-        connections: [webhook→validate, webhook→log, validate→save, save→email, orphan_a→orphan_b]
+        connections: %{
+          "webhook" => %{"success" => [conn_to_validate, conn_to_log]},
+          "validate" => %{"success" => [conn_to_save]},
+          "save" => %{"success" => [conn_to_email]},
+          "orphan_a" => %{"success" => [conn_to_orphan_b]}
+        }
       }
-      
+
       # Compiled execution graph: 5 nodes, optimized
       {:ok, graph} = WorkflowCompiler.compile(workflow)
       %ExecutionGraph{
-        workflow: %Workflow{nodes: [webhook, validate, save, email, log]},  # Pruned
+        workflow: %Workflow{
+          nodes: [webhook, validate, save, email, log],  # Pruned
+          connections: %{
+            "webhook" => %{"success" => [conn_to_validate, conn_to_log]},
+            "validate" => %{"success" => [conn_to_save]},
+            "save" => %{"success" => [conn_to_email]}
+          }
+        },
         trigger_node: webhook,
         dependency_graph: %{
           "validate" => ["webhook"],
-          "log" => ["webhook"], 
+          "log" => ["webhook"],
           "save" => ["validate"],
           "email" => ["save"]
         },

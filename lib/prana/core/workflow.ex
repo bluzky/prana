@@ -9,7 +9,7 @@ defmodule Prana.Workflow do
           description: String.t() | nil,
           version: integer(),
           nodes: [Prana.Node.t()],
-          connections: [Prana.Connection.t()],
+          connections: %{String.t() => %{String.t() => [Prana.Connection.t()]}},
           variables: map(),
           settings: Prana.WorkflowSettings.t(),
           metadata: map()
@@ -37,7 +37,7 @@ defmodule Prana.Workflow do
       description: description,
       version: 1,
       nodes: [],
-      connections: [],
+      connections: %{},
       variables: %{},
       settings: %Prana.WorkflowSettings{},
       metadata: %{}
@@ -54,7 +54,7 @@ defmodule Prana.Workflow do
       description: Map.get(data, "description") || Map.get(data, :description),
       version: Map.get(data, "version") || Map.get(data, :version) || 1,
       nodes: parse_nodes(Map.get(data, "nodes") || Map.get(data, :nodes) || []),
-      connections: parse_connections(Map.get(data, "connections") || Map.get(data, :connections) || []),
+      connections: parse_connections(Map.get(data, "connections") || Map.get(data, :connections) || %{}),
       variables: Map.get(data, "variables") || Map.get(data, :variables) || %{},
       settings: parse_settings(Map.get(data, "settings") || Map.get(data, :settings) || %{}),
       metadata: Map.get(data, "metadata") || Map.get(data, :metadata) || %{}
@@ -65,7 +65,13 @@ defmodule Prana.Workflow do
   Gets entry nodes (nodes with no incoming connections)
   """
   def get_entry_nodes(%__MODULE__{nodes: nodes, connections: connections}) do
-    target_node_keys = MapSet.new(connections, & &1.to)
+    target_node_keys = 
+      connections
+      |> Enum.flat_map(fn {_node, ports} -> 
+           Enum.flat_map(ports, fn {_port, conns} -> conns end)
+         end)
+      |> MapSet.new(& &1.to)
+    
     Enum.reject(nodes, &MapSet.member?(target_node_keys, &1.key))
   end
 
@@ -73,7 +79,9 @@ defmodule Prana.Workflow do
   Gets connections from a specific node and port
   """
   def get_connections_from(%__MODULE__{connections: connections}, node_key, port) do
-    Enum.filter(connections, &(&1.from == node_key && &1.from_port == port))
+    connections
+    |> Map.get(node_key, %{})
+    |> Map.get(port, [])
   end
 
   @doc """
@@ -110,7 +118,43 @@ defmodule Prana.Workflow do
   Adds a connection to the workflow
   """
   def add_connection(%__MODULE__{connections: connections} = workflow, %Prana.Connection{} = connection) do
-    {:ok, %{workflow | connections: connections ++ [connection]}}
+    updated_connections = 
+      connections
+      |> Map.put_new(connection.from, %{})
+      |> Map.update!(connection.from, fn ports ->
+           current_conns = Map.get(ports, connection.from_port, [])
+           Map.put(ports, connection.from_port, current_conns ++ [connection])
+         end)
+    
+    {:ok, %{workflow | connections: updated_connections}}
+  end
+
+  @doc """
+  Gets all connections as flat list (utility function for tests and validation)
+  """
+  def all_connections(%__MODULE__{connections: connections}) do
+    connections
+    |> Enum.flat_map(fn {_node, ports} -> 
+         Enum.flat_map(ports, fn {_port, conns} -> conns end)
+       end)
+  end
+
+  @doc """
+  Gets connections from specific node (all ports)
+  """
+  def get_connections_from_node(%__MODULE__{connections: connections}, node_key) do
+    connections
+    |> Map.get(node_key, %{})
+    |> Enum.flat_map(fn {_port, conns} -> conns end)
+  end
+
+  @doc """
+  Gets all output ports for a node
+  """
+  def get_output_ports(%__MODULE__{connections: connections}, node_key) do
+    connections
+    |> Map.get(node_key, %{})
+    |> Map.keys()
   end
 
   @doc """
@@ -136,9 +180,24 @@ defmodule Prana.Workflow do
     Enum.map(nodes, &Prana.Node.from_map/1)
   end
 
-  defp parse_connections(connections) when is_list(connections) do
-    Enum.map(connections, &Prana.Connection.from_map/1)
+  defp parse_connections(connections) when is_map(connections) do
+    # Parse connection structs from map format
+    connections
+    |> Enum.map(fn {node_key, ports} ->
+         parsed_ports = 
+           ports
+           |> Enum.map(fn {port, conns} ->
+                parsed_conns = Enum.map(conns, &Prana.Connection.from_map/1)
+                {port, parsed_conns}
+              end)
+           |> Map.new()
+         
+         {node_key, parsed_ports}
+       end)
+    |> Map.new()
   end
+
+  defp parse_connections(_), do: %{}
 
   defp parse_settings(settings) when is_map(settings) do
     struct(Prana.WorkflowSettings, settings)
@@ -176,8 +235,14 @@ defmodule Prana.Workflow do
   defp validate_connections(connections, nodes) do
     node_keys = MapSet.new(nodes, & &1.key)
 
+    all_connections = 
+      connections
+      |> Enum.flat_map(fn {_node, ports} -> 
+           Enum.flat_map(ports, fn {_port, conns} -> conns end)
+         end)
+
     invalid_connections =
-      Enum.reject(connections, fn conn ->
+      Enum.reject(all_connections, fn conn ->
         MapSet.member?(node_keys, conn.from) &&
           MapSet.member?(node_keys, conn.to)
       end)

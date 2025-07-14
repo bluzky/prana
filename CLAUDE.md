@@ -39,11 +39,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Key Components
 
 #### Core Data Structures (`lib/prana/core/`)
-- **`Prana.Workflow`**: Complete workflow with nodes and connections
+- **`Prana.Workflow`**: Complete workflow with nodes and double-indexed connections
 - **`Prana.Node`**: Individual workflow node with type, integration, action, and configuration
 - **`Prana.Connection`**: Port-based connections between nodes with conditions and data mapping
 - **`Prana.NodeExecution`**: Individual node execution state tracking
 - **`Prana.ExecutionContext`**: Shared execution context across workflow
+
+#### Optimized Connection Structure
+```elixir
+%Workflow{
+  connections: %{
+    "node_key" => %{
+      "output_port" => [%Connection{...}, ...],
+      "error_port" => [%Connection{...}, ...]
+    }
+  }
+}
+```
 
 #### Execution Engine
 - **`Prana.NodeExecutor`** (`node_executor.ex`): ✅ **PRODUCTION READY** - Executes individual nodes with expression-based input preparation, Action behavior execution, suspension/resume patterns, and comprehensive error handling
@@ -197,6 +209,7 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 - **GraphExecutor handles all execution patterns** - sequential, conditional branching, fork-join, sub-workflows
 - **Current focus** is additional integrations (Wait, HTTP, Transform, Log) for broader workflow capabilities
 - **Major performance improvements**: Single trigger execution, graph pruning, O(1) connection lookups
+- **Double-indexed connections**: Optimized `%{node_key => %{output_port => [connections]}}` structure for ultra-fast routing
 - **Advanced execution patterns**: Conditional branching, diamond patterns, sub-workflow coordination
 
 #### Adding New Features

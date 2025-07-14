@@ -49,6 +49,19 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
     end
   end
 
+  # Helper function to convert list-based connections to map-based
+  defp convert_connections_to_map(workflow) do
+    connections_list = workflow.connections
+    
+    # Convert to proper map structure using add_connection
+    workflow_with_empty_connections = %{workflow | connections: %{}}
+    
+    Enum.reduce(connections_list, workflow_with_empty_connections, fn connection, acc_workflow ->
+      {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
+      updated_workflow
+    end)
+  end
+
   setup do
     # Start the IntegrationRegistry GenServer for testing
     {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
@@ -119,7 +132,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -189,7 +202,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -269,7 +282,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -347,7 +360,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -422,7 +435,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -518,7 +531,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -577,7 +590,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -666,7 +679,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       }
 
       # Compile and execute workflow
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,

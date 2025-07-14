@@ -23,6 +23,19 @@ defmodule Prana.Execution.DiamondForkTest do
   # Setup and Helpers
   # ============================================================================
 
+  # Helper function to convert list-based connections to map-based
+  defp convert_connections_to_map(workflow) do
+    connections_list = workflow.connections
+    
+    # Convert to proper map structure using add_connection
+    workflow_with_empty_connections = %{workflow | connections: %{}}
+    
+    Enum.reduce(connections_list, workflow_with_empty_connections, fn connection, acc_workflow ->
+      {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
+      updated_workflow
+    end)
+  end
+
   setup do
     # Start integration registry for each test
     Code.ensure_loaded(Prana.Integrations.Data)
@@ -187,7 +200,7 @@ defmodule Prana.Execution.DiamondForkTest do
   describe "Basic Diamond Execution" do
     test "executes diamond pattern A → (B, C) → Merge → D successfully" do
       workflow = create_basic_diamond_workflow()
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -230,7 +243,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
     test "merge receives outputs from both branches" do
       workflow = create_basic_diamond_workflow()
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -256,7 +269,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
     test "final node receives merged data from merge node" do
       workflow = create_basic_diamond_workflow()
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -288,7 +301,7 @@ defmodule Prana.Execution.DiamondForkTest do
   describe "Fail-Fast Behavior" do
     test "workflow fails when first branch (B) fails" do
       workflow = create_diamond_workflow_with_failing_branch("branch_b")
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -326,7 +339,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
     test "workflow fails when second branch (C) fails" do
       workflow = create_diamond_workflow_with_failing_branch("branch_c")
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -365,7 +378,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
     test "merge and final nodes do not execute when any branch fails" do
       workflow = create_diamond_workflow_with_failing_branch("branch_b")
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -413,7 +426,7 @@ defmodule Prana.Execution.DiamondForkTest do
   describe "Context Tracking" do
     test "executed_nodes includes all diamond pattern nodes in correct order" do
       workflow = create_basic_diamond_workflow()
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -439,7 +452,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
     test "merge node can access both branch results" do
       workflow = create_basic_diamond_workflow()
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
@@ -470,7 +483,7 @@ defmodule Prana.Execution.DiamondForkTest do
 
     test "final node can access merged results" do
       workflow = create_basic_diamond_workflow()
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,

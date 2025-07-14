@@ -25,6 +25,19 @@ defmodule Prana.Execution.SimpleLoopTest do
   # Setup and Helpers
   # ============================================================================
 
+  # Helper function to convert list-based connections to map-based
+  defp convert_connections_to_map(workflow) do
+    connections_list = workflow.connections
+    
+    # Convert to proper map structure using add_connection
+    workflow_with_empty_connections = %{workflow | connections: %{}}
+    
+    Enum.reduce(connections_list, workflow_with_empty_connections, fn connection, acc_workflow ->
+      {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
+      updated_workflow
+    end)
+  end
+
   setup do
     # Start integration registry for each test
     Code.ensure_loaded(Prana.Integrations.Logic)
@@ -306,7 +319,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
   describe "simple counter loop" do
     test "executes counter-based loop correctly" do
-      workflow = create_simple_counter_loop_workflow()
+      workflow = create_simple_counter_loop_workflow() |> convert_connections_to_map()
 
       # Compile workflow into execution graph
       {:ok, execution_graph} =
@@ -343,10 +356,10 @@ defmodule Prana.Execution.SimpleLoopTest do
 
   describe "simple retry loop" do
     test "executes retry pattern correctly" do
-      workflow = create_retry_loop_workflow()
+      workflow = create_retry_loop_workflow() |> convert_connections_to_map()
 
       # Compile workflow into execution graph
-      {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
+      {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
 
       # Create execution context
       context = %{
@@ -379,7 +392,7 @@ defmodule Prana.Execution.SimpleLoopTest do
 
   describe "loop termination" do
     test "prevents infinite loops with proper condition design" do
-      workflow = create_simple_counter_loop_workflow()
+      workflow = create_simple_counter_loop_workflow() |> convert_connections_to_map()
 
       # Compile workflow into execution graph
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")

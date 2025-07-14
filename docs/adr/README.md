@@ -21,6 +21,7 @@ Each ADR includes:
 | [003](./003-unified-suspension-resume.md) | Unified Suspension/Resume Mechanism for Async Coordination | Proposed | 2025-07-05 |
 | [004](./004-middleware-system.md) | Middleware System for Workflow Lifecycle Events | Accepted | 2025-07-05 |
 | [006](./006-loop-integration-design.md) | Loop Integration Design | Proposed | 2025-07-05 |
+| [007](./007-double-indexed-connection-optimization.md) | Double-Indexed Connection Structure Optimization | Accepted | 2025-07-14 |
 
 ## Creating New ADRs
 
