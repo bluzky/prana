@@ -182,15 +182,6 @@ defmodule Prana.GraphExecutor do
     env_data = Map.get(context, :env, %{})
     execution = Execution.rebuild_runtime(execution, env_data)
 
-    # For new executions, initialize active_nodes with trigger node and node_depth map
-    active_nodes = MapSet.new([execution_graph.trigger_node_key])
-    node_depth = %{execution_graph.trigger_node_key => 0}
-
-    execution =
-      execution
-      |> put_in([Access.key(:__runtime), "active_nodes"], active_nodes)
-      |> put_in([Access.key(:__runtime), "node_depth"], node_depth)
-
     # Emit execution started event
     Middleware.call(:execution_started, %{execution: execution})
 
@@ -234,23 +225,18 @@ defmodule Prana.GraphExecutor do
   defp execute_workflow_loop(execution, execution_graph) do
     # Check for infinite loop protection
     # Note: iteration_count is persisted in metadata to survive suspension/resume cycles
-    iteration_count = execution.__runtime["iteration_count"] || 0
-    max_iterations = execution.__runtime["max_iterations"] || 100
+    iteration_count = Execution.get_iteration_count(execution)
+    max_iterations = Execution.get_max_iterations(execution)
 
     if iteration_count >= max_iterations do
       failed_execution = Execution.fail(execution)
       {:error, failed_execution}
     else
       # Increment iteration counter in both runtime and persistent metadata
-      new_count = iteration_count + 1
-
-      execution =
-        execution
-        |> put_in([Access.key(:__runtime), "iteration_count"], new_count)
-        |> put_in([Access.key(:metadata), "iteration_count"], new_count)
+      execution = Execution.increment_iteration_count(execution)
 
       # Get active nodes from runtime state
-      active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
+      active_nodes = Execution.get_active_nodes(execution)
 
       # Continue execution with updated state
       # Note: Execution.__runtime is updated internally by NodeExecutor

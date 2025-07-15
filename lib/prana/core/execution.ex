@@ -800,4 +800,65 @@ defmodule Prana.Execution do
 
     %{execution | node_executions: updated_node_executions}
   end
+
+
+  @doc """
+  Increment iteration count for loop protection.
+  
+  This function increments the iteration counter in both runtime and persistent
+  metadata to track workflow execution progress and prevent infinite loops.
+  
+  ## Parameters
+  - `execution` - The execution to update
+  
+  ## Returns
+  Updated execution with incremented iteration count
+  """
+  def increment_iteration_count(execution) do
+    current_count = execution.__runtime["iteration_count"] || 0
+    new_count = current_count + 1
+
+    execution
+    |> put_in([Access.key(:__runtime), "iteration_count"], new_count)
+    |> put_in([Access.key(:metadata), "iteration_count"], new_count)
+  end
+
+  @doc """
+  Get iteration count from runtime state.
+  
+  ## Parameters
+  - `execution` - The execution to get iteration count from
+  
+  ## Returns
+  Current iteration count as integer
+  """
+  def get_iteration_count(execution) do
+    execution.__runtime["iteration_count"] || 0
+  end
+
+  @doc """
+  Get maximum iterations from runtime state.
+  
+  ## Parameters
+  - `execution` - The execution to get max iterations from
+  
+  ## Returns
+  Maximum iterations as integer
+  """
+  def get_max_iterations(execution) do
+    execution.__runtime["max_iterations"] || 100
+  end
+
+  @doc """
+  Get active nodes from runtime state.
+  
+  ## Parameters
+  - `execution` - The execution to get active nodes from
+  
+  ## Returns
+  MapSet of active node keys
+  """
+  def get_active_nodes(execution) do
+    execution.__runtime["active_nodes"] || MapSet.new()
+  end
 end
