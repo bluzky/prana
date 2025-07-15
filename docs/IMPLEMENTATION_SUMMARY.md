@@ -235,7 +235,6 @@ prana/
 ```
 
 #### Supporting Structures
-- `Prana.Condition` (`condition.ex`) - Connection routing conditions
 - `Prana.Integration` (`integration.ex`) - Integration definition struct
 - `Prana.Action` (`action.ex`) - Action definition struct
 - `Prana.Execution` (`execution.ex`) - Workflow execution instance

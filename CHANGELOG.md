@@ -60,7 +60,6 @@
   - `Prana.Workflow` - Workflow definition with nodes and connections
   - `Prana.Node` - Individual node with type, integration, action, config
   - `Prana.Connection` - Connection between nodes with ports and conditions
-  - `Prana.Condition` - Connection routing conditions
   - `Prana.Integration` - Integration struct with actions
   - `Prana.Action` - Action struct with metadata
   - `Prana.Execution` - Workflow execution instance

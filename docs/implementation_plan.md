@@ -29,7 +29,6 @@
 - [x] `Prana.Workflow` - Workflow definition with nodes and connections
 - [x] `Prana.Node` - Individual node with type, integration, action, config
 - [x] `Prana.Connection` - Connection between nodes with ports and conditions
-- [x] `Prana.Condition` - Connection routing conditions
 - [x] `Prana.Integration` - Integration struct with actions
 - [x] `Prana.Action` - Action struct with metadata
 
