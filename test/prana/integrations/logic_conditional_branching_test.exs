@@ -18,7 +18,6 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
   alias Prana.TestSupport.TestIntegration
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
-  alias Prana.WorkflowSettings
 
   # Helper functions for handling map-based node_executions
   defp get_all_node_executions(execution) do
@@ -52,10 +51,10 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
   # Helper function to convert list-based connections to map-based
   defp convert_connections_to_map(workflow) do
     connections_list = workflow.connections
-    
+
     # Convert to proper map structure using add_connection
     workflow_with_empty_connections = %{workflow | connections: %{}}
-    
+
     Enum.reduce(connections_list, workflow_with_empty_connections, fn connection, acc_workflow ->
       {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
       updated_workflow
@@ -127,8 +126,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
           %Connection{from: "trigger", from_port: "success", to: "if_condition", to_port: "input"},
           %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "input"},
           %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow
@@ -197,8 +195,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
           %Connection{from: "trigger", from_port: "success", to: "if_condition", to_port: "input"},
           %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "input"},
           %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow
@@ -277,8 +274,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
           %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"},
           %Connection{from: "true_branch", from_port: "success", to: "merge", to_port: "input"},
           %Connection{from: "false_branch", from_port: "success", to: "merge", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow
@@ -355,8 +351,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
           %Connection{from: "trigger", from_port: "success", to: "switch", to_port: "input"},
           %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "input"},
           %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow
@@ -430,8 +425,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
           %Connection{from: "trigger", from_port: "success", to: "switch", to_port: "input"},
           %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "input"},
           %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow
@@ -526,8 +520,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
           %Connection{from: "case1_branch", from_port: "success", to: "merge", to_port: "input"},
           %Connection{from: "case2_branch", from_port: "success", to: "merge", to_port: "input"},
           %Connection{from: "case3_branch", from_port: "success", to: "merge", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow
@@ -585,8 +578,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         nodes: [trigger_node, switch_node],
         connections: [
           %Connection{from: "trigger", from_port: "success", to: "switch", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow
@@ -603,7 +595,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       # Verify execution failed with fail-fast behavior
       assert {:error, result} = execution_result
       assert result.status == :failed
-      
+
       # In fail-fast mode, execution stops early when invalid conditions are detected
       # The switch node with empty/nil conditions is detected as invalid before execution
     end
@@ -665,8 +657,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
           %Connection{from: "switch", from_port: "case1", to: "if_condition", to_port: "input"},
           %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "input"},
           %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"}
-        ],
-        settings: %WorkflowSettings{}
+        ]
       }
 
       # Compile and execute workflow

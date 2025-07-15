@@ -188,10 +188,7 @@ end
 %Prana.Node{
   type: :action,
   integration_name: "core",
-  action_name: "merge",
-  settings: %{
-    "strategy" => "combine_arrays"     # Data combination only
-  }
+  action_name: "merge"
 }
 ```
 
@@ -233,12 +230,7 @@ end
 %Prana.Node{
   type: :wait,
   integration_name: "core",
-  action_name: "wait_for_completion",
-  settings: %{
-    "timeout_ms" => 30000,
-    "wait_strategy" => "all_branches",
-    "on_timeout" => "fail"
-  }
+  action_name: "wait_for_completion"
 }
 ```
 
@@ -590,7 +582,6 @@ end
 ## 8. Implementation Phases
 
 ### Phase 3.1: Core Patterns (✅ COMPLETED)
-- ✅ Node settings attribute
 - ✅ Sequential execution implementation (`execute_nodes_sequentially/4`)
 - ✅ Multi-branching with fail-fast behavior
 - ✅ Linear branching pattern (A → B, C, D sequential)

@@ -41,7 +41,6 @@
 ### 1.3 Configuration Types
 - [x] `Prana.ErrorHandling` - Error handling configuration
 - [x] `Prana.RetryPolicy` - Retry policy configuration
-- [x] `Prana.WorkflowSettings` - Workflow-level settings
 
 ## 2. Core Behaviors (✅ COMPLETED - Simplified)
 
@@ -118,7 +117,7 @@
   - [x] **Performance optimization** - O(1) connection lookups, optimized context
   - [x] **End-to-end testing** with comprehensive test coverage
 
-#### Phase 3.2: Conditional Branching (✅ COMPLETED) 
+#### Phase 3.2: Conditional Branching (✅ COMPLETED)
 - [x] **Advanced conditional execution patterns** with branch-following strategy
   - [x] **IF/ELSE branching** - exclusive path execution based on conditions
   - [x] **Switch/Case routing** - multi-branch routing (premium, standard, basic, default)
@@ -130,7 +129,7 @@
   - [x] **Context-aware data routing** - conditional paths marked during routing
   - [x] **Comprehensive testing** - 24 passing conditional branching tests (1358 lines)
 
-#### Phase 3.3: Diamond Pattern Coordination (✅ COMPLETED) 
+#### Phase 3.3: Diamond Pattern Coordination (✅ COMPLETED)
 - [x] **Fork-join coordination patterns** with data merging
   - [x] **Diamond pattern execution** - A → (B, C) → Merge → D
   - [x] **Merge integration** - core merge action with multiple strategies
@@ -411,7 +410,7 @@ prana/
 # Before: O(n) connection scans
 connections: [%Connection{...}, %Connection{...}, ...]
 
-# After: O(1) connection lookups  
+# After: O(1) connection lookups
 connections: %{
   "node_key" => %{
     "output_port" => [%Connection{...}],
@@ -431,7 +430,7 @@ connections: %{
 #### Implementation Benefits
 - **Ultra-fast connection lookups**: `workflow.connections[node_key][port]`
 - **Optimized graph traversal**: Instant connected node discovery
-- **Efficient pruning**: Only process reachable connections  
+- **Efficient pruning**: Only process reachable connections
 - **Better memory locality**: Related connections stored together
 - **Scalable execution**: Optimized for workflows with hundreds of connections
 

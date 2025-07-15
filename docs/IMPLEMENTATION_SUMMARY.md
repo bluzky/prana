@@ -157,7 +157,6 @@ prana/
   nodes: [Prana.Node.t()],
   connections: [Prana.Connection.t()],
   variables: map(),
-  settings: Prana.WorkflowSettings.t(),
   metadata: map()
 }
 ```
@@ -245,7 +244,6 @@ prana/
 - `Prana.ExecutionContext` (`execution_context.ex`) - Shared execution context
 - `Prana.ErrorHandling` (`error_handling.ex`) - Error handling configuration
 - `Prana.RetryPolicy` (`retry_policy.ex`) - Retry policy configuration
-- `Prana.WorkflowSettings` (`workflow_settings.ex`) - Workflow-level settings
 
 ### Behavior Definitions (`lib/prana/behaviours/`)
 

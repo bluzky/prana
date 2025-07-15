@@ -15,8 +15,8 @@ defmodule Prana.Execution.DiamondForkTest do
   alias Prana.GraphExecutor
   alias Prana.Integrations.Data
   alias Prana.Integrations.Manual
-  alias Prana.TestSupport.TestIntegration
   alias Prana.Node
+  alias Prana.TestSupport.TestIntegration
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
 
@@ -27,10 +27,10 @@ defmodule Prana.Execution.DiamondForkTest do
   # Helper function to convert list-based connections to map-based
   defp convert_connections_to_map(workflow) do
     connections_list = workflow.connections
-    
+
     # Convert to proper map structure using add_connection
     workflow_with_empty_connections = %{workflow | connections: %{}}
-    
+
     Enum.reduce(connections_list, workflow_with_empty_connections, fn connection, acc_workflow ->
       {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
       updated_workflow
@@ -182,7 +182,6 @@ defmodule Prana.Execution.DiamondForkTest do
         }
       ],
       variables: %{},
-      settings: %{},
       metadata: %{}
     }
   end
@@ -311,7 +310,7 @@ defmodule Prana.Execution.DiamondForkTest do
   describe "Fail-Fast Behavior" do
     test "workflow fails when first branch (B) fails" do
       workflow = create_diamond_workflow_with_failing_branch("branch_b")
-      
+
       {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "start")
 
       context = %{
@@ -323,11 +322,10 @@ defmodule Prana.Execution.DiamondForkTest do
       # Execute the workflow
       result = GraphExecutor.execute_graph(execution_graph, context)
 
-
       # Verify workflow failed with fail-fast behavior
       assert {:error, failed_execution} = result
       assert failed_execution.status == :failed
-      
+
       # In fail-fast mode, execution stops early and may not execute the failing node
       # The important thing is that merge and final nodes do not execute
     end
@@ -348,7 +346,7 @@ defmodule Prana.Execution.DiamondForkTest do
       # Verify workflow failed with fail-fast behavior
       assert {:error, failed_execution} = result
       assert failed_execution.status == :failed
-      
+
       # In fail-fast mode, execution stops early and may not execute the failing node
       # The important thing is that merge and final nodes do not execute
     end
@@ -369,7 +367,7 @@ defmodule Prana.Execution.DiamondForkTest do
       # Verify workflow failed with fail-fast behavior
       assert {:error, failed_execution} = result
       assert failed_execution.status == :failed
-      
+
       # In fail-fast mode, execution stops early and may not execute the failing node
       # The important thing is that merge and final nodes do not execute
     end

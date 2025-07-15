@@ -68,7 +68,6 @@
   - `Prana.ExecutionContext` - Shared execution context
   - `Prana.ErrorHandling` - Error handling configuration
   - `Prana.RetryPolicy` - Retry policy configuration
-  - `Prana.WorkflowSettings` - Workflow-level settings
 
 - **Behavior Definitions**: Clean contracts for extensibility
   - `Prana.Behaviour.Integration` - Integration contract with `definition/0` callback

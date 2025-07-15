@@ -19,7 +19,6 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   alias Prana.TestSupport.TestIntegration
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
-  alias Prana.WorkflowSettings
 
   # Helper functions for handling map-based node_executions
   defp get_all_node_executions(execution) do
@@ -118,7 +117,6 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         nodes: [trigger_node, branch_a1, branch_a2, branch_b1, branch_b2, merge_node],
         connections: %{},
         variables: %{},
-        settings: %WorkflowSettings{},
         metadata: %{}
       }
 
@@ -170,7 +168,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       ]
 
       # Add all connections to the workflow
-      workflow = 
+      workflow =
         Enum.reduce(connections, workflow, fn connection, acc_workflow ->
           {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
           updated_workflow
