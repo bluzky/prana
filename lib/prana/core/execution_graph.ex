@@ -3,7 +3,6 @@ defmodule Prana.ExecutionGraph do
   Execution graph containing workflow analysis and execution optimization.
 
   The compiled output of WorkflowCompiler containing:
-  - Pruned workflow (only reachable nodes)
   - Pre-built lookup maps for O(1) performance
   - Dependency graph for execution ordering
   - Trigger node as execution entry point

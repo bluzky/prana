@@ -266,8 +266,7 @@ defmodule Prana.NodeExecutorTest do
       __runtime: %{
         "nodes" => %{
           "previous_node" => %{
-            "output" => %{"user_id" => 123},
-            "context" => %{"batch_size" => 10}
+            "output" => %{"user_id" => 123}
           }
         },
         "env" => %{"environment" => "test"},
@@ -323,14 +322,12 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test", "with_context", %{"data" => "test"})
       routed_input = %{"data" => "test"}
 
-      assert {:ok, node_execution, updated_execution} =
+      assert {:ok, node_execution, _updated_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.status == :completed
       assert node_execution.output_data == %{data: %{"data" => "test"}}
       assert node_execution.output_port == "success"
-      assert node_execution.context_data == %{processing_time: 100}
-      assert updated_execution.__runtime["nodes"]["test_node"]["context"] == %{processing_time: 100}
     end
 
     test "handles action errors", %{execution: execution} do
@@ -538,14 +535,12 @@ defmodule Prana.NodeExecutorTest do
 
       resume_data = %{result: "resumed_with_context"}
 
-      assert {:ok, completed_execution, updated_execution} =
+      assert {:ok, completed_execution, _updated_execution} =
                NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
 
       assert completed_execution.status == :completed
       assert completed_execution.output_data == resume_data
       assert completed_execution.output_port == "success"
-      assert completed_execution.context_data == %{resumed: true}
-      assert updated_execution.__runtime["nodes"]["test_node"]["context"] == %{resumed: true}
     end
 
     test "handles resume errors", %{execution: execution} do

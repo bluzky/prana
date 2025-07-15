@@ -13,10 +13,10 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
   # Helper function to convert list-based connections to map-based
   defp convert_connections_to_map(workflow) do
     connections_list = workflow.connections
-    
+
     # Convert to proper map structure using add_connection
     workflow_with_empty_connections = %{workflow | connections: %{}}
-    
+
     Enum.reduce(connections_list, workflow_with_empty_connections, fn connection, acc_workflow ->
       {:ok, updated_workflow} = Workflow.add_connection(acc_workflow, connection)
       updated_workflow
@@ -249,7 +249,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
   describe "resume_workflow/4" do
     test "resumes suspended workflow with sub-workflow results" do
       # Create and suspend a workflow first
-      workflow = create_simple_sub_workflow() |> convert_connections_to_map()
+      workflow = convert_connections_to_map(create_simple_sub_workflow())
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute until suspension
@@ -289,7 +289,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
     test "handles resume with nested suspension" do
       # Test case where resumed workflow triggers another suspension
-      workflow = create_nested_sub_workflow() |> convert_connections_to_map()
+      workflow = convert_connections_to_map(create_nested_sub_workflow())
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute until first suspension
@@ -388,7 +388,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         trigger_type: "manual",
         trigger_data: %{},
         vars: %{},
-        context_data: %{},
         node_executions: %{},
         current_execution_index: 0,
         # Missing suspended_node_id which makes it invalid
@@ -427,7 +426,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
   describe "middleware integration" do
     test "emits correct middleware events for sub-workflow coordination" do
-      workflow = create_simple_sub_workflow() |> convert_connections_to_map()
+      workflow = convert_connections_to_map(create_simple_sub_workflow())
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute until suspension

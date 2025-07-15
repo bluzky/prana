@@ -58,8 +58,8 @@ defmodule Prana.ExecutionTest do
 
       # Verify runtime state structure
       assert result.__runtime["nodes"] == %{
-               "node_1" => %{"output" => %{user_id: 123}, "context" => %{}},
-               "node_2" => %{"output" => %{email: "test@example.com"}, "context" => %{}}
+               "node_1" => %{"output" => %{user_id: 123}},
+               "node_2" => %{"output" => %{email: "test@example.com"}}
              }
 
       assert result.__runtime["env"] == env_data
@@ -128,7 +128,7 @@ defmodule Prana.ExecutionTest do
       result = Execution.rebuild_runtime(execution, %{})
 
       # Only completed nodes should be in nodes map
-      assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}, "context" => %{}}}
+      assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}}}
     end
   end
 
@@ -165,7 +165,7 @@ defmodule Prana.ExecutionTest do
       assert completed_node.output_port == "success"
 
       # Verify runtime state
-      assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data, "context" => %{}}
+      assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data}
     end
 
     test "integrates completed node execution into execution state" do
@@ -331,7 +331,7 @@ defmodule Prana.ExecutionTest do
         },
         current_execution_index: 1,
         __runtime: %{
-          "nodes" => %{"node_1" => %{"output" => %{user_id: 123}, "context" => %{}}},
+          "nodes" => %{"node_1" => %{"output" => %{user_id: 123}}},
           "env" => %{"api_key" => "test"}
         }
       }
@@ -347,8 +347,8 @@ defmodule Prana.ExecutionTest do
       result = Execution.complete_node(execution, completed_node_execution_2)
 
       # Verify state synchronization
-      assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}, "context" => %{}}
-      assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}, "context" => %{}}
+      assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}}
+      assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}}
       # Note: executed_nodes not included in simplified rebuild_runtime
       # Note: active_paths not included in simplified rebuild_runtime
 

@@ -47,12 +47,10 @@ defmodule Prana.NodeExecutor do
       node_execution = %{node_execution | params: prepared_params}
 
       case invoke_action(action, prepared_params, context) do
-        {:ok, output_data, output_port, context} ->
+        {:ok, output_data, output_port, _context} ->
           # Complete the local node execution and update context
           completed_execution =
-            node_execution
-            |> NodeExecution.complete(output_data, output_port)
-            |> NodeExecution.update_context(context)
+            NodeExecution.complete(node_execution, output_data, output_port)
 
           # Then integrate it into the execution state
           updated_execution = Prana.Execution.complete_node(execution, completed_execution)
@@ -125,12 +123,10 @@ defmodule Prana.NodeExecutor do
 
             {:ok, completed_execution, updated_execution}
 
-          {:ok, output_data, output_port, context} ->
+          {:ok, output_data, output_port, _context} ->
             # Complete with context data
             completed_execution =
-              suspended_node_execution
-              |> NodeExecution.complete(output_data, output_port)
-              |> NodeExecution.update_context(context)
+              NodeExecution.complete(suspended_node_execution, output_data, output_port)
 
             # Integrate it into the execution state
             updated_execution = Prana.Execution.complete_node(execution, completed_execution)

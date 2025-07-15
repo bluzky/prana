@@ -49,7 +49,6 @@ defmodule Prana.Execution do
           trigger_type: String.t(),
           trigger_data: map(),
           vars: map(),
-          context_data: map(),
           node_executions: %{String.t() => [Prana.NodeExecution.t()]},
           current_execution_index: integer(),
           preparation_data: map(),
@@ -78,7 +77,6 @@ defmodule Prana.Execution do
     :trigger_type,
     :trigger_data,
     :vars,
-    :context_data,
     :node_executions,
     :current_execution_index,
     :suspended_node_id,
@@ -107,7 +105,6 @@ defmodule Prana.Execution do
       trigger_type: trigger_type,
       trigger_data: %{},
       vars: vars,
-      context_data: %{},
       node_executions: %{},
       current_execution_index: 0,
       preparation_data: %{},
@@ -424,7 +421,7 @@ defmodule Prana.Execution do
 
         case last_execution do
           nil -> {node_key, nil}
-          exec -> {node_key, %{"output" => exec.output_data, "context" => exec.context_data}}
+          exec -> {node_key, %{"output" => exec.output_data}}
         end
       end)
       |> Enum.reject(fn {_, data} -> is_nil(data) end)
@@ -504,8 +501,7 @@ defmodule Prana.Execution do
         runtime ->
           # Update with latest execution output
           node_data = %{
-            "output" => completed_node_execution.output_data,
-            "context" => completed_node_execution.context_data
+            "output" => completed_node_execution.output_data
           }
 
           updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
