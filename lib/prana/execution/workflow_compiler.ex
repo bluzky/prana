@@ -29,13 +29,11 @@ defmodule Prana.WorkflowCompiler do
   """
   @spec compile(Workflow.t(), String.t() | nil) :: {:ok, ExecutionGraph.t()} | {:error, term()}
   def compile(%Workflow{} = workflow, trigger_node_key \\ nil) do
-    with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_key),
-         {:ok, reachable_nodes} <- find_reachable_nodes(workflow, trigger_node) do
-      compiled_workflow = prune_workflow(workflow, reachable_nodes)
-      dependency_graph = build_dependency_graph(compiled_workflow)
-      connection_map = build_connection_map(compiled_workflow)
-      reverse_connection_map = build_reverse_connection_map(compiled_workflow)
-      node_map = build_node_map(compiled_workflow)
+    with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_key) do
+      dependency_graph = build_dependency_graph(workflow)
+      connection_map = build_connection_map(workflow)
+      reverse_connection_map = build_reverse_connection_map(workflow)
+      node_map = build_node_map(workflow)
 
       execution_graph = %ExecutionGraph{
         workflow_id: workflow.id,
@@ -106,79 +104,6 @@ defmodule Prana.WorkflowCompiler do
       {:ok, %Prana.Action{type: action_type}} -> {:ok, action_type}
       {:error, reason} -> {:error, reason}
     end
-  end
-
-  # ============================================================================
-  # Graph Traversal & Pruning
-  # ============================================================================
-
-  # Find all nodes reachable from the trigger node using graph traversal.
-  # This removes any nodes that are not connected to the execution path.
-  @spec find_reachable_nodes(Workflow.t(), Node.t()) :: {:ok, [Node.t()]} | {:error, term()}
-  defp find_reachable_nodes(%Workflow{} = workflow, %Node{} = trigger_node) do
-    # Use breadth-first search to find all reachable nodes
-    visited = MapSet.new()
-    queue = [trigger_node.key]
-
-    reachable_node_keys = traverse_graph(workflow, queue, visited)
-
-    # Get actual node structs for reachable IDs
-    reachable_nodes =
-      Enum.filter(workflow.nodes, fn node -> MapSet.member?(reachable_node_keys, node.key) end)
-
-    {:ok, reachable_nodes}
-  end
-
-  @spec traverse_graph(Workflow.t(), [String.t()], MapSet.t()) :: MapSet.t()
-  defp traverse_graph(_workflow, [], visited), do: visited
-
-  defp traverse_graph(%Workflow{} = workflow, [current_key | rest], visited) do
-    if MapSet.member?(visited, current_key) do
-      # Already visited this node
-      traverse_graph(workflow, rest, visited)
-    else
-      # Mark as visited and find connected nodes
-      new_visited = MapSet.put(visited, current_key)
-      connected_nodes = find_connected_nodes(workflow, current_key)
-      new_queue = rest ++ connected_nodes
-
-      traverse_graph(workflow, new_queue, new_visited)
-    end
-  end
-
-  @spec find_connected_nodes(Workflow.t(), String.t()) :: [String.t()]
-  defp find_connected_nodes(%Workflow{connections: connections}, from_node_key) do
-    connections
-    |> Map.get(from_node_key, %{})
-    |> Enum.flat_map(fn {_port, conns} ->
-      Enum.map(conns, & &1.to)
-    end)
-    |> Enum.uniq()
-  end
-
-  # Create a compiled workflow containing only reachable nodes and their connections.
-  @spec prune_workflow(Workflow.t(), [Node.t()]) :: Workflow.t()
-  defp prune_workflow(%Workflow{} = workflow, reachable_nodes) do
-    reachable_node_keys = MapSet.new(reachable_nodes, & &1.key)
-
-    # Filter connections to only include those between reachable nodes
-    reachable_connections =
-      Map.new(reachable_node_keys, fn node_key ->
-        node_connections = Map.get(workflow.connections, node_key, %{})
-
-        filtered_ports =
-          Map.new(node_connections, fn {port, conns} ->
-            filtered_conns = Enum.filter(conns, fn conn -> MapSet.member?(reachable_node_keys, conn.to) end)
-            {port, filtered_conns}
-          end)
-
-        {node_key, filtered_ports}
-      end)
-
-    # Filter connections to only include reachable targets
-
-    # Create new workflow with compiled nodes and connections
-    %{workflow | nodes: reachable_nodes, connections: reachable_connections}
   end
 
   # ============================================================================

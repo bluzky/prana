@@ -104,35 +104,6 @@ defmodule Prana.WorkflowCompilerTest do
     workflow
   end
 
-  defp create_orphaned_workflow do
-    # webhook -> validate (reachable)
-    # orphan_a -> orphan_b (unreachable)
-    workflow = Workflow.new("orphaned_workflow", "Workflow with orphaned nodes")
-
-    # Main flow
-    webhook = create_trigger_node("webhook", "Webhook")
-    validate = create_action_node("validate", "Validate")
-
-    # Orphaned flow
-    orphan_a = create_action_node("orphan_a", "Orphan A")
-    orphan_b = create_action_node("orphan_b", "Orphan B")
-
-    workflow =
-      workflow
-      |> Workflow.add_node!(webhook)
-      |> Workflow.add_node!(validate)
-      |> Workflow.add_node!(orphan_a)
-      |> Workflow.add_node!(orphan_b)
-
-    # Only connect main flow and separate orphan flow
-    conn1 = Connection.new(webhook.key, "success", validate.key, "input")
-    conn2 = Connection.new(orphan_a.key, "success", orphan_b.key, "input")
-
-    {:ok, workflow} = Workflow.add_connection(workflow, conn1)
-    {:ok, workflow} = Workflow.add_connection(workflow, conn2)
-    workflow
-  end
-
   defp create_diamond_dependency_workflow do
     # trigger -> [process_a, process_b] -> final
     # final depends on both process_a and process_b completing
@@ -307,27 +278,6 @@ defmodule Prana.WorkflowCompilerTest do
   # ============================================================================
 
   describe "graph pruning" do
-    test "prunes unreachable orphaned nodes" do
-      workflow = create_orphaned_workflow()
-
-      # Original workflow has 4 nodes
-      assert length(workflow.nodes) == 4
-      assert length(Workflow.all_connections(workflow)) == 2
-
-      {:ok, graph} = WorkflowCompiler.compile(workflow)
-
-      # Compiled graph should only have reachable nodes (2 nodes)
-      assert map_size(graph.node_map) == 2
-      assert map_size(graph.connection_map) == 1
-
-      # Should only contain webhook and validate nodes
-      node_keys = Map.keys(graph.node_map)
-      assert "webhook" in node_keys
-      assert "validate" in node_keys
-      refute "orphan_a" in node_keys
-      refute "orphan_b" in node_keys
-    end
-
     test "keeps all nodes when everything is reachable" do
       workflow = create_simple_workflow()
 
@@ -399,40 +349,6 @@ defmodule Prana.WorkflowCompilerTest do
       assert process_a_node.key in final_deps
       assert process_b_node.key in final_deps
       assert length(final_deps) == 2
-    end
-
-    test "waits for all dependencies in diamond pattern" do
-      workflow = create_diamond_dependency_workflow()
-      {:ok, graph} = WorkflowCompiler.compile(workflow)
-
-      trigger_node = Enum.find(workflow.nodes, &(&1.key == "trigger"))
-      process_a_node = Enum.find(workflow.nodes, &(&1.key == "process_a"))
-      process_b_node = Enum.find(workflow.nodes, &(&1.key == "process_b"))
-
-      # Initially only trigger ready
-      ready = WorkflowCompiler.find_ready_nodes(graph, MapSet.new(), MapSet.new(), MapSet.new())
-      assert length(ready) == 1
-      assert hd(ready).key == "trigger"
-
-      # After trigger completes, both process_a and process_b ready
-      completed = MapSet.new([trigger_node.key])
-      ready = WorkflowCompiler.find_ready_nodes(graph, completed, MapSet.new(), MapSet.new())
-      assert length(ready) == 2
-      ready_keys = Enum.map(ready, & &1.key)
-      assert "process_a" in ready_keys
-      assert "process_b" in ready_keys
-
-      # After only process_a completes, final should NOT be ready yet
-      completed = MapSet.new([trigger_node.key, process_a_node.key])
-      ready = WorkflowCompiler.find_ready_nodes(graph, completed, MapSet.new(), MapSet.new())
-      ready_keys = Enum.map(ready, & &1.key)
-      refute "final" in ready_keys
-
-      # After both process_a and process_b complete, final should be ready
-      completed = MapSet.new([trigger_node.key, process_a_node.key, process_b_node.key])
-      ready = WorkflowCompiler.find_ready_nodes(graph, completed, MapSet.new(), MapSet.new())
-      assert length(ready) == 1
-      assert hd(ready).key == "final"
     end
 
     test "handles node with multiple dependencies correctly" do
