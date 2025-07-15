@@ -51,18 +51,6 @@ defmodule Prana.WorkflowCompiler do
     end
   end
 
-  @doc """
-  Find nodes that are ready for execution based on dependency satisfaction.
-  """
-  @spec find_ready_nodes(ExecutionGraph.t(), MapSet.t(), MapSet.t(), MapSet.t()) :: [Node.t()]
-  def find_ready_nodes(%ExecutionGraph{} = graph, completed_nodes, failed_nodes, pending_nodes) do
-    graph.node_map
-    |> Map.values()
-    |> Enum.reject(&node_executed?(&1.key, completed_nodes, failed_nodes))
-    |> Enum.reject(&node_pending?(&1.key, pending_nodes))
-    |> Enum.filter(&dependencies_satisfied?(graph, &1, completed_nodes))
-  end
-
   # ============================================================================
   # Trigger Node Selection
   # ============================================================================
@@ -239,28 +227,5 @@ defmodule Prana.WorkflowCompiler do
   @spec build_node_map(Workflow.t()) :: map()
   defp build_node_map(%Workflow{nodes: nodes}) do
     Map.new(nodes, fn node -> {node.key, node} end)
-  end
-
-  # ============================================================================
-  # Helper Functions
-  # ============================================================================
-
-  @spec node_executed?(String.t(), MapSet.t(), MapSet.t()) :: boolean()
-  defp node_executed?(node_key, completed_nodes, failed_nodes) do
-    MapSet.member?(completed_nodes, node_key) or MapSet.member?(failed_nodes, node_key)
-  end
-
-  @spec node_pending?(String.t(), MapSet.t()) :: boolean()
-  defp node_pending?(node_key, pending_nodes) do
-    MapSet.member?(pending_nodes, node_key)
-  end
-
-  @spec dependencies_satisfied?(ExecutionGraph.t(), Node.t(), MapSet.t()) :: boolean()
-  defp dependencies_satisfied?(%ExecutionGraph{} = graph, %Node{} = node, completed_nodes) do
-    dependencies = Map.get(graph.dependency_graph, node.key, [])
-
-    Enum.all?(dependencies, fn dep_node_key ->
-      MapSet.member?(completed_nodes, dep_node_key)
-    end)
   end
 end
