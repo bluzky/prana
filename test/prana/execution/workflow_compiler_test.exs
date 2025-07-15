@@ -223,10 +223,9 @@ defmodule Prana.WorkflowCompilerTest do
 
       {:ok, %ExecutionGraph{} = graph} = WorkflowCompiler.compile(workflow)
 
-      assert graph.total_nodes == 3
-      assert graph.trigger_node.key == "webhook"
-      assert length(graph.workflow.nodes) == 3
-      assert length(Workflow.all_connections(graph.workflow)) == 2
+      assert map_size(graph.node_map) == 3
+      assert graph.trigger_node_key == "webhook"
+      assert map_size(graph.connection_map) == 2
     end
 
     test "compiles parallel workflow" do
@@ -234,7 +233,7 @@ defmodule Prana.WorkflowCompilerTest do
 
       {:ok, %ExecutionGraph{} = graph} = WorkflowCompiler.compile(workflow)
 
-      assert graph.total_nodes == 3
+      assert map_size(graph.node_map) == 3
 
       # Webhook should have 2 outgoing connections
       webhook_node = Enum.find(workflow.nodes, &(&1.key == "webhook"))
@@ -273,12 +272,12 @@ defmodule Prana.WorkflowCompilerTest do
       # Compile with webhook trigger
       webhook_node = Enum.find(workflow.nodes, &(&1.key == "webhook"))
       {:ok, graph1} = WorkflowCompiler.compile(workflow, webhook_node.key)
-      assert graph1.trigger_node.key == "webhook"
+      assert graph1.trigger_node_key == "webhook"
 
       # Compile with schedule trigger
       schedule_node = Enum.find(workflow.nodes, &(&1.key == "schedule"))
       {:ok, graph2} = WorkflowCompiler.compile(workflow, schedule_node.key)
-      assert graph2.trigger_node.key == "schedule"
+      assert graph2.trigger_node_key == "schedule"
     end
 
     test "returns error when node exists but is not a trigger" do
@@ -318,12 +317,11 @@ defmodule Prana.WorkflowCompilerTest do
       {:ok, graph} = WorkflowCompiler.compile(workflow)
 
       # Compiled graph should only have reachable nodes (2 nodes)
-      assert graph.total_nodes == 2
-      assert length(graph.workflow.nodes) == 2
-      assert length(Workflow.all_connections(graph.workflow)) == 1
+      assert map_size(graph.node_map) == 2
+      assert map_size(graph.connection_map) == 1
 
       # Should only contain webhook and validate nodes
-      node_keys = Enum.map(graph.workflow.nodes, & &1.key)
+      node_keys = Map.keys(graph.node_map)
       assert "webhook" in node_keys
       assert "validate" in node_keys
       refute "orphan_a" in node_keys
@@ -339,9 +337,8 @@ defmodule Prana.WorkflowCompilerTest do
       {:ok, graph} = WorkflowCompiler.compile(workflow)
 
       # All nodes should be preserved
-      assert graph.total_nodes == 3
-      assert length(graph.workflow.nodes) == 3
-      assert length(Workflow.all_connections(graph.workflow)) == 2
+      assert map_size(graph.node_map) == 3
+      assert map_size(graph.connection_map) == 2
     end
   end
 
@@ -447,14 +444,14 @@ defmodule Prana.WorkflowCompilerTest do
       assert length(connections) == 2
     end
 
-    test "accurate total_nodes count" do
+    test "accurate node count" do
       workflow1 = create_simple_workflow()
       {:ok, graph1} = WorkflowCompiler.compile(workflow1)
-      assert graph1.total_nodes == 3
+      assert map_size(graph1.node_map) == 3
 
       workflow2 = create_parallel_workflow()
       {:ok, graph2} = WorkflowCompiler.compile(workflow2)
-      assert graph2.total_nodes == 3
+      assert map_size(graph2.node_map) == 3
     end
   end
 
