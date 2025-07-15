@@ -37,15 +37,15 @@ defmodule Prana.WorkflowCompiler do
       reverse_connection_map = build_reverse_connection_map(compiled_workflow)
       node_map = build_node_map(compiled_workflow)
 
-      execution_graph = %ExecutionGraph{
-        workflow: compiled_workflow,
-        trigger_node: trigger_node,
-        dependency_graph: dependency_graph,
-        connection_map: connection_map,
-        reverse_connection_map: reverse_connection_map,
-        node_map: node_map,
-        total_nodes: length(reachable_nodes)
-      }
+      execution_graph = ExecutionGraph.new(
+        compiled_workflow.id,
+        compiled_workflow.version || 1,
+        trigger_node.key,
+        node_map,
+        connection_map,
+        reverse_connection_map,
+        dependency_graph
+      )
 
       {:ok, execution_graph}
     end
@@ -56,7 +56,7 @@ defmodule Prana.WorkflowCompiler do
   """
   @spec find_ready_nodes(ExecutionGraph.t(), MapSet.t(), MapSet.t(), MapSet.t()) :: [Node.t()]
   def find_ready_nodes(%ExecutionGraph{} = graph, completed_nodes, failed_nodes, pending_nodes) do
-    graph.workflow.nodes
+    Map.values(graph.nodes)
     |> Enum.reject(&node_executed?(&1.key, completed_nodes, failed_nodes))
     |> Enum.reject(&node_pending?(&1.key, pending_nodes))
     |> Enum.filter(&dependencies_satisfied?(graph, &1, completed_nodes))
