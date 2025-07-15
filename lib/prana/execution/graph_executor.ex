@@ -129,7 +129,7 @@ defmodule Prana.GraphExecutor do
       case resume_suspended_node(execution_graph, prepared_execution, suspended_node_id, resume_data) do
         {:ok, updated_execution} ->
           # Node resumed successfully, continue execution (same pattern as main loop)
-          execute_workflow_loop(updated_execution, execution_graph)
+          execute_workflow_loop(updated_execution)
 
         {:error, reason} ->
           {:error, reason}
@@ -187,10 +187,10 @@ defmodule Prana.GraphExecutor do
 
     try do
       # Workflow preparation phase - prepare all actions and store in execution
-      case prepare_workflow_actions(execution_graph, execution) do
+      case Execution.prepare_workflow_actions(execution) do
         {:ok, enriched_execution} ->
           # Main execution loop with enriched execution
-          case execute_workflow_loop(enriched_execution, execution_graph) do
+          case execute_workflow_loop(enriched_execution) do
             {:ok, final_execution} ->
               Middleware.call(:execution_completed, %{execution: final_execution})
               {:ok, final_execution}
@@ -222,7 +222,7 @@ defmodule Prana.GraphExecutor do
 
   # Main workflow execution loop - continues until workflow is complete or error occurs.
   # Uses Execution.__runtime for all workflow-level coordination.
-  defp execute_workflow_loop(execution, execution_graph) do
+  defp execute_workflow_loop(execution) do
     # Check for infinite loop protection
     # Note: iteration_count is persisted in metadata to survive suspension/resume cycles
     iteration_count = Execution.get_iteration_count(execution)
@@ -245,9 +245,9 @@ defmodule Prana.GraphExecutor do
         final_execution = Execution.complete(execution)
         {:ok, final_execution}
       else
-        case find_and_execute_ready_nodes(execution, execution_graph) do
+        case find_and_execute_ready_nodes(execution) do
           {:ok, updated_execution} ->
-            execute_workflow_loop(updated_execution, execution_graph)
+            execute_workflow_loop(updated_execution)
 
           {:suspend, suspended_execution} ->
             {:suspend, suspended_execution}
@@ -261,9 +261,9 @@ defmodule Prana.GraphExecutor do
 
   # Find ready nodes and execute following branch-completion strategy.
   # Uses Execution.__runtime for tracking active paths and executed nodes.
-  defp find_and_execute_ready_nodes(execution, execution_graph) do
+  defp find_and_execute_ready_nodes(execution) do
     ready_nodes =
-      find_ready_nodes(execution_graph, execution.node_executions, execution.__runtime)
+      find_ready_nodes(execution.execution_graph, execution.node_executions, execution.__runtime)
 
     if Enum.empty?(ready_nodes) do
       # No ready nodes but workflow not complete - likely an error condition
@@ -273,7 +273,7 @@ defmodule Prana.GraphExecutor do
       # Select single node to execute, prioritizing branch completion
       selected_node = select_node_for_branch_following(ready_nodes, execution.__runtime)
 
-      case execute_single_node_with_events(selected_node, execution_graph, execution) do
+      case execute_single_node_with_events(selected_node, execution) do
         {%NodeExecution{status: :completed} = node_execution, updated_execution} ->
           # Output routing and context updates are now handled internally by NodeExecutor
           # and the Execution.complete_node/2 function
@@ -282,8 +282,7 @@ defmodule Prana.GraphExecutor do
             Execution.update_active_nodes_on_completion(
               updated_execution,
               selected_node.key,
-              node_execution.output_port,
-              execution_graph
+              node_execution.output_port
             )
 
           {:ok, final_execution}
@@ -439,9 +438,9 @@ defmodule Prana.GraphExecutor do
   end
 
   # Execute a single node with middleware events using unified execution architecture
-  defp execute_single_node_with_events(node, execution_graph, execution) do
+  defp execute_single_node_with_events(node, execution) do
     # Extract multi-port input data for this node from execution graph and runtime state
-    routed_input = Execution.extract_multi_port_input(node, execution_graph, execution)
+    routed_input = Execution.extract_multi_port_input(node, execution)
 
     # Get execution tracking indices
     execution_index = execution.current_execution_index
@@ -502,8 +501,7 @@ defmodule Prana.GraphExecutor do
             Execution.update_active_nodes_on_completion(
               updated_execution,
               suspended_node_id,
-              completed_node_execution.output_port,
-              execution_graph
+              completed_node_execution.output_port
             )
 
           {:ok, final_execution}
@@ -513,66 +511,6 @@ defmodule Prana.GraphExecutor do
       end
     else
       {:error, %{type: "suspended_node_not_found", node_key: suspended_node_id}}
-    end
-  end
-
-  # Prepare all workflow actions during the preparation phase.
-  # Scans all nodes in the workflow, calls prepare/1 on each action module,
-  # and stores the preparation data in the execution struct.
-  defp prepare_workflow_actions(execution_graph, execution) do
-    # Prepare all actions and collect preparation data
-    case prepare_all_actions(Map.values(execution_graph.node_map)) do
-      {:ok, preparation_data} ->
-        # Store preparation data in execution
-        enriched_execution = %{execution | preparation_data: preparation_data}
-        {:ok, enriched_execution}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  # Prepare all actions in the workflow
-  defp prepare_all_actions(nodes) do
-    Enum.reduce_while(nodes, {:ok, %{}}, fn node, {:ok, acc_prep_data} ->
-      case prepare_single_action(node) do
-        {:ok, nil} ->
-          {:cont, {:ok, acc_prep_data}}
-
-        {:ok, node_prep_data} ->
-          updated_prep_data = Map.put(acc_prep_data, node.key, node_prep_data)
-          {:cont, {:ok, updated_prep_data}}
-
-        {:error, reason} ->
-          {:halt, {:error, %{type: "action_preparation_failed", node_key: node.key, reason: reason}}}
-      end
-    end)
-
-    # Store preparation data using node custom_id
-  end
-
-  # Prepare a single action
-  defp prepare_single_action(node) do
-    # Look up action from integration registry
-    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
-      {:ok, action} ->
-        # Call prepare/1 on the action module
-        try do
-          case action.module.prepare(node) do
-            {:ok, preparation_data} ->
-              {:ok, preparation_data}
-
-            {:error, reason} ->
-              {:error, reason}
-          end
-        rescue
-          error ->
-            {:error, %{type: "preparation_exception", message: Exception.message(error)}}
-        end
-
-      {:error, _reason} ->
-        # Action not found in registry, return empty preparation data
-        {:ok, nil}
     end
   end
 end

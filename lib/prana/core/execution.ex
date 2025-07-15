@@ -637,7 +637,7 @@ defmodule Prana.Execution do
   ## Returns
   Map with port names as keys and routed data as values
   """
-  def extract_multi_port_input(node, execution_graph, execution) do
+  def extract_multi_port_input(node, execution) do
     # Get input ports from the action definition, not the node
     input_ports =
       case get_action_input_ports(node) do
@@ -650,7 +650,7 @@ defmodule Prana.Execution do
     multi_port_input =
       Enum.reduce(input_ports, %{}, fn input_port, acc ->
         # Find all connections that target this node's input port
-        incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.key, input_port)
+        incoming_connections = get_incoming_connections_for_node_port(execution.execution_graph, node.key, input_port)
 
         # For same input port with multiple connections, use most recent execution_index
         port_data = resolve_input_port_data(incoming_connections, execution)
@@ -731,7 +731,7 @@ defmodule Prana.Execution do
   ## Returns
   Updated execution with modified runtime state
   """
-  def update_active_nodes_on_completion(execution, completed_node_key, output_port, execution_graph) do
+  def update_active_nodes_on_completion(execution, completed_node_key, output_port) do
     # Get current active_nodes and node_depth from runtime
     current_active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
     current_node_depth = execution.__runtime["node_depth"] || %{}
@@ -745,7 +745,7 @@ defmodule Prana.Execution do
     # Add target nodes from completed node's output connections and assign depths
     {final_active_nodes, final_node_depth} =
       if output_port do
-        connections = Map.get(execution_graph.connection_map, {completed_node_key, output_port}, [])
+        connections = Map.get(execution.execution_graph.connection_map, {completed_node_key, output_port}, [])
         target_nodes = MapSet.new(connections, & &1.to)
 
         # Add target nodes to active_nodes
@@ -801,16 +801,15 @@ defmodule Prana.Execution do
     %{execution | node_executions: updated_node_executions}
   end
 
-
   @doc """
   Increment iteration count for loop protection.
-  
+
   This function increments the iteration counter in both runtime and persistent
   metadata to track workflow execution progress and prevent infinite loops.
-  
+
   ## Parameters
   - `execution` - The execution to update
-  
+
   ## Returns
   Updated execution with incremented iteration count
   """
@@ -825,10 +824,10 @@ defmodule Prana.Execution do
 
   @doc """
   Get iteration count from runtime state.
-  
+
   ## Parameters
   - `execution` - The execution to get iteration count from
-  
+
   ## Returns
   Current iteration count as integer
   """
@@ -838,10 +837,10 @@ defmodule Prana.Execution do
 
   @doc """
   Get maximum iterations from runtime state.
-  
+
   ## Parameters
   - `execution` - The execution to get max iterations from
-  
+
   ## Returns
   Maximum iterations as integer
   """
@@ -851,14 +850,83 @@ defmodule Prana.Execution do
 
   @doc """
   Get active nodes from runtime state.
-  
+
   ## Parameters
   - `execution` - The execution to get active nodes from
-  
+
   ## Returns
   MapSet of active node keys
   """
   def get_active_nodes(execution) do
     execution.__runtime["active_nodes"] || MapSet.new()
+  end
+
+  @doc """
+  Prepare all workflow actions during the preparation phase.
+
+  Scans all nodes in the workflow, calls prepare/1 on each action module,
+  and stores the preparation data in the execution struct.
+
+  ## Parameters
+  - `execution_graph` - The execution graph containing all nodes
+  - `execution` - The execution to store preparation data in
+
+  ## Returns
+  - `{:ok, enriched_execution}` - Execution with preparation data stored
+  - `{:error, reason}` - Preparation failed with error details
+  """
+  def prepare_workflow_actions(execution) do
+    # Prepare all actions and collect preparation data
+    case prepare_all_actions(Map.values(execution.execution_graph.node_map)) do
+      {:ok, preparation_data} ->
+        # Store preparation data in execution
+        enriched_execution = %{execution | preparation_data: preparation_data}
+        {:ok, enriched_execution}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # Prepare all actions in the workflow
+  defp prepare_all_actions(nodes) do
+    Enum.reduce_while(nodes, {:ok, %{}}, fn node, {:ok, acc_prep_data} ->
+      case prepare_single_action(node) do
+        {:ok, nil} ->
+          {:cont, {:ok, acc_prep_data}}
+
+        {:ok, node_prep_data} ->
+          updated_prep_data = Map.put(acc_prep_data, node.key, node_prep_data)
+          {:cont, {:ok, updated_prep_data}}
+
+        {:error, reason} ->
+          {:halt, {:error, %{type: "action_preparation_failed", node_key: node.key, reason: reason}}}
+      end
+    end)
+  end
+
+  # Prepare a single action
+  defp prepare_single_action(node) do
+    # Look up action from integration registry
+    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
+      {:ok, action} ->
+        # Call prepare/1 on the action module
+        try do
+          case action.module.prepare(node) do
+            {:ok, preparation_data} ->
+              {:ok, preparation_data}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
+        rescue
+          error ->
+            {:error, %{type: "preparation_exception", message: Exception.message(error)}}
+        end
+
+      {:error, _reason} ->
+        # Action not found in registry, return empty preparation data
+        {:ok, nil}
+    end
   end
 end
