@@ -42,16 +42,14 @@ defmodule Prana.Execution do
           id: String.t(),
           workflow_id: String.t(),
           workflow_version: integer(),
+          execution_graph: Prana.ExecutionGraph.t(),
           parent_execution_id: String.t() | nil,
-          root_execution_id: String.t() | nil,
           execution_mode: execution_mode(),
           status: status(),
           trigger_type: String.t(),
           trigger_data: map(),
           vars: map(),
-          output_data: map() | nil,
           context_data: map(),
-          error_data: map() | nil,
           node_executions: %{String.t() => [Prana.NodeExecution.t()]},
           current_execution_index: integer(),
           preparation_data: map(),
@@ -59,7 +57,6 @@ defmodule Prana.Execution do
           suspension_type: SuspensionData.suspension_type() | nil,
           suspension_data: SuspensionData.suspension_data() | nil,
           suspended_at: DateTime.t() | nil,
-          resume_token: String.t() | nil,
           started_at: DateTime.t() | nil,
           completed_at: DateTime.t() | nil,
           metadata: map(),
@@ -74,23 +71,20 @@ defmodule Prana.Execution do
     :id,
     :workflow_id,
     :workflow_version,
+    :execution_graph,
     :parent_execution_id,
-    :root_execution_id,
     :execution_mode,
     :status,
     :trigger_type,
     :trigger_data,
     :vars,
-    :output_data,
     :context_data,
-    :error_data,
     :node_executions,
     :current_execution_index,
     :suspended_node_id,
     :suspension_type,
     :suspension_data,
     :suspended_at,
-    :resume_token,
     :started_at,
     :completed_at,
     :__runtime,
@@ -101,23 +95,19 @@ defmodule Prana.Execution do
   @doc """
   Creates a new execution
   """
-  def new(workflow_id, workflow_version, trigger_type, vars) do
+  def new(graph, trigger_type, vars) do
     execution_id = generate_id()
 
     %__MODULE__{
       id: execution_id,
-      workflow_id: workflow_id,
-      workflow_version: workflow_version,
+      workflow_id: graph.workflow_id,
       parent_execution_id: nil,
-      root_execution_id: execution_id,
       execution_mode: :async,
       status: :pending,
       trigger_type: trigger_type,
       trigger_data: %{},
       vars: vars,
-      output_data: nil,
       context_data: %{},
-      error_data: nil,
       node_executions: %{},
       current_execution_index: 0,
       preparation_data: %{},
@@ -125,7 +115,6 @@ defmodule Prana.Execution do
       suspension_type: nil,
       suspension_data: nil,
       suspended_at: nil,
-      resume_token: nil,
       started_at: nil,
       completed_at: nil,
       metadata: %{}
@@ -142,15 +131,15 @@ defmodule Prana.Execution do
   @doc """
   Marks execution as completed
   """
-  def complete(%__MODULE__{} = execution, output_data) do
-    %{execution | status: :completed, output_data: output_data, completed_at: DateTime.utc_now()}
+  def complete(%__MODULE__{} = execution) do
+    %{execution | status: :completed, completed_at: DateTime.utc_now()}
   end
 
   @doc """
   Marks execution as failed
   """
-  def fail(%__MODULE__{} = execution, error_data) do
-    %{execution | status: :failed, error_data: error_data, completed_at: DateTime.utc_now()}
+  def fail(%__MODULE__{} = execution) do
+    %{execution | status: :failed, completed_at: DateTime.utc_now()}
   end
 
   @doc """
@@ -177,17 +166,14 @@ defmodule Prana.Execution do
       # Explicit resume token for webhook scenarios
       suspend(execution, "node_123", :webhook, suspension_data, "custom_resume_token_123")
   """
-  def suspend(%__MODULE__{} = execution, node_key, suspension_type, suspension_data, resume_token \\ nil) do
-    final_resume_token = resume_token || generate_resume_token()
-
+  def suspend(%__MODULE__{} = execution, node_key, suspension_type, suspension_data) do
     %{
       execution
       | status: :suspended,
         suspended_node_id: node_key,
         suspension_type: suspension_type,
         suspension_data: suspension_data,
-        suspended_at: DateTime.utc_now(),
-        resume_token: final_resume_token
+        suspended_at: DateTime.utc_now()
     }
   end
 
@@ -334,8 +320,7 @@ defmodule Prana.Execution do
       | suspended_node_id: nil,
         suspension_type: nil,
         suspension_data: nil,
-        suspended_at: nil,
-        resume_token: nil
+        suspended_at: nil
     }
   end
 
@@ -570,9 +555,5 @@ defmodule Prana.Execution do
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     %{execution | node_executions: updated_node_executions}
-  end
-
-  defp generate_resume_token do
-    32 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 32)
   end
 end

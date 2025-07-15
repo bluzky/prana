@@ -38,13 +38,13 @@ defmodule Prana.WorkflowCompiler do
       node_map = build_node_map(compiled_workflow)
 
       execution_graph = %ExecutionGraph{
-        workflow: compiled_workflow,
-        trigger_node: trigger_node,
+        workflow_id: workflow.id,
+        trigger_node_key: trigger_node.key,
         dependency_graph: dependency_graph,
         connection_map: connection_map,
         reverse_connection_map: reverse_connection_map,
         node_map: node_map,
-        total_nodes: length(reachable_nodes)
+        variables: workflow.variables
       }
 
       {:ok, execution_graph}
@@ -56,7 +56,8 @@ defmodule Prana.WorkflowCompiler do
   """
   @spec find_ready_nodes(ExecutionGraph.t(), MapSet.t(), MapSet.t(), MapSet.t()) :: [Node.t()]
   def find_ready_nodes(%ExecutionGraph{} = graph, completed_nodes, failed_nodes, pending_nodes) do
-    graph.workflow.nodes
+    graph.node_map
+    |> Map.values()
     |> Enum.reject(&node_executed?(&1.key, completed_nodes, failed_nodes))
     |> Enum.reject(&node_pending?(&1.key, pending_nodes))
     |> Enum.filter(&dependencies_satisfied?(graph, &1, completed_nodes))
@@ -161,9 +162,9 @@ defmodule Prana.WorkflowCompiler do
   defp find_connected_nodes(%Workflow{connections: connections}, from_node_key) do
     connections
     |> Map.get(from_node_key, %{})
-    |> Enum.flat_map(fn {_port, conns} -> 
-         Enum.map(conns, & &1.to)
-       end)
+    |> Enum.flat_map(fn {_port, conns} ->
+      Enum.map(conns, & &1.to)
+    end)
     |> Enum.uniq()
   end
 
@@ -174,21 +175,19 @@ defmodule Prana.WorkflowCompiler do
 
     # Filter connections to only include those between reachable nodes
     reachable_connections =
-      reachable_node_keys
-      |> Map.new(fn node_key ->
-           node_connections = Map.get(workflow.connections, node_key, %{})
-           
-           # Filter connections to only include reachable targets
-           filtered_ports = 
-             Map.new(node_connections, fn {port, conns} ->
-               filtered_conns = Enum.filter(conns, fn conn ->
-                 MapSet.member?(reachable_node_keys, conn.to)
-               end)
-               {port, filtered_conns}
-             end)
-           
-           {node_key, filtered_ports}
-         end)
+      Map.new(reachable_node_keys, fn node_key ->
+        node_connections = Map.get(workflow.connections, node_key, %{})
+
+        filtered_ports =
+          Map.new(node_connections, fn {port, conns} ->
+            filtered_conns = Enum.filter(conns, fn conn -> MapSet.member?(reachable_node_keys, conn.to) end)
+            {port, filtered_conns}
+          end)
+
+        {node_key, filtered_ports}
+      end)
+
+    # Filter connections to only include reachable targets
 
     # Create new workflow with compiled nodes and connections
     %{workflow | nodes: reachable_nodes, connections: reachable_connections}
@@ -204,14 +203,14 @@ defmodule Prana.WorkflowCompiler do
   @spec build_dependency_graph(Workflow.t()) :: map()
   defp build_dependency_graph(%Workflow{connections: connections}) do
     connections
-    |> Enum.flat_map(fn {_node, ports} -> 
-         Enum.flat_map(ports, fn {_port, conns} -> conns end)
-       end)
+    |> Enum.flat_map(fn {_node, ports} ->
+      Enum.flat_map(ports, fn {_port, conns} -> conns end)
+    end)
     |> Enum.reduce(%{}, fn conn, acc ->
-         Map.update(acc, conn.to, [conn.from], fn deps ->
-           Enum.uniq([conn.from | deps])
-         end)
-       end)
+      Map.update(acc, conn.to, [conn.from], fn deps ->
+        Enum.uniq([conn.from | deps])
+      end)
+    end)
   end
 
   # Build connection map for fast lookup of outgoing connections.
@@ -219,10 +218,10 @@ defmodule Prana.WorkflowCompiler do
   defp build_connection_map(%Workflow{connections: connections}) do
     connections
     |> Enum.flat_map(fn {node_key, ports} ->
-         Enum.map(ports, fn {port, conns} ->
-           {{node_key, port}, conns}
-         end)
-       end)
+      Enum.map(ports, fn {port, conns} ->
+        {{node_key, port}, conns}
+      end)
+    end)
     |> Map.new()
   end
 
@@ -230,9 +229,9 @@ defmodule Prana.WorkflowCompiler do
   @spec build_reverse_connection_map(Workflow.t()) :: map()
   defp build_reverse_connection_map(%Workflow{connections: connections}) do
     connections
-    |> Enum.flat_map(fn {_node, ports} -> 
-         Enum.flat_map(ports, fn {_port, conns} -> conns end)
-       end)
+    |> Enum.flat_map(fn {_node, ports} ->
+      Enum.flat_map(ports, fn {_port, conns} -> conns end)
+    end)
     |> Enum.group_by(fn conn -> conn.to end)
   end
 

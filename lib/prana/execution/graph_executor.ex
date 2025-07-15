@@ -175,7 +175,7 @@ defmodule Prana.GraphExecutor do
           {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
   def execute_graph(%ExecutionGraph{} = execution_graph, context \\ %{}) do
     # Create initial execution and context
-    execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", execution_graph.workflow.variables)
+    execution = Execution.new(execution_graph, "graph_executor", execution_graph.variables)
     execution = Execution.start(execution)
 
     # Initialize runtime state once at the start of execution
@@ -183,8 +183,8 @@ defmodule Prana.GraphExecutor do
     execution = Execution.rebuild_runtime(execution, env_data)
 
     # For new executions, initialize active_nodes with trigger node and node_depth map
-    active_nodes = MapSet.new([execution_graph.trigger_node.key])
-    node_depth = %{execution_graph.trigger_node.key => 0}
+    active_nodes = MapSet.new([execution_graph.trigger_node_key])
+    node_depth = %{execution_graph.trigger_node_key => 0}
 
     execution =
       execution
@@ -216,14 +216,14 @@ defmodule Prana.GraphExecutor do
 
         {:error, reason} ->
           # Preparation failed, fail the execution
-          failed_execution = Execution.fail(execution, reason)
+          failed_execution = Execution.fail(execution)
           Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
           {:error, failed_execution}
       end
     rescue
       error ->
         reason = %{type: "execution_exception", message: Exception.message(error), details: %{}}
-        failed_execution = Execution.fail(execution, reason)
+        failed_execution = Execution.fail(execution)
         Middleware.call(:execution_failed, %{execution: failed_execution, reason: reason})
         {:error, failed_execution}
     end
@@ -238,17 +238,7 @@ defmodule Prana.GraphExecutor do
     max_iterations = execution.__runtime["max_iterations"] || 100
 
     if iteration_count >= max_iterations do
-      reason = %{
-        type: "infinite_loop_detected",
-        message: "Execution exceeded maximum iterations limit",
-        details: %{
-          iteration_count: iteration_count,
-          max_iterations: max_iterations,
-          active_nodes: execution.__runtime["active_nodes"]
-        }
-      }
-
-      failed_execution = Execution.fail(execution, reason)
+      failed_execution = Execution.fail(execution)
       {:error, failed_execution}
     else
       # Increment iteration counter in both runtime and persistent metadata
@@ -266,7 +256,7 @@ defmodule Prana.GraphExecutor do
       # Note: Execution.__runtime is updated internally by NodeExecutor
 
       if MapSet.size(active_nodes) == 0 do
-        final_execution = Execution.complete(execution, %{})
+        final_execution = Execution.complete(execution)
         {:ok, final_execution}
       else
         case find_and_execute_ready_nodes(execution, execution_graph) do
@@ -291,8 +281,7 @@ defmodule Prana.GraphExecutor do
 
     if Enum.empty?(ready_nodes) do
       # No ready nodes but workflow not complete - likely an error condition
-      error_data = %{type: "execution_stalled", message: "No ready nodes found but workflow not complete"}
-      failed_execution = Execution.fail(execution, error_data)
+      failed_execution = Execution.fail(execution)
       {:error, failed_execution}
     else
       # Select single node to execute, prioritizing branch completion
@@ -335,7 +324,7 @@ defmodule Prana.GraphExecutor do
           failed_execution =
             updated_execution
             |> Execution.fail_node(node_execution)
-            |> Execution.fail(node_execution.error_data)
+            |> Execution.fail()
 
           {:error, failed_execution}
 

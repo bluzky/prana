@@ -8,8 +8,6 @@ defmodule Prana.GraphExecutorTest do
   alias Prana.Node
   alias Prana.NodeExecution
   alias Prana.TestSupport.TestIntegration
-  alias Prana.Workflow
-  alias Prana.WorkflowSettings
 
   # Helper functions for handling map-based node_executions
   defp get_all_node_executions(execution) do
@@ -59,24 +57,15 @@ defmodule Prana.GraphExecutorTest do
         params: %{}
       }
 
-      workflow = %Workflow{
-        id: "test_workflow",
-        name: "Test Workflow",
-        nodes: [node],
-        connections: [],
-        variables: %{},
-        settings: %WorkflowSettings{},
-        metadata: %{}
-      }
 
       execution_graph = %ExecutionGraph{
-        workflow: workflow,
-        trigger_node: node,
+        workflow_id: "test_workflow",
+        trigger_node_key: "test_node",
         dependency_graph: %{},
         connection_map: %{},
         reverse_connection_map: %{},
         node_map: %{"test_node" => node},
-        total_nodes: 1
+        variables: %{}
       }
 
       context = %{
@@ -106,10 +95,10 @@ defmodule Prana.GraphExecutorTest do
       node1 = %Node{key: "node_1"}
       node2 = %Node{key: "node_2"}
 
-      workflow = %Workflow{nodes: [node1, node2], connections: []}
 
       execution_graph = %ExecutionGraph{
-        workflow: workflow,
+        workflow_id: "test_workflow",
+        trigger_node_key: "node_1",
         node_map: %{"node_1" => node1, "node_2" => node2},
         dependency_graph: %{
           "node_1" => [],
@@ -119,7 +108,9 @@ defmodule Prana.GraphExecutorTest do
         reverse_connection_map: %{
           "node_1" => [],
           "node_2" => []
-        }
+        },
+        connection_map: %{},
+        variables: %{}
       }
 
       completed_executions = %{}
@@ -146,10 +137,10 @@ defmodule Prana.GraphExecutorTest do
       node1 = %Node{key: "node_1"}
       node2 = %Node{key: "node_2"}
 
-      workflow = %Workflow{nodes: [node1, node2], connections: []}
 
       execution_graph = %ExecutionGraph{
-        workflow: workflow,
+        workflow_id: "test_workflow",
+        trigger_node_key: "node_1",
         node_map: %{"node_1" => node1, "node_2" => node2},
         dependency_graph: %{
           "node_1" => [],
@@ -159,7 +150,9 @@ defmodule Prana.GraphExecutorTest do
         reverse_connection_map: %{
           "node_1" => [],
           "node_2" => []
-        }
+        },
+        connection_map: %{},
+        variables: %{}
       }
 
       # node1 is already completed

@@ -113,7 +113,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       # Verify suspended execution state
       assert suspended_execution.status == :suspended
       assert suspended_execution.workflow_id == "parent_workflow"
-      assert is_binary(suspended_execution.resume_token)
       assert suspended_execution.suspended_node_id == "sub_workflow_node"
 
       # Verify node executions - trigger should be completed, sub_workflow suspended
@@ -278,7 +277,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Verify completion
       assert completed_execution.status == :completed
-      assert completed_execution.resume_token == nil
 
       # Verify all nodes executed
       assert completed_execution.node_executions |> Map.values() |> List.flatten() |> length() == 3
@@ -345,7 +343,15 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         node_executions: []
       }
 
-      execution_graph = %ExecutionGraph{workflow: %Workflow{nodes: []}}
+      execution_graph = %ExecutionGraph{
+        workflow_id: "test_workflow",
+        trigger_node_key: "trigger",
+        dependency_graph: %{},
+        connection_map: %{},
+        reverse_connection_map: %{},
+        node_map: %{},
+        variables: %{}
+      }
 
       result =
         GraphExecutor.resume_workflow(
@@ -362,17 +368,48 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
     end
 
     test "returns error for invalid suspended execution" do
-      # Create suspended execution without proper resume token
+      # Create suspended execution without proper suspended_node_id
       invalid_suspended = %Execution{
         id: "test",
         workflow_id: "test",
+        workflow_version: 1,
+        execution_graph: %Prana.ExecutionGraph{
+          workflow_id: "test",
+          trigger_node_key: "trigger",
+          dependency_graph: %{},
+          connection_map: %{},
+          reverse_connection_map: %{},
+          node_map: %{},
+          variables: %{}
+        },
+        parent_execution_id: nil,
+        execution_mode: :async,
         status: :suspended,
-        # Missing suspended_node_id
-        resume_token: %{},
-        node_executions: []
+        trigger_type: "manual",
+        trigger_data: %{},
+        vars: %{},
+        context_data: %{},
+        node_executions: %{},
+        current_execution_index: 0,
+        # Missing suspended_node_id which makes it invalid
+        suspended_node_id: nil,
+        suspension_type: nil,
+        suspension_data: nil,
+        suspended_at: nil,
+        started_at: nil,
+        completed_at: nil,
+        metadata: %{}
       }
 
-      execution_graph = %ExecutionGraph{workflow: %Workflow{nodes: []}, node_map: %{}}
+      execution_graph = %ExecutionGraph{
+        workflow_id: "test_workflow",
+        trigger_node_key: "trigger",
+        dependency_graph: %{},
+        connection_map: %{},
+        reverse_connection_map: %{},
+        node_map: %{},
+        variables: %{}
+      }
 
       result =
         GraphExecutor.resume_workflow(
