@@ -175,7 +175,7 @@ defmodule Prana.GraphExecutor do
           {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
   def execute_graph(%ExecutionGraph{} = execution_graph, context \\ %{}) do
     # Create initial execution and context
-    execution = Execution.new(execution_graph.workflow.id, 1, "graph_executor", execution_graph.workflow.variables)
+    execution = Execution.new(execution_graph.workflow_id, execution_graph.workflow_version, "graph_executor", %{})
     execution = Execution.start(execution)
 
     # Initialize runtime state once at the start of execution
@@ -183,8 +183,8 @@ defmodule Prana.GraphExecutor do
     execution = Execution.rebuild_runtime(execution, env_data)
 
     # For new executions, initialize active_nodes with trigger node and node_depth map
-    active_nodes = MapSet.new([execution_graph.trigger_node.key])
-    node_depth = %{execution_graph.trigger_node.key => 0}
+    active_nodes = MapSet.new([execution_graph.trigger_node_key])
+    node_depth = %{execution_graph.trigger_node_key => 0}
 
     execution =
       execution
@@ -424,7 +424,7 @@ defmodule Prana.GraphExecutor do
 
     # Only check active nodes instead of all nodes
     active_nodes
-    |> Enum.map(fn node_key -> execution_graph.node_map[node_key] end)
+    |> Enum.map(fn node_key -> execution_graph.nodes[node_key] end)
     |> Enum.reject(&is_nil/1)
     |> Enum.filter(fn node ->
       dependencies_satisfied?(node, execution_graph, completed_node_ids)
@@ -540,7 +540,7 @@ defmodule Prana.GraphExecutor do
   # Complete a suspended node execution with resume data
   defp resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data) do
     # Find the suspended node definition and execution
-    suspended_node = Map.get(execution_graph.node_map, suspended_node_id)
+    suspended_node = Map.get(execution_graph.nodes, suspended_node_id)
 
     # Find the suspended node execution from the map structure
     suspended_node_executions = Map.get(suspended_execution.node_executions, suspended_node_id, [])
@@ -577,7 +577,7 @@ defmodule Prana.GraphExecutor do
   # and stores the preparation data in the execution struct.
   defp prepare_workflow_actions(execution_graph, execution) do
     # Prepare all actions and collect preparation data
-    case prepare_all_actions(Map.values(execution_graph.node_map)) do
+    case prepare_all_actions(Map.values(execution_graph.nodes)) do
       {:ok, preparation_data} ->
         # Store preparation data in execution
         enriched_execution = %{execution | preparation_data: preparation_data}
