@@ -99,6 +99,7 @@ defmodule Prana.Execution do
     %__MODULE__{
       id: execution_id,
       workflow_id: graph.workflow_id,
+      execution_graph: graph,
       parent_execution_id: nil,
       execution_mode: :async,
       status: :pending,
@@ -282,10 +283,7 @@ defmodule Prana.Execution do
     # Use reverse connection map if available, otherwise fall back to filtering
     case Map.get(execution_graph, :reverse_connection_map) do
       nil ->
-        # Fallback: filter all connections (less efficient but functional)
-        Enum.filter(execution_graph.workflow.connections, fn conn ->
-          conn.to == node_key
-        end)
+        raise "Invalid execution graph"
 
       reverse_map ->
         # Optimized: direct lookup
@@ -429,11 +427,11 @@ defmodule Prana.Execution do
 
     # Rebuild active_nodes if execution_graph is provided
     active_nodes =
-      if execution.execution_graph do
-        rebuild_active_nodes(execution)
-      else
+      if Enum.empty?(execution.node_executions) do
         # Default empty for cases without execution_graph
-        MapSet.new()
+        MapSet.new([execution.execution_graph.trigger_node_key])
+      else
+        rebuild_active_nodes(execution)
       end
 
     # Build runtime state
@@ -447,7 +445,8 @@ defmodule Prana.Execution do
       "env" => env_data,
       "active_nodes" => active_nodes,
       "iteration_count" => current_iteration_count,
-      "max_iterations" => max_iterations
+      "max_iterations" => max_iterations,
+      "node_depth" => %{}
     }
 
     %{execution | __runtime: runtime}

@@ -13,6 +13,14 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
+        execution_graph: %{
+          node_map: %{
+            "node_1" => %{key: "node_1", name: "Node 1"},
+            "node_2" => %{key: "node_2", name: "Node 2"},
+            "node_3" => %{key: "node_3", name: "Node 3"}
+          },
+          reverse_connection_map: %{}
+        },
         node_executions: %{
           "node_1" => [
             %NodeExecution{
@@ -73,7 +81,12 @@ defmodule Prana.ExecutionTest do
         workflow_id: "wf_1",
         workflow_version: 1,
         node_executions: %{},
-        current_execution_index: 0
+        current_execution_index: 0,
+        execution_graph: %{
+          trigger_node_key: "start_node",
+          node_map: %{},
+          reverse_connection_map: %{}
+        }
       }
 
       result = Execution.rebuild_runtime(execution, %{})
@@ -87,6 +100,14 @@ defmodule Prana.ExecutionTest do
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
+        execution_graph: %{
+          node_map: %{
+            "node_1" => %{key: "node_1", name: "Node 1"},
+            "node_2" => %{key: "node_2", name: "Node 2"},
+            "node_3" => %{key: "node_3", name: "Node 3"}
+          },
+          reverse_connection_map: %{}
+        },
         node_executions: %{
           "node_1" => [
             %NodeExecution{
@@ -368,6 +389,14 @@ defmodule Prana.ExecutionTest do
         workflow_version: 1,
         node_executions: %{},
         current_execution_index: 0,
+        execution_graph: %{
+          node_map: %{
+            "node_1" => %{key: "node_1", name: "Node 1"},
+            "node_2" => %{key: "node_2", name: "Node 2"},
+            "node_3" => %{key: "node_3", name: "Node 3"}
+          },
+          reverse_connection_map: %{}
+        },
         __runtime: %{
           "nodes" => %{},
           "env" => %{"api_key" => "test"}
@@ -398,6 +427,7 @@ defmodule Prana.ExecutionTest do
         workflow_id: "wf_1",
         workflow_version: 1,
         node_executions: incremental_result.node_executions,
+        execution_graph: incremental_result.execution_graph,
         __runtime: nil
       }
 
