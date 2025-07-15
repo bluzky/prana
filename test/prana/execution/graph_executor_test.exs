@@ -57,7 +57,6 @@ defmodule Prana.GraphExecutorTest do
         params: %{}
       }
 
-
       execution_graph = %ExecutionGraph{
         workflow_id: "test_workflow",
         trigger_node_key: "test_node",
@@ -94,7 +93,6 @@ defmodule Prana.GraphExecutorTest do
     test "finds nodes with no dependencies" do
       node1 = %Node{key: "node_1"}
       node2 = %Node{key: "node_2"}
-
 
       execution_graph = %ExecutionGraph{
         workflow_id: "test_workflow",
@@ -136,7 +134,6 @@ defmodule Prana.GraphExecutorTest do
     test "finds nodes after dependencies are satisfied" do
       node1 = %Node{key: "node_1"}
       node2 = %Node{key: "node_2"}
-
 
       execution_graph = %ExecutionGraph{
         workflow_id: "test_workflow",

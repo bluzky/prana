@@ -551,4 +551,253 @@ defmodule Prana.Execution do
 
     %{execution | node_executions: updated_node_executions}
   end
+
+  @doc """
+  Get next run index for a specific node.
+
+  This function calculates the next run index for a node based on its existing executions.
+  Used for retry scenarios where a node needs to be executed multiple times.
+
+  ## Parameters
+  - `execution` - The execution containing node execution history
+  - `node_key` - The key of the node to get the next run index for
+
+  ## Returns
+  Integer representing the next run index for the node
+  """
+  def get_next_run_index(%__MODULE__{} = execution, node_key) do
+    case Map.get(execution.node_executions, node_key, []) do
+      [] ->
+        0
+
+      executions ->
+        max_run_index = Enum.max_by(executions, & &1.run_index).run_index
+        max_run_index + 1
+    end
+  end
+
+  @doc """
+  Get input ports from an action definition.
+
+  This function retrieves the input ports defined for a specific action
+  by looking up the action in the integration registry.
+
+  ## Parameters
+  - `node` - The node containing integration_name and action_name
+
+  ## Returns
+  - `{:ok, ports}` - List of input port names
+  - `{:error, :action_not_found}` - Action not found in registry
+  """
+  def get_action_input_ports(node) do
+    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
+      {:ok, action} ->
+        {:ok, action.input_ports || ["input"]}
+
+      {:error, _reason} ->
+        {:error, :action_not_found}
+    end
+  end
+
+  @doc """
+  Get incoming connections for a specific node and port.
+
+  This function retrieves all connections that target a specific node and input port
+  using the execution graph's reverse connection map for O(1) lookup performance.
+
+  ## Parameters
+  - `execution_graph` - The execution graph containing connection maps
+  - `node_key` - The key of the target node
+  - `input_port` - The name of the input port
+
+  ## Returns
+  List of Connection structs targeting the specified node and port
+  """
+  def get_incoming_connections_for_node_port(execution_graph, node_key, input_port) do
+    # Use reverse connection map for O(1) lookup (exists after proper compilation)
+    # For manually created ExecutionGraphs in tests, fall back to empty list
+    reverse_map = Map.get(execution_graph, :reverse_connection_map, %{})
+    all_incoming = Map.get(reverse_map, node_key, [])
+
+    # Filter for connections targeting the specific input port
+    Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)
+  end
+
+  @doc """
+  Extract multi-port input data for a node by computing routing from execution graph and runtime state.
+
+  This function builds a complete input map for a node by examining all its input ports
+  and routing the appropriate data from connected nodes based on the execution graph.
+
+  ## Parameters
+  - `node` - The node to extract input data for
+  - `execution_graph` - The execution graph containing connection information
+  - `execution` - The execution containing runtime state and completed node outputs
+
+  ## Returns
+  Map with port names as keys and routed data as values
+  """
+  def extract_multi_port_input(node, execution_graph, execution) do
+    # Get input ports from the action definition, not the node
+    input_ports =
+      case get_action_input_ports(node) do
+        {:ok, ports} -> ports
+        # fallback to default
+        _error -> ["input"]
+      end
+
+    # Build multi-port input map: port_name => routed_data
+    multi_port_input =
+      Enum.reduce(input_ports, %{}, fn input_port, acc ->
+        # Find all connections that target this node's input port
+        incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.key, input_port)
+
+        # For same input port with multiple connections, use most recent execution_index
+        port_data = resolve_input_port_data(incoming_connections, execution)
+
+        if port_data do
+          Map.put(acc, input_port, port_data)
+        else
+          acc
+        end
+      end)
+
+    multi_port_input
+  end
+
+  @doc """
+  Resolve input port data when multiple connections target the same port.
+
+  This function handles the case where multiple connections feed into the same input port
+  by using execution_index to select the most recent execution's output data.
+
+  ## Parameters
+  - `connections` - List of Connection structs targeting the same input port
+  - `execution` - The execution containing runtime state and node execution history
+
+  ## Returns
+  The output data from the most recent execution, or nil if no valid data found
+  """
+  def resolve_input_port_data(connections, execution) do
+    # Find the connection with the most recent execution_index
+    connections
+    |> Enum.map(fn connection ->
+      # Get the latest execution for this source node
+      node_executions = Map.get(execution.node_executions, connection.from, [])
+      latest_execution = List.last(node_executions)
+
+      if latest_execution && latest_execution.output_port == connection.from_port do
+        # Valid connection with matching output port
+        source_node_data = execution.__runtime["nodes"][connection.from]
+        output_data = if source_node_data, do: source_node_data["output"]
+        {connection, latest_execution, output_data}
+        # Invalid or no execution
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] ->
+        # No valid connections
+        nil
+
+      [{_, _, output_data}] ->
+        # Single connection, use its data
+        output_data
+
+      connection_data_list ->
+        # Multiple connections, select by highest execution_index
+        {_, _, output_data} =
+          Enum.max_by(connection_data_list, fn {_, execution, _} ->
+            execution.execution_index
+          end)
+
+        output_data
+    end
+  end
+
+  @doc """
+  Update active_nodes and node_depth when a node completes.
+
+  This function updates the runtime state to reflect that a node has completed execution
+  by removing it from active_nodes and adding its target nodes based on the output port.
+  It also maintains node_depth tracking for branch-following execution strategy.
+
+  ## Parameters
+  - `execution` - The execution to update
+  - `completed_node_key` - The key of the node that completed
+  - `output_port` - The output port the node completed with (or nil if failed)
+  - `execution_graph` - The execution graph containing connection information
+
+  ## Returns
+  Updated execution with modified runtime state
+  """
+  def update_active_nodes_on_completion(execution, completed_node_key, output_port, execution_graph) do
+    # Get current active_nodes and node_depth from runtime
+    current_active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
+    current_node_depth = execution.__runtime["node_depth"] || %{}
+
+    # Remove completed node from active_nodes
+    updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
+
+    # Get completed node's depth
+    completed_node_depth = Map.get(current_node_depth, completed_node_key, 0)
+
+    # Add target nodes from completed node's output connections and assign depths
+    {final_active_nodes, final_node_depth} =
+      if output_port do
+        connections = Map.get(execution_graph.connection_map, {completed_node_key, output_port}, [])
+        target_nodes = MapSet.new(connections, & &1.to)
+
+        # Add target nodes to active_nodes
+        updated_active_nodes = MapSet.union(updated_active_nodes, target_nodes)
+
+        # Assign depth = completed_node_depth + 1 to all target nodes
+        target_depth = completed_node_depth + 1
+
+        updated_node_depth =
+          Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
+            Map.put(depth_map, node_key, target_depth)
+          end)
+
+        {updated_active_nodes, updated_node_depth}
+      else
+        {updated_active_nodes, current_node_depth}
+      end
+
+    # Update runtime state
+    execution
+    |> put_in([Access.key(:__runtime), "active_nodes"], final_active_nodes)
+    |> put_in([Access.key(:__runtime), "node_depth"], final_node_depth)
+  end
+
+  @doc """
+  Add a node execution to the execution map structure.
+
+  This function adds a NodeExecution to the execution's audit trail, handling
+  retry scenarios by replacing existing executions with the same run_index.
+
+  ## Parameters
+  - `execution` - The execution to update
+  - `node_execution` - The NodeExecution to add
+
+  ## Returns
+  Updated execution with the node execution added to node_executions map
+  """
+  def add_node_execution_to_map(execution, node_execution) do
+    node_key = node_execution.node_key
+    existing_executions = Map.get(execution.node_executions, node_key, [])
+
+    # Remove any existing execution with same run_index (for retries)
+    remaining_executions =
+      Enum.reject(existing_executions, fn ne -> ne.run_index == node_execution.run_index end)
+
+    # Add the new execution (maintain chronological order by execution_index)
+    updated_executions =
+      Enum.sort_by(remaining_executions ++ [node_execution], & &1.execution_index)
+
+    # Update the map
+    updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
+
+    %{execution | node_executions: updated_node_executions}
+  end
 end

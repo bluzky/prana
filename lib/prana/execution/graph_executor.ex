@@ -293,7 +293,7 @@ defmodule Prana.GraphExecutor do
           # and the Execution.complete_node/2 function
           # Update active_nodes based on completed node's outputs
           final_execution =
-            update_active_nodes_on_completion(
+            Execution.update_active_nodes_on_completion(
               updated_execution,
               selected_node.key,
               node_execution.output_port,
@@ -424,7 +424,7 @@ defmodule Prana.GraphExecutor do
   defp dependencies_satisfied?(node, execution_graph, completed_node_ids) do
     # Get input ports for this node
     input_ports =
-      case get_action_input_ports(node) do
+      case Execution.get_action_input_ports(node) do
         {:ok, ports} -> ports
         # fallback to default
         _error -> ["input"]
@@ -439,7 +439,7 @@ defmodule Prana.GraphExecutor do
   # Check if a specific input port is satisfied (at least one source available)
   defp input_port_satisfied?(node_key, input_port, execution_graph, completed_node_ids) do
     # Get all incoming connections for this node and port
-    incoming_connections = get_incoming_connections_for_node_port(execution_graph, node_key, input_port)
+    incoming_connections = Execution.get_incoming_connections_for_node_port(execution_graph, node_key, input_port)
 
     # If no incoming connections, port is satisfied (no dependencies)
     if Enum.empty?(incoming_connections) do
@@ -455,11 +455,11 @@ defmodule Prana.GraphExecutor do
   # Execute a single node with middleware events using unified execution architecture
   defp execute_single_node_with_events(node, execution_graph, execution) do
     # Extract multi-port input data for this node from execution graph and runtime state
-    routed_input = extract_multi_port_input(node, execution_graph, execution)
+    routed_input = Execution.extract_multi_port_input(node, execution_graph, execution)
 
     # Get execution tracking indices
     execution_index = execution.current_execution_index
-    run_index = get_next_run_index(execution, node.key)
+    run_index = Execution.get_next_run_index(execution, node.key)
 
     # Emit node starting event
     Middleware.call(:node_starting, %{node: node, execution: execution})
@@ -483,47 +483,16 @@ defmodule Prana.GraphExecutor do
 
         # Increment execution index and add suspended node to execution
         final_execution = %{execution | current_execution_index: execution_index + 1}
-        updated_execution = add_node_execution_to_map(final_execution, suspended_node_execution)
+        updated_execution = Execution.add_node_execution_to_map(final_execution, suspended_node_execution)
         {suspended_node_execution, updated_execution}
 
       {:error, {_reason, error_node_execution}} ->
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
         # Increment execution index and add failed node to execution
         final_execution = %{execution | current_execution_index: execution_index + 1}
-        updated_execution = add_node_execution_to_map(final_execution, error_node_execution)
+        updated_execution = Execution.add_node_execution_to_map(final_execution, error_node_execution)
         {error_node_execution, updated_execution}
     end
-  end
-
-  # Get next run index for a specific node
-  defp get_next_run_index(execution, node_key) do
-    case Map.get(execution.node_executions, node_key, []) do
-      [] ->
-        0
-
-      executions ->
-        max_run_index = Enum.max_by(executions, & &1.run_index).run_index
-        max_run_index + 1
-    end
-  end
-
-  # Add node execution to the map structure
-  defp add_node_execution_to_map(execution, node_execution) do
-    node_key = node_execution.node_key
-    existing_executions = Map.get(execution.node_executions, node_key, [])
-
-    # Remove any existing execution with same run_index (for retries)
-    remaining_executions =
-      Enum.reject(existing_executions, fn ne -> ne.run_index == node_execution.run_index end)
-
-    # Add the new execution (maintain chronological order by execution_index)
-    updated_executions =
-      Enum.sort_by(remaining_executions ++ [node_execution], & &1.execution_index)
-
-    # Update the map
-    updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
-
-    %{execution | node_executions: updated_node_executions}
   end
 
   # Complete a suspended node execution with resume data
@@ -544,7 +513,7 @@ defmodule Prana.GraphExecutor do
         {:ok, completed_node_execution, updated_execution} ->
           # Update active nodes based on completed node's outputs
           final_execution =
-            update_active_nodes_on_completion(
+            Execution.update_active_nodes_on_completion(
               updated_execution,
               suspended_node_id,
               completed_node_execution.output_port,
@@ -619,136 +588,5 @@ defmodule Prana.GraphExecutor do
         # Action not found in registry, return empty preparation data
         {:ok, nil}
     end
-  end
-
-  # Extract multi-port input data for a node by computing routing from execution graph and runtime state
-  # Returns a map with port names as keys and routed data as values
-  defp extract_multi_port_input(node, execution_graph, execution) do
-    # Get input ports from the action definition, not the node
-    input_ports =
-      case get_action_input_ports(node) do
-        {:ok, ports} -> ports
-        # fallback to default
-        _error -> ["input"]
-      end
-
-    # Build multi-port input map: port_name => routed_data
-    multi_port_input =
-      Enum.reduce(input_ports, %{}, fn input_port, acc ->
-        # Find all connections that target this node's input port
-        incoming_connections = get_incoming_connections_for_node_port(execution_graph, node.key, input_port)
-
-        # For same input port with multiple connections, use most recent execution_index
-        port_data = resolve_input_port_data(incoming_connections, execution)
-
-        if port_data do
-          Map.put(acc, input_port, port_data)
-        else
-          acc
-        end
-      end)
-
-    multi_port_input
-  end
-
-  # Resolve input port data when multiple connections target the same port
-  # Uses execution_index to select the most recent execution
-  defp resolve_input_port_data(connections, execution) do
-    # Find the connection with the most recent execution_index
-    connections
-    |> Enum.map(fn connection ->
-      # Get the latest execution for this source node
-      node_executions = Map.get(execution.node_executions, connection.from, [])
-      latest_execution = List.last(node_executions)
-
-      if latest_execution && latest_execution.output_port == connection.from_port do
-        # Valid connection with matching output port
-        source_node_data = execution.__runtime["nodes"][connection.from]
-        output_data = if source_node_data, do: source_node_data["output"]
-        {connection, latest_execution, output_data}
-        # Invalid or no execution
-      end
-    end)
-    |> Enum.reject(&is_nil/1)
-    |> case do
-      [] ->
-        # No valid connections
-        nil
-
-      [{_, _, output_data}] ->
-        # Single connection, use its data
-        output_data
-
-      connection_data_list ->
-        # Multiple connections, select by highest execution_index
-        {_, _, output_data} =
-          Enum.max_by(connection_data_list, fn {_, execution, _} ->
-            execution.execution_index
-          end)
-
-        output_data
-    end
-  end
-
-  # Get input ports from the action definition
-  defp get_action_input_ports(node) do
-    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
-      {:ok, action} ->
-        {:ok, action.input_ports || ["input"]}
-
-      {:error, _reason} ->
-        {:error, :action_not_found}
-    end
-  end
-
-  # Get incoming connections for a specific node and port
-  defp get_incoming_connections_for_node_port(execution_graph, node_key, input_port) do
-    # Use reverse connection map for O(1) lookup (exists after proper compilation)
-    # For manually created ExecutionGraphs in tests, fall back to empty list
-    reverse_map = Map.get(execution_graph, :reverse_connection_map, %{})
-    all_incoming = Map.get(reverse_map, node_key, [])
-
-    # Filter for connections targeting the specific input port
-    Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)
-  end
-
-  # Update active_nodes and node_depth when a node completes
-  defp update_active_nodes_on_completion(execution, completed_node_key, output_port, execution_graph) do
-    # Get current active_nodes and node_depth from runtime
-    current_active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
-    current_node_depth = execution.__runtime["node_depth"] || %{}
-
-    # Remove completed node from active_nodes
-    updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
-
-    # Get completed node's depth
-    completed_node_depth = Map.get(current_node_depth, completed_node_key, 0)
-
-    # Add target nodes from completed node's output connections and assign depths
-    {final_active_nodes, final_node_depth} =
-      if output_port do
-        connections = Map.get(execution_graph.connection_map, {completed_node_key, output_port}, [])
-        target_nodes = MapSet.new(connections, & &1.to)
-
-        # Add target nodes to active_nodes
-        updated_active_nodes = MapSet.union(updated_active_nodes, target_nodes)
-
-        # Assign depth = completed_node_depth + 1 to all target nodes
-        target_depth = completed_node_depth + 1
-
-        updated_node_depth =
-          Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
-            Map.put(depth_map, node_key, target_depth)
-          end)
-
-        {updated_active_nodes, updated_node_depth}
-      else
-        {updated_active_nodes, current_node_depth}
-      end
-
-    # Update runtime state
-    execution
-    |> put_in([Access.key(:__runtime), "active_nodes"], final_active_nodes)
-    |> put_in([Access.key(:__runtime), "node_depth"], final_node_depth)
   end
 end
