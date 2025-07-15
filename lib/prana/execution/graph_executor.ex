@@ -274,18 +274,10 @@ defmodule Prana.GraphExecutor do
       selected_node = select_node_for_branch_following(ready_nodes, execution.__runtime)
 
       case execute_single_node_with_events(selected_node, execution) do
-        {%NodeExecution{status: :completed} = node_execution, updated_execution} ->
+        {%NodeExecution{status: :completed} = _node_execution, updated_execution} ->
           # Output routing and context updates are now handled internally by NodeExecutor
-          # and the Execution.complete_node/2 function
-          # Update active_nodes based on completed node's outputs
-          final_execution =
-            Execution.update_active_nodes_on_completion(
-              updated_execution,
-              selected_node.key,
-              node_execution.output_port
-            )
-
-          {:ok, final_execution}
+          # and the Execution.complete_node/2 function (which also updates active_nodes)
+          {:ok, updated_execution}
 
         {%NodeExecution{status: :suspended} = node_execution, updated_execution} ->
           # Extract suspension information from NodeExecution fields
@@ -495,16 +487,9 @@ defmodule Prana.GraphExecutor do
 
       # Call NodeExecutor with new unified interface
       case NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data) do
-        {:ok, completed_node_execution, updated_execution} ->
-          # Update active nodes based on completed node's outputs
-          final_execution =
-            Execution.update_active_nodes_on_completion(
-              updated_execution,
-              suspended_node_id,
-              completed_node_execution.output_port
-            )
-
-          {:ok, final_execution}
+        {:ok, _completed_node_execution, updated_execution} ->
+          # Active nodes are updated automatically by NodeExecutor via Execution.complete_node/2
+          {:ok, updated_execution}
 
         {:error, {reason, _failed_node_execution}} ->
           {:error, reason}

@@ -453,17 +453,18 @@ defmodule Prana.Execution do
   end
 
   @doc """
-  Adds a completed node execution to the execution and updates runtime state.
+  Adds a completed node execution to the execution and updates all completion-related state.
 
   This function integrates an already-completed NodeExecution into the execution's
-  audit trail and synchronizes the runtime state for optimal performance.
+  audit trail and synchronizes both persistent and runtime state, including updating
+  active nodes and node depth tracking for workflow orchestration.
 
   ## Parameters
   - `execution` - The execution to update
   - `completed_node_execution` - The completed NodeExecution to add
 
   ## Returns
-  Updated execution with synchronized persistent and runtime state
+  Updated execution with synchronized persistent and runtime state, including updated active nodes
 
   ## Example
 
@@ -473,6 +474,7 @@ defmodule Prana.Execution do
       # Both persistent and runtime state updated
       execution.node_executions  # Contains the completed NodeExecution
       execution.__runtime["nodes"]["api_call"]  # Contains %{user_id: 123}
+      execution.__runtime["active_nodes"]  # Updated based on completed node's outputs
   """
   def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :completed} = completed_node_execution) do
     node_key = completed_node_execution.node_key
@@ -507,7 +509,11 @@ defmodule Prana.Execution do
           Map.put(runtime, "nodes", updated_node_map)
       end
 
-    %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
+    # Update execution with persistent and runtime state
+    updated_execution = %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
+
+    # Update active nodes and node depth tracking based on completion
+    update_active_nodes_on_completion(updated_execution, node_key, completed_node_execution.output_port)
   end
 
   @doc """
@@ -715,59 +721,54 @@ defmodule Prana.Execution do
     end
   end
 
-  @doc """
-  Update active_nodes and node_depth when a node completes.
+  # Update active_nodes and node_depth when a node completes.
+  # This function updates the runtime state to reflect that a node has completed execution
+  # by removing it from active_nodes and adding its target nodes based on the output port.
+  # It also maintains node_depth tracking for branch-following execution strategy.
+  defp update_active_nodes_on_completion(execution, completed_node_key, output_port) do
+    # Safety check: only update if runtime state exists
+    case execution.__runtime do
+      nil ->
+        execution
 
-  This function updates the runtime state to reflect that a node has completed execution
-  by removing it from active_nodes and adding its target nodes based on the output port.
-  It also maintains node_depth tracking for branch-following execution strategy.
+      runtime ->
+        # Get current active_nodes and node_depth from runtime
+        current_active_nodes = runtime["active_nodes"] || MapSet.new()
+        current_node_depth = runtime["node_depth"] || %{}
 
-  ## Parameters
-  - `execution` - The execution to update
-  - `completed_node_key` - The key of the node that completed
-  - `output_port` - The output port the node completed with (or nil if failed)
-  - `execution_graph` - The execution graph containing connection information
+        # Remove completed node from active_nodes
+        updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
 
-  ## Returns
-  Updated execution with modified runtime state
-  """
-  def update_active_nodes_on_completion(execution, completed_node_key, output_port) do
-    # Get current active_nodes and node_depth from runtime
-    current_active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
-    current_node_depth = execution.__runtime["node_depth"] || %{}
+        # Get completed node's depth
+        completed_node_depth = Map.get(current_node_depth, completed_node_key, 0)
 
-    # Remove completed node from active_nodes
-    updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
+        # Add target nodes from completed node's output connections and assign depths
+        {final_active_nodes, final_node_depth} =
+          if output_port && execution.execution_graph && Map.has_key?(execution.execution_graph, :connection_map) do
+            connections = Map.get(execution.execution_graph.connection_map, {completed_node_key, output_port}, [])
+            target_nodes = MapSet.new(connections, & &1.to)
 
-    # Get completed node's depth
-    completed_node_depth = Map.get(current_node_depth, completed_node_key, 0)
+            # Add target nodes to active_nodes
+            updated_active_nodes = MapSet.union(updated_active_nodes, target_nodes)
 
-    # Add target nodes from completed node's output connections and assign depths
-    {final_active_nodes, final_node_depth} =
-      if output_port do
-        connections = Map.get(execution.execution_graph.connection_map, {completed_node_key, output_port}, [])
-        target_nodes = MapSet.new(connections, & &1.to)
+            # Assign depth = completed_node_depth + 1 to all target nodes
+            target_depth = completed_node_depth + 1
 
-        # Add target nodes to active_nodes
-        updated_active_nodes = MapSet.union(updated_active_nodes, target_nodes)
+            updated_node_depth =
+              Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
+                Map.put(depth_map, node_key, target_depth)
+              end)
 
-        # Assign depth = completed_node_depth + 1 to all target nodes
-        target_depth = completed_node_depth + 1
+            {updated_active_nodes, updated_node_depth}
+          else
+            {updated_active_nodes, current_node_depth}
+          end
 
-        updated_node_depth =
-          Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
-            Map.put(depth_map, node_key, target_depth)
-          end)
-
-        {updated_active_nodes, updated_node_depth}
-      else
-        {updated_active_nodes, current_node_depth}
-      end
-
-    # Update runtime state
-    execution
-    |> put_in([Access.key(:__runtime), "active_nodes"], final_active_nodes)
-    |> put_in([Access.key(:__runtime), "node_depth"], final_node_depth)
+        # Update runtime state
+        execution
+        |> put_in([Access.key(:__runtime), "active_nodes"], final_active_nodes)
+        |> put_in([Access.key(:__runtime), "node_depth"], final_node_depth)
+    end
   end
 
   @doc """
