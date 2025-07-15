@@ -119,7 +119,7 @@ defmodule Prana.GraphExecutor do
       ) do
     # Initialize runtime state once for resume (execution loaded from storage)
     env_data = Map.get(execution_context, :env, %{})
-    prepared_execution = Execution.rebuild_runtime(suspended_execution, env_data, execution_graph)
+    prepared_execution = Execution.rebuild_runtime(%{suspended_execution | execution_graph: execution_graph}, env_data)
 
     # Find the suspended node and complete it with the resume data
     suspended_node_id = prepared_execution.suspended_node_id

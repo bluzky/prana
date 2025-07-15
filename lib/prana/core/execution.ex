@@ -213,7 +213,7 @@ defmodule Prana.Execution do
   end
 
   # Rebuild active_nodes from execution state with loop support
-  defp rebuild_active_nodes(execution, execution_graph) do
+  defp rebuild_active_nodes(execution) do
     # 1. Do not include suspended nodes in active nodes during runtime rebuild
     # Suspended nodes will be resumed and completed, so they shouldn't be active
     base_active_nodes = MapSet.new()
@@ -223,10 +223,10 @@ defmodule Prana.Execution do
 
     # 3. Find nodes that have received fresh input since their last execution
     nodes_with_fresh_input =
-      execution_graph.node_map
+      execution.execution_graph.node_map
       |> Map.keys()
       |> Enum.filter(fn node_key ->
-        has_fresh_input_since_last_execution?(node_key, completed_nodes, execution_graph)
+        has_fresh_input_since_last_execution?(node_key, completed_nodes, execution.execution_graph)
       end)
       |> MapSet.new()
 
@@ -409,7 +409,7 @@ defmodule Prana.Execution do
       execution.__runtime["active_paths"]  # %{"path_1" => true, "path_2" => true}
       execution.__runtime["executed_nodes"] # ["node_1", "node_2"]
   """
-  def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}, execution_graph \\ nil) do
+  def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
     # Get LAST completed execution of each node (highest run_index)
     node_structured =
       execution.node_executions
@@ -429,8 +429,8 @@ defmodule Prana.Execution do
 
     # Rebuild active_nodes if execution_graph is provided
     active_nodes =
-      if execution_graph do
-        rebuild_active_nodes(execution, execution_graph)
+      if execution.execution_graph do
+        rebuild_active_nodes(execution)
       else
         # Default empty for cases without execution_graph
         MapSet.new()
