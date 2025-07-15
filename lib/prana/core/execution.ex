@@ -930,4 +930,75 @@ defmodule Prana.Execution do
         {:ok, nil}
     end
   end
+
+  @doc """
+  Find nodes that are ready to execute based on their dependencies and conditional paths.
+
+  A node is ready if:
+  1. It hasn't been executed yet (not in completed node executions)
+  2. All its input dependencies have been satisfied
+  3. It's reachable from completed nodes or is an entry node
+  4. It's on an active conditional execution path (for conditional branching)
+
+  ## Parameters
+
+  - `execution` - The execution containing ExecutionGraph and runtime state
+  - `execution_context` - Current execution context with conditional path tracking
+
+  ## Returns
+
+  List of Node structs that are ready for execution.
+  """
+  @spec find_ready_nodes(t()) :: [Prana.Node.t()]
+  def find_ready_nodes(%__MODULE__{} = execution) do
+    # Get active nodes from execution context
+    active_nodes = execution.__runtime["active_nodes"] || MapSet.new()
+
+    # Extract completed node IDs from map structure for dependency checking
+    completed_node_ids =
+      execution.node_executions
+      |> Enum.map(fn {node_key, executions} -> {node_key, List.last(executions)} end)
+      |> Enum.filter(fn {_, exec} -> exec.status == :completed end)
+      |> MapSet.new(fn {node_key, _} -> node_key end)
+
+    # Only check active nodes instead of all nodes
+    active_nodes
+    |> Enum.map(fn node_key -> execution.execution_graph.node_map[node_key] end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.filter(fn node ->
+      dependencies_satisfied?(node, execution.execution_graph, completed_node_ids)
+    end)
+  end
+
+  # Check if all input ports for a node are satisfied (port-based logic)
+  defp dependencies_satisfied?(node, execution_graph, completed_node_ids) do
+    # Get input ports for this node
+    input_ports =
+      case get_action_input_ports(node) do
+        {:ok, ports} -> ports
+        # fallback to default
+        _error -> ["input"]
+      end
+
+    # For each input port, check if at least one source connection is satisfied
+    Enum.all?(input_ports, fn input_port ->
+      input_port_satisfied?(node.key, input_port, execution_graph, completed_node_ids)
+    end)
+  end
+
+  # Check if a specific input port is satisfied (at least one source available)
+  defp input_port_satisfied?(node_key, input_port, execution_graph, completed_node_ids) do
+    # Get all incoming connections for this node and port
+    incoming_connections = get_incoming_connections_for_node_port(execution_graph, node_key, input_port)
+
+    # If no incoming connections, port is satisfied (no dependencies)
+    if Enum.empty?(incoming_connections) do
+      true
+    else
+      # At least one source node must be completed
+      Enum.any?(incoming_connections, fn conn ->
+        MapSet.member?(completed_node_ids, conn.from)
+      end)
+    end
+  end
 end

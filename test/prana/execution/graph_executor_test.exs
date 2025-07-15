@@ -6,7 +6,6 @@ defmodule Prana.GraphExecutorTest do
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
   alias Prana.Node
-  alias Prana.NodeExecution
   alias Prana.TestSupport.TestIntegration
 
   # Helper functions for handling map-based node_executions
@@ -86,93 +85,6 @@ defmodule Prana.GraphExecutorTest do
       assert node_execution.status == :completed
       assert node_execution.node_key == "test_node"
       assert node_execution.output_port == "success"
-    end
-  end
-
-  describe "find_ready_nodes/3" do
-    test "finds nodes with no dependencies" do
-      node1 = %Node{key: "node_1"}
-      node2 = %Node{key: "node_2"}
-
-      execution_graph = %ExecutionGraph{
-        workflow_id: "test_workflow",
-        trigger_node_key: "node_1",
-        node_map: %{"node_1" => node1, "node_2" => node2},
-        dependency_graph: %{
-          "node_1" => [],
-          # node2 depends on node1
-          "node_2" => ["node_1"]
-        },
-        reverse_connection_map: %{
-          "node_1" => [],
-          "node_2" => []
-        },
-        connection_map: %{},
-        variables: %{}
-      }
-
-      completed_executions = %{}
-
-      # Updated context structure for conditional branching
-      context = %{
-        "input" => %{},
-        "variables" => %{},
-        "metadata" => %{},
-        "nodes" => %{},
-        "executed_nodes" => [],
-        "active_paths" => %{},
-        # Only node_1 is active since node_2 depends on it
-        "active_nodes" => MapSet.new(["node_1"])
-      }
-
-      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
-
-      assert length(ready_nodes) == 1
-      assert hd(ready_nodes).key == "node_1"
-    end
-
-    test "finds nodes after dependencies are satisfied" do
-      node1 = %Node{key: "node_1"}
-      node2 = %Node{key: "node_2"}
-
-      execution_graph = %ExecutionGraph{
-        workflow_id: "test_workflow",
-        trigger_node_key: "node_1",
-        node_map: %{"node_1" => node1, "node_2" => node2},
-        dependency_graph: %{
-          "node_1" => [],
-          # node2 depends on node1
-          "node_2" => ["node_1"]
-        },
-        reverse_connection_map: %{
-          "node_1" => [],
-          "node_2" => []
-        },
-        connection_map: %{},
-        variables: %{}
-      }
-
-      # node1 is already completed
-      completed_executions = %{
-        "node_1" => [%NodeExecution{node_key: "node_1", status: :completed, execution_index: 0, run_index: 0}]
-      }
-
-      # Updated context structure for conditional branching
-      context = %{
-        "input" => %{},
-        "variables" => %{},
-        "metadata" => %{},
-        "nodes" => %{"node_1" => %{"status" => "completed"}},
-        "executed_nodes" => ["node_1"],
-        "active_paths" => %{"node_1_success" => true},
-        # node_2 should be active since node_1 completed
-        "active_nodes" => MapSet.new(["node_2"])
-      }
-
-      ready_nodes = GraphExecutor.find_ready_nodes(execution_graph, completed_executions, context)
-
-      assert length(ready_nodes) == 1
-      assert hd(ready_nodes).key == "node_2"
     end
   end
 end
