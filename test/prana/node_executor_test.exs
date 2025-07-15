@@ -289,7 +289,7 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test", "basic_success", %{"value" => "{{$input.value}}"})
       routed_input = %{"value" => 10}
 
-      assert {:ok, node_execution, updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.status == :completed
@@ -301,28 +301,25 @@ defmodule Prana.NodeExecutorTest do
       assert is_integer(node_execution.duration_ms)
 
       # Check updated execution
-      assert updated_execution.node_executions["test_node"] == [node_execution]
-      assert updated_execution.__runtime["nodes"]["test_node"]["output"] == %{result: 20}
     end
 
     test "executes node with explicit port selection", %{execution: execution} do
       node = Node.new("test_node", "test", "explicit_port", %{"premium" => true})
       routed_input = %{"premium" => true}
 
-      assert {:ok, node_execution, updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.status == :completed
       assert node_execution.output_data == %{status: "premium"}
       assert node_execution.output_port == "premium"
-      assert updated_execution.__runtime["nodes"]["test_node"]["output"] == %{status: "premium"}
     end
 
     test "executes node with context data", %{execution: execution} do
       node = Node.new("test_node", "test", "with_context", %{"data" => "test"})
       routed_input = %{"data" => "test"}
 
-      assert {:ok, node_execution, _updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.status == :completed
@@ -386,7 +383,7 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test", "basic_success", nil)
       routed_input = %{"value" => 10}
 
-      assert {:ok, node_execution, _updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.params == %{}
@@ -402,7 +399,7 @@ defmodule Prana.NodeExecutorTest do
 
       routed_input = %{"amount" => 100}
 
-      assert {:ok, node_execution, _updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.params == %{
@@ -473,7 +470,7 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test", "dynamic_ports", %{"type" => "premium"})
       routed_input = %{"type" => "premium"}
 
-      assert {:ok, node_execution, _updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.status == :completed
@@ -508,13 +505,12 @@ defmodule Prana.NodeExecutorTest do
       resume_data = %{result: "resumed_successfully"}
       resume_node = Node.new("test_node", "test", "suspend_action", %{})
 
-      assert {:ok, completed_execution, updated_execution} =
+      assert {:ok, completed_execution} =
                NodeExecutor.resume_node(resume_node, execution, suspended_execution, resume_data)
 
       assert completed_execution.status == :completed
       assert completed_execution.output_data == resume_data
       assert completed_execution.output_port == "resumed"
-      assert updated_execution.__runtime["nodes"]["test_node"]["output"] == resume_data
     end
 
     test "resumes with context data", %{execution: execution} do
@@ -535,7 +531,7 @@ defmodule Prana.NodeExecutorTest do
 
       resume_data = %{result: "resumed_with_context"}
 
-      assert {:ok, completed_execution, _updated_execution} =
+      assert {:ok, completed_execution} =
                NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
 
       assert completed_execution.status == :completed
@@ -862,7 +858,7 @@ defmodule Prana.NodeExecutorTest do
 
       routed_input = %{"value" => 42}
 
-      assert {:ok, node_execution, _updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.params == %{
@@ -881,7 +877,7 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test", "basic_success", %{})
       routed_input = %{"value" => 10}
 
-      assert {:ok, node_execution, _updated_execution} =
+      assert {:ok, node_execution} =
                NodeExecutor.execute_node(node, execution, routed_input, 5, 2)
 
       assert node_execution.execution_index == 5

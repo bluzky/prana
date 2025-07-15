@@ -23,12 +23,12 @@ defmodule Prana.NodeExecutor do
   - `run_index` - Per-node iteration index
 
   ## Returns
-  - `{:ok, node_execution, updated_execution}` - Successful execution
+  - `{:ok, node_execution}` - Successful execution
   - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
   @spec execute_node(Node.t(), Prana.Execution.t(), map(), integer(), integer()) ::
-          {:ok, NodeExecution.t(), Prana.Execution.t()}
+          {:ok, NodeExecution.t()}
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
   def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input, execution_index \\ 0, run_index \\ 0) do
@@ -48,23 +48,17 @@ defmodule Prana.NodeExecutor do
 
       case invoke_action(action, prepared_params, context) do
         {:ok, output_data, output_port, _context} ->
-          # Complete the local node execution and update context
+          # Complete the local node execution
           completed_execution =
             NodeExecution.complete(node_execution, output_data, output_port)
 
-          # Then integrate it into the execution state
-          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
-
-          {:ok, completed_execution, updated_execution}
+          {:ok, completed_execution}
 
         {:ok, output_data, output_port} ->
-          # Complete the local node execution without context data
+          # Complete the local node execution
           completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
 
-          # Then integrate it into the execution state
-          updated_execution = Prana.Execution.complete_node(execution, completed_execution)
-
-          {:ok, completed_execution, updated_execution}
+          {:ok, completed_execution}
 
         {:suspend, suspension_type, suspend_data} ->
           # Node suspended for async coordination
@@ -94,11 +88,11 @@ defmodule Prana.NodeExecutor do
   - `resume_data` - Data to complete the suspended execution with
 
   ## Returns
-  - `{:ok, node_execution, updated_execution}` - Successfully resumed and completed
+  - `{:ok, node_execution}` - Successfully resumed and completed
   - `{:error, {reason, failed_node_execution}}` - Resume failed
   """
   @spec resume_node(Node.t(), Prana.Execution.t(), NodeExecution.t(), map()) ::
-          {:ok, NodeExecution.t(), Prana.Execution.t()} | {:error, {term(), NodeExecution.t()}}
+          {:ok, NodeExecution.t()} | {:error, {term(), NodeExecution.t()}}
   def resume_node(
         %Node{} = node,
         %Prana.Execution{} = execution,
@@ -118,20 +112,14 @@ defmodule Prana.NodeExecutor do
             # Complete the suspended node execution
             completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
 
-            # Integrate it into the execution state
-            updated_execution = Prana.Execution.complete_node(execution, completed_execution)
-
-            {:ok, completed_execution, updated_execution}
+            {:ok, completed_execution}
 
           {:ok, output_data, output_port, _context} ->
             # Complete with context data
             completed_execution =
               NodeExecution.complete(suspended_node_execution, output_data, output_port)
 
-            # Integrate it into the execution state
-            updated_execution = Prana.Execution.complete_node(execution, completed_execution)
-
-            {:ok, completed_execution, updated_execution}
+            {:ok, completed_execution}
 
           {:error, reason} ->
             # Resume failed

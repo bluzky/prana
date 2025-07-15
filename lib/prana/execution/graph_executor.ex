@@ -405,7 +405,9 @@ defmodule Prana.GraphExecutor do
 
     # Execute the node using the tracking interface
     case NodeExecutor.execute_node(node, execution, routed_input, execution_index, run_index) do
-      {:ok, result_node_execution, updated_execution} ->
+      {:ok, result_node_execution} ->
+        # Complete the node execution at workflow level
+        updated_execution = Prana.Execution.complete_node(execution, result_node_execution)
         # Increment execution index for next node
         final_execution = %{updated_execution | current_execution_index: execution_index + 1}
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
@@ -447,8 +449,9 @@ defmodule Prana.GraphExecutor do
 
       # Call NodeExecutor with unified interface
       case NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data) do
-        {:ok, _completed_node_execution, updated_execution} ->
-          # Active nodes are updated automatically by NodeExecutor via Execution.complete_node/2
+        {:ok, completed_node_execution} ->
+          # Complete the node execution at workflow level
+          updated_execution = Prana.Execution.complete_node(resume_ready_execution, completed_node_execution)
           {:ok, updated_execution}
 
         {:error, {reason, _failed_node_execution}} ->
