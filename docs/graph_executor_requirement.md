@@ -19,8 +19,8 @@ The **GraphExecutor** is the core workflow orchestration engine in the Prana aut
 
 ## 2. Current Implementation Status
 
-**✅ Phase 3.1**: Core Execution with Performance Optimization  
-**✅ Phase 3.2**: Conditional Branching with Branch-Following Execution  
+**✅ Phase 3.1**: Core Execution with Performance Optimization
+**✅ Phase 3.2**: Conditional Branching with Branch-Following Execution
 
 ### Branch-Following Execution Model
 
@@ -56,7 +56,7 @@ context = %{
 ### Key Capabilities
 
 - **Graph Execution**: Execute pre-compiled ExecutionGraphs with dependency-driven execution
-- **Branch-Following**: Single-node execution with intelligent branch prioritization  
+- **Branch-Following**: Single-node execution with intelligent branch prioritization
 - **Data Routing**: Port-based data flow with O(1) connection lookups
 - **Sub-workflows**: Sync and fire-and-forget execution modes
 - **Event Integration**: Comprehensive middleware event emission
@@ -101,12 +101,12 @@ context = %{
 def select_node_for_branch_following(ready_nodes, execution_graph, execution_context) do
   # Priority 1: Nodes continuing active branches
   continuing_nodes = filter_nodes_continuing_active_branches(ready_nodes)
-  
+
   if not empty?(continuing_nodes) do
     # Among continuing nodes, prefer those with fewer dependencies
     select_by_dependency_count(continuing_nodes)
   else
-    # Priority 2: Start new branches, prefer fewer dependencies  
+    # Priority 2: Start new branches, prefer fewer dependencies
     select_by_dependency_count(ready_nodes)
   end
 end
@@ -189,23 +189,6 @@ end
 
 ### 4.2 Core Functionality
 
-#### 4.2.1 Node-level Retry Policies
-```elixir
-# Retry configuration per node
-retry_policy = %RetryPolicy{
-  max_attempts: 3,
-  backoff_strategy: :exponential,
-  base_delay_ms: 1000,
-  max_delay_ms: 30000,
-  retry_on: [:network_error, :timeout]
-}
-```
-
-#### 4.2.2 Retry Coordination
-- **GraphExecutor-NodeExecutor Integration**: Coordinate retry attempts
-- **Exponential Backoff**: Intelligent delay between retry attempts
-- **Retry State Tracking**: Monitor retry counts and failures
-- **Selective Retry**: Retry only on specific error types
 
 #### 4.2.3 Timeout Management
 - **Node-level Timeouts**: Individual node execution timeouts

@@ -36,11 +36,8 @@
 ### 1.2 Execution Data Types
 - [x] `Prana.Execution` - Workflow execution instance
 - [x] `Prana.NodeExecution` - Individual node execution state (Updated: fixed fail/2)
-- [x] `Prana.ExecutionContext` - Shared execution context
 
 ### 1.3 Configuration Types
-- [x] `Prana.ErrorHandling` - Error handling configuration
-- [x] `Prana.RetryPolicy` - Retry policy configuration
 
 ## 2. Core Behaviors (✅ COMPLETED - Simplified)
 
@@ -319,7 +316,6 @@
   - [ ] Integration errors
 
 ### 10.2 Resilience Components
-- [ ] Retry logic implementation
 - [ ] Circuit breaker patterns
 - [ ] Timeout handling
 - [ ] Graceful degradation
