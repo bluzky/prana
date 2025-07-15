@@ -617,67 +617,6 @@ defmodule Prana.NodeExecutorTest do
     end
   end
 
-  describe "prepare_params/2" do
-    test "returns empty map for nil params" do
-      node = %Node{params: nil}
-      context = %{}
-
-      assert {:ok, %{}} = NodeExecutor.prepare_params(node, context)
-    end
-
-    test "processes expression parameters" do
-      node = %Node{
-        params: %{
-          "simple" => "{{$input.value}}",
-          "nested" => "{{ $nodes.api.output.result }}",
-          "literal" => "literal_value"
-        }
-      }
-
-      context = %{
-        "$input" => %{"value" => 42},
-        "$nodes" => %{"api" => %{"output" => %{"result" => "success"}}},
-        "$env" => %{}
-      }
-
-      assert {:ok, processed} = NodeExecutor.prepare_params(node, context)
-
-      assert processed == %{
-               "simple" => 42,
-               "nested" => "success",
-               "literal" => "literal_value"
-             }
-    end
-  end
-
-  describe "get_action/1" do
-    test "retrieves action successfully" do
-      node = %Node{integration_name: "test", action_name: "basic_success"}
-
-      assert {:ok, action} = NodeExecutor.get_action(node)
-      assert action.name == "basic_success"
-      assert action.module == TestActions.BasicSuccess
-    end
-
-    test "handles nonexistent integration" do
-      node = %Node{integration_name: "nonexistent", action_name: "action"}
-
-      assert {:error, reason} = NodeExecutor.get_action(node)
-      assert reason["type"] == "action_not_found"
-      assert reason["integration_name"] == "nonexistent"
-      assert reason["action_name"] == "action"
-    end
-
-    test "handles nonexistent action" do
-      node = %Node{integration_name: "test", action_name: "nonexistent"}
-
-      assert {:error, reason} = NodeExecutor.get_action(node)
-      assert reason["type"] == "action_not_found"
-      assert reason["integration_name"] == "test"
-      assert reason["action_name"] == "nonexistent"
-    end
-  end
-
   describe "invoke_action/3" do
     test "invokes action successfully" do
       action = %Action{

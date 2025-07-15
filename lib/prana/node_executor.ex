@@ -32,49 +32,16 @@ defmodule Prana.NodeExecutor do
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
   def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input, execution_index \\ 0, run_index \\ 0) do
-    # Create initial node execution with proper execution ID and indices
-    node_execution =
-      execution.id
-      |> NodeExecution.new(node.key, execution_index, run_index)
-      |> NodeExecution.start()
-
-    # Build context once for both input preparation and action execution
-    context =
-      build_expression_context(node_execution, execution, routed_input)
+    node_execution = create_node_execution(execution, node, execution_index, run_index)
+    context = build_expression_context(node_execution, execution, routed_input)
 
     with {:ok, prepared_params} <- prepare_params(node, context),
          {:ok, action} <- get_action(node) do
       node_execution = %{node_execution | params: prepared_params}
-
-      case invoke_action(action, prepared_params, context) do
-        {:ok, output_data, output_port, _context} ->
-          # Complete the local node execution
-          completed_execution =
-            NodeExecution.complete(node_execution, output_data, output_port)
-
-          {:ok, completed_execution}
-
-        {:ok, output_data, output_port} ->
-          # Complete the local node execution
-          completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-
-          {:ok, completed_execution}
-
-        {:suspend, suspension_type, suspend_data} ->
-          # Node suspended for async coordination
-          suspended_execution = suspend_node_execution(node_execution, suspension_type, suspend_data)
-          {:suspend, suspended_execution}
-
-        {:error, reason} ->
-          # Action execution failed
-          failed_execution = NodeExecution.fail(node_execution, reason)
-          {:error, {reason, failed_execution}}
-      end
+      handle_action_execution(action, prepared_params, context, node_execution)
     else
       {:error, reason} ->
-        # Params preparation or action retrieval failed
-        failed_execution = NodeExecution.fail(node_execution, reason)
-        {:error, {reason, failed_execution}}
+        handle_execution_error(node_execution, reason)
     end
   end
 
@@ -99,181 +66,130 @@ defmodule Prana.NodeExecutor do
         %NodeExecution{} = suspended_node_execution,
         resume_data
       ) do
-    # Build context for resume (same as execute_node)
     context = build_expression_context(suspended_node_execution, execution, %{})
-
-    # Get the original params from the suspended node execution
     params = suspended_node_execution.params || %{}
 
     case get_action(node) do
       {:ok, action} ->
-        case invoke_resume_action(action, params, context, resume_data) do
-          {:ok, output_data, output_port} ->
-            # Complete the suspended node execution
-            completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
-
-            {:ok, completed_execution}
-
-          {:ok, output_data, output_port, _context} ->
-            # Complete with context data
-            completed_execution =
-              NodeExecution.complete(suspended_node_execution, output_data, output_port)
-
-            {:ok, completed_execution}
-
-          {:error, reason} ->
-            # Resume failed
-            failed_execution = NodeExecution.fail(suspended_node_execution, reason)
-            {:error, {reason, failed_execution}}
-        end
+        handle_resume_action(action, params, context, resume_data, suspended_node_execution)
 
       {:error, reason} ->
-        # Action retrieval failed
-        failed_execution = NodeExecution.fail(suspended_node_execution, reason)
-        {:error, {reason, failed_execution}}
+        handle_execution_error(suspended_node_execution, reason)
     end
   end
 
-  @doc """
-  Prepare node params using expression evaluation.
-
-  ## Parameters
-  - `node` - The node to prepare params for
-  - `context` - Full execution context for expression evaluation
-
-  ## Returns
-  - `{:ok, prepared_params}` - Params ready for action execution
-  - `{:error, reason}` - Params preparation failed
-  """
   @spec prepare_params(Node.t(), map()) :: {:ok, map()} | {:error, term()}
-  def prepare_params(%Node{params: nil}, _context) do
-    # No params defined - return empty map
-    {:ok, %{}}
-  end
+  defp prepare_params(%Node{params: nil}, _context), do: {:ok, %{}}
 
-  # Evaluate params expressions using context
-  def prepare_params(%Node{params: params}, context) when is_map(params) do
+  defp prepare_params(%Node{params: params}, context) when is_map(params) do
     case Prana.Template.Engine.process_map(params, context) do
       {:ok, processed_map} ->
         {:ok, processed_map || %{}}
 
       {:error, reason} ->
-        {:error,
-         %{
-           "type" => "expression_evaluation_failed",
-           "reason" => reason,
-           "params" => params
-         }}
+        {:error, build_params_error("expression_evaluation_failed", reason, params)}
     end
   rescue
     error ->
-      {:error,
-       %{
-         "type" => "params_preparation_failed",
-         "error" => inspect(error),
-         "params" => params
-       }}
+      {:error, build_params_error("params_preparation_failed", inspect(error), params)}
   end
 
-  @doc """
-  Get action definition from integration registry.
-  """
-  @spec get_action(Node.t()) :: {:ok, Prana.Action.t()} | {:error, term()}
-  def get_action(%Node{integration_name: integration_name, action_name: action_name}) do
+  defp build_params_error(type, reason, params) do
+    %{
+      "type" => type,
+      "reason" => reason,
+      "params" => params
+    }
+  end
+
+  # =============================================================================
+  # ACTION MANAGEMENT
+  # =============================================================================
+
+  defp get_action(%Node{integration_name: integration_name, action_name: action_name}) do
     case IntegrationRegistry.get_action(integration_name, action_name) do
       {:ok, action} ->
         {:ok, action}
 
       {:error, :not_found} ->
-        {:error,
-         %{
-           "type" => "action_not_found",
-           "integration_name" => integration_name,
-           "action_name" => action_name
-         }}
+        {:error, build_action_error("action_not_found", integration_name, action_name)}
 
       {:error, reason} ->
-        {:error,
-         %{
-           "type" => "registry_error",
-           "reason" => reason
-         }}
+        {:error, build_registry_error(reason)}
     end
   end
 
-  @doc """
-  Invoke action using Action behavior pattern and handle different return formats.
-  """
+  defp build_action_error(type, integration_name, action_name) do
+    %{
+      "type" => type,
+      "integration_name" => integration_name,
+      "action_name" => action_name
+    }
+  end
+
+  defp build_registry_error(reason) do
+    %{
+      "type" => "registry_error",
+      "reason" => reason
+    }
+  end
+
+  # =============================================================================
+  # ACTION INVOCATION
+  # =============================================================================
+
   @spec invoke_action(Prana.Action.t(), map(), map()) :: {:ok, term(), String.t()} | {:error, term()}
   def invoke_action(%Prana.Action{} = action, input, context) do
-    # Action behavior pattern with full context access
     result = action.module.execute(input, context)
     process_action_result(result, action)
   rescue
     error ->
-      {:error,
-       %{
-         "type" => "action_execution_failed",
-         "error" => inspect(error),
-         "module" => action.module,
-         "action" => action.name
-       }}
+      {:error, build_action_execution_error("action_execution_failed", error, action)}
   catch
     :exit, reason ->
-      {:error,
-       %{
-         "type" => "action_exit",
-         "reason" => inspect(reason),
-         "module" => action.module,
-         "action" => action.name
-       }}
+      {:error, build_action_execution_error("action_exit", reason, action)}
 
     :throw, value ->
-      {:error,
-       %{
-         "type" => "action_throw",
-         "value" => inspect(value),
-         "module" => action.module,
-         "action" => action.name
-       }}
+      {:error, build_action_execution_error("action_throw", value, action)}
   end
 
-  @doc """
-  Invoke action resume method with params, context, and resume data.
-  """
   @spec invoke_resume_action(Prana.Action.t(), map(), map(), term()) :: {:ok, term(), String.t()} | {:error, term()}
   def invoke_resume_action(%Prana.Action{} = action, params, context, resume_data) do
-    # Call the action's resume method
     result = action.module.resume(params, context, resume_data)
     process_action_result(result, action)
   rescue
     error ->
-      {:error,
-       %{
-         "type" => "action_resume_failed",
-         "error" => inspect(error),
-         "module" => action.module,
-         "action" => action.name
-       }}
+      {:error, build_action_execution_error("action_resume_failed", error, action)}
   catch
     :exit, reason ->
-      {:error,
-       %{
-         "type" => "action_resume_exit",
-         "reason" => inspect(reason),
-         "module" => action.module,
-         "action" => action.name
-       }}
+      {:error, build_action_execution_error("action_resume_exit", reason, action)}
 
     :throw, value ->
-      {:error,
-       %{
-         "type" => "action_resume_throw",
-         "value" => inspect(value),
-         "module" => action.module,
-         "action" => action.name
-       }}
+      {:error, build_action_execution_error("action_resume_throw", value, action)}
   end
+
+  defp build_action_execution_error(type, error_data, action) do
+    error_key =
+      case type do
+        "action_execution_failed" -> "error"
+        "action_resume_failed" -> "error"
+        "action_exit" -> "reason"
+        "action_resume_exit" -> "reason"
+        "action_throw" -> "value"
+        "action_resume_throw" -> "value"
+      end
+
+    %{
+      "type" => type,
+      error_key => inspect(error_data),
+      "module" => action.module,
+      "action" => action.name
+    }
+  end
+
+  # =============================================================================
+  # RESULT PROCESSING
+  # =============================================================================
 
   @doc """
   Process different action return formats and determine output port.
@@ -333,107 +249,152 @@ defmodule Prana.NodeExecutor do
           {:ok, term(), String.t()} | {:ok, term(), String.t(), map()} | {:error, term()} | {:suspend, atom(), term()}
   def process_action_result(result, %Prana.Action{} = action) do
     case result do
-      # Suspension format for async coordination: {:suspend, type, data}
       {:suspend, suspension_type, suspend_data} when is_atom(suspension_type) ->
         {:suspend, suspension_type, suspend_data}
 
-      # Context-aware explicit port format: {:ok, data, port, context}
       {:ok, data, port, context} when is_binary(port) and is_map(context) ->
-        if allows_dynamic_ports?(action) or port in action.output_ports do
-          {:ok, data, port, context}
-        else
-          {:error,
-           %{
-             "type" => "invalid_output_port",
-             "port" => port,
-             "available_ports" => action.output_ports
-           }}
-        end
+        handle_success_with_port_and_context(data, port, context, action)
 
-      # Context-aware default port format: {:ok, data, context}
       {:ok, data, context} when is_map(context) ->
         port = get_default_success_port(action)
         {:ok, data, port, context}
 
-      # Explicit port format: {:ok, data, port}
       {:ok, data, port} when is_binary(port) ->
-        if allows_dynamic_ports?(action) or port in action.output_ports do
-          {:ok, data, port}
-        else
-          {:error,
-           %{
-             "type" => "invalid_output_port",
-             "port" => port,
-             "available_ports" => action.output_ports
-           }}
-        end
+        handle_success_with_port(data, port, action)
 
-      # Explicit error with port: {:error, error, port}
       {:error, error, port} when is_binary(port) ->
-        if allows_dynamic_ports?(action) or port in action.output_ports do
-          {:error,
-           %{
-             "type" => "action_error",
-             "error" => error,
-             "port" => port
-           }}
-        else
-          {:error,
-           %{
-             "type" => "invalid_output_port",
-             "port" => port,
-             "available_ports" => action.output_ports
-           }}
-        end
+        handle_error_with_port(error, port, action)
 
-      # Default success format: {:ok, data}
       {:ok, data} ->
         port = get_default_success_port(action)
         {:ok, data, port}
 
-      # Default error format: {:error, error}
       {:error, error} ->
         port = get_default_error_port(action)
+        {:error, build_action_error_result(error, port)}
 
-        {:error,
-         %{
-           "type" => "action_error",
-           "error" => error,
-           "port" => port
-         }}
-
-      # Invalid format - all actions must return tuples
       invalid_result ->
-        {:error,
-         %{
-           "type" => "invalid_action_return_format",
-           "result" => inspect(invalid_result),
-           "message" =>
-             "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}"
-         }}
+        {:error, build_invalid_format_error(invalid_result)}
     end
   end
 
-  # Private helper functions
+  defp handle_success_with_port_and_context(data, port, context, action) do
+    if valid_port?(port, action) do
+      {:ok, data, port, context}
+    else
+      {:error, build_invalid_port_error(port, action)}
+    end
+  end
+
+  defp handle_success_with_port(data, port, action) do
+    if valid_port?(port, action) do
+      {:ok, data, port}
+    else
+      {:error, build_invalid_port_error(port, action)}
+    end
+  end
+
+  defp handle_error_with_port(error, port, action) do
+    if valid_port?(port, action) do
+      {:error, build_action_error_result(error, port)}
+    else
+      {:error, build_invalid_port_error(port, action)}
+    end
+  end
+
+  defp valid_port?(port, action) do
+    allows_dynamic_ports?(action) or port in action.output_ports
+  end
+
+  defp build_action_error_result(error, port) do
+    %{
+      "type" => "action_error",
+      "error" => error,
+      "port" => port
+    }
+  end
+
+  defp build_invalid_port_error(port, action) do
+    %{
+      "type" => "invalid_output_port",
+      "port" => port,
+      "available_ports" => action.output_ports
+    }
+  end
+
+  defp build_invalid_format_error(invalid_result) do
+    %{
+      "type" => "invalid_action_return_format",
+      "result" => inspect(invalid_result),
+      "message" =>
+        "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}"
+    }
+  end
+
+  # =============================================================================
+  # EXECUTION HELPERS
+  # =============================================================================
+
+  defp create_node_execution(execution, node, execution_index, run_index) do
+    execution.id
+    |> NodeExecution.new(node.key, execution_index, run_index)
+    |> NodeExecution.start()
+  end
+
+  defp handle_action_execution(action, prepared_params, context, node_execution) do
+    case invoke_action(action, prepared_params, context) do
+      {:ok, output_data, output_port} ->
+        completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
+        {:ok, completed_execution}
+
+      {:ok, output_data, output_port, _context} ->
+        completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
+        {:ok, completed_execution}
+
+      {:suspend, suspension_type, suspend_data} ->
+        suspended_execution = suspend_node_execution(node_execution, suspension_type, suspend_data)
+        {:suspend, suspended_execution}
+
+      {:error, reason} ->
+        handle_execution_error(node_execution, reason)
+    end
+  end
+
+  defp handle_resume_action(action, params, context, resume_data, suspended_node_execution) do
+    case invoke_resume_action(action, params, context, resume_data) do
+      {:ok, output_data, output_port} ->
+        completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+        {:ok, completed_execution}
+
+      {:ok, output_data, output_port, _context} ->
+        completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+        {:ok, completed_execution}
+
+      {:error, reason} ->
+        handle_execution_error(suspended_node_execution, reason)
+    end
+  end
+
+  defp handle_execution_error(node_execution, reason) do
+    failed_execution = NodeExecution.fail(node_execution, reason)
+    {:error, {reason, failed_execution}}
+  end
+
+  # =============================================================================
+  # CONTEXT BUILDING
+  # =============================================================================
 
   @spec build_expression_context(Prana.NodeExecution.t(), Prana.Execution.t(), map()) :: map()
   defp build_expression_context(node_execution, %Prana.Execution{} = execution, routed_input) do
-    # Build standardized expression context with all built-in variables
     %{
-      # routed input by port
       "$input" => routed_input,
-      # structured node data (output + context)
       "$nodes" => execution.__runtime["nodes"],
-      # environment variables
       "$env" => execution.__runtime["env"],
-      # workflow variables
       "$vars" => execution.vars,
-      # workflow metadata
       "$workflow" => %{
         "id" => execution.workflow_id,
         "version" => execution.workflow_version
       },
-      # execution metadata
       "$execution" => %{
         "run_index" => node_execution.run_index,
         "execution_index" => node_execution.execution_index,
@@ -444,12 +405,15 @@ defmodule Prana.NodeExecutor do
     }
   end
 
+  # =============================================================================
+  # PARAMETER PREPARATION
+  # =============================================================================
+
   @spec get_default_success_port(Prana.Action.t()) :: String.t()
   defp get_default_success_port(%Prana.Action{output_ports: ports}) do
     cond do
       "output" in ports -> "output"
       length(ports) > 0 -> List.first(ports)
-      # fallback
       true -> "output"
     end
   end
@@ -460,16 +424,13 @@ defmodule Prana.NodeExecutor do
       "error" in ports -> "error"
       "failure" in ports -> "failure"
       length(ports) > 1 -> List.last(ports)
-      # fallback
       true -> "error"
     end
   end
 
-  # Check if action allows dynamic output ports
   defp allows_dynamic_ports?(%Prana.Action{output_ports: ["*"]}), do: true
   defp allows_dynamic_ports?(_action), do: false
 
-  # Suspend node execution for async coordination
   defp suspend_node_execution(%NodeExecution{} = node_execution, suspension_type, suspend_data) do
     %{
       node_execution
