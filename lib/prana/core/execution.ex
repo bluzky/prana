@@ -292,12 +292,6 @@ defmodule Prana.Execution do
   end
 
   @doc """
-  Checks if execution is suspended
-  """
-  def suspended?(%__MODULE__{status: :suspended}), do: true
-  def suspended?(%__MODULE__{}), do: false
-
-  @doc """
   Resumes a suspended execution by clearing suspension fields.
 
   This only clears the suspension state - the caller is responsible for
@@ -319,59 +313,35 @@ defmodule Prana.Execution do
     }
   end
 
-  @doc """
-  Gets suspension information if execution is suspended.
-
-  ## Returns
-  - `{:ok, suspension_info}` if suspended
-  - `:not_suspended` if not suspended
-
-  ## Example
-
-      case get_suspension_info(execution) do
-        {:ok, %{type: :webhook, data: data, node_key: node_key}} ->
-          # Handle webhook suspension
-        :not_suspended ->
-          # Execution not suspended
-      end
-  """
-  def get_suspension_info(%__MODULE__{
-        status: :suspended,
-        suspended_node_id: node_key,
-        suspension_type: type,
-        suspension_data: data,
-        suspended_at: suspended_at
-      })
-      when not is_nil(node_key) and not is_nil(type) and not is_nil(data) do
-    {:ok,
-     %{
-       node_key: node_key,
-       type: type,
-       data: data,
-       suspended_at: suspended_at
-     }}
-  end
-
-  def get_suspension_info(%__MODULE__{}) do
-    :not_suspended
-  end
-
-  @doc """
-  Validates suspension data for the execution's suspension type.
-
-  ## Returns
-  - `:ok` if valid or not suspended
-  - `{:error, reason}` if invalid suspension data
-  """
-  def validate_suspension_data(%__MODULE__{suspension_type: type, suspension_data: data})
-      when not is_nil(type) and not is_nil(data) do
-    SuspensionData.validate_suspension_data(type, data)
-  end
-
-  def validate_suspension_data(%__MODULE__{}), do: :ok
-
   defp generate_id do
     16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
+  end
+
+  # Rebuild completed node outputs from execution history
+  defp rebuild_completed_node_outputs(node_executions) do
+    node_executions
+    |> Enum.map(fn {node_key, executions} ->
+      last_execution =
+        executions
+        |> Enum.reverse()
+        |> Enum.find(&(&1.status == :completed))
+
+      case last_execution do
+        nil -> {node_key, nil}
+        exec -> {node_key, %{"output" => exec.output_data}}
+      end
+    end)
+    |> Enum.reject(fn {_, data} -> is_nil(data) end)
+    |> Map.new()
+  end
+
+  # Calculate initial active nodes based on execution state
+  defp calculate_initial_active_nodes(execution) do
+    if Enum.empty?(execution.node_executions) do
+      MapSet.new([execution.execution_graph.trigger_node_key])
+    else
+      rebuild_active_nodes(execution)
+    end
   end
 
   @doc """
@@ -408,40 +378,14 @@ defmodule Prana.Execution do
       execution.__runtime["executed_nodes"] # ["node_1", "node_2"]
   """
   def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
-    # Get LAST completed execution of each node (highest run_index)
-    node_structured =
-      execution.node_executions
-      |> Enum.map(fn {node_key, executions} ->
-        last_execution =
-          executions
-          |> Enum.reverse()
-          |> Enum.find(&(&1.status == :completed))
+    node_outputs = rebuild_completed_node_outputs(execution.node_executions)
+    active_nodes = calculate_initial_active_nodes(execution)
 
-        case last_execution do
-          nil -> {node_key, nil}
-          exec -> {node_key, %{"output" => exec.output_data}}
-        end
-      end)
-      |> Enum.reject(fn {_, data} -> is_nil(data) end)
-      |> Map.new()
-
-    # Rebuild active_nodes if execution_graph is provided
-    active_nodes =
-      if Enum.empty?(execution.node_executions) do
-        # Default empty for cases without execution_graph
-        MapSet.new([execution.execution_graph.trigger_node_key])
-      else
-        rebuild_active_nodes(execution)
-      end
-
-    # Build runtime state
     max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
-
-    # Get iteration count from persistent metadata (survives suspension/resume)
     current_iteration_count = execution.metadata["iteration_count"] || 0
 
     runtime = %{
-      "nodes" => node_structured,
+      "nodes" => node_outputs,
       "env" => env_data,
       "active_nodes" => active_nodes,
       "iteration_count" => current_iteration_count,
@@ -450,6 +394,33 @@ defmodule Prana.Execution do
     }
 
     %{execution | __runtime: runtime}
+  end
+
+  # Update node executions list, handling retries by replacing same run_index
+  defp update_node_executions(existing_executions, new_execution) do
+    remaining_executions =
+      Enum.reject(existing_executions, fn ne -> ne.run_index == new_execution.run_index end)
+
+    Enum.sort_by(remaining_executions ++ [new_execution], & &1.execution_index)
+  end
+
+  # Get input ports for a node, with fallback to default "input" port
+  defp get_node_input_ports(node) do
+    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
+      {:ok, action} ->
+        action.input_ports || ["input"]
+
+      {:error, _reason} ->
+        ["input"]
+    end
+  end
+
+  # Safely update runtime state, handling nil runtime
+  defp update_runtime_safely(execution, update_fn) do
+    case execution.__runtime do
+      nil -> execution
+      runtime -> %{execution | __runtime: update_fn.(runtime)}
+    end
   end
 
   @doc """
@@ -478,39 +449,22 @@ defmodule Prana.Execution do
   """
   def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :completed} = completed_node_execution) do
     node_key = completed_node_execution.node_key
-
-    # Get existing executions for this node
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
-    # Remove any existing execution with same run_index (for retries)
-    remaining_executions =
-      Enum.reject(existing_executions, fn ne -> ne.run_index == completed_node_execution.run_index end)
-
-    # Add the completed execution (maintain chronological order by execution_index)
-    updated_executions =
-      Enum.sort_by(remaining_executions ++ [completed_node_execution], & &1.execution_index)
-
-    # Update the map
+    # Update node executions list
+    updated_executions = update_node_executions(existing_executions, completed_node_execution)
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
+    # Update execution with persistent state
+    updated_execution = %{execution | node_executions: updated_node_executions}
+
     # Update runtime state if present
-    updated_runtime =
-      case execution.__runtime do
-        nil ->
-          nil
-
-        runtime ->
-          # Update with latest execution output
-          node_data = %{
-            "output" => completed_node_execution.output_data
-          }
-
-          updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
-          Map.put(runtime, "nodes", updated_node_map)
-      end
-
-    # Update execution with persistent and runtime state
-    updated_execution = %{execution | node_executions: updated_node_executions, __runtime: updated_runtime}
+    updated_execution =
+      update_runtime_safely(updated_execution, fn runtime ->
+        node_data = %{"output" => completed_node_execution.output_data}
+        updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
+        Map.put(runtime, "nodes", updated_node_map)
+      end)
 
     # Update active nodes and node depth tracking based on completion
     update_active_nodes_on_completion(updated_execution, node_key, completed_node_execution.output_port)
@@ -540,19 +494,10 @@ defmodule Prana.Execution do
   """
   def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :failed} = failed_node_execution) do
     node_key = failed_node_execution.node_key
-
-    # Get existing executions for this node
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
-    # Remove any existing execution with same run_index (for retries)
-    remaining_executions =
-      Enum.reject(existing_executions, fn ne -> ne.run_index == failed_node_execution.run_index end)
-
-    # Add the failed execution
-    updated_executions =
-      Enum.sort_by(remaining_executions ++ [failed_node_execution], & &1.execution_index)
-
-    # Update the map
+    # Update node executions list
+    updated_executions = update_node_executions(existing_executions, failed_node_execution)
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     %{execution | node_executions: updated_node_executions}
@@ -582,46 +527,21 @@ defmodule Prana.Execution do
     end
   end
 
-  @doc """
-  Get input ports from an action definition.
+  # @doc """
+  # Get incoming connections for a specific node and port.
 
-  This function retrieves the input ports defined for a specific action
-  by looking up the action in the integration registry.
+  # This function retrieves all connections that target a specific node and input port
+  # using the execution graph's reverse connection map for O(1) lookup performance.
 
-  ## Parameters
-  - `node` - The node containing integration_name and action_name
+  # ## Parameters
+  # - `execution_graph` - The execution graph containing connection maps
+  # - `node_key` - The key of the target node
+  # - `input_port` - The name of the input port
 
-  ## Returns
-  - `{:ok, ports}` - List of input port names
-  - `{:error, :action_not_found}` - Action not found in registry
-  """
-  def get_action_input_ports(node) do
-    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
-      {:ok, action} ->
-        {:ok, action.input_ports || ["input"]}
-
-      {:error, _reason} ->
-        {:error, :action_not_found}
-    end
-  end
-
-  @doc """
-  Get incoming connections for a specific node and port.
-
-  This function retrieves all connections that target a specific node and input port
-  using the execution graph's reverse connection map for O(1) lookup performance.
-
-  ## Parameters
-  - `execution_graph` - The execution graph containing connection maps
-  - `node_key` - The key of the target node
-  - `input_port` - The name of the input port
-
-  ## Returns
-  List of Connection structs targeting the specified node and port
-  """
-  def get_incoming_connections_for_node_port(execution_graph, node_key, input_port) do
-    # Use reverse connection map for O(1) lookup (exists after proper compilation)
-    # For manually created ExecutionGraphs in tests, fall back to empty list
+  # ## Returns
+  # List of Connection structs targeting the specified node and port
+  # """
+  defp get_incoming_connections_for_node_port(execution_graph, node_key, input_port) do
     reverse_map = Map.get(execution_graph, :reverse_connection_map, %{})
     all_incoming = Map.get(reverse_map, node_key, [])
 
@@ -645,12 +565,7 @@ defmodule Prana.Execution do
   """
   def extract_multi_port_input(node, execution) do
     # Get input ports from the action definition, not the node
-    input_ports =
-      case get_action_input_ports(node) do
-        {:ok, ports} -> ports
-        # fallback to default
-        _error -> ["input"]
-      end
+    input_ports = get_node_input_ports(node)
 
     # Build multi-port input map: port_name => routed_data
     multi_port_input =
@@ -671,6 +586,28 @@ defmodule Prana.Execution do
     multi_port_input
   end
 
+  # Get valid connection data for a source node
+  defp get_connection_data(connection, execution) do
+    node_executions = Map.get(execution.node_executions, connection.from, [])
+    latest_execution = List.last(node_executions)
+
+    if latest_execution && latest_execution.output_port == connection.from_port do
+      source_node_data = execution.__runtime["nodes"][connection.from]
+      output_data = if source_node_data, do: source_node_data["output"]
+      {connection, latest_execution, output_data}
+    end
+  end
+
+  # Select most recent output data from multiple connections
+  defp select_most_recent_output(connection_data_list) do
+    {_, _, output_data} =
+      Enum.max_by(connection_data_list, fn {_, execution, _} ->
+        execution.execution_index
+      end)
+
+    output_data
+  end
+
   @doc """
   Resolve input port data when multiple connections target the same port.
 
@@ -685,39 +622,15 @@ defmodule Prana.Execution do
   The output data from the most recent execution, or nil if no valid data found
   """
   def resolve_input_port_data(connections, execution) do
-    # Find the connection with the most recent execution_index
-    connections
-    |> Enum.map(fn connection ->
-      # Get the latest execution for this source node
-      node_executions = Map.get(execution.node_executions, connection.from, [])
-      latest_execution = List.last(node_executions)
+    valid_connections =
+      connections
+      |> Enum.map(&get_connection_data(&1, execution))
+      |> Enum.reject(&is_nil/1)
 
-      if latest_execution && latest_execution.output_port == connection.from_port do
-        # Valid connection with matching output port
-        source_node_data = execution.__runtime["nodes"][connection.from]
-        output_data = if source_node_data, do: source_node_data["output"]
-        {connection, latest_execution, output_data}
-        # Invalid or no execution
-      end
-    end)
-    |> Enum.reject(&is_nil/1)
-    |> case do
-      [] ->
-        # No valid connections
-        nil
-
-      [{_, _, output_data}] ->
-        # Single connection, use its data
-        output_data
-
-      connection_data_list ->
-        # Multiple connections, select by highest execution_index
-        {_, _, output_data} =
-          Enum.max_by(connection_data_list, fn {_, execution, _} ->
-            execution.execution_index
-          end)
-
-        output_data
+    case valid_connections do
+      [] -> nil
+      [{_, _, output_data}] -> output_data
+      connection_data_list -> select_most_recent_output(connection_data_list)
     end
   end
 
@@ -726,49 +639,44 @@ defmodule Prana.Execution do
   # by removing it from active_nodes and adding its target nodes based on the output port.
   # It also maintains node_depth tracking for branch-following execution strategy.
   defp update_active_nodes_on_completion(execution, completed_node_key, output_port) do
-    # Safety check: only update if runtime state exists
-    case execution.__runtime do
-      nil ->
-        execution
+    update_runtime_safely(execution, fn runtime ->
+      # Get current active_nodes and node_depth from runtime
+      current_active_nodes = runtime["active_nodes"] || MapSet.new()
+      current_node_depth = runtime["node_depth"] || %{}
 
-      runtime ->
-        # Get current active_nodes and node_depth from runtime
-        current_active_nodes = runtime["active_nodes"] || MapSet.new()
-        current_node_depth = runtime["node_depth"] || %{}
+      # Remove completed node from active_nodes
+      updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
 
-        # Remove completed node from active_nodes
-        updated_active_nodes = MapSet.delete(current_active_nodes, completed_node_key)
+      # Get completed node's depth
+      completed_node_depth = Map.get(current_node_depth, completed_node_key, 0)
 
-        # Get completed node's depth
-        completed_node_depth = Map.get(current_node_depth, completed_node_key, 0)
+      # Add target nodes from completed node's output connections and assign depths
+      {final_active_nodes, final_node_depth} =
+        if output_port && execution.execution_graph && Map.has_key?(execution.execution_graph, :connection_map) do
+          connections = Map.get(execution.execution_graph.connection_map, {completed_node_key, output_port}, [])
+          target_nodes = MapSet.new(connections, & &1.to)
 
-        # Add target nodes from completed node's output connections and assign depths
-        {final_active_nodes, final_node_depth} =
-          if output_port && execution.execution_graph && Map.has_key?(execution.execution_graph, :connection_map) do
-            connections = Map.get(execution.execution_graph.connection_map, {completed_node_key, output_port}, [])
-            target_nodes = MapSet.new(connections, & &1.to)
+          # Add target nodes to active_nodes
+          updated_active_nodes = MapSet.union(updated_active_nodes, target_nodes)
 
-            # Add target nodes to active_nodes
-            updated_active_nodes = MapSet.union(updated_active_nodes, target_nodes)
+          # Assign depth = completed_node_depth + 1 to all target nodes
+          target_depth = completed_node_depth + 1
 
-            # Assign depth = completed_node_depth + 1 to all target nodes
-            target_depth = completed_node_depth + 1
+          updated_node_depth =
+            Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
+              Map.put(depth_map, node_key, target_depth)
+            end)
 
-            updated_node_depth =
-              Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
-                Map.put(depth_map, node_key, target_depth)
-              end)
+          {updated_active_nodes, updated_node_depth}
+        else
+          {updated_active_nodes, current_node_depth}
+        end
 
-            {updated_active_nodes, updated_node_depth}
-          else
-            {updated_active_nodes, current_node_depth}
-          end
-
-        # Update runtime state
-        execution
-        |> put_in([Access.key(:__runtime), "active_nodes"], final_active_nodes)
-        |> put_in([Access.key(:__runtime), "node_depth"], final_node_depth)
-    end
+      # Update runtime state
+      runtime
+      |> Map.put("active_nodes", final_active_nodes)
+      |> Map.put("node_depth", final_node_depth)
+    end)
   end
 
   @doc """
@@ -788,15 +696,8 @@ defmodule Prana.Execution do
     node_key = node_execution.node_key
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
-    # Remove any existing execution with same run_index (for retries)
-    remaining_executions =
-      Enum.reject(existing_executions, fn ne -> ne.run_index == node_execution.run_index end)
-
-    # Add the new execution (maintain chronological order by execution_index)
-    updated_executions =
-      Enum.sort_by(remaining_executions ++ [node_execution], & &1.execution_index)
-
-    # Update the map
+    # Update node executions list
+    updated_executions = update_node_executions(existing_executions, node_execution)
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     %{execution | node_executions: updated_node_executions}
@@ -973,12 +874,7 @@ defmodule Prana.Execution do
   # Check if all input ports for a node are satisfied (port-based logic)
   defp dependencies_satisfied?(node, execution_graph, completed_node_ids) do
     # Get input ports for this node
-    input_ports =
-      case get_action_input_ports(node) do
-        {:ok, ports} -> ports
-        # fallback to default
-        _error -> ["input"]
-      end
+    input_ports = get_node_input_ports(node)
 
     # For each input port, check if at least one source connection is satisfied
     Enum.all?(input_ports, fn input_port ->
