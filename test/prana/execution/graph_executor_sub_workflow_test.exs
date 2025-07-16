@@ -105,7 +105,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       # Execute workflow
       context = %{variables: %{}}
 
-      result = GraphExecutor.execute_graph(execution_graph, context)
+      result = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Should suspend at sub-workflow node
       assert {:suspend, suspended_execution} = result
@@ -189,7 +189,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
       # Compile and execute
       {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
-      result = GraphExecutor.execute_graph(execution_graph, %{})
+      result = GraphExecutor.execute_workflow(execution_graph, %{})
 
       # Should suspend at fire-and-forget node (caller-driven pattern)
       assert {:suspend, suspended_execution} = result
@@ -254,7 +254,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Execute until suspension
       {:suspend, suspended_execution} =
-        GraphExecutor.execute_graph(execution_graph, %{"user_id" => 456})
+        GraphExecutor.execute_workflow(execution_graph, %{"user_id" => 456})
 
       # Resume with sub-workflow results
       resume_data = %{
@@ -294,7 +294,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Execute until first suspension
       {:suspend, first_suspended} =
-        GraphExecutor.execute_graph(
+        GraphExecutor.execute_workflow(
           execution_graph,
           %{"stage" => 1}
         )
@@ -431,7 +431,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
       # Execute until suspension
       {:suspend, _suspended} =
-        GraphExecutor.execute_graph(
+        GraphExecutor.execute_workflow(
           execution_graph,
           %{"user_id" => 789}
         )

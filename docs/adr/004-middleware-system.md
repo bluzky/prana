@@ -105,7 +105,7 @@ end
 ### Integration with GraphExecutor
 ```elixir
 defmodule Prana.Execution.GraphExecutor do
-  def execute_graph(graph, input, context) do
+  def execute_workflow(graph, input, context) do
     # Fire start event
     Prana.Middleware.call(:execution_started, %{
       execution_id: graph.execution_id,
@@ -159,7 +159,7 @@ end
 ### 1. Direct Callbacks
 ```elixir
 # Rejected - less flexible
-def execute_graph(graph, input, on_start, on_complete, on_error)
+def execute_workflow(graph, input, on_start, on_complete, on_error)
 ```
 
 ### 2. Event Bus with GenServer

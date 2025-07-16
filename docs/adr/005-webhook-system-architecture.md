@@ -223,7 +223,7 @@ defmodule MyApp.WorkflowEngine do
     # Create pending webhook in database
     MyApp.WebhookDB.create_pending_webhook(resume_url, execution_id)
     
-    case Prana.GraphExecutor.execute_graph(workflow_id, input_data, context) do
+    case Prana.GraphExecutor.execute_workflow(workflow_id, input_data, context) do
       {:suspend, :external_event, suspend_data} ->
         # Activate webhook and save execution state
         MyApp.WebhookDB.activate_webhook(resume_url, suspend_data)

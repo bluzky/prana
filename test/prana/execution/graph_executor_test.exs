@@ -73,7 +73,7 @@ defmodule Prana.GraphExecutorTest do
       }
 
       # Now that we have registered the test integration, execution should succeed
-      result = GraphExecutor.execute_graph(execution_graph, context)
+      result = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Should return successful execution
       assert {:ok, execution} = result

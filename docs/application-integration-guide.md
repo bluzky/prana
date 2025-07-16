@@ -1,7 +1,7 @@
 # Prana Application Integration Guide: Suspension/Resume Flows
 
-**Version**: 1.0  
-**Date**: December 2024  
+**Version**: 1.0
+**Date**: December 2024
 **Purpose**: Guide applications to integrate async coordination patterns with Prana
 
 ---
@@ -12,7 +12,7 @@ Prana provides a **unified suspension/resume mechanism** for async coordination 
 
 ### **Supported Patterns**
 1. **External Event Coordination** - Webhooks, human approvals, manual triggers
-2. **Sub-workflow Orchestration** - Parent-child workflow execution  
+2. **Sub-workflow Orchestration** - Parent-child workflow execution
 3. **External System Polling** - API status monitoring with conditions
 4. **Time-based Delays** - Scheduled execution with flexible duration
 
@@ -20,11 +20,54 @@ Prana provides a **unified suspension/resume mechanism** for async coordination 
 
 ## 🏗️ **Core Architecture**
 
-### **Suspension Flow**
-```
-Integration Node → {:suspend, type, data} → GraphExecutor → Middleware Event → Application Logic
-                                                ↓
-Application Logic → External System → Trigger Event → resume_workflow() → Continue Execution
+### **Integration Flow**
+
+```mermaid
+graph TD
+    subgraph execute_workflow
+        start([Execute workflow: workflow, input, opts])
+        start --> build_graph
+        build_graph --> init_execution
+        init_execution --> insert_db
+        insert_db --> execute[GraphExecutor.execute_workflow]
+        execute --> handle_result
+    end
+
+    subgraph resume_workflow
+        resume([resume workflow: execution, resume_input])
+        resume --> rebuild_graph
+        rebuild_graph --> call_resume[[GraphExecutor.resume_workflow]]
+        call_resume --> handle_result
+    end
+
+    subgraph handle_result
+        result_data([result_data]) --> should_suspend{suspended?}
+        should_suspend --NO--> update_execution_db
+        update_execution_db --> end_execution([end])
+        should_suspend --YES--> handle_suspend[[handle suspend]]
+        handle_suspend --> handle_suspend_result
+        handle_suspend_result --> should_resume{should resume?}
+        should_resume --YES--> call_resume2[[GraphExecutor.resume_workflow]]
+        call_resume2 --> result_data
+        should_resume --NO--> update_execution_db
+    end
+
+    subgraph handle_suspend
+        suspension_data([suspension data]) --> check_type{suspension type}
+        check_type --> wait[timer, scheduler, webhook]
+        wait --> return_wait(suspend)
+        check_type --> sub_workflow
+        sub_workflow --> check_mode{execution mode}
+        check_mode --> synchronous
+        synchronous --> call_execute_workflow[[call execute_workflow]]
+        call_execute_workflow --> return_continue
+        check_mode --> asynchronous
+        asynchronous --> enque_for_execution
+        enque_for_execution --> return_wait
+        check_mode --> fire_and_forget
+        fire_and_forget --> enque_for_execution2[enque_for_execution]
+        enque_for_execution2 --> return_continue
+    end
 ```
 
 ### **Key Components**
@@ -43,20 +86,20 @@ Create middleware to handle all suspension types:
 ```elixir
 defmodule MyApp.SuspensionMiddleware do
   @behaviour Prana.Behaviour.Middleware
-  
+
   require Logger
 
   def call(:node_suspended, data, next) do
     Logger.info("Workflow #{data.execution_id} suspended: #{data.suspend_type}")
-    
+
     case data.suspend_type do
       :external_event -> handle_external_event_suspension(data)
-      :sub_workflow -> handle_sub_workflow_suspension(data)  
+      :sub_workflow -> handle_sub_workflow_suspension(data)
       :polling -> handle_polling_suspension(data)
       :delay -> handle_delay_suspension(data)
       unknown -> Logger.error("Unknown suspension type: #{unknown}")
     end
-    
+
     next.(data)
   end
 
@@ -73,7 +116,7 @@ defmodule MyApp.SuspensionMiddleware do
   end
 
   def call(event, data, next), do: next.(data)
-  
+
   # Implementation methods below...
 end
 ```
@@ -95,11 +138,11 @@ defmodule MyApp.Application do
   def start(_type, _args) do
     # Configure Prana with middleware
     Prana.Middleware.configure(Application.get_env(:my_app, :prana_middleware))
-    
+
     children = [
       # Your other supervisors...
     ]
-    
+
     Supervisor.start_link(children, strategy: :one_for_one)
   end
 end
@@ -133,7 +176,7 @@ end
 defp handle_external_event_suspension(data) do
   suspend_data = data.suspend_data
   execution_id = data.execution_id
-  
+
   # 1. Save suspension state to database
   MyApp.Database.save_suspended_workflow(%{
     execution_id: execution_id,
@@ -143,13 +186,13 @@ defp handle_external_event_suspension(data) do
     suspended_at: DateTime.utc_now(),
     timeout_at: DateTime.add(DateTime.utc_now(), suspend_data.timeout_ms, :millisecond)
   })
-  
+
   # 2. Register for event notifications
   MyApp.EventRouter.register_waiting_workflow(execution_id, suspend_data.event_type, suspend_data.event_filter)
-  
+
   # 3. Schedule timeout handling
   MyApp.Scheduler.schedule_timeout(execution_id, suspend_data.timeout_ms, suspend_data.on_timeout)
-  
+
   :ok
 end
 ```
@@ -159,23 +202,23 @@ end
 defmodule MyApp.WebhookController do
   def handle_approval_webhook(conn, params) do
     event_data = parse_webhook_data(params)
-    
+
     # Find workflows waiting for this event
     waiting_workflows = MyApp.Database.find_workflows_waiting_for_event(
-      event_data.type, 
+      event_data.type,
       event_data.filter_criteria
     )
-    
+
     # Resume each matching workflow
     Enum.each(waiting_workflows, fn suspended_workflow ->
       case Prana.WorkflowManager.resume_workflow(suspended_workflow.execution_id, event_data) do
-        {:ok, _result} -> 
+        {:ok, _result} ->
           MyApp.Database.mark_workflow_resumed(suspended_workflow.execution_id)
-        {:error, reason} -> 
+        {:error, reason} ->
           Logger.error("Failed to resume workflow: #{reason}")
       end
     end)
-    
+
     json(conn, %{status: "processed", count: length(waiting_workflows)})
   end
 end
@@ -205,7 +248,7 @@ end
 defp handle_sub_workflow_suspension(data) do
   suspend_data = data.suspend_data
   execution_id = data.execution_id
-  
+
   # 1. Load sub-workflow
   case MyApp.WorkflowLoader.load_workflow(suspend_data.workflow_id) do
     {:ok, sub_workflow} ->
@@ -218,20 +261,20 @@ defp handle_sub_workflow_suspension(data) do
             child_execution_id: sub_execution_id,
             created_at: DateTime.utc_now()
           })
-          
+
           # 4. Watch for completion
           MyApp.ExecutionWatcher.watch_completion(sub_execution_id, execution_id)
-          
+
         {:error, reason} ->
           # Resume parent with error
           Prana.WorkflowManager.resume_workflow(execution_id, {:error, reason})
       end
-      
+
     {:error, reason} ->
       # Resume parent with error
       Prana.WorkflowManager.resume_workflow(execution_id, {:error, reason})
   end
-  
+
   :ok
 end
 ```
@@ -240,27 +283,27 @@ end
 ```elixir
 defmodule MyApp.ExecutionWatcher do
   use GenServer
-  
+
   def watch_completion(sub_execution_id, parent_execution_id) do
     GenServer.start_link(__MODULE__, {sub_execution_id, parent_execution_id})
   end
-  
+
   def init({sub_execution_id, parent_execution_id}) do
     # Subscribe to execution events
     MyApp.PubSub.subscribe("executions:#{sub_execution_id}")
     {:ok, %{sub_execution_id: sub_execution_id, parent_execution_id: parent_execution_id}}
   end
-  
+
   def handle_info({:execution_completed, execution_id, result}, state) when execution_id == state.sub_execution_id do
     # Sub-workflow completed, resume parent
     case Prana.WorkflowManager.resume_workflow(state.parent_execution_id, result) do
       {:ok, _} -> Logger.info("Parent workflow resumed successfully")
       {:error, reason} -> Logger.error("Failed to resume parent workflow: #{reason}")
     end
-    
+
     {:stop, :normal, state}
   end
-  
+
   def handle_info({:execution_failed, execution_id, error}, state) when execution_id == state.sub_execution_id do
     # Sub-workflow failed, resume parent with error
     Prana.WorkflowManager.resume_workflow(state.parent_execution_id, {:error, error})
@@ -294,15 +337,15 @@ end
 defp handle_polling_suspension(data) do
   suspend_data = data.suspend_data
   execution_id = data.execution_id
-  
+
   # Start polling worker
   case MyApp.PollingWorker.start_polling(execution_id, suspend_data) do
     {:ok, _pid} -> :ok
-    {:error, reason} -> 
+    {:error, reason} ->
       # Resume with error immediately
       Prana.WorkflowManager.resume_workflow(execution_id, {:error, reason})
   end
-  
+
   :ok
 end
 ```
@@ -311,31 +354,31 @@ end
 ```elixir
 defmodule MyApp.PollingWorker do
   use GenServer
-  
+
   def start_polling(execution_id, poll_config) do
     GenServer.start_link(__MODULE__, {execution_id, poll_config, 0})
   end
-  
+
   def init({execution_id, config, attempts}) do
     # Start polling immediately
     send(self(), :poll)
     {:ok, %{execution_id: execution_id, config: config, attempts: attempts}}
   end
-  
+
   def handle_info(:poll, state) do
     %{execution_id: execution_id, config: config, attempts: attempts} = state
-    
+
     cond do
       attempts >= config.max_attempts ->
         # Max attempts reached
         Prana.WorkflowManager.resume_workflow(execution_id, {:timeout, %{attempts: attempts}})
         {:stop, :normal, state}
-        
+
       DateTime.utc_now() > timeout_deadline(state) ->
         # Timeout reached
         Prana.WorkflowManager.resume_workflow(execution_id, {:timeout, %{attempts: attempts}})
         {:stop, :normal, state}
-        
+
       true ->
         # Make HTTP request
         case MyApp.HttpClient.get(config.endpoint) do
@@ -349,7 +392,7 @@ defmodule MyApp.PollingWorker do
               Process.send_after(self(), :poll, config.interval_ms)
               {:noreply, %{state | attempts: attempts + 1}}
             end
-            
+
           {:error, _reason} ->
             # HTTP error, schedule retry
             Process.send_after(self(), :poll, config.interval_ms)
@@ -357,7 +400,7 @@ defmodule MyApp.PollingWorker do
         end
     end
   end
-  
+
   defp condition_met?(response, condition) do
     # Use Prana's ExpressionEngine to evaluate condition
     context = %{"response" => response}
@@ -366,7 +409,7 @@ defmodule MyApp.PollingWorker do
       _ -> false
     end
   end
-  
+
   defp timeout_deadline(state) do
     DateTime.add(DateTime.utc_now(), state.config.timeout_ms, :millisecond)
   end
@@ -395,23 +438,23 @@ defp handle_delay_suspension(data) do
   suspend_data = data.suspend_data
   execution_id = data.execution_id
   duration_ms = suspend_data.duration_ms
-  
+
   if duration_ms > @long_delay_threshold do
     # Long delay - persist to database for restart resilience
     resume_at = DateTime.add(DateTime.utc_now(), duration_ms, :millisecond)
-    
+
     MyApp.Database.save_delayed_execution(%{
       execution_id: execution_id,
       resume_at: resume_at,
       suspended_at: DateTime.utc_now()
     })
-    
+
     MyApp.DelayScheduler.schedule_persistent_delay(execution_id, resume_at)
   else
     # Short delay - use in-memory timer
     MyApp.DelayScheduler.schedule_memory_delay(execution_id, duration_ms)
   end
-  
+
   :ok
 end
 
@@ -423,58 +466,58 @@ end
 ```elixir
 defmodule MyApp.DelayScheduler do
   use GenServer
-  
+
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
-  
+
   def schedule_memory_delay(execution_id, duration_ms) do
     GenServer.cast(__MODULE__, {:schedule_memory, execution_id, duration_ms})
   end
-  
+
   def schedule_persistent_delay(execution_id, resume_at) do
     GenServer.cast(__MODULE__, {:schedule_persistent, execution_id, resume_at})
   end
-  
+
   def init(state) do
     # Restore any persistent delays on startup
     restore_persistent_delays()
     {:ok, state}
   end
-  
+
   def handle_cast({:schedule_memory, execution_id, duration_ms}, state) do
     Process.send_after(self(), {:resume_workflow, execution_id}, duration_ms)
     {:noreply, state}
   end
-  
+
   def handle_cast({:schedule_persistent, execution_id, resume_at}, state) do
     # Calculate remaining time
     now = DateTime.utc_now()
     remaining_ms = DateTime.diff(resume_at, now, :millisecond)
-    
+
     if remaining_ms > 0 do
       Process.send_after(self(), {:resume_workflow, execution_id}, remaining_ms)
     else
       # Already past resume time, resume immediately
       send(self(), {:resume_workflow, execution_id})
     end
-    
+
     {:noreply, state}
   end
-  
+
   def handle_info({:resume_workflow, execution_id}, state) do
     resume_data = %{resumed_at: DateTime.utc_now(), type: "delay_completed"}
-    
+
     case Prana.WorkflowManager.resume_workflow(execution_id, resume_data) do
-      {:ok, _} -> 
+      {:ok, _} ->
         MyApp.Database.mark_delay_completed(execution_id)
-      {:error, reason} -> 
+      {:error, reason} ->
         Logger.error("Failed to resume delayed workflow #{execution_id}: #{reason}")
     end
-    
+
     {:noreply, state}
   end
-  
+
   defp restore_persistent_delays do
     case MyApp.Database.get_pending_delayed_executions() do
       [] -> :ok
@@ -507,14 +550,14 @@ end
 ```elixir
 defp handle_suspension_error(execution_id, error) do
   Logger.error("Suspension handling failed for #{execution_id}: #{inspect(error)}")
-  
+
   # Resume workflow with error
   error_data = %{
     type: "suspension_error",
     reason: error,
     timestamp: DateTime.utc_now()
   }
-  
+
   Prana.WorkflowManager.resume_workflow(execution_id, {:error, error_data})
 end
 ```
@@ -545,7 +588,7 @@ CREATE TABLE workflow_relationships (
   child_execution_id VARCHAR(255) NOT NULL,
   relationship_type VARCHAR(50) DEFAULT 'sub_workflow',
   created_at TIMESTAMP DEFAULT NOW(),
-  
+
   PRIMARY KEY (parent_execution_id, child_execution_id)
 );
 ```
@@ -581,21 +624,21 @@ CREATE INDEX idx_delayed_executions_resume_at ON delayed_executions(resume_at);
 # Test suspension/resume flow
 defmodule MyApp.SuspensionTest do
   use ExUnit.Case
-  
+
   test "external event suspension and resume" do
     # Create workflow with wait node
     workflow = create_test_workflow_with_wait()
-    
+
     # Execute workflow - should suspend
     {:suspended, execution_id, _} = Prana.WorkflowManager.execute_workflow(workflow, %{})
-    
+
     # Verify suspension was handled
     assert MyApp.Database.get_suspended_workflow(execution_id)
-    
+
     # Trigger resume
     event_data = %{type: "approval", approved: true}
     {:ok, result} = Prana.WorkflowManager.resume_workflow(execution_id, event_data)
-    
+
     # Verify completion
     assert result.status == :completed
     refute MyApp.Database.get_suspended_workflow(execution_id)
@@ -613,7 +656,7 @@ defmodule MyApp.SuspensionMetrics do
       execution_id: execution_id
     })
   end
-  
+
   def track_resume(execution_id, duration_ms) do
     :telemetry.execute([:prana, :suspension, :resumed], %{duration: duration_ms}, %{
       execution_id: execution_id
@@ -648,7 +691,7 @@ end
 # Check suspended workflows
 MyApp.Database.list_suspended_workflows()
 
-# Check workflow relationships  
+# Check workflow relationships
 MyApp.Database.list_workflow_relationships()
 
 # Monitor active timers

@@ -42,7 +42,7 @@ Result: [trigger] → [branch_a1] → [branch_a2] → [branch_b1] → [branch_b2
 ### Primary API
 
 ```elixir
-execute_graph(execution_graph, input_data, context \\ %{})
+execute_workflow(execution_graph, input_data, context \\ %{})
   :: {:ok, Execution.t()} | {:error, reason}
 
 # Required context structure

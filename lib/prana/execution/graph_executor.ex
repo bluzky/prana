@@ -8,7 +8,10 @@ defmodule Prana.GraphExecutor do
 
   ## Primary API
 
-      execute_graph(execution_graph, context \\ %{})
+      initialize_execution(execution_graph, context \\ %{})
+        :: {:ok, Execution.t()} | {:error, reason}
+
+      execute_workflow(execution)
         :: {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
 
       resume_workflow(suspended_execution, resume_data, execution_graph, execution_context)
@@ -185,28 +188,20 @@ defmodule Prana.GraphExecutor do
       }
 
       # Normal execution
-      {:ok, execution} = GraphExecutor.execute_graph(graph, context)
+      {:ok, execution} = GraphExecutor.execute_workflow(graph, context)
 
       # Suspended execution (sub-workflow coordination)
-      {:suspend, execution} = GraphExecutor.execute_graph(graph, context)
+      {:suspend, execution} = GraphExecutor.execute_workflow(graph, context)
   """
-  @spec execute_graph(ExecutionGraph.t(), map()) ::
-          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
-  def execute_graph(%ExecutionGraph{} = execution_graph, context \\ %{}) do
-    with {:ok, execution} <- initialize_execution(execution_graph, context),
-         {:ok, prepared_execution} <- Execution.prepare_workflow_actions(execution) do
-      execute_workflow_with_error_handling(prepared_execution)
-    else
-      {:error, reason} ->
-        handle_preparation_failure(execution_graph, reason)
-    end
-  rescue
-    error ->
-      handle_execution_exception(execution_graph, error)
-  end
-
-  # Initialize a new execution with runtime state
-  defp initialize_execution(execution_graph, context) do
+  @doc """
+  Initialize a new execution context for a workflow.
+  
+  This allows applications to persist the execution before starting execution,
+  providing consistency with resume_workflow which also takes a pre-initialized execution.
+  """
+  @spec initialize_execution(ExecutionGraph.t(), map()) ::
+          {:ok, Execution.t()} | {:error, reason :: any()}
+  def initialize_execution(execution_graph, context \\ %{}) do
     execution =
       execution_graph
       |> Execution.new("graph_executor", execution_graph.variables)
@@ -215,7 +210,45 @@ defmodule Prana.GraphExecutor do
 
     Middleware.call(:execution_started, %{execution: execution})
     {:ok, execution}
+  rescue
+    error ->
+      {:error, %{type: "initialization_error", message: Exception.message(error), error: error}}
   end
+
+  @doc """
+  Execute a workflow with a pre-initialized execution context.
+  
+  This is now consistent with resume_workflow which also takes a pre-initialized execution.
+  Applications should call initialize_execution/2 first, persist the execution, then call this function.
+  """
+  @spec execute_workflow(Execution.t()) ::
+          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
+  def execute_workflow(%Execution{} = execution) do
+    with {:ok, prepared_execution} <- Execution.prepare_workflow_actions(execution) do
+      execute_workflow_with_error_handling(prepared_execution)
+    else
+      {:error, reason} ->
+        handle_preparation_failure(execution.execution_graph, reason)
+    end
+  rescue
+    error ->
+      handle_execution_exception(execution.execution_graph, error)
+  end
+
+  @doc """
+  Legacy function for backward compatibility.
+  
+  This function initializes execution internally and should be deprecated in favor of
+  initialize_execution/2 followed by execute_workflow/1.
+  """
+  @spec execute_workflow(ExecutionGraph.t(), map()) ::
+          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
+  def execute_workflow(%ExecutionGraph{} = execution_graph, context \\ %{}) do
+    with {:ok, execution} <- initialize_execution(execution_graph, context) do
+      execute_workflow(execution)
+    end
+  end
+
 
   # Execute workflow loop with proper error handling
   defp execute_workflow_with_error_handling(execution) do
@@ -275,7 +308,7 @@ defmodule Prana.GraphExecutor do
     else
       # Increment iteration counter in both runtime and persistent metadata
       execution = Execution.increment_iteration_count(execution)
-      
+
       # Get active nodes from runtime state
       active_nodes = Execution.get_active_nodes(execution)
 
@@ -349,11 +382,12 @@ defmodule Prana.GraphExecutor do
   rescue
     error ->
       # Unexpected error during node execution
-      {:error, %{
-        type: "execution_exception",
-        message: "Exception during node execution: #{Exception.message(error)}",
-        details: %{exception: error}
-      }}
+      {:error,
+       %{
+         type: "execution_exception",
+         message: "Exception during node execution: #{Exception.message(error)}",
+         details: %{exception: error}
+       }}
   end
 
   @doc """

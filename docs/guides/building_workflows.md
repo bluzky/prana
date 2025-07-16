@@ -796,7 +796,7 @@ test_workflow = %Workflow{
 
 # Execute test
 {:ok, execution_graph} = WorkflowCompiler.compile(test_workflow, "trigger")
-{:ok, result} = GraphExecutor.execute_graph(execution_graph, %{"user_id" => 123}, %{})
+{:ok, result} = GraphExecutor.execute_workflow(execution_graph, %{"user_id" => 123}, %{})
 ```
 
 ### Testing with Variables

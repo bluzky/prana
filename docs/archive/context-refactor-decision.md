@@ -50,7 +50,7 @@ Refactor to a single, authoritative execution context that eliminates ExecutionC
 
 **GraphExecutor:**
 ```elixir
-execute_graph(execution_graph, init_context)
+execute_workflow(execution_graph, init_context)
 # Where init_context = %{vars: map(), env: map(), metadata: map()}
 
 resume_workflow(execution, resume_data, env_data, execution_graph)

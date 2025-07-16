@@ -13,7 +13,7 @@ workflow = %Workflow{nodes: [...], connections: [...]}
 
 {:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
 
-{:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
+{:ok, execution} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
 ```
 
 ### Key Components
@@ -213,7 +213,7 @@ end
 ### How GraphExecutor Uses Compiled Graphs
 
 ```elixir
-def execute_graph(%ExecutionGraph{} = execution_graph, input_data, context) do
+def execute_workflow(%ExecutionGraph{} = execution_graph, input_data, context) do
   # Use pre-compiled optimization maps for fast execution
   ready_nodes = find_ready_nodes(execution_graph, completed_executions, context)
 
@@ -248,7 +248,7 @@ workflow = %Workflow{
 input_data = %{"user_id" => 123}
 context = %{workflow_loader: &my_loader/1}
 
-{:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
+{:ok, execution} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
 ```
 
 ### Auto-Trigger Selection
@@ -305,11 +305,11 @@ end
 
 # New approach
 {:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
-{:ok, execution} = GraphExecutor.execute_graph(execution_graph, input_data, context)
+{:ok, execution} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
 ```
 
 ### Backward Compatibility
-- **API unchanged**: GraphExecutor.execute_graph maintains same interface
+- **API unchanged**: GraphExecutor.execute_workflow maintains same interface
 - **Auto-detection**: Trigger selection works automatically
 - **Error handling**: Clear error messages guide users
 

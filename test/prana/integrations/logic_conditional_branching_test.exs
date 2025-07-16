@@ -138,7 +138,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      {:ok, result} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
       assert result.status == :completed
@@ -207,7 +207,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      {:ok, result} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
       assert result.status == :completed
@@ -286,7 +286,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      {:ok, result} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
       assert result.status == :completed
@@ -363,7 +363,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      {:ok, result} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
       assert result.status == :completed
@@ -437,7 +437,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      {:ok, result} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
       assert result.status == :completed
@@ -532,7 +532,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      {:ok, result} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
       assert result.status == :completed
@@ -590,7 +590,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      execution_result = GraphExecutor.execute_graph(execution_graph, context)
+      execution_result = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution failed with fail-fast behavior
       assert {:error, result} = execution_result
@@ -669,7 +669,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         metadata: %{}
       }
 
-      {:ok, result} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
       assert result.status == :completed

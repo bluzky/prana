@@ -331,7 +331,7 @@ defmodule Prana.Execution.SimpleLoopTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution completed successfully
       assert execution.status == :completed
@@ -367,7 +367,7 @@ defmodule Prana.Execution.SimpleLoopTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
+      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution completed successfully
       assert execution.status == :completed
@@ -405,7 +405,7 @@ defmodule Prana.Execution.SimpleLoopTest do
       # Execute the workflow with a timeout to prevent infinite loops
       task =
         Task.async(fn ->
-          GraphExecutor.execute_graph(execution_graph, context)
+          GraphExecutor.execute_workflow(execution_graph, context)
         end)
 
       # Should complete within reasonable time (5 seconds)

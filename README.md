@@ -76,7 +76,7 @@ workflow = %Prana.Workflow{
 # 4. Compile and execute
 {:ok, execution_graph} = Prana.WorkflowCompiler.compile(workflow, "start")
 
-result = Prana.GraphExecutor.execute_graph(
+result = Prana.GraphExecutor.execute_workflow(
   execution_graph,
   %{"message" => "Hello", "user" => "World"},
   %{}

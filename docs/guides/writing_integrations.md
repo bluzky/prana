@@ -473,7 +473,7 @@ test "integration works in workflow" do
   }
 
   {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "test_node")
-  result = GraphExecutor.execute_graph(execution_graph, %{"user_data" => "test"}, %{})
+  result = GraphExecutor.execute_workflow(execution_graph, %{"user_data" => "test"}, %{})
 
   assert {:ok, completed_execution} = result
 end
