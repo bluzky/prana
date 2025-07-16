@@ -1,15 +1,15 @@
 defmodule Prana.ExecutionTest do
   use ExUnit.Case
 
-  alias Prana.Execution
   alias Prana.NodeExecution
+  alias Prana.WorkflowExecution
 
-  doctest Prana.Execution
+  doctest Prana.WorkflowExecution
 
   describe "runtime state rebuilding" do
     test "rebuild_runtime/2 creates runtime state from node executions" do
       # Setup execution with node executions
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -62,7 +62,7 @@ defmodule Prana.ExecutionTest do
       env_data = %{"api_key" => "test_key", "base_url" => "https://api.test.com"}
 
       # Rebuild runtime state
-      result = Execution.rebuild_runtime(execution, env_data)
+      result = WorkflowExecution.rebuild_runtime(execution, env_data)
 
       # Verify runtime state structure
       assert result.__runtime["nodes"] == %{
@@ -76,7 +76,7 @@ defmodule Prana.ExecutionTest do
     end
 
     test "rebuild_runtime/2 handles empty node executions" do
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -89,14 +89,14 @@ defmodule Prana.ExecutionTest do
         }
       }
 
-      result = Execution.rebuild_runtime(execution, %{})
+      result = WorkflowExecution.rebuild_runtime(execution, %{})
 
       assert result.__runtime["nodes"] == %{}
       assert result.__runtime["env"] == %{}
     end
 
     test "rebuild_runtime/2 filters out non-completed nodes from runtime state" do
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -146,7 +146,7 @@ defmodule Prana.ExecutionTest do
         current_execution_index: 3
       }
 
-      result = Execution.rebuild_runtime(execution, %{})
+      result = WorkflowExecution.rebuild_runtime(execution, %{})
 
       # Only completed nodes should be in nodes map
       assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}}}
@@ -155,7 +155,7 @@ defmodule Prana.ExecutionTest do
 
   describe "complete_node/2" do
     test "completes node and updates both persistent and runtime state" do
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -176,7 +176,7 @@ defmodule Prana.ExecutionTest do
       output_data = %{result: "success"}
       completed_node_execution = NodeExecution.complete(node_execution, output_data, "success")
 
-      result = Execution.complete_node(execution, completed_node_execution)
+      result = WorkflowExecution.complete_node(execution, completed_node_execution)
 
       # Verify persistent state (map structure)
       assert Map.has_key?(result.node_executions, "node_1")
@@ -190,7 +190,7 @@ defmodule Prana.ExecutionTest do
     end
 
     test "integrates completed node execution into execution state" do
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -211,7 +211,7 @@ defmodule Prana.ExecutionTest do
       output_data = %{result: "success"}
       completed_node_execution = NodeExecution.complete(node_execution, output_data, "success")
 
-      result = Execution.complete_node(execution, completed_node_execution)
+      result = WorkflowExecution.complete_node(execution, completed_node_execution)
 
       # Should integrate the completed node execution
       assert map_size(result.node_executions) == 1
@@ -223,7 +223,7 @@ defmodule Prana.ExecutionTest do
     end
 
     test "handles nil runtime state gracefully" do
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -240,7 +240,7 @@ defmodule Prana.ExecutionTest do
 
       completed_node_execution = NodeExecution.complete(node_execution, %{data: "test"}, "success")
 
-      result = Execution.complete_node(execution, completed_node_execution)
+      result = WorkflowExecution.complete_node(execution, completed_node_execution)
 
       # Should still update persistent state
       assert map_size(result.node_executions) == 1
@@ -254,7 +254,7 @@ defmodule Prana.ExecutionTest do
 
   describe "fail_node/2" do
     test "fails node and updates both persistent and runtime state" do
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -283,7 +283,7 @@ defmodule Prana.ExecutionTest do
       error_data = %{error: "network timeout"}
       failed_node_execution = NodeExecution.fail(running_node_execution, error_data)
 
-      result = Execution.fail_node(execution, failed_node_execution)
+      result = WorkflowExecution.fail_node(execution, failed_node_execution)
 
       # Verify persistent state
       [failed_node] = result.node_executions["node_1"]
@@ -298,7 +298,7 @@ defmodule Prana.ExecutionTest do
     end
 
     test "creates new node execution if none exists" do
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -319,7 +319,7 @@ defmodule Prana.ExecutionTest do
       error_data = %{error: "test error"}
       failed_node_execution = NodeExecution.fail(node_execution, error_data)
 
-      result = Execution.fail_node(execution, failed_node_execution)
+      result = WorkflowExecution.fail_node(execution, failed_node_execution)
 
       # Should integrate the failed node execution
       assert map_size(result.node_executions) == 1
@@ -333,7 +333,7 @@ defmodule Prana.ExecutionTest do
   describe "state synchronization" do
     test "complete_node maintains state synchronization" do
       # Start with execution that has existing completed nodes
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -365,7 +365,7 @@ defmodule Prana.ExecutionTest do
 
       completed_node_execution_2 = NodeExecution.complete(node_execution_2, %{email: "test@example.com"}, "primary")
 
-      result = Execution.complete_node(execution, completed_node_execution_2)
+      result = WorkflowExecution.complete_node(execution, completed_node_execution_2)
 
       # Verify state synchronization
       assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}}
@@ -383,7 +383,7 @@ defmodule Prana.ExecutionTest do
 
     test "rebuilding runtime state produces identical results to incremental updates" do
       # Build execution incrementally
-      execution = %Execution{
+      execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -412,17 +412,17 @@ defmodule Prana.ExecutionTest do
 
       incremental_result =
         execution
-        |> Execution.complete_node(completed_node_1)
-        |> Execution.complete_node(completed_node_2)
+        |> WorkflowExecution.complete_node(completed_node_1)
+        |> WorkflowExecution.complete_node(completed_node_2)
         |> then(fn exec ->
           # Create and fail node execution for node_3
           node_exec_3 = "exec_1" |> NodeExecution.new("node_3", 0, 0) |> NodeExecution.start()
           failed_node_3 = NodeExecution.fail(node_exec_3, %{error: "timeout"})
-          Execution.fail_node(exec, failed_node_3)
+          WorkflowExecution.fail_node(exec, failed_node_3)
         end)
 
       # Build execution from scratch via rebuild
-      execution_for_rebuild = %Execution{
+      execution_for_rebuild = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
         workflow_version: 1,
@@ -431,7 +431,7 @@ defmodule Prana.ExecutionTest do
         __runtime: nil
       }
 
-      rebuilt_result = Execution.rebuild_runtime(execution_for_rebuild, %{"api_key" => "test"})
+      rebuilt_result = WorkflowExecution.rebuild_runtime(execution_for_rebuild, %{"api_key" => "test"})
 
       # Runtime states should be identical
       assert rebuilt_result.__runtime["nodes"] == incremental_result.__runtime["nodes"]

@@ -1,4 +1,4 @@
-defmodule Prana.Execution.DiamondForkTest do
+defmodule Prana.WorkflowExecution.DiamondForkTest do
   @moduledoc """
   Unit tests for diamond fork execution patterns in GraphExecutor
 
@@ -11,7 +11,6 @@ defmodule Prana.Execution.DiamondForkTest do
   use ExUnit.Case, async: false
 
   alias Prana.Connection
-  alias Prana.Execution
   alias Prana.GraphExecutor
   alias Prana.Integrations.Data
   alias Prana.Integrations.Manual
@@ -19,6 +18,7 @@ defmodule Prana.Execution.DiamondForkTest do
   alias Prana.TestSupport.TestIntegration
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
+  alias Prana.WorkflowExecution
 
   # ============================================================================
   # Setup and Helpers
@@ -221,7 +221,7 @@ defmodule Prana.Execution.DiamondForkTest do
       result = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify successful execution
-      assert {:ok, %Execution{status: :completed} = execution} = result
+      assert {:ok, %WorkflowExecution{status: :completed} = execution} = result
 
       # Verify all nodes executed by checking node_executions
       all_executions = execution.node_executions |> Map.values() |> List.flatten()

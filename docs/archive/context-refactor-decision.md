@@ -23,7 +23,7 @@ These multiple contexts require constant conversion and synchronization, leading
 Refactor to a single, authoritative execution context that eliminates ExecutionContext and consolidates all context management:
 
 ```elixir
-%Prana.Execution{
+%Prana.WorkflowExecution{
   # Persistent metadata (for database storage)
   id: String.t(),
   workflow_id: String.t(), 

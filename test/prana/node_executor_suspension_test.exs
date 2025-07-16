@@ -2,10 +2,10 @@ defmodule Prana.NodeExecutorSuspensionTest do
   use ExUnit.Case, async: false
 
   alias Prana.Action
-  alias Prana.Execution
   alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecutor
+  alias Prana.WorkflowExecution
 
   setup do
     # Start registry for tests
@@ -20,7 +20,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     :ok = IntegrationRegistry.register_integration(Prana.Integrations.Manual)
 
     # Create test execution with unified architecture
-    execution = %Execution{
+    execution = %WorkflowExecution{
       id: "test_execution",
       workflow_id: "test_workflow",
       workflow_version: 1,
@@ -39,7 +39,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
       }
     }
 
-    execution = Execution.rebuild_runtime(execution, %{})
+    execution = WorkflowExecution.rebuild_runtime(execution, %{})
 
     on_exit(fn ->
       if Process.alive?(registry_pid) do

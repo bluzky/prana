@@ -122,6 +122,6 @@ defmodule Prana.NodeExecution do
   end
 
   defp generate_id do
-    16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
+    UUID.uuid4()
   end
 end

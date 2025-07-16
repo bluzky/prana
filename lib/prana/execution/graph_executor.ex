@@ -9,13 +9,13 @@ defmodule Prana.GraphExecutor do
   ## Primary API
 
       initialize_execution(execution_graph, context \\ %{})
-        :: {:ok, Execution.t()} | {:error, reason}
+        :: {:ok, WorkflowExecution.t()} | {:error, reason}
 
       execute_workflow(execution)
-        :: {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
+        :: {:ok, WorkflowExecution.t()} | {:suspend, WorkflowExecution.t()} | {:error, WorkflowExecution.t()}
 
       resume_workflow(suspended_execution, resume_data, execution_graph, execution_context)
-        :: {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, any()}
+        :: {:ok, WorkflowExecution.t()} | {:suspend, WorkflowExecution.t()} | {:error, any()}
 
   ## Required Context Structure
 
@@ -70,7 +70,7 @@ defmodule Prana.GraphExecutor do
 
   ### Execution with Runtime State
   ```elixir
-  %Execution{
+  %WorkflowExecution{
     # Persistent metadata and audit trail
     id: String.t(),
     workflow_id: String.t(),
@@ -102,18 +102,16 @@ defmodule Prana.GraphExecutor do
   Suspension data is type-safe and includes all necessary context for resumption.
   """
 
-  alias Prana.Execution
   alias Prana.ExecutionGraph
   alias Prana.Middleware
   alias Prana.Node
   alias Prana.NodeExecution
   alias Prana.NodeExecutor
+  alias Prana.WorkflowExecution
 
   require Logger
 
   # Note: Orchestration context type removed - using unified Execution struct only
-
-
 
   @doc """
   Initialize a new execution context for a workflow.
@@ -122,13 +120,13 @@ defmodule Prana.GraphExecutor do
   providing consistency with resume_workflow which also takes a pre-initialized execution.
   """
   @spec initialize_execution(ExecutionGraph.t(), map()) ::
-          {:ok, Execution.t()} | {:error, reason :: any()}
+          {:ok, WorkflowExecution.t()} | {:error, reason :: any()}
   def initialize_execution(execution_graph, context \\ %{}) do
     execution =
       execution_graph
-      |> Execution.new("graph_executor", execution_graph.variables)
-      |> Execution.start()
-      |> Execution.rebuild_runtime(Map.get(context, :env, %{}))
+      |> WorkflowExecution.new("graph_executor", execution_graph.variables)
+      |> WorkflowExecution.start()
+      |> WorkflowExecution.rebuild_runtime(Map.get(context, :env, %{}))
 
     Middleware.call(:execution_started, %{execution: execution})
     {:ok, execution}
@@ -144,9 +142,9 @@ defmodule Prana.GraphExecutor do
   Applications should call initialize_execution/2 first, persist the execution, then call this function.
   """
   @spec execute_workflow(Execution.t()) ::
-          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
-  def execute_workflow(%Execution{} = execution) do
-    case Execution.prepare_workflow_actions(execution) do
+          {:ok, WorkflowExecution.t()} | {:suspend, WorkflowExecution.t()} | {:error, WorkflowExecution.t()}
+  def execute_workflow(%WorkflowExecution{} = execution) do
+    case WorkflowExecution.prepare_workflow_actions(execution) do
       {:ok, prepared_execution} ->
         execute_workflow_with_error_handling(prepared_execution)
 
@@ -165,7 +163,7 @@ defmodule Prana.GraphExecutor do
   initialize_execution/2 followed by execute_workflow/1.
   """
   @spec execute_workflow(ExecutionGraph.t(), map()) ::
-          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
+          {:ok, WorkflowExecution.t()} | {:suspend, WorkflowExecution.t()} | {:error, WorkflowExecution.t()}
   def execute_workflow(%ExecutionGraph{} = execution_graph, context \\ %{}) do
     with {:ok, execution} <- initialize_execution(execution_graph, context) do
       execute_workflow(execution)
@@ -192,9 +190,9 @@ defmodule Prana.GraphExecutor do
   defp handle_preparation_failure(execution_graph, reason) do
     execution =
       execution_graph
-      |> Execution.new("graph_executor", execution_graph.variables)
-      |> Execution.start()
-      |> Execution.fail()
+      |> WorkflowExecution.new("graph_executor", execution_graph.variables)
+      |> WorkflowExecution.start()
+      |> WorkflowExecution.fail()
 
     Middleware.call(:execution_failed, %{execution: execution, reason: reason})
     {:error, execution}
@@ -210,32 +208,32 @@ defmodule Prana.GraphExecutor do
 
     execution =
       execution_graph
-      |> Execution.new("graph_executor", execution_graph.variables)
-      |> Execution.start()
-      |> Execution.fail()
+      |> WorkflowExecution.new("graph_executor", execution_graph.variables)
+      |> WorkflowExecution.start()
+      |> WorkflowExecution.fail()
 
     Middleware.call(:execution_failed, %{execution: execution, reason: reason})
     {:error, execution}
   end
 
   # Main workflow execution loop - continues until workflow is complete or error occurs.
-  # Uses Execution.__runtime for all workflow-level coordination.
+  # Uses WorkflowExecution.__runtime for all workflow-level coordination.
   defp execute_workflow_loop(execution) do
     # Check for infinite loop protection
-    iteration_count = Execution.get_iteration_count(execution)
-    max_iterations = Execution.get_max_iterations(execution)
+    iteration_count = WorkflowExecution.get_iteration_count(execution)
+    max_iterations = WorkflowExecution.get_max_iterations(execution)
 
     if iteration_count >= max_iterations do
-      {:error, Execution.fail(execution)}
+      {:error, WorkflowExecution.fail(execution)}
     else
       # Increment iteration counter in both runtime and persistent metadata
-      execution = Execution.increment_iteration_count(execution)
+      execution = WorkflowExecution.increment_iteration_count(execution)
 
       # Get active nodes from runtime state
-      active_nodes = Execution.get_active_nodes(execution)
+      active_nodes = WorkflowExecution.get_active_nodes(execution)
 
       if MapSet.size(active_nodes) == 0 do
-        {:ok, Execution.complete(execution)}
+        {:ok, WorkflowExecution.complete(execution)}
       else
         case find_and_execute_ready_nodes(execution) do
           {:ok, updated_execution} ->
@@ -252,13 +250,13 @@ defmodule Prana.GraphExecutor do
   end
 
   # Find ready nodes and execute following branch-completion strategy.
-  # Uses Execution.__runtime for tracking active paths and executed nodes.
+  # Uses WorkflowExecution.__runtime for tracking active paths and executed nodes.
   defp find_and_execute_ready_nodes(execution) do
-    ready_nodes = Execution.find_ready_nodes(execution)
+    ready_nodes = WorkflowExecution.find_ready_nodes(execution)
 
     if Enum.empty?(ready_nodes) do
       # No ready nodes but workflow not complete - likely an error condition
-      {:error, Execution.fail(execution)}
+      {:error, WorkflowExecution.fail(execution)}
     else
       # Select single node to execute, prioritizing branch completion
       selected_node = select_node_for_branch_following(ready_nodes, execution.__runtime)
@@ -266,7 +264,7 @@ defmodule Prana.GraphExecutor do
       case execute_single_node_with_events(selected_node, execution) do
         {%NodeExecution{status: :completed}, updated_execution} ->
           # Output routing and context updates are handled internally by NodeExecutor
-          # and the Execution.complete_node/2 function (which also updates active_nodes)
+          # and the WorkflowExecution.complete_node/2 function (which also updates active_nodes)
           {:ok, updated_execution}
 
         {%NodeExecution{status: :suspended} = node_execution, updated_execution} ->
@@ -276,7 +274,7 @@ defmodule Prana.GraphExecutor do
 
           # Suspend the entire execution with structured suspension data
           suspended_execution =
-            Execution.suspend(updated_execution, selected_node.key, suspension_type, suspend_data)
+            WorkflowExecution.suspend(updated_execution, selected_node.key, suspension_type, suspend_data)
 
           Middleware.call(:execution_suspended, %{
             execution: suspended_execution,
@@ -290,8 +288,8 @@ defmodule Prana.GraphExecutor do
           # Update execution with failed node and mark execution as failed
           failed_execution =
             updated_execution
-            |> Execution.fail_node(node_execution)
-            |> Execution.fail()
+            |> WorkflowExecution.fail_node(node_execution)
+            |> WorkflowExecution.fail()
 
           {:error, failed_execution}
 
@@ -350,11 +348,11 @@ defmodule Prana.GraphExecutor do
   # Execute a single node with middleware events using unified execution architecture
   defp execute_single_node_with_events(node, execution) do
     # Extract multi-port input data for this node from execution graph and runtime state
-    routed_input = Execution.extract_multi_port_input(node, execution)
+    routed_input = WorkflowExecution.extract_multi_port_input(node, execution)
 
     # Get execution tracking indices
     execution_index = execution.current_execution_index
-    run_index = Execution.get_next_run_index(execution, node.key)
+    run_index = WorkflowExecution.get_next_run_index(execution, node.key)
 
     # Emit node starting event
     Middleware.call(:node_starting, %{node: node, execution: execution})
@@ -363,7 +361,7 @@ defmodule Prana.GraphExecutor do
     case NodeExecutor.execute_node(node, execution, routed_input, execution_index, run_index) do
       {:ok, result_node_execution} ->
         # Complete the node execution at workflow level
-        updated_execution = Prana.Execution.complete_node(execution, result_node_execution)
+        updated_execution = Prana.WorkflowExecution.complete_node(execution, result_node_execution)
         # Increment execution index for next node
         final_execution = %{updated_execution | current_execution_index: execution_index + 1}
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
@@ -380,14 +378,14 @@ defmodule Prana.GraphExecutor do
 
         # Increment execution index and add suspended node to execution
         final_execution = %{execution | current_execution_index: execution_index + 1}
-        updated_execution = Execution.add_node_execution_to_map(final_execution, suspended_node_execution)
+        updated_execution = WorkflowExecution.add_node_execution_to_map(final_execution, suspended_node_execution)
         {suspended_node_execution, updated_execution}
 
       {:error, {_reason, error_node_execution}} ->
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
         # Increment execution index and add failed node to execution
         final_execution = %{execution | current_execution_index: execution_index + 1}
-        updated_execution = Execution.add_node_execution_to_map(final_execution, error_node_execution)
+        updated_execution = WorkflowExecution.add_node_execution_to_map(final_execution, error_node_execution)
         {error_node_execution, updated_execution}
     end
   end
@@ -408,14 +406,10 @@ defmodule Prana.GraphExecutor do
   - `{:error, reason}` - Resume failed with error details
   """
   @spec resume_workflow(Execution.t(), map(), map()) ::
-          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, any()}
+          {:ok, WorkflowExecution.t()} | {:suspend, WorkflowExecution.t()} | {:error, any()}
   def resume_workflow(suspended_execution, resume_data, options \\ %{})
-  
-  def resume_workflow(
-        %Execution{status: :suspended} = suspended_execution,
-        resume_data,
-        options
-      ) do
+
+  def resume_workflow(%WorkflowExecution{status: :suspended} = suspended_execution, resume_data, options) do
     with {:ok, prepared_execution} <-
            prepare_execution_for_resume(suspended_execution, options),
          {:ok, suspended_node_id} <- validate_suspended_node_id(prepared_execution),
@@ -425,14 +419,14 @@ defmodule Prana.GraphExecutor do
     end
   end
 
-  def resume_workflow(%Execution{status: status}, _resume_data, _options) do
+  def resume_workflow(%WorkflowExecution{status: status}, _resume_data, _options) do
     {:error, %{type: "invalid_execution_status", message: "Can only resume suspended executions", status: status}}
   end
 
   # Prepare execution for resume by rebuilding runtime state
   defp prepare_execution_for_resume(suspended_execution, options) do
     env_data = Map.get(options, :env, %{})
-    prepared_execution = Execution.rebuild_runtime(suspended_execution, env_data)
+    prepared_execution = WorkflowExecution.rebuild_runtime(suspended_execution, env_data)
     {:ok, prepared_execution}
   end
 
@@ -453,13 +447,13 @@ defmodule Prana.GraphExecutor do
 
     if suspended_node && suspended_node_execution do
       # Clear suspension state for resume (runtime state already initialized in resume_workflow)
-      resume_ready_execution = Execution.resume_suspension(suspended_execution)
+      resume_ready_execution = WorkflowExecution.resume_suspension(suspended_execution)
 
       # Call NodeExecutor with unified interface
       case NodeExecutor.resume_node(suspended_node, resume_ready_execution, suspended_node_execution, resume_data) do
         {:ok, completed_node_execution} ->
           # Complete the node execution at workflow level
-          updated_execution = Prana.Execution.complete_node(resume_ready_execution, completed_node_execution)
+          updated_execution = Prana.WorkflowExecution.complete_node(resume_ready_execution, completed_node_execution)
           {:ok, updated_execution}
 
         {:error, {reason, _failed_node_execution}} ->

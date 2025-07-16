@@ -1,14 +1,13 @@
-defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
+defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
   use ExUnit.Case, async: false
 
   alias Prana.Connection
-  alias Prana.Execution
-  alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
+  alias Prana.WorkflowExecution
 
   # Helper function to convert list-based connections to map-based
   defp convert_connections_to_map(workflow) do
@@ -332,21 +331,11 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
     test "returns error for invalid execution status" do
       # Try to resume a completed execution
-      completed_execution = %Execution{
+      completed_execution = %WorkflowExecution{
         id: "test",
         workflow_id: "test",
         status: :completed,
         node_executions: []
-      }
-
-      execution_graph = %ExecutionGraph{
-        workflow_id: "test_workflow",
-        trigger_node_key: "trigger",
-        dependency_graph: %{},
-        connection_map: %{},
-        reverse_connection_map: %{},
-        node_map: %{},
-        variables: %{}
       }
 
       result =
@@ -364,7 +353,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
 
     test "returns error for invalid suspended execution" do
       # Create suspended execution without proper suspended_node_id
-      invalid_suspended = %Execution{
+      invalid_suspended = %WorkflowExecution{
         id: "test",
         workflow_id: "test",
         workflow_version: 1,
@@ -393,16 +382,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         started_at: nil,
         completed_at: nil,
         metadata: %{}
-      }
-
-      execution_graph = %ExecutionGraph{
-        workflow_id: "test_workflow",
-        trigger_node_key: "trigger",
-        dependency_graph: %{},
-        connection_map: %{},
-        reverse_connection_map: %{},
-        node_map: %{},
-        variables: %{}
       }
 
       result =

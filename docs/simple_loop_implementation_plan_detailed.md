@@ -336,7 +336,7 @@ defmodule Prana.LoopStateManager do
   @doc """
   Initialize loop state in execution metadata
   """
-  def initialize_loop_state(%Execution{} = execution) do
+  def initialize_loop_state(%WorkflowExecution{} = execution) do
     loop_state = %{
       "active_loops" => %{},
       "node_iterations" => %{},
@@ -499,7 +499,7 @@ def initialize_execution_with_loops(workflow, trigger_data) do
   loop_compile_metadata = Prana.LoopDetector.detect_and_prepare_loops(workflow)
 
   execution =
-    %Execution{
+    %WorkflowExecution{
       id: generate_id(),
       workflow_id: workflow.id,
       status: :running,

@@ -2,12 +2,12 @@ defmodule Prana.NodeExecutorTest do
   use ExUnit.Case, async: false
 
   alias Prana.Action
-  alias Prana.Execution
   alias Prana.Integration
   alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecution
   alias Prana.NodeExecutor
+  alias Prana.WorkflowExecution
 
   # Test action modules
   defmodule TestActions do
@@ -255,7 +255,7 @@ defmodule Prana.NodeExecutorTest do
     :ok = IntegrationRegistry.register_integration(TestIntegration)
 
     # Create test execution
-    execution = %Execution{
+    execution = %WorkflowExecution{
       id: "test_execution",
       workflow_id: "test_workflow",
       workflow_version: 1,

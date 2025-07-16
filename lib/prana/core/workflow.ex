@@ -166,7 +166,7 @@ defmodule Prana.Workflow do
   # Private functions
 
   defp generate_id do
-    16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
+    UUID.uuid4()
   end
 
   defp parse_nodes(nodes) when is_list(nodes) do

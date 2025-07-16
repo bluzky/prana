@@ -1,4 +1,4 @@
-defmodule Prana.Execution do
+defmodule Prana.WorkflowExecution do
   @moduledoc """
   Represents a workflow execution instance with structured suspension support.
 
@@ -314,7 +314,7 @@ defmodule Prana.Execution do
   end
 
   defp generate_id do
-    16 |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, 16)
+    UUID.uuid4()
   end
 
   # Rebuild completed node outputs from execution history

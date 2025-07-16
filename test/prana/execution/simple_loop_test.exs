@@ -1,4 +1,4 @@
-defmodule Prana.Execution.SimpleLoopTest do
+defmodule Prana.WorkflowExecution.SimpleLoopTest do
   @moduledoc """
   Unit tests for simple loop patterns using existing Logic integration
 
@@ -12,7 +12,7 @@ defmodule Prana.Execution.SimpleLoopTest do
   use ExUnit.Case, async: false
 
   alias Prana.Connection
-  # alias Prana.Execution
+  # alias Prana.WorkflowExecution
   # alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
   alias Prana.Integrations.Logic

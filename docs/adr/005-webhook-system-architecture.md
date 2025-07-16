@@ -145,7 +145,7 @@ end
 "$execution.resume_url" → "webhook_12345_abc789"
 
 # Enhanced ExecutionContext
-%Prana.ExecutionContext{
+%Prana.WorkflowExecutionContext{
   # ... existing fields
   resume_url: "webhook_12345_abc789",  # Generated at execution start
 }
@@ -214,7 +214,7 @@ defmodule MyApp.WorkflowEngine do
     execution_id = generate_execution_id()
     resume_url = Prana.WebhookRegistry.generate_resume_url(execution_id)
     
-    context = %Prana.ExecutionContext{
+    context = %Prana.WorkflowExecutionContext{
       execution_id: execution_id,
       resume_url: resume_url,
       # ... other fields

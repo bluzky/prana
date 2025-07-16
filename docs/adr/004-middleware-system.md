@@ -104,7 +104,7 @@ end
 
 ### Integration with GraphExecutor
 ```elixir
-defmodule Prana.Execution.GraphExecutor do
+defmodule Prana.WorkflowExecution.GraphExecutor do
   def execute_workflow(graph, input, context) do
     # Fire start event
     Prana.Middleware.call(:execution_started, %{

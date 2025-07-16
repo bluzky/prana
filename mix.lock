@@ -17,5 +17,6 @@
   "skema": {:hex, :skema, "1.0.0", "da5d77d6fd6491b279de981d03f3beed3708e5f14371d06a070b203843eecd48", [:mix], [{:decimal, "~> 2.1", [hex: :decimal, repo: "hexpm", optional: false]}, {:valdi, "~> 0.5", [hex: :valdi, repo: "hexpm", optional: false]}], "hexpm", "13b56e9616ea79bb38eeb3460cec93cec6c2ba85d27b20371ae00387b2301c8a"},
   "styler": {:hex, :styler, "0.11.9", "2595393b94e660cd6e8b582876337cc50ff047d184ccbed42fdad2bfd5d78af5", [:mix], [], "hexpm", "8b7806ba1fdc94d0a75127c56875f91db89b75117fcc67572661010c13e1f259"},
   "telemetry": {:hex, :telemetry, "1.3.0", "fedebbae410d715cf8e7062c96a1ef32ec22e764197f70cda73d82778d61e7a2", [:rebar3], [], "hexpm", "7015fc8919dbe63764f4b4b87a95b7c0996bd539e0d499be6ec9d7f3875b79e6"},
+  "uuid": {:hex, :uuid, "1.1.8", "e22fc04499de0de3ed1116b770c7737779f226ceefa0badb3592e64d5cfb4eb9", [:mix], [], "hexpm", "c790593b4c3b601f5dc2378baae7efaf5b3d73c4c6456ba85759905be792f2ac"},
   "valdi": {:hex, :valdi, "0.5.0", "b686378c33de1cd35b4fe6f60598d88d10a9a2c5d914a243433158a078607b23", [:mix], [{:decimal, "~> 2.1", [hex: :decimal, repo: "hexpm", optional: false]}], "hexpm", "a375904658a7175d77546785338ab927a0cb7723b3fd24f0890510cdadf5ba27"},
 }

@@ -27,11 +27,17 @@ defmodule Prana.NodeExecutor do
   - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
-  @spec execute_node(Node.t(), Prana.Execution.t(), map(), integer(), integer()) ::
+  @spec execute_node(Node.t(), Prana.WorkflowExecution.t(), map(), integer(), integer()) ::
           {:ok, NodeExecution.t()}
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
-  def execute_node(%Node{} = node, %Prana.Execution{} = execution, routed_input, execution_index \\ 0, run_index \\ 0) do
+  def execute_node(
+        %Node{} = node,
+        %Prana.WorkflowExecution{} = execution,
+        routed_input,
+        execution_index \\ 0,
+        run_index \\ 0
+      ) do
     node_execution = create_node_execution(execution, node, execution_index, run_index)
     context = build_expression_context(node_execution, execution, routed_input)
 
@@ -58,11 +64,11 @@ defmodule Prana.NodeExecutor do
   - `{:ok, node_execution}` - Successfully resumed and completed
   - `{:error, {reason, failed_node_execution}}` - Resume failed
   """
-  @spec resume_node(Node.t(), Prana.Execution.t(), NodeExecution.t(), map()) ::
+  @spec resume_node(Node.t(), Prana.WorkflowExecution.t(), NodeExecution.t(), map()) ::
           {:ok, NodeExecution.t()} | {:error, {term(), NodeExecution.t()}}
   def resume_node(
         %Node{} = node,
-        %Prana.Execution{} = execution,
+        %Prana.WorkflowExecution{} = execution,
         %NodeExecution{} = suspended_node_execution,
         resume_data
       ) do
@@ -384,8 +390,8 @@ defmodule Prana.NodeExecutor do
   # CONTEXT BUILDING
   # =============================================================================
 
-  @spec build_expression_context(Prana.NodeExecution.t(), Prana.Execution.t(), map()) :: map()
-  defp build_expression_context(node_execution, %Prana.Execution{} = execution, routed_input) do
+  @spec build_expression_context(Prana.NodeExecution.t(), Prana.WorkflowExecution.t(), map()) :: map()
+  defp build_expression_context(node_execution, %Prana.WorkflowExecution{} = execution, routed_input) do
     %{
       "$input" => routed_input,
       "$nodes" => execution.__runtime["nodes"],

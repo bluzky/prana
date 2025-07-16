@@ -269,7 +269,7 @@ defmodule MyApp.WorkflowEngine do
     # Scan workflow for wait nodes and generate resume URLs
     resume_urls = scan_and_generate_resume_urls(workflow_id, execution_id)
 
-    %Prana.ExecutionContext{
+    %Prana.WorkflowExecutionContext{
       execution_id: execution_id,
       resume_urls: resume_urls,
       variables: %{},
