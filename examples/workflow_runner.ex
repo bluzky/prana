@@ -65,8 +65,7 @@ defmodule Examples.WorkflowRunner do
   def resume_workflow(execution, resume_input) do
     Logger.info("Resuming workflow execution: #{execution.id}")
 
-    with {:ok, execution_graph} <- rebuild_graph(execution),
-         {:ok, result} <- GraphExecutor.resume_workflow(execution_graph, execution, resume_input) do
+    with {:ok, result} <- GraphExecutor.resume_workflow(execution, resume_input) do
       handle_result(result)
     else
       error ->
@@ -125,21 +124,21 @@ defmodule Examples.WorkflowRunner do
     end
   end
 
-  defp handle_result(result_data) do
-    case result_data do
-      %{status: :suspended} = suspended_result ->
-        Logger.info("Workflow suspended: #{suspended_result.suspend_type}")
-        handle_suspend(suspended_result)
-
-      %{status: :completed} = completed_result ->
+  defp handle_result(result_tuple) do
+    case result_tuple do
+      {:ok, execution} ->
         Logger.info("Workflow completed successfully")
-        update_execution_db(completed_result, :completed)
-        {:ok, completed_result}
+        update_execution_db(execution, :completed)
+        {:ok, execution}
 
-      %{status: :failed} = failed_result ->
+      {:suspend, execution} ->
+        Logger.info("Workflow suspended")
+        handle_suspend(execution)
+
+      {:error, execution} ->
         Logger.error("Workflow execution failed")
-        update_execution_db(failed_result, :failed)
-        {:error, failed_result}
+        update_execution_db(execution, :failed)
+        {:error, execution}
     end
   end
 

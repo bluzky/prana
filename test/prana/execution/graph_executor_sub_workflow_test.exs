@@ -226,8 +226,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         GraphExecutor.resume_workflow(
           suspended_execution,
           resume_data,
-          execution_graph,
-          execution_context
+          %{env: execution_context}
         )
 
       # Should complete after immediate resume
@@ -268,8 +267,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         GraphExecutor.resume_workflow(
           suspended_execution,
           resume_data,
-          execution_graph,
-          execution_context
+          %{env: execution_context}
         )
 
       # Should complete successfully
@@ -307,8 +305,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         GraphExecutor.resume_workflow(
           first_suspended,
           first_resume_data,
-          execution_graph,
-          execution_context
+          %{env: execution_context}
         )
 
       # Should suspend again at second sub-workflow
@@ -325,8 +322,7 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         GraphExecutor.resume_workflow(
           second_suspended,
           second_resume_data,
-          execution_graph,
-          second_context
+          %{env: second_context}
         )
 
       # Should complete after second resume
@@ -357,7 +353,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         GraphExecutor.resume_workflow(
           completed_execution,
           %{},
-          execution_graph,
           %{}
         )
 
@@ -414,7 +409,6 @@ defmodule Prana.Execution.GraphExecutorSubWorkflowTest do
         GraphExecutor.resume_workflow(
           invalid_suspended,
           %{},
-          execution_graph,
           %{}
         )
 

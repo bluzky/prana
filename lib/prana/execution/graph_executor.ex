@@ -113,89 +113,11 @@ defmodule Prana.GraphExecutor do
 
   # Note: Orchestration context type removed - using unified Execution struct only
 
-  @doc """
-  Resume a suspended workflow execution with sub-workflow results.
 
-  ## Parameters
 
-  - `suspended_execution` - The suspended Execution struct
-  - `resume_data` - Data to resume with (sub-workflow results, external event data, etc.)
-  - `execution_graph` - The original ExecutionGraph
-  - `execution_context` - The original execution context
-
-  ## Returns
-
-  - `{:ok, execution}` - Successful completion after resume
-  - `{:suspend, execution}` - Execution suspended again (for nested async operations)
-  - `{:error, reason}` - Resume failed with error details
-  """
-  @spec resume_workflow(Execution.t(), map(), ExecutionGraph.t(), map()) ::
-          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, any()}
-  def resume_workflow(
-        %Execution{status: :suspended} = suspended_execution,
-        resume_data,
-        execution_graph,
-        execution_context
-      ) do
-    with {:ok, prepared_execution} <-
-           prepare_execution_for_resume(suspended_execution, execution_graph, execution_context),
-         {:ok, suspended_node_id} <- validate_suspended_node_id(prepared_execution),
-         {:ok, updated_execution} <-
-           resume_suspended_node(execution_graph, prepared_execution, suspended_node_id, resume_data) do
-      execute_workflow_loop(updated_execution)
-    end
-  end
-
-  def resume_workflow(%Execution{status: status}, _resume_data, _execution_graph, _execution_context) do
-    {:error, %{type: "invalid_execution_status", message: "Can only resume suspended executions", status: status}}
-  end
-
-  # Prepare execution for resume by rebuilding runtime state
-  defp prepare_execution_for_resume(suspended_execution, execution_graph, execution_context) do
-    env_data = Map.get(execution_context, :env, %{})
-    prepared_execution = Execution.rebuild_runtime(%{suspended_execution | execution_graph: execution_graph}, env_data)
-    {:ok, prepared_execution}
-  end
-
-  # Validate that the suspended execution has a valid suspended node ID
-  defp validate_suspended_node_id(prepared_execution) do
-    case prepared_execution.suspended_node_id do
-      nil -> {:error, %{type: "invalid_suspended_execution", message: "Cannot find suspended node ID"}}
-      suspended_node_id -> {:ok, suspended_node_id}
-    end
-  end
-
-  @doc """
-  Execute a workflow graph with the given context.
-
-  ## Parameters
-
-  - `execution_graph` - Pre-compiled ExecutionGraph from WorkflowCompiler
-  - `context` - Execution context with workflow_loader callback and optional variables/metadata
-
-  ## Returns
-
-  - `{:ok, execution}` - Successful execution with final state
-  - `{:suspend, execution}` - Execution suspended for async coordination (sub-workflows, external events, etc.)
-  - `{:error, failed_execution}` - Execution failed with complete state including failed node details
-
-  ## Examples
-
-      context = %{
-        workflow_loader: &MyApp.WorkflowLoader.load_workflow/1,
-        variables: %{api_url: "https://api.example.com"},
-        metadata: %{user_id: 123}
-      }
-
-      # Normal execution
-      {:ok, execution} = GraphExecutor.execute_workflow(graph, context)
-
-      # Suspended execution (sub-workflow coordination)
-      {:suspend, execution} = GraphExecutor.execute_workflow(graph, context)
-  """
   @doc """
   Initialize a new execution context for a workflow.
-  
+
   This allows applications to persist the execution before starting execution,
   providing consistency with resume_workflow which also takes a pre-initialized execution.
   """
@@ -217,16 +139,17 @@ defmodule Prana.GraphExecutor do
 
   @doc """
   Execute a workflow with a pre-initialized execution context.
-  
+
   This is now consistent with resume_workflow which also takes a pre-initialized execution.
   Applications should call initialize_execution/2 first, persist the execution, then call this function.
   """
   @spec execute_workflow(Execution.t()) ::
           {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, Execution.t()}
   def execute_workflow(%Execution{} = execution) do
-    with {:ok, prepared_execution} <- Execution.prepare_workflow_actions(execution) do
-      execute_workflow_with_error_handling(prepared_execution)
-    else
+    case Execution.prepare_workflow_actions(execution) do
+      {:ok, prepared_execution} ->
+        execute_workflow_with_error_handling(prepared_execution)
+
       {:error, reason} ->
         handle_preparation_failure(execution.execution_graph, reason)
     end
@@ -237,7 +160,7 @@ defmodule Prana.GraphExecutor do
 
   @doc """
   Legacy function for backward compatibility.
-  
+
   This function initializes execution internally and should be deprecated in favor of
   initialize_execution/2 followed by execute_workflow/1.
   """
@@ -248,7 +171,6 @@ defmodule Prana.GraphExecutor do
       execute_workflow(execution)
     end
   end
-
 
   # Execute workflow loop with proper error handling
   defp execute_workflow_with_error_handling(execution) do
@@ -470,10 +392,62 @@ defmodule Prana.GraphExecutor do
     end
   end
 
+  @doc """
+  Resume a suspended workflow execution with sub-workflow results.
+
+  ## Parameters
+
+  - `suspended_execution` - The suspended Execution struct (contains execution_graph and execution data)
+  - `resume_data` - Data to resume with (sub-workflow results, external event data, etc.)
+  - `options` - Optional configuration (env data, middleware overrides, etc.)
+
+  ## Returns
+
+  - `{:ok, execution}` - Successful completion after resume
+  - `{:suspend, execution}` - Execution suspended again (for nested async operations)
+  - `{:error, reason}` - Resume failed with error details
+  """
+  @spec resume_workflow(Execution.t(), map(), map()) ::
+          {:ok, Execution.t()} | {:suspend, Execution.t()} | {:error, any()}
+  def resume_workflow(suspended_execution, resume_data, options \\ %{})
+  
+  def resume_workflow(
+        %Execution{status: :suspended} = suspended_execution,
+        resume_data,
+        options
+      ) do
+    with {:ok, prepared_execution} <-
+           prepare_execution_for_resume(suspended_execution, options),
+         {:ok, suspended_node_id} <- validate_suspended_node_id(prepared_execution),
+         {:ok, updated_execution} <-
+           resume_suspended_node(prepared_execution, suspended_node_id, resume_data) do
+      execute_workflow_loop(updated_execution)
+    end
+  end
+
+  def resume_workflow(%Execution{status: status}, _resume_data, _options) do
+    {:error, %{type: "invalid_execution_status", message: "Can only resume suspended executions", status: status}}
+  end
+
+  # Prepare execution for resume by rebuilding runtime state
+  defp prepare_execution_for_resume(suspended_execution, options) do
+    env_data = Map.get(options, :env, %{})
+    prepared_execution = Execution.rebuild_runtime(suspended_execution, env_data)
+    {:ok, prepared_execution}
+  end
+
+  # Validate that the suspended execution has a valid suspended node ID
+  defp validate_suspended_node_id(prepared_execution) do
+    case prepared_execution.suspended_node_id do
+      nil -> {:error, %{type: "invalid_suspended_execution", message: "Cannot find suspended node ID"}}
+      suspended_node_id -> {:ok, suspended_node_id}
+    end
+  end
+
   # Complete a suspended node execution with resume data
-  defp resume_suspended_node(execution_graph, suspended_execution, suspended_node_id, resume_data) do
-    # Find the suspended node definition and execution
-    suspended_node = Map.get(execution_graph.node_map, suspended_node_id)
+  defp resume_suspended_node(suspended_execution, suspended_node_id, resume_data) do
+    # Find the suspended node definition and execution from execution's own execution_graph
+    suspended_node = Map.get(suspended_execution.execution_graph.node_map, suspended_node_id)
     suspended_node_executions = Map.get(suspended_execution.node_executions, suspended_node_id, [])
     suspended_node_execution = Enum.find(suspended_node_executions, &(&1.status == :suspended))
 
