@@ -24,6 +24,9 @@ defmodule Prana.NodeExecutorSuspensionTest do
       id: "test_execution",
       workflow_id: "test_workflow",
       workflow_version: 1,
+      execution_graph: %{
+        trigger_node_key: "start_node"
+      },
       execution_mode: "node_executor_test",
       status: :running,
       vars: %{"api_url" => "https://api.test.com"},

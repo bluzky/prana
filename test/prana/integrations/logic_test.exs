@@ -1,7 +1,6 @@
 defmodule Prana.Integrations.LogicTest do
   use ExUnit.Case, async: false
 
-  alias Prana.IntegrationRegistry
   alias Prana.Integrations.Logic
   alias Prana.Integrations.Logic.IfConditionAction
   alias Prana.Integrations.Logic.SwitchAction

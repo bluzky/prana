@@ -21,7 +21,6 @@ defmodule Prana.NodeExecution do
           suspension_type: atom() | nil,
           suspension_data: term() | nil,
           metadata: map(),
-          context_data: map(),
           execution_index: integer(),
           run_index: integer()
         }
@@ -42,7 +41,6 @@ defmodule Prana.NodeExecution do
     params: %{},
     retry_count: 0,
     metadata: %{},
-    context_data: %{},
     execution_index: 0,
     run_index: 0
   ]
@@ -66,7 +64,6 @@ defmodule Prana.NodeExecution do
       suspension_type: nil,
       suspension_data: nil,
       metadata: %{},
-      context_data: %{},
       execution_index: execution_index,
       run_index: run_index
     }
@@ -116,13 +113,6 @@ defmodule Prana.NodeExecution do
   """
   def increment_retry(%__MODULE__{} = node_execution) do
     %{node_execution | retry_count: node_execution.retry_count + 1}
-  end
-
-  @doc """
-  Updates context data for the node execution
-  """
-  def update_context(%__MODULE__{} = node_execution, context_data) do
-    %{node_execution | context_data: context_data}
   end
 
   defp calculate_duration(nil), do: nil

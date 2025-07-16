@@ -157,7 +157,6 @@ prana/
   nodes: [Prana.Node.t()],
   connections: [Prana.Connection.t()],
   variables: map(),
-  settings: Prana.WorkflowSettings.t(),
   metadata: map()
 }
 ```
@@ -181,8 +180,6 @@ prana/
   params: map(),                # Configuration/input data
   output_ports: [String.t()],      # Available output ports
   input_ports: [String.t()],       # Available input ports
-  error_handling: Prana.ErrorHandling.t(),
-  retry_policy: Prana.RetryPolicy.t() | nil,
   timeout_seconds: integer() | nil,
   metadata: map()
 }
@@ -238,14 +235,9 @@ prana/
 ```
 
 #### Supporting Structures
-- `Prana.Condition` (`condition.ex`) - Connection routing conditions
 - `Prana.Integration` (`integration.ex`) - Integration definition struct
 - `Prana.Action` (`action.ex`) - Action definition struct
 - `Prana.Execution` (`execution.ex`) - Workflow execution instance
-- `Prana.ExecutionContext` (`execution_context.ex`) - Shared execution context
-- `Prana.ErrorHandling` (`error_handling.ex`) - Error handling configuration
-- `Prana.RetryPolicy` (`retry_policy.ex`) - Retry policy configuration
-- `Prana.WorkflowSettings` (`workflow_settings.ex`) - Workflow-level settings
 
 ### Behavior Definitions (`lib/prana/behaviours/`)
 

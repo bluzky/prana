@@ -3,7 +3,6 @@ defmodule Prana.ExecutionGraph do
   Execution graph containing workflow analysis and execution optimization.
 
   The compiled output of WorkflowCompiler containing:
-  - Pruned workflow (only reachable nodes)
   - Pre-built lookup maps for O(1) performance
   - Dependency graph for execution ordering
   - Trigger node as execution entry point
@@ -24,15 +23,8 @@ defmodule Prana.ExecutionGraph do
       # Compiled execution graph: 5 nodes, optimized
       {:ok, graph} = WorkflowCompiler.compile(workflow)
       %ExecutionGraph{
-        workflow: %Workflow{
-          nodes: [webhook, validate, save, email, log],  # Pruned
-          connections: %{
-            "webhook" => %{"success" => [conn_to_validate, conn_to_log]},
-            "validate" => %{"success" => [conn_to_save]},
-            "save" => %{"success" => [conn_to_email]}
-          }
-        },
-        trigger_node: webhook,
+        workflow_id: "id",
+        trigger_node_key: "webhook",
         dependency_graph: %{
           "validate" => ["webhook"],
           "log" => ["webhook"],
@@ -49,18 +41,14 @@ defmodule Prana.ExecutionGraph do
           "validate" => validate_node,
           # ...
         },
-        total_nodes: 5
       }
   """
 
-  alias Prana.Node
-  alias Prana.Workflow
-
   defstruct [
     # Compiled workflow with only reachable nodes
-    :workflow,
+    :workflow_id,
     # The specific trigger node that started execution
-    :trigger_node,
+    :trigger_node_key,
     # Map of node_id -> [prerequisite_node_ids]
     :dependency_graph,
     # Map of {from_node, from_port} -> [connections]
@@ -69,17 +57,17 @@ defmodule Prana.ExecutionGraph do
     :reverse_connection_map,
     # Map of node_id -> node for quick lookup
     :node_map,
-    # Total number of nodes in compiled workflow
-    :total_nodes
+    # variable map from workflow TODO: using directly from workflow
+    :variables
   ]
 
   @type t :: %__MODULE__{
-          workflow: Workflow.t(),
-          trigger_node: Node.t(),
+          workflow_id: String.t(),
+          trigger_node_key: String.t(),
           dependency_graph: map(),
           connection_map: map(),
           reverse_connection_map: map(),
           node_map: map(),
-          total_nodes: integer()
+          variables: map()
         }
 end

@@ -43,7 +43,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`Prana.Node`**: Individual workflow node with type, integration, action, and configuration
 - **`Prana.Connection`**: Port-based connections between nodes with conditions and data mapping
 - **`Prana.NodeExecution`**: Individual node execution state tracking
-- **`Prana.ExecutionContext`**: Shared execution context across workflow
 
 #### Optimized Connection Structure
 ```elixir

@@ -60,15 +60,10 @@
   - `Prana.Workflow` - Workflow definition with nodes and connections
   - `Prana.Node` - Individual node with type, integration, action, config
   - `Prana.Connection` - Connection between nodes with ports and conditions
-  - `Prana.Condition` - Connection routing conditions
   - `Prana.Integration` - Integration struct with actions
   - `Prana.Action` - Action struct with metadata
   - `Prana.Execution` - Workflow execution instance
   - `Prana.NodeExecution` - Individual node execution state
-  - `Prana.ExecutionContext` - Shared execution context
-  - `Prana.ErrorHandling` - Error handling configuration
-  - `Prana.RetryPolicy` - Retry policy configuration
-  - `Prana.WorkflowSettings` - Workflow-level settings
 
 - **Behavior Definitions**: Clean contracts for extensibility
   - `Prana.Behaviour.Integration` - Integration contract with `definition/0` callback

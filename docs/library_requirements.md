@@ -33,8 +33,6 @@
   params: map(),
   output_ports: [String.t()],
   input_ports: [String.t()],
-  error_handling: Prana.ErrorHandling.t(),
-  retry_policy: Prana.RetryPolicy.t() | nil,
   position: {x, y}
 }
 ```
@@ -207,8 +205,8 @@ defmodule MyApp.SlackIntegration do
           function: :send_message,
           input_ports: ["input"],
           output_ports: ["success", "error"],
-          
-          
+
+
         }
       }
     }
@@ -302,7 +300,7 @@ prana/
 │   ├── prana/
 │   │   ├── core/              # Core data structures (structs)
 │   │   ├── behaviours/        # Behavior definitions
-│   │   ├── integrations/      # Built-in integrations  
+│   │   ├── integrations/      # Built-in integrations
 │   │   ├── execution/         # Execution engine
 │   │   ├── registry/          # Integration registry
 │   │   ├── middleware.ex      # Middleware pipeline

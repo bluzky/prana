@@ -1,8 +1,8 @@
 # Simple Loop Implementation Plan - Detailed
 
-**Date**: July 2025  
-**Status**: Implementation Ready  
-**Scope**: Minimal changes to enable n8n-style simple loops in Prana  
+**Date**: July 2025
+**Status**: Implementation Ready
+**Scope**: Minimal changes to enable n8n-style simple loops in Prana
 
 ## Executive Summary
 
@@ -41,7 +41,7 @@ end
 # NEW: Implement real cycle detection
 defp detect_and_classify_cycles(workflow) do
   cycles = detect_cycles_dfs(workflow.nodes, workflow.connections)
-  
+
   case cycles do
     [] -> {:ok, :no_cycles}
     cycles -> classify_loop_safety(cycles, workflow.nodes)
@@ -50,20 +50,20 @@ end
 
 # NEW: Classify cycles as safe simple loops or dangerous
 defp classify_loop_safety(cycles, nodes) do
-  logic_node_ids = 
+  logic_node_ids =
     nodes
     |> Enum.filter(&(&1.integration_name == "logic"))
     |> MapSet.new(& &1.id)
-  
-  safe_cycles = 
+
+  safe_cycles =
     Enum.filter(cycles, fn cycle ->
       # Safe if: contains logic node AND is simple (≤ 5 nodes)
       has_logic_node = Enum.any?(cycle, &MapSet.member?(logic_node_ids, &1))
       is_simple = length(cycle) <= 5
-      
+
       has_logic_node and is_simple
     end)
-  
+
   cond do
     length(safe_cycles) == length(cycles) -> {:ok, :simple_loops}
     true -> {:error, "Workflow contains unsafe cycles"}
@@ -73,22 +73,22 @@ end
 # NEW: Real DFS cycle detection
 defp detect_cycles_dfs(nodes, connections) do
   graph = build_adjacency_list(connections)
-  
-  {_, cycles} = 
+
+  {_, cycles} =
     Enum.reduce(nodes, {MapSet.new(), []}, fn node, {visited, found_cycles} ->
       if MapSet.member?(visited, node.id) do
         {visited, found_cycles}
       else
         case dfs_find_cycles(graph, node.id, MapSet.new(), []) do
-          {:cycle, cycle_path} -> 
+          {:cycle, cycle_path} ->
             new_visited = MapSet.union(visited, MapSet.new(cycle_path))
             {new_visited, [cycle_path | found_cycles]}
-          :no_cycle -> 
+          :no_cycle ->
             {MapSet.put(visited, node.id), found_cycles}
         end
       end
     end)
-  
+
   cycles
 end
 
@@ -108,7 +108,7 @@ defp dfs_find_cycles(graph, current, visited, path) do
     new_visited = MapSet.put(visited, current)
     new_path = [current | path]
     neighbors = Map.get(graph, current, [])
-    
+
     Enum.reduce_while(neighbors, :no_cycle, fn neighbor, _acc ->
       if MapSet.member?(visited, neighbor) do
         {:cont, :no_cycle}
@@ -184,7 +184,7 @@ end
 test "creates iteration executions correctly" do
   base = NodeExecution.new("exec_1", "node_1")
   iter2 = NodeExecution.new_iteration(base, 2, 5)
-  
+
   assert iter2.iteration == 2
   assert iter2.run_index == 5
   assert NodeExecution.is_loop_iteration?(iter2)
@@ -202,11 +202,11 @@ end
 ```elixir
 # REPLACE the current find_ready_nodes function
 def find_ready_nodes(%ExecutionGraph{} = execution_graph, completed_node_executions, execution) do
-  # Group executions by node_id 
+  # Group executions by node_id
   executions_by_node = Enum.group_by(completed_node_executions, & &1.node_id)
-  
+
   # Get latest execution status for dependency checking
-  latest_execution_status = 
+  latest_execution_status =
     Enum.map(executions_by_node, fn {node_id, executions} ->
       latest = Enum.max_by(executions, & &1.iteration, fn -> nil end)
       {node_id, latest}
@@ -227,17 +227,17 @@ end
 defp should_execute_node?(node, executions_by_node, execution) do
   # Check if node is part of an active loop (from metadata)
   active_loops = get_in(execution.metadata, ["loop_state", "active_loops"]) || %{}
-  
-  participating_loop = 
+
+  participating_loop =
     Enum.find(active_loops, fn {_loop_id, loop_data} ->
       node.id in loop_data["nodes"]
     end)
-  
+
   case participating_loop do
     nil ->
       # Not in a loop - execute if not already executed
       not Map.has_key?(executions_by_node, node.id)
-    
+
     {loop_id, _loop_data} ->
       # In a loop - check if should continue using metadata
       Prana.LoopStateManager.should_continue_loop?(execution, loop_id)
@@ -250,12 +250,12 @@ defp is_loop_node?(node, executions_by_node, execution_context) do
   # and there are active loop indicators in the execution context
   node_executions = Map.get(executions_by_node, node.id, [])
   has_been_executed = not Enum.empty?(node_executions)
-  
+
   # Check if any completed execution indicates loop continuation
   if has_been_executed do
     last_execution = List.last(node_executions)
     # Logic nodes with "true" output indicate loop continuation
-    last_execution.output_port == "true" and 
+    last_execution.output_port == "true" and
     is_logic_integration_node?(node)
   else
     false
@@ -271,17 +271,17 @@ defp should_continue_loop?(node, node_executions, execution_context) do
   current_iteration = length(node_executions)
   max_iterations = get_max_iterations(execution_context)
   last_execution = List.last(node_executions)
-  
+
   cond do
     # Safety: Check max iterations
     current_iteration >= max_iterations -> false
-    
+
     # Check if last execution indicated termination
     should_terminate_based_on_output?(node, last_execution) -> false
-    
+
     # Check if there's input ready for next iteration
     has_loop_input_ready?(node, execution_context) -> true
-    
+
     # Default: don't continue
     true -> false
   end
@@ -292,7 +292,7 @@ defp should_terminate_based_on_output?(node, last_execution) do
     {"logic", "if_condition"} ->
       # IF condition with false output indicates loop termination
       last_execution.output_port == "false"
-    
+
     _ ->
       # Non-logic nodes don't control termination
       false
@@ -301,7 +301,7 @@ end
 
 defp has_loop_input_ready?(node, execution_context) do
   # Check if there's data available for the next loop iteration
-  # This is a simplified implementation - in practice, you'd check 
+  # This is a simplified implementation - in practice, you'd check
   # if the loop-back connections have provided new data
   true  # For now, assume input is ready
 end
@@ -332,7 +332,7 @@ defmodule Prana.LoopStateManager do
   @moduledoc """
   Manages loop state persistence in execution metadata
   """
-  
+
   @doc """
   Initialize loop state in execution metadata
   """
@@ -344,10 +344,10 @@ defmodule Prana.LoopStateManager do
       "global_run_counter" => 0,
       "max_iterations" => 10
     }
-    
+
     put_in(execution.metadata["loop_state"], loop_state)
   end
-  
+
   @doc """
   Start a new loop
   """
@@ -360,10 +360,10 @@ defmodule Prana.LoopStateManager do
       "loop_context" => %{},
       "created_at" => DateTime.utc_now()
     }
-    
+
     put_in(execution.metadata["loop_state"]["active_loops"][loop_id], loop_data)
   end
-  
+
   @doc """
   Increment loop iteration
   """
@@ -376,7 +376,7 @@ defmodule Prana.LoopStateManager do
     end)
     |> update_in(["metadata", "loop_state", "global_run_counter"], &(&1 + 1))
   end
-  
+
   @doc """
   Terminate a loop
   """
@@ -385,14 +385,14 @@ defmodule Prana.LoopStateManager do
     |> put_in(["metadata", "loop_state", "loop_termination_flags", loop_id], true)
     |> update_in(["metadata", "loop_state", "active_loops"], &Map.delete(&1, loop_id))
   end
-  
+
   @doc """
   Check if a loop should continue
   """
   def should_continue_loop?(execution, loop_id) do
     loop_state = get_in(execution.metadata, ["loop_state", "active_loops", loop_id])
     termination_flag = get_in(execution.metadata, ["loop_state", "loop_termination_flags", loop_id])
-    
+
     cond do
       is_nil(loop_state) -> false
       termination_flag == true -> false
@@ -400,7 +400,7 @@ defmodule Prana.LoopStateManager do
       true -> true
     end
   end
-  
+
   defp get_max_iterations(execution) do
     get_in(execution.metadata, ["loop_state", "max_iterations"]) || 10
   end
@@ -414,7 +414,7 @@ defp initialize_runtime_state(execution, env_data) do
     "active_paths" => %{},
     "executed_nodes" => Enum.map(execution.node_executions, & &1.node_id)
   }
-  
+
   # Simply copy loop state from metadata (no reconstruction!)
   loop_state = get_in(execution.metadata, ["loop_state"]) || %{}
   Map.merge(base_runtime, loop_state)
@@ -427,30 +427,30 @@ test "persists loop state in execution metadata" do
   # Setup workflow with simple loop
   workflow = create_simple_loop_workflow()
   execution = initialize_execution_with_loops(workflow, %{})
-  
+
   # Verify loop state is initialized in metadata
   loop_state = get_in(execution.metadata, ["loop_state"])
   assert map_size(loop_state["active_loops"]) == 1
   assert loop_state["node_iterations"] == %{}
-  
+
   # Execute first iteration
   {:ok, after_first} = execute_workflow_step(execution)
-  
+
   # Verify loop state is updated in metadata
   updated_loop_state = get_in(after_first.metadata, ["loop_state"])
   assert updated_loop_state["node_iterations"]["increment"] == 1
   assert updated_loop_state["global_run_counter"] == 1
-  
+
   # Simulate persistence save/load cycle
   persisted_execution = save_and_load_execution(after_first)
-  
+
   # Verify loop state survives persistence
   restored_loop_state = get_in(persisted_execution.metadata, ["loop_state"])
   assert restored_loop_state == updated_loop_state
-  
+
   # Continue execution
   {:ok, after_second} = execute_workflow_step(persisted_execution)
-  
+
   # Verify loop continued correctly
   final_loop_state = get_in(after_second.metadata, ["loop_state"])
   assert final_loop_state["node_iterations"]["increment"] == 2
@@ -467,24 +467,24 @@ defmodule Prana.LoopDetector do
   """
   def detect_and_prepare_loops(workflow) do
     cycles = detect_cycles_dfs(workflow.nodes, workflow.connections)
-    
-    loop_metadata = 
+
+    loop_metadata =
       cycles
       |> Enum.with_index()
       |> Enum.map(fn {cycle_nodes, index} ->
         loop_id = "loop_#{index + 1}"
         termination_node = find_logic_node_in_cycle(cycle_nodes, workflow.nodes)
-        
+
         {loop_id, %{
           "nodes" => cycle_nodes,
           "termination_node" => termination_node
         }}
       end)
       |> Map.new()
-    
+
     %{"detected_loops" => loop_metadata}
   end
-  
+
   defp find_logic_node_in_cycle(cycle_nodes, all_nodes) do
     # Find the Logic integration node in the cycle (loop controller)
     Enum.find(cycle_nodes, fn node_id ->
@@ -497,8 +497,8 @@ end
 # NEW: Initialize execution with loop metadata
 def initialize_execution_with_loops(workflow, trigger_data) do
   loop_compile_metadata = Prana.LoopDetector.detect_and_prepare_loops(workflow)
-  
-  execution = 
+
+  execution =
     %Execution{
       id: generate_id(),
       workflow_id: workflow.id,
@@ -508,15 +508,15 @@ def initialize_execution_with_loops(workflow, trigger_data) do
       }
     }
     |> Prana.LoopStateManager.initialize_loop_state()
-  
+
   # Auto-start detected loops
   detected_loops = loop_compile_metadata["detected_loops"] || %{}
-  
+
   Enum.reduce(detected_loops, execution, fn {loop_id, loop_info}, acc ->
     Prana.LoopStateManager.start_loop(
-      acc, 
-      loop_id, 
-      loop_info["nodes"], 
+      acc,
+      loop_id,
+      loop_info["nodes"],
       loop_info["termination_node"]
     )
   end)
@@ -526,19 +526,19 @@ end
 defp execute_single_node_with_loop_tracking(selected_node, execution_graph, execution) do
   # Find if this node is part of a loop
   loop_id = find_node_loop_id(selected_node, execution)
-  
+
   case execute_single_node_with_events(selected_node, execution_graph, execution) do
     {%NodeExecution{status: :completed} = node_execution, updated_execution} ->
       # Update loop state if this is a loop node
-      final_execution = 
+      final_execution =
         if loop_id do
           handle_loop_node_completion(updated_execution, selected_node, node_execution, loop_id)
         else
           updated_execution
         end
-      
+
       {:ok, final_execution}
-    
+
     other_result ->
       other_result
   end
@@ -546,9 +546,9 @@ end
 
 defp handle_loop_node_completion(execution, node, node_execution, loop_id) do
   # Update loop iteration count
-  updated_execution = 
+  updated_execution =
     Prana.LoopStateManager.increment_loop_iteration(execution, loop_id, node.id)
-  
+
   # Check if this node terminates the loop
   if should_terminate_loop_after_execution?(node, node_execution) do
     Prana.LoopStateManager.terminate_loop(updated_execution, loop_id)
@@ -564,7 +564,7 @@ end
 
 defp find_node_loop_id(node, execution) do
   active_loops = get_in(execution.metadata, ["loop_state", "active_loops"]) || %{}
-  
+
   Enum.find_value(active_loops, fn {loop_id, loop_data} ->
     if node.id in loop_data["nodes"], do: loop_id, else: nil
   end)
@@ -579,21 +579,21 @@ end
 # NEW: Safety validation using metadata-based loop state
 defp validate_loop_safety(node, execution) do
   loop_id = find_node_loop_id(node, execution)
-  
+
   if loop_id do
     loop_state = get_in(execution.metadata, ["loop_state", "active_loops", loop_id])
     current_iteration = loop_state["current_iteration"]
     max_iterations = get_in(execution.metadata, ["loop_state", "max_iterations"]) || 10
-    
+
     cond do
       # Check maximum iterations
       current_iteration > max_iterations ->
         {:error, "Loop #{loop_id} exceeded maximum iterations (#{max_iterations})"}
-      
+
       # Check loop timeout
       loop_timeout_exceeded?(loop_state) ->
         {:error, "Loop #{loop_id} execution timeout exceeded"}
-      
+
       true ->
         :ok
     end
@@ -605,7 +605,7 @@ end
 defp loop_timeout_exceeded?(loop_state) do
   created_at = loop_state["created_at"]
   max_duration_ms = 60_000  # 1 minute
-  
+
   if created_at do
     DateTime.diff(DateTime.utc_now(), created_at, :millisecond) > max_duration_ms
   else
@@ -616,9 +616,9 @@ end
 defp rapid_execution_detected?(node_executions) do
   if length(node_executions) >= 3 do
     recent_executions = Enum.take(node_executions, -3)
-    
+
     # Check if executions are happening too quickly
-    time_spans = 
+    time_spans =
       recent_executions
       |> Enum.chunk_every(2, 1, :discard)
       |> Enum.map(fn [first, second] ->
@@ -628,7 +628,7 @@ defp rapid_execution_detected?(node_executions) do
           1000  # Default to safe interval
         end
       end)
-    
+
     avg_interval = Enum.sum(time_spans) / length(time_spans)
     avg_interval < 50  # Less than 50ms between executions
   else
@@ -638,11 +638,11 @@ end
 
 defp loop_timeout_exceeded?(node_executions) do
   case {List.first(node_executions), List.last(node_executions)} do
-    {%{started_at: first_start}, %{completed_at: last_end}} 
+    {%{started_at: first_start}, %{completed_at: last_end}}
     when not is_nil(first_start) and not is_nil(last_end) ->
       total_duration = DateTime.diff(last_end, first_start, :millisecond)
       total_duration > 60_000  # 1 minute max for loop
-    
+
     _ ->
       false
   end
@@ -650,55 +650,20 @@ end
 
 # NEW: Integration with existing execute_single_node function
 defp execute_single_node_with_loop_safety(selected_node, execution_graph, execution) do
-  node_executions = 
+  node_executions =
     execution.node_executions
     |> Enum.filter(&(&1.node_id == selected_node.id))
-  
+
   case validate_loop_safety(selected_node, node_executions, execution.__runtime) do
     :ok ->
       execute_single_node_with_events(selected_node, execution_graph, execution)
-    
+
     {:error, reason} ->
       # Create failed execution
       failed_execution = create_failed_node_execution(selected_node, execution, reason)
       updated_execution = Execution.add_node_execution(execution, failed_execution)
       {:error, updated_execution}
   end
-end
-```
-
-### 3.2 Add Configuration Support
-
-```elixir
-# NEW: Configurable loop settings
-defmodule Prana.LoopSettings do
-  @moduledoc """
-  Configuration settings for loop execution
-  """
-  
-  defstruct [
-    max_iterations: 10,           # Maximum iterations per node
-    max_loop_duration_ms: 60_000, # 1 minute max
-    min_iteration_interval_ms: 50, # Minimum time between iterations
-    rapid_execution_threshold: 3   # Number of recent executions to check
-  ]
-  
-  def default() do
-    %__MODULE__{}
-  end
-  
-  def from_workflow_settings(%Prana.WorkflowSettings{} = settings) do
-    %__MODULE__{
-      max_iterations: Map.get(settings.metadata, "max_loop_iterations", 10),
-      max_loop_duration_ms: Map.get(settings.metadata, "max_loop_duration_ms", 60_000)
-    }
-  end
-end
-
-# Integration with workflow execution
-defp get_loop_settings(execution_graph) do
-  workflow_settings = execution_graph.workflow.settings
-  Prana.LoopSettings.from_workflow_settings(workflow_settings)
 end
 ```
 
@@ -709,96 +674,96 @@ end
 ```elixir
 defmodule Prana.SimpleLoopIntegrationTest do
   use ExUnit.Case, async: false
-  
+
   alias Prana.GraphExecutor
   alias Prana.WorkflowCompiler
-  
+
   describe "simple counter loop" do
     test "executes counter loop correctly" do
       # Create workflow: Init(0) → Increment → IF(< 3) → (true: Increment, false: End)
       workflow = build_counter_loop_workflow(max_count: 3)
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{},
         metadata: %{}
       }
-      
+
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
-      
+
       # Verify increment node executed 3 times
       increment_executions = get_node_executions(execution, "increment")
       assert length(increment_executions) == 3
-      
+
       # Verify iterations are tracked correctly
       assert Enum.map(increment_executions, & &1.iteration) == [1, 2, 3]
-      
+
       # Verify final state
       assert execution.status == :completed
     end
-    
+
     test "respects maximum iteration limit" do
       workflow = build_infinite_loop_workflow()  # No termination condition
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       context = %{"max_iterations" => 5}
-      
+
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
-      
+
       # Should stop at max iterations and have error
       assert execution.status == :failed
       failed_execution = get_failed_node_execution(execution)
       assert failed_execution.error_data["message"] =~ "exceeded maximum iterations"
     end
   end
-  
+
   describe "retry pattern loop" do
     test "retries until success" do
       # Create workflow: Init → Attempt → IF(success) → (false: Increment + Attempt, true: End)
       workflow = build_retry_loop_workflow(fail_count: 2)
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       context = %{workflow_loader: fn _id -> {:error, "not implemented"} end}
-      
+
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
-      
+
       # Verify attempt node executed 3 times (fail, fail, success)
       attempt_executions = get_node_executions(execution, "attempt")
       assert length(attempt_executions) == 3
-      
+
       # Verify final success
       assert execution.status == :completed
     end
   end
-  
+
   describe "safety mechanisms" do
     test "detects rapid execution" do
       # Create workflow with very fast loop
       workflow = build_rapid_loop_workflow()
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       # Mock very fast execution times
       context = %{mock_fast_execution: true}
-      
+
       {:ok, execution} = GraphExecutor.execute_graph(execution_graph, context)
-      
+
       # Should detect rapid execution and fail
       assert execution.status == :failed
       failed_execution = get_failed_node_execution(execution)
       assert failed_execution.error_data["message"] =~ "rapid execution detected"
     end
   end
-  
+
   # Helper functions
   defp build_counter_loop_workflow(max_count: max_count) do
     # Implementation details for test workflow creation
   end
-  
+
   defp get_node_executions(execution, node_id) do
     Enum.filter(execution.node_executions, &(&1.node_id == node_id))
   end
-  
+
   defp get_failed_node_execution(execution) do
     Enum.find(execution.node_executions, &(&1.status == :failed))
   end
@@ -872,7 +837,7 @@ Initialize → Process → Logic IF → (true: back to Process)
 - [ ] Implement cycle detection algorithm
 - [ ] Add basic tests
 
-### Week 2: Core Functionality  
+### Week 2: Core Functionality
 - [ ] Modify GraphExecutor ready node detection
 - [ ] Add loop continuation logic
 - [ ] Update runtime state management
