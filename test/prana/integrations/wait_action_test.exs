@@ -2,17 +2,24 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
   use ExUnit.Case, async: false
 
   alias Prana.Integrations.Wait.WaitAction
+  alias Prana.Node
 
   describe "prepare/1" do
     test "webhook mode generates resume URLs" do
-      input_map = %{
-        "mode" => "webhook",
-        "timeout_hours" => 24,
-        "base_url" => "https://myapp.com",
-        "$execution" => %{"id" => "exec_123"}
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{
+          "mode" => "webhook",
+          "timeout_hours" => 24,
+          "base_url" => "https://myapp.com",
+          "$execution" => %{"id" => "exec_123"}
+        }
       }
 
-      {:ok, preparation_data} = WaitAction.prepare(input_map)
+      {:ok, preparation_data} = WaitAction.prepare(node)
 
       assert preparation_data.timeout_hours == 24
       assert String.starts_with?(preparation_data.resume_id, "exec_123_")
@@ -22,13 +29,19 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     end
 
     test "webhook mode works without base_url" do
-      input_map = %{
-        "mode" => "webhook",
-        "timeout_hours" => 12,
-        "$execution" => %{"id" => "exec_456"}
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{
+          "mode" => "webhook",
+          "timeout_hours" => 12,
+          "$execution" => %{"id" => "exec_456"}
+        }
       }
 
-      {:ok, preparation_data} = WaitAction.prepare(input_map)
+      {:ok, preparation_data} = WaitAction.prepare(node)
 
       assert preparation_data.timeout_hours == 12
       assert String.starts_with?(preparation_data.resume_id, "exec_456_")
@@ -37,24 +50,36 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     end
 
     test "webhook mode returns error for invalid timeout_hours" do
-      input_map = %{
-        "mode" => "webhook",
-        "timeout_hours" => -1,
-        "$execution" => %{"id" => "exec_123"}
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{
+          "mode" => "webhook",
+          "timeout_hours" => -1,
+          "$execution" => %{"id" => "exec_123"}
+        }
       }
 
-      {:error, reason} = WaitAction.prepare(input_map)
+      {:error, reason} = WaitAction.prepare(node)
       assert reason =~ "timeout_hours must be a positive number"
     end
 
     test "interval mode calculates timing correctly" do
-      input_map = %{
-        "mode" => "interval",
-        "duration" => 30,
-        "unit" => "seconds"
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{
+          "mode" => "interval",
+          "duration" => 30,
+          "unit" => "seconds"
+        }
       }
 
-      {:ok, preparation_data} = WaitAction.prepare(input_map)
+      {:ok, preparation_data} = WaitAction.prepare(node)
 
       assert preparation_data.mode == "interval"
       assert preparation_data.duration_ms == 30_000
@@ -68,13 +93,19 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     test "schedule mode validates and parses datetime" do
       future_time = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
 
-      input_map = %{
-        "mode" => "schedule",
-        "schedule_at" => future_time,
-        "timezone" => "UTC"
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{
+          "mode" => "schedule",
+          "schedule_at" => future_time,
+          "timezone" => "UTC"
+        }
       }
 
-      {:ok, preparation_data} = WaitAction.prepare(input_map)
+      {:ok, preparation_data} = WaitAction.prepare(node)
 
       assert preparation_data.mode == "schedule"
       assert preparation_data.timezone == "UTC"
@@ -86,26 +117,44 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     test "schedule mode returns error for past datetime" do
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
 
-      input_map = %{
-        "mode" => "schedule",
-        "schedule_at" => past_time
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{
+          "mode" => "schedule",
+          "schedule_at" => past_time
+        }
       }
 
-      {:error, reason} = WaitAction.prepare(input_map)
+      {:error, reason} = WaitAction.prepare(node)
       assert reason =~ "schedule_at must be in the future"
     end
 
     test "returns error for missing mode" do
-      input_map = %{}
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{}
+      }
 
-      {:error, reason} = WaitAction.prepare(input_map)
+      {:error, reason} = WaitAction.prepare(node)
       assert reason == "mode is required"
     end
 
     test "returns error for invalid mode" do
-      input_map = %{"mode" => "invalid"}
+      node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{"mode" => "invalid"}
+      }
 
-      {:error, reason} = WaitAction.prepare(input_map)
+      {:error, reason} = WaitAction.prepare(node)
       assert reason =~ "mode must be 'interval', 'schedule', or 'webhook'"
     end
   end
@@ -136,14 +185,14 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
     test "interval mode creates proper suspension" do
       input_map = %{
         "mode" => "interval",
-        "duration" => 30,
-        "unit" => "seconds"
+        "duration" => 2,
+        "unit" => "minutes"
       }
 
       {:suspend, :interval, suspension_data} = WaitAction.execute(input_map, %{})
 
       assert suspension_data.mode == "interval"
-      assert suspension_data.duration_ms == 30_000
+      assert suspension_data.duration_ms == 120_000
       assert %DateTime{} = suspension_data.started_at
       assert %DateTime{} = suspension_data.resume_at
     end
@@ -194,14 +243,20 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
   describe "end-to-end webhook workflow" do
     test "complete webhook prepare/execute/resume cycle" do
       # 1. Preparation phase
-      prepare_input = %{
-        "mode" => "webhook",
-        "timeout_hours" => 24,
-        "base_url" => "https://myapp.com",
-        "$execution" => %{"id" => "exec_workflow_123"}
+      prepare_node = %Node{
+        key: "test_node",
+        name: "Test Wait Node",
+        integration_name: "wait",
+        action_name: "wait",
+        params: %{
+          "mode" => "webhook",
+          "timeout_hours" => 24,
+          "base_url" => "https://myapp.com",
+          "$execution" => %{"id" => "exec_workflow_123"}
+        }
       }
 
-      {:ok, preparation_data} = WaitAction.prepare(prepare_input)
+      {:ok, preparation_data} = WaitAction.prepare(prepare_node)
 
       assert String.starts_with?(preparation_data.resume_id, "exec_workflow_123_")
       assert String.contains?(preparation_data.webhook_url, preparation_data.resume_id)

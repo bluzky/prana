@@ -79,8 +79,6 @@ defmodule PranaDemo.WorkflowRunner do
   end
 
   defp handle_result(result) do
-    IO.inspect(">>> Handler result")
-
     case result do
       {:ok, execution} ->
         Logger.info("Workflow completed successfully")

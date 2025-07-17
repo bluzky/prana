@@ -176,7 +176,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
         # Merge → D
         %Connection{
           from: "merge",
-          from_port: "success",
+          from_port: "main",
           to: "final",
           to_port: "input"
         }
@@ -268,7 +268,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       merge_execution = Enum.find(all_executions, &(&1.node_key == "merge"))
       assert merge_execution != nil
       assert merge_execution.status == :completed
-      assert merge_execution.output_port == "success"
+      assert merge_execution.output_port == "main"
 
       # Verify merge output contains data from both branches
       merged_data = merge_execution.output_data
@@ -429,7 +429,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       # Verify merge result contains combined data
       assert merge_execution.status == :completed
-      assert merge_execution.output_port == "success"
+      assert merge_execution.output_port == "main"
       merged_output = merge_execution.output_data
       assert is_list(merged_output)
       assert length(merged_output) == 2

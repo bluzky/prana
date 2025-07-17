@@ -146,11 +146,9 @@ defmodule Prana.GraphExecutor do
   def execute_workflow(%WorkflowExecution{} = execution) do
     case WorkflowExecution.prepare_workflow_actions(execution) do
       {:ok, prepared_execution} ->
-        IO.inspect(">> prepare execution")
         execute_workflow_with_error_handling(prepared_execution)
 
       {:error, reason} ->
-        IO.inspect(">> prepare execution failed")
         handle_preparation_failure(execution.execution_graph, reason)
     end
   rescue
