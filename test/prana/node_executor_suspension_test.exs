@@ -185,7 +185,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "processes suspension tuple correctly" do
       action = %Action{
         name: "test_action",
-        output_ports: ["success", "error"]
+        output_ports: ["main", "error"]
       }
 
       suspend_data = %{workflow_id: "test", data: %{}}
@@ -199,7 +199,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "handles different suspension types" do
       action = %Action{
         name: "test_action",
-        output_ports: ["success", "error"]
+        output_ports: ["main", "error"]
       }
 
       # Test different suspension types
@@ -225,7 +225,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "validates suspension tuple format" do
       action = %Action{
         name: "test_action",
-        output_ports: ["success", "error"]
+        output_ports: ["main", "error"]
       }
 
       # Invalid suspension type (not an atom)

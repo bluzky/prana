@@ -148,28 +148,28 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
         # A → B
         %Connection{
           from: "start",
-          from_port: "success",
+          from_port: "main",
           to: "branch_b",
           to_port: "input"
         },
         # A → C
         %Connection{
           from: "start",
-          from_port: "success",
+          from_port: "main",
           to: "branch_c",
           to_port: "input"
         },
         # B → Merge
         %Connection{
           from: "branch_b",
-          from_port: "success",
+          from_port: "main",
           to: "merge",
           to_port: "input_a"
         },
         # C → Merge
         %Connection{
           from: "branch_c",
-          from_port: "success",
+          from_port: "main",
           to: "merge",
           to_port: "input_b"
         },
@@ -294,7 +294,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       final_execution = Enum.find(all_executions, &(&1.node_key == "final"))
       assert final_execution != nil
       assert final_execution.status == :completed
-      assert final_execution.output_port == "success"
+      assert final_execution.output_port == "main"
 
       # Verify merge node also executed successfully
       merge_execution = Enum.find(all_executions, &(&1.node_key == "merge"))
@@ -458,7 +458,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       # Verify final node executed successfully with access to context
       assert final_execution.status == :completed
-      assert final_execution.output_port == "success"
+      assert final_execution.output_port == "main"
 
       # Verify all diamond pattern nodes are accessible in execution
       start_execution = Enum.find(all_executions, &(&1.node_key == "start"))

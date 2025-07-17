@@ -37,7 +37,7 @@ defmodule Prana.Integrations.Workflow do
           type: :action,
           module: Prana.Integrations.Workflow.ExecuteWorkflowAction,
           input_ports: ["input"],
-          output_ports: ["success", "error", "failure", "timeout"]
+          output_ports: ["main", "error", "failure", "timeout"]
         }
       }
     }

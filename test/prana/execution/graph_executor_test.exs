@@ -84,7 +84,7 @@ defmodule Prana.GraphExecutorTest do
       node_execution = get_first_node_execution(execution)
       assert node_execution.status == :completed
       assert node_execution.node_key == "test_node"
-      assert node_execution.output_port == "success"
+      assert node_execution.output_port == "main"
     end
   end
 end

@@ -80,11 +80,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     case resume_data do
       %{"sub_workflow_output" => output, "status" => "completed"} ->
         # Sub-workflow completed successfully
-        {:ok, output, "success"}
+        {:ok, output, "main"}
 
       %{"sub_workflow_output" => output} ->
         # Sub-workflow completed successfully (no explicit status)
-        {:ok, output, "success"}
+        {:ok, output, "main"}
 
       %{"status" => "failed", "error" => error} when failure_strategy == "fail_parent" ->
         # Sub-workflow failed and should fail parent
@@ -104,11 +104,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
       # For fire-and-forget, any resume data indicates successful trigger
       _ when execution_mode == "fire_and_forget" ->
-        {:ok, resume_data, "success"}
+        {:ok, resume_data, "main"}
 
       # Default case - treat as successful completion
       _ ->
-        {:ok, resume_data, "success"}
+        {:ok, resume_data, "main"}
     end
   end
 

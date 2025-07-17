@@ -136,7 +136,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         # Start -> Initialize Counter
         %Connection{
           from: "start",
-          from_port: "success",
+          from_port: "main",
           to: "init_counter",
           to_port: "input",
           metadata: %{}
@@ -145,7 +145,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         # Initialize Counter -> Increment (first iteration)
         %Connection{
           from: "init_counter",
-          from_port: "success",
+          from_port: "main",
           to: "increment",
           to_port: "input",
           metadata: %{}
@@ -154,7 +154,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         # Increment -> Loop Condition
         %Connection{
           from: "increment",
-          from_port: "success",
+          from_port: "main",
           to: "loop_condition",
           to_port: "input",
           metadata: %{}
@@ -255,7 +255,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         # Start -> Initialize Retry
         %Connection{
           from: "start",
-          from_port: "success",
+          from_port: "main",
           to: "init_retry",
           to_port: "input",
           metadata: %{}
@@ -264,7 +264,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         # Initialize Retry -> Attempt Operation (first iteration)
         %Connection{
           from: "init_retry",
-          from_port: "success",
+          from_port: "main",
           to: "attempt_operation",
           to_port: "input",
           metadata: %{}
@@ -273,7 +273,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         # Attempt Operation -> Retry Check
         %Connection{
           from: "attempt_operation",
-          from_port: "success",
+          from_port: "main",
           to: "retry_check",
           to_port: "input",
           metadata: %{}
@@ -291,7 +291,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         # Increment Retry -> Attempt Operation (loop back)
         %Connection{
           from: "increment_retry",
-          from_port: "success",
+          from_port: "main",
           to: "attempt_operation",
           to_port: "input",
           metadata: %{}

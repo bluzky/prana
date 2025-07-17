@@ -37,13 +37,13 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
       # Create action with fixed ports
       fixed_action = %Action{
         name: "test_action",
-        output_ports: ["success", "error"]
+        output_ports: ["main", "error"]
       }
 
       # Valid port should work
-      assert {:ok, %{result: "data"}, "success"} =
+      assert {:ok, %{result: "data"}, "main"} =
                NodeExecutor.process_action_result(
-                 {:ok, %{result: "data"}, "success"},
+                 {:ok, %{result: "data"}, "main"},
                  fixed_action
                )
 

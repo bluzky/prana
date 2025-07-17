@@ -45,11 +45,11 @@ defmodule Prana.NodeExecutorTest do
     defmodule WithContext do
       @moduledoc false
       def execute(input, _context) do
-        {:ok, %{data: input}, "success", %{processing_time: 100}}
+        {:ok, %{data: input}, "main", %{processing_time: 100}}
       end
 
       def resume(_params, _context, resume_data) do
-        {:ok, resume_data, "success", %{resumed: true}}
+        {:ok, resume_data, "main", %{resumed: true}}
       end
     end
 
@@ -177,7 +177,7 @@ defmodule Prana.NodeExecutorTest do
             type: :action,
             module: TestActions.WithContext,
             input_ports: ["input"],
-            output_ports: ["success"]
+            output_ports: ["main"]
           },
           "error_action" => %Action{
             name: "error_action",
@@ -204,7 +204,7 @@ defmodule Prana.NodeExecutorTest do
             type: :action,
             module: TestActions.SuspendAction,
             input_ports: ["input"],
-            output_ports: ["success", "resumed"]
+            output_ports: ["main", "resumed"]
           },
           "exception_action" => %Action{
             name: "exception_action",
@@ -324,7 +324,7 @@ defmodule Prana.NodeExecutorTest do
 
       assert node_execution.status == :completed
       assert node_execution.output_data == %{data: %{"data" => "test"}}
-      assert node_execution.output_port == "success"
+      assert node_execution.output_port == "main"
     end
 
     test "handles action errors", %{execution: execution} do
@@ -536,7 +536,7 @@ defmodule Prana.NodeExecutorTest do
 
       assert completed_execution.status == :completed
       assert completed_execution.output_data == resume_data
-      assert completed_execution.output_port == "success"
+      assert completed_execution.output_port == "main"
     end
 
     test "handles resume errors", %{execution: execution} do
@@ -715,12 +715,12 @@ defmodule Prana.NodeExecutorTest do
     end
 
     test "processes context-aware result with explicit port" do
-      action = %Action{output_ports: ["success"]}
-      result = {:ok, %{data: "test"}, "success", %{context: "data"}}
+      action = %Action{output_ports: ["main"]}
+      result = {:ok, %{data: "test"}, "main", %{context: "data"}}
 
       assert {:ok, data, port, context} = NodeExecutor.process_action_result(result, action)
       assert data == %{data: "test"}
-      assert port == "success"
+      assert port == "main"
       assert context == %{context: "data"}
     end
 

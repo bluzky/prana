@@ -11,7 +11,7 @@ defmodule Prana.Action do
         description: "Make HTTP requests (GET, POST, PUT, DELETE, etc.)",
         module: MyApp.HttpRequestAction,
         input_ports: ["input"],
-        output_ports: ["success", "error", "timeout"],
+        output_ports: ["main", "error", "timeout"],
 
         input_schema: %{
           type: "object",

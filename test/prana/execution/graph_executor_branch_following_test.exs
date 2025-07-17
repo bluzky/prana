@@ -125,13 +125,13 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         # Trigger to both branch starts
         %Connection{
           from: "trigger",
-          from_port: "success",
+          from_port: "main",
           to: "branch_a1",
           to_port: "input"
         },
         %Connection{
           from: "trigger",
-          from_port: "success",
+          from_port: "main",
           to: "branch_b1",
           to_port: "input"
         },
@@ -139,7 +139,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         # Branch A sequence
         %Connection{
           from: "branch_a1",
-          from_port: "success",
+          from_port: "main",
           to: "branch_a2",
           to_port: "input"
         },
@@ -147,7 +147,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         # Branch B sequence
         %Connection{
           from: "branch_b1",
-          from_port: "success",
+          from_port: "main",
           to: "branch_b2",
           to_port: "input"
         },
@@ -155,13 +155,13 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         # Both branches to merge
         %Connection{
           from: "branch_a2",
-          from_port: "success",
+          from_port: "main",
           to: "merge",
           to_port: "input_a"
         },
         %Connection{
           from: "branch_b2",
-          from_port: "success",
+          from_port: "main",
           to: "merge",
           to_port: "input_b"
         }

@@ -86,13 +86,13 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
           %Connection{
             from: "trigger",
             to: "sub_workflow_node",
-            from_port: "success",
+            from_port: "main",
             to_port: "input"
           },
           %Connection{
             from: "sub_workflow_node",
             to: "output",
-            from_port: "success",
+            from_port: "main",
             to_port: "input"
           }
         ]
@@ -173,13 +173,13 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
           %Connection{
             from: "trigger",
             to: "fire_forget_sub",
-            from_port: "success",
+            from_port: "main",
             to_port: "input"
           },
           %Connection{
             from: "fire_forget_sub",
             to: "output",
-            from_port: "success",
+            from_port: "main",
             to_port: "input"
           }
         ]
@@ -464,13 +464,13 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         %Connection{
           from: "trigger",
           to: "sub_workflow_node",
-          from_port: "success",
+          from_port: "main",
           to_port: "input"
         },
         %Connection{
           from: "sub_workflow_node",
           to: "output",
-          from_port: "success",
+          from_port: "main",
           to_port: "input"
         }
       ]
@@ -512,9 +512,9 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         }
       ],
       connections: [
-        %Connection{from: "trigger", to: "first_sub_workflow", from_port: "success", to_port: "input"},
-        %Connection{from: "first_sub_workflow", to: "second_sub_workflow", from_port: "success", to_port: "input"},
-        %Connection{from: "second_sub_workflow", to: "output", from_port: "success", to_port: "input"}
+        %Connection{from: "trigger", to: "first_sub_workflow", from_port: "main", to_port: "input"},
+        %Connection{from: "first_sub_workflow", to: "second_sub_workflow", from_port: "main", to_port: "input"},
+        %Connection{from: "second_sub_workflow", to: "output", from_port: "main", to_port: "input"}
       ]
     }
   end

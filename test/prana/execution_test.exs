@@ -27,7 +27,7 @@ defmodule Prana.ExecutionTest do
               node_key: "node_1",
               status: :completed,
               output_data: %{user_id: 123},
-              output_port: "success",
+              output_port: "main",
               started_at: ~U[2024-01-01 10:00:00Z],
               execution_index: 0,
               run_index: 0
@@ -174,7 +174,7 @@ defmodule Prana.ExecutionTest do
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
-      completed_node_execution = NodeExecution.complete(node_execution, output_data, "success")
+      completed_node_execution = NodeExecution.complete(node_execution, output_data, "main")
 
       result = WorkflowExecution.complete_node(execution, completed_node_execution)
 
@@ -183,7 +183,7 @@ defmodule Prana.ExecutionTest do
       [completed_node] = result.node_executions["node_1"]
       assert completed_node.status == :completed
       assert completed_node.output_data == output_data
-      assert completed_node.output_port == "success"
+      assert completed_node.output_port == "main"
 
       # Verify runtime state
       assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data}
@@ -209,7 +209,7 @@ defmodule Prana.ExecutionTest do
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
-      completed_node_execution = NodeExecution.complete(node_execution, output_data, "success")
+      completed_node_execution = NodeExecution.complete(node_execution, output_data, "main")
 
       result = WorkflowExecution.complete_node(execution, completed_node_execution)
 
@@ -238,7 +238,7 @@ defmodule Prana.ExecutionTest do
         |> NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
-      completed_node_execution = NodeExecution.complete(node_execution, %{data: "test"}, "success")
+      completed_node_execution = NodeExecution.complete(node_execution, %{data: "test"}, "main")
 
       result = WorkflowExecution.complete_node(execution, completed_node_execution)
 
@@ -343,7 +343,7 @@ defmodule Prana.ExecutionTest do
               node_key: "node_1",
               status: :completed,
               output_data: %{user_id: 123},
-              output_port: "success",
+              output_port: "main",
               started_at: ~U[2024-01-01 10:00:00Z],
               execution_index: 0,
               run_index: 0
@@ -405,7 +405,7 @@ defmodule Prana.ExecutionTest do
 
       # Build incrementally using the new interface
       node_exec_1 = "exec_1" |> NodeExecution.new("node_1", 0, 0) |> NodeExecution.start()
-      completed_node_1 = NodeExecution.complete(node_exec_1, %{user_id: 123}, "success")
+      completed_node_1 = NodeExecution.complete(node_exec_1, %{user_id: 123}, "main")
 
       node_exec_2 = "exec_1" |> NodeExecution.new("node_2", 0, 0) |> NodeExecution.start()
       completed_node_2 = NodeExecution.complete(node_exec_2, %{email: "test@example.com"}, "primary")
