@@ -23,12 +23,13 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
     case Map.fetch(params, "condition") do
       {:ok, value} ->
         # Pass input data through to output for downstream nodes
-        input_data = get_in(context, ["$input", "input"]) || %{}
+        input_data = get_in(context, ["$input", "main"]) || %{}
 
         # Manually evaluate expression if needed
         evaluated_value =
           case value do
-            "$input.should_retry" -> get_in(context, ["$input", "input", "should_retry"])
+            "$input.should_retry" -> get_in(context, ["$input", "main", "should_retry"])
+            "$input.main.should_retry" -> get_in(context, ["$input", "main", "should_retry"])
             other -> other
           end
 

@@ -60,16 +60,16 @@ defmodule PranaDemo.DemoWorkflow do
     # Create connections
     conn1 = %Connection{
       from: "trigger",
-      from_port: "success",
+      from_port: "main",
       to: "set_data",
-      to_port: "input"
+      to_port: "main"
     }
 
     conn2 = %Connection{
       from: "set_data",
-      from_port: "success",
+      from_port: "main",
       to: "process_adult",
-      to_port: "input"
+      to_port: "main"
     }
 
     # Add connections
@@ -149,10 +149,10 @@ defmodule PranaDemo.DemoWorkflow do
 
     # Create connections
     connections = [
-      %Connection{from: "trigger", from_port: "success", to: "set_data", to_port: "input"},
-      %Connection{from: "set_data", from_port: "success", to: "age_check", to_port: "input"},
-      %Connection{from: "age_check", from_port: "true", to: "process_adult", to_port: "input"},
-      %Connection{from: "age_check", from_port: "false", to: "process_minor", to_port: "input"}
+      %Connection{from: "trigger", from_port: "main", to: "set_data", to_port: "main"},
+      %Connection{from: "set_data", from_port: "main", to: "age_check", to_port: "main"},
+      %Connection{from: "age_check", from_port: "true", to: "process_adult", to_port: "main"},
+      %Connection{from: "age_check", from_port: "false", to: "process_minor", to_port: "main"}
     ]
 
     # Add connections
@@ -327,39 +327,39 @@ defmodule PranaDemo.DemoWorkflow do
     connections = [
       %Connection{
         from: "trigger",
-        from_port: "success",
+        from_port: "main",
         to: "attempt_operation",
-        to_port: "input"
+        to_port: "main"
       },
       %Connection{
         from: "attempt_operation",
-        from_port: "success",
+        from_port: "main",
         to: "process_success",
-        to_port: "input"
+        to_port: "main"
       },
       %Connection{
         from: "attempt_operation",
         from_port: "error",
         to: "retry_check",
-        to_port: "input"
+        to_port: "main"
       },
       %Connection{
         from: "retry_check",
         from_port: "true",
         to: "increment_retry",
-        to_port: "input"
+        to_port: "main"
       },
       %Connection{
         from: "retry_check",
         from_port: "false",
         to: "process_success",
-        to_port: "input"
+        to_port: "main"
       },
       %Connection{
         from: "increment_retry",
-        from_port: "success",
+        from_port: "main",
         to: "attempt_operation",
-        to_port: "input"
+        to_port: "main"
       }
     ]
 
@@ -428,15 +428,15 @@ defmodule PranaDemo.DemoWorkflow do
     connections = [
       %Connection{
         from: "trigger",
-        from_port: "success",
+        from_port: "main",
         to: "execute_sub_workflow",
-        to_port: "input"
+        to_port: "main"
       },
       %Connection{
         from: "execute_sub_workflow",
-        from_port: "success",
+        from_port: "main",
         to: "process_result",
-        to_port: "input"
+        to_port: "main"
       }
     ]
 
@@ -479,9 +479,9 @@ defmodule PranaDemo.DemoWorkflow do
     # Create connection
     conn = %Connection{
       from: "sub_trigger",
-      from_port: "success",
+      from_port: "main",
       to: "sub_process",
-      to_port: "input"
+      to_port: "main"
     }
 
     {:ok, sub_workflow} = Workflow.add_connection(sub_workflow, conn)
@@ -549,13 +549,13 @@ defmodule PranaDemo.DemoWorkflow do
 
     # Create connections
     connections = [
-      %Connection{from: "trigger", from_port: "success", to: "set_data", to_port: "input"},
-      %Connection{from: "set_data", from_port: "success", to: "wait_timer", to_port: "input"},
+      %Connection{from: "trigger", from_port: "main", to: "set_data", to_port: "main"},
+      %Connection{from: "set_data", from_port: "main", to: "wait_timer", to_port: "main"},
       %Connection{
         from: "wait_timer",
-        from_port: "success",
+        from_port: "main",
         to: "process_after_wait",
-        to_port: "input"
+        to_port: "main"
       }
     ]
 

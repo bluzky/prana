@@ -8,8 +8,8 @@ defmodule Prana.Integrations.Manual.IncrementRetryAction do
   @impl true
   def execute(_params, context) do
     # Get values directly from input context
-    current_retry = get_in(context, ["$input", "input", "retry_count"]) || 0
-    max_retries = get_in(context, ["$input", "input", "max_retries"]) || 3
+    current_retry = get_in(context, ["$input", "main", "retry_count"]) || 0
+    max_retries = get_in(context, ["$input", "main", "max_retries"]) || 3
 
     new_retry = current_retry + 1
 

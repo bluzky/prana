@@ -87,13 +87,13 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
             from: "trigger",
             to: "sub_workflow_node",
             from_port: "main",
-            to_port: "input"
+            to_port: "main"
           },
           %Connection{
             from: "sub_workflow_node",
             to: "output",
             from_port: "main",
-            to_port: "input"
+            to_port: "main"
           }
         ]
       }
@@ -174,13 +174,13 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
             from: "trigger",
             to: "fire_forget_sub",
             from_port: "main",
-            to_port: "input"
+            to_port: "main"
           },
           %Connection{
             from: "fire_forget_sub",
             to: "output",
             from_port: "main",
-            to_port: "input"
+            to_port: "main"
           }
         ]
       }

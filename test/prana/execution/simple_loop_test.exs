@@ -117,7 +117,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
-            "condition" => "{{$input.input.counter < 3}}"
+            "condition" => "{{$execution.run_index < 3}}"
           },
           metadata: %{}
         },
@@ -138,7 +138,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "start",
           from_port: "main",
           to: "init_counter",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -147,7 +147,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "init_counter",
           from_port: "main",
           to: "increment",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -156,7 +156,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "increment",
           from_port: "main",
           to: "loop_condition",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -165,7 +165,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "loop_condition",
           from_port: "true",
           to: "increment",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -174,7 +174,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "loop_condition",
           from_port: "false",
           to: "complete",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         }
       ],
@@ -226,7 +226,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           integration_name: "logic",
           action_name: "if_condition",
           params: %{
-            "condition" => "$input.should_retry"
+            "condition" => "$input.main.should_retry"
           },
           metadata: %{}
         },
@@ -257,7 +257,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "start",
           from_port: "main",
           to: "init_retry",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -266,7 +266,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "init_retry",
           from_port: "main",
           to: "attempt_operation",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -275,7 +275,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "attempt_operation",
           from_port: "main",
           to: "retry_check",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -284,7 +284,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "retry_check",
           from_port: "true",
           to: "increment_retry",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -293,7 +293,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "increment_retry",
           from_port: "main",
           to: "attempt_operation",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         },
 
@@ -302,7 +302,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "retry_check",
           from_port: "false",
           to: "complete",
-          to_port: "input",
+          to_port: "main",
           metadata: %{}
         }
       ],
@@ -341,8 +341,8 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       increment_executions =
         length(Map.get(execution.node_executions, "increment", []))
 
-      # Should have 3 iterations (counter: 0 -> 1 -> 2 -> 3, then exit)
-      assert increment_executions == 3
+      # Should have 4 iterations (counter: 0 -> 1 -> 2 -> 3, then exit)
+      assert increment_executions == 4
 
       # Verify the final complete node was executed
       complete_executions =

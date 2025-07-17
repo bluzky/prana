@@ -8,8 +8,8 @@ defmodule Prana.Integrations.Manual.AttemptOperationAction do
   @impl true
   def execute(_params, context) do
     # Get values directly from input context
-    retry_count = get_in(context, ["$input", "input", "retry_count"]) || 0
-    max_retries = get_in(context, ["$input", "input", "max_retries"]) || 3
+    retry_count = get_in(context, ["$input", "main", "retry_count"]) || 0
+    max_retries = get_in(context, ["$input", "main", "max_retries"]) || 3
 
     # Simulate success after 2 retries
     success = retry_count >= 2

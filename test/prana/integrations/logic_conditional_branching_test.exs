@@ -123,9 +123,9 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test IF/ELSE Workflow",
         nodes: [trigger_node, if_node, true_branch, false_branch],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "if_condition", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "if_condition", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "main"}
         ]
       }
 
@@ -192,9 +192,9 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test IF/ELSE Workflow",
         nodes: [trigger_node, if_node, true_branch, false_branch],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "if_condition", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "if_condition", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "main"}
         ]
       }
 
@@ -269,11 +269,11 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test IF/ELSE Diamond Workflow",
         nodes: [trigger_node, if_node, true_branch, false_branch, merge_node],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "if_condition", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"},
-          %Connection{from: "true_branch", from_port: "main", to: "merge", to_port: "input"},
-          %Connection{from: "false_branch", from_port: "main", to: "merge", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "if_condition", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "main"},
+          %Connection{from: "true_branch", from_port: "main", to: "merge", to_port: "main"},
+          %Connection{from: "false_branch", from_port: "main", to: "merge", to_port: "main"}
         ]
       }
 
@@ -348,9 +348,9 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test Switch Workflow",
         nodes: [trigger_node, switch_node, case1_branch, case2_branch],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "main"}
         ]
       }
 
@@ -422,9 +422,9 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test Switch Workflow",
         nodes: [trigger_node, switch_node, case1_branch, case2_branch],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "main"}
         ]
       }
 
@@ -513,13 +513,13 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test Switch Diamond Workflow",
         nodes: [trigger_node, switch_node, case1_branch, case2_branch, case3_branch, merge_node],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case3", to: "case3_branch", to_port: "input"},
-          %Connection{from: "case1_branch", from_port: "main", to: "merge", to_port: "input"},
-          %Connection{from: "case2_branch", from_port: "main", to: "merge", to_port: "input"},
-          %Connection{from: "case3_branch", from_port: "main", to: "merge", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case1", to: "case1_branch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case2", to: "case2_branch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case3", to: "case3_branch", to_port: "main"},
+          %Connection{from: "case1_branch", from_port: "main", to: "merge", to_port: "main"},
+          %Connection{from: "case2_branch", from_port: "main", to: "merge", to_port: "main"},
+          %Connection{from: "case3_branch", from_port: "main", to: "merge", to_port: "main"}
         ]
       }
 
@@ -577,7 +577,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test Switch Failure Workflow",
         nodes: [trigger_node, switch_node],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "main"}
         ]
       }
 
@@ -653,10 +653,10 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         name: "Test Nested Conditional Workflow",
         nodes: [trigger_node, switch_node, if_node, true_branch, false_branch],
         connections: [
-          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "input"},
-          %Connection{from: "switch", from_port: "case1", to: "if_condition", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "input"},
-          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "input"}
+          %Connection{from: "trigger", from_port: "main", to: "switch", to_port: "main"},
+          %Connection{from: "switch", from_port: "case1", to: "if_condition", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "true", to: "true_branch", to_port: "main"},
+          %Connection{from: "if_condition", from_port: "false", to: "false_branch", to_port: "main"}
         ]
       }
 

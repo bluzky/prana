@@ -36,7 +36,7 @@ defmodule Prana.Integrations.Workflow do
           description: "Execute a sub-workflow with synchronous or asynchronous coordination",
           type: :action,
           module: Prana.Integrations.Workflow.ExecuteWorkflowAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main", "error", "failure", "timeout"]
         }
       }

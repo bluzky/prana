@@ -150,14 +150,14 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
           from: "start",
           from_port: "main",
           to: "branch_b",
-          to_port: "input"
+          to_port: "main"
         },
         # A → C
         %Connection{
           from: "start",
           from_port: "main",
           to: "branch_c",
-          to_port: "input"
+          to_port: "main"
         },
         # B → Merge
         %Connection{
@@ -178,7 +178,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
           from: "merge",
           from_port: "main",
           to: "final",
-          to_port: "input"
+          to_port: "main"
         }
       ],
       variables: %{},

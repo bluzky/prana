@@ -32,7 +32,7 @@ defmodule Prana.Integrations.Manual do
           description: "Process adult data",
           type: :action,
           module: Prana.Integrations.Manual.ProcessAdultAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main"]
         },
         "process_minor" => %Action{
@@ -41,7 +41,7 @@ defmodule Prana.Integrations.Manual do
           description: "Process minor data",
           type: :action,
           module: Prana.Integrations.Manual.ProcessMinorAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main"]
         },
         "set_data" => %Action{
@@ -50,7 +50,7 @@ defmodule Prana.Integrations.Manual do
           description: "Set data for testing",
           type: :action,
           module: Prana.Integrations.Manual.SetDataAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main"]
         },
         "attempt_operation" => %Action{
@@ -59,7 +59,7 @@ defmodule Prana.Integrations.Manual do
           description: "Simulate operation that may fail for retry testing",
           type: :action,
           module: Prana.Integrations.Manual.AttemptOperationAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main"]
         },
         "increment_retry" => %Action{
@@ -68,7 +68,7 @@ defmodule Prana.Integrations.Manual do
           description: "Increment retry counter for retry testing",
           type: :action,
           module: Prana.Integrations.Manual.IncrementRetryAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main"]
         }
       }

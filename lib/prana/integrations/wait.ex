@@ -35,7 +35,7 @@ defmodule Prana.Integrations.Wait do
           description: "Unified wait action supporting multiple modes: interval, schedule, webhook",
           type: :wait,
           module: Prana.Integrations.Wait.WaitAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main", "timeout", "error"]
         }
       }

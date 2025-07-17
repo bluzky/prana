@@ -31,7 +31,7 @@ defmodule Prana.Integrations.Logic do
           description: "Evaluate a condition and route to true or false branch",
           type: :logic,
           module: Prana.Integrations.Logic.IfConditionAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["true", "false"]
         },
         "switch" => %Action{
@@ -40,7 +40,7 @@ defmodule Prana.Integrations.Logic do
           description: "Multi-case routing based on simple condition expressions",
           type: :logic,
           module: Prana.Integrations.Logic.SwitchAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["*"]
         }
       }

@@ -35,7 +35,7 @@ defmodule Prana.Integrations.HTTP do
           description: "Make HTTP requests with configurable method, headers, and body",
           type: :action,
           module: Prana.Integrations.HTTP.RequestAction,
-          input_ports: ["input"],
+          input_ports: ["main"],
           output_ports: ["main", "error", "timeout"]
         },
         "webhook" => %Action{

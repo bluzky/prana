@@ -21,7 +21,7 @@ defmodule Prana.Integrations.LogicTest do
       assert if_action.name == "if_condition"
       assert if_action.display_name == "IF Condition"
       assert if_action.module == Prana.Integrations.Logic.IfConditionAction
-      assert if_action.input_ports == ["input"]
+      assert if_action.input_ports == ["main"]
       assert if_action.output_ports == ["true", "false"]
 
       # Check switch action
@@ -30,7 +30,7 @@ defmodule Prana.Integrations.LogicTest do
       assert switch_action.name == "switch"
       assert switch_action.display_name == "Switch"
       assert switch_action.module == Prana.Integrations.Logic.SwitchAction
-      assert switch_action.input_ports == ["input"]
+      assert switch_action.input_ports == ["main"]
       assert switch_action.output_ports == ["*"]
     end
   end
