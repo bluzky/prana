@@ -13,6 +13,20 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   @behaviour Prana.Behaviour.Action
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "if_condition",
+      display_name: "IF Condition",
+      description: "Evaluate condition and route to true/false",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["true", "false"]
+    }
+  end
+
   @impl true
   def prepare(_node) do
     {:ok, %{}}

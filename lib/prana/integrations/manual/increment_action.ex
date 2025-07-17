@@ -5,6 +5,20 @@ defmodule Prana.Integrations.Manual.IncrementAction do
 
   use Prana.Actions.SimpleAction
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "increment",
+      display_name: "Increment",
+      description: "Increment a counter for testing loop patterns",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["main"]
+    }
+  end
+
   @impl true
   def execute(_params, context) do
     # Use loop context instead of input data

@@ -5,8 +5,14 @@ defmodule Prana.Integrations.Manual do
 
   @behaviour Prana.Behaviour.Integration
 
-  alias Prana.Action
   alias Prana.Integration
+  alias Prana.Integrations.Manual.AttemptOperationAction
+  alias Prana.Integrations.Manual.IncrementAction
+  alias Prana.Integrations.Manual.IncrementRetryAction
+  alias Prana.Integrations.Manual.ProcessAdultAction
+  alias Prana.Integrations.Manual.ProcessMinorAction
+  alias Prana.Integrations.Manual.SetDataAction
+  alias Prana.Integrations.Manual.TriggerAction
 
   @impl true
   def definition do
@@ -17,60 +23,13 @@ defmodule Prana.Integrations.Manual do
       version: "1.0.0",
       category: "test",
       actions: %{
-        "trigger" => %Action{
-          name: "trigger",
-          display_name: "Manual Trigger",
-          description: "Simple trigger for testing",
-          type: :trigger,
-          module: Prana.Integrations.Manual.TriggerAction,
-          input_ports: [],
-          output_ports: ["main"]
-        },
-        "process_adult" => %Action{
-          name: "process_adult",
-          display_name: "Process Adult",
-          description: "Process adult data",
-          type: :action,
-          module: Prana.Integrations.Manual.ProcessAdultAction,
-          input_ports: ["main"],
-          output_ports: ["main"]
-        },
-        "process_minor" => %Action{
-          name: "process_minor",
-          display_name: "Process Minor",
-          description: "Process minor data",
-          type: :action,
-          module: Prana.Integrations.Manual.ProcessMinorAction,
-          input_ports: ["main"],
-          output_ports: ["main"]
-        },
-        "set_data" => %Action{
-          name: "set_data",
-          display_name: "Set Data",
-          description: "Set data for testing",
-          type: :action,
-          module: Prana.Integrations.Manual.SetDataAction,
-          input_ports: ["main"],
-          output_ports: ["main"]
-        },
-        "attempt_operation" => %Action{
-          name: "attempt_operation",
-          display_name: "Attempt Operation",
-          description: "Simulate operation that may fail for retry testing",
-          type: :action,
-          module: Prana.Integrations.Manual.AttemptOperationAction,
-          input_ports: ["main"],
-          output_ports: ["main"]
-        },
-        "increment_retry" => %Action{
-          name: "increment_retry",
-          display_name: "Increment Retry",
-          description: "Increment retry counter for retry testing",
-          type: :action,
-          module: Prana.Integrations.Manual.IncrementRetryAction,
-          input_ports: ["main"],
-          output_ports: ["main"]
-        }
+        "trigger" => TriggerAction.specification(),
+        "process_adult" => ProcessAdultAction.specification(),
+        "process_minor" => ProcessMinorAction.specification(),
+        "set_data" => SetDataAction.specification(),
+        "attempt_operation" => AttemptOperationAction.specification(),
+        "increment_retry" => IncrementRetryAction.specification(),
+        "increment" => IncrementAction.specification()
       }
     }
   end

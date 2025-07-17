@@ -9,6 +9,20 @@ defmodule Prana.Integrations.HTTP.RequestAction do
 
   use Skema
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "request",
+      display_name: "HTTP Request",
+      description: "Make HTTP requests with configurable method, headers, and body",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["main", "error", "timeout"]
+    }
+  end
+
   defschema AuthSchema do
     field(:type, :string,
       required: true,

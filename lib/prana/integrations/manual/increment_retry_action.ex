@@ -5,6 +5,20 @@ defmodule Prana.Integrations.Manual.IncrementRetryAction do
 
   use Prana.Actions.SimpleAction
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "increment_retry",
+      display_name: "Increment Retry",
+      description: "Increment retry counter for retry testing",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["main"]
+    }
+  end
+
   @impl true
   def execute(_params, context) do
     # Get values directly from input context

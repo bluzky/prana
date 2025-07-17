@@ -23,6 +23,20 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
   @behaviour Prana.Behaviour.Action
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "execute_workflow",
+      display_name: "Execute Sub-workflow",
+      description: "Execute a sub-workflow with synchronous or asynchronous coordination",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["main", "error", "failure", "timeout"]
+    }
+  end
+
   @impl true
   def prepare(_node) do
     {:ok, %{}}

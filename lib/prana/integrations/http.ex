@@ -14,8 +14,9 @@ defmodule Prana.Integrations.HTTP do
 
   @behaviour Prana.Behaviour.Integration
 
-  alias Prana.Action
   alias Prana.Integration
+  alias Prana.Integrations.HTTP.RequestAction
+  alias Prana.Integrations.HTTP.WebhookAction
 
   @doc """
   Returns the integration definition with all available actions
@@ -29,24 +30,8 @@ defmodule Prana.Integrations.HTTP do
       version: "1.0.0",
       category: "network",
       actions: %{
-        "request" => %Action{
-          name: "request",
-          display_name: "HTTP Request",
-          description: "Make HTTP requests with configurable method, headers, and body",
-          type: :action,
-          module: Prana.Integrations.HTTP.RequestAction,
-          input_ports: ["main"],
-          output_ports: ["main", "error", "timeout"]
-        },
-        "webhook" => %Action{
-          name: "webhook",
-          display_name: "Webhook Trigger",
-          description: "Configure webhook endpoint for triggering workflow execution",
-          type: :trigger,
-          module: Prana.Integrations.HTTP.WebhookAction,
-          input_ports: [],
-          output_ports: ["main"]
-        }
+        "request" => RequestAction.specification(),
+        "webhook" => WebhookAction.specification()
       }
     }
   end

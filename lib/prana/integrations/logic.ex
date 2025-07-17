@@ -10,8 +10,9 @@ defmodule Prana.Integrations.Logic do
 
   @behaviour Prana.Behaviour.Integration
 
-  alias Prana.Action
   alias Prana.Integration
+  alias Prana.Integrations.Logic.IfConditionAction
+  alias Prana.Integrations.Logic.SwitchAction
 
   @doc """
   Returns the integration definition with all available actions
@@ -25,24 +26,8 @@ defmodule Prana.Integrations.Logic do
       version: "1.0.0",
       category: "core",
       actions: %{
-        "if_condition" => %Action{
-          name: "if_condition",
-          display_name: "IF Condition",
-          description: "Evaluate a condition and route to true or false branch",
-          type: :logic,
-          module: Prana.Integrations.Logic.IfConditionAction,
-          input_ports: ["main"],
-          output_ports: ["true", "false"]
-        },
-        "switch" => %Action{
-          name: "switch",
-          display_name: "Switch",
-          description: "Multi-case routing based on simple condition expressions",
-          type: :logic,
-          module: Prana.Integrations.Logic.SwitchAction,
-          input_ports: ["main"],
-          output_ports: ["*"]
-        }
+        "if_condition" => IfConditionAction.specification(),
+        "switch" => SwitchAction.specification()
       }
     }
   end

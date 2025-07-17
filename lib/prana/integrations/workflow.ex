@@ -15,8 +15,8 @@ defmodule Prana.Integrations.Workflow do
 
   @behaviour Prana.Behaviour.Integration
 
-  alias Prana.Action
   alias Prana.Integration
+  alias Prana.Integrations.Workflow.ExecuteWorkflowAction
 
   @doc """
   Returns the integration definition with all available actions
@@ -30,15 +30,7 @@ defmodule Prana.Integrations.Workflow do
       version: "1.0.0",
       category: "coordination",
       actions: %{
-        "execute_workflow" => %Action{
-          name: "execute_workflow",
-          display_name: "Execute Sub-workflow",
-          description: "Execute a sub-workflow with synchronous or asynchronous coordination",
-          type: :action,
-          module: Prana.Integrations.Workflow.ExecuteWorkflowAction,
-          input_ports: ["main"],
-          output_ports: ["main", "error", "failure", "timeout"]
-        }
+        "execute_workflow" => ExecuteWorkflowAction.specification()
       }
     }
   end

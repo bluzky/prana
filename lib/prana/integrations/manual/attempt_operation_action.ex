@@ -5,6 +5,20 @@ defmodule Prana.Integrations.Manual.AttemptOperationAction do
 
   use Prana.Actions.SimpleAction
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "attempt_operation",
+      display_name: "Attempt Operation",
+      description: "Simulate operation that may fail for retry testing",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["main"]
+    }
+  end
+
   @impl true
   def execute(_params, context) do
     # Get values directly from input context

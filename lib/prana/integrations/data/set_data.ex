@@ -5,6 +5,20 @@ defmodule Prana.Integrations.Data.SetDataAction do
 
   use Prana.Actions.SimpleAction
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "set_data",
+      display_name: "Set Data",
+      description: "Set data",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["main", "error"]
+    }
+  end
+
   @impl true
   def execute(params, _context) do
     {:ok, params}

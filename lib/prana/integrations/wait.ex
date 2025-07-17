@@ -29,15 +29,7 @@ defmodule Prana.Integrations.Wait do
       version: "1.0.0",
       category: "control",
       actions: %{
-        "wait" => %Action{
-          name: "wait",
-          display_name: "Wait",
-          description: "Unified wait action supporting multiple modes: interval, schedule, webhook",
-          type: :wait,
-          module: Prana.Integrations.Wait.WaitAction,
-          input_ports: ["main"],
-          output_ports: ["main", "timeout", "error"]
-        }
+        "wait" => Prana.Integrations.Wait.WaitAction.specification()
       }
     }
   end
@@ -258,6 +250,20 @@ defmodule Prana.Integrations.Wait.WaitAction do
   """
 
   @behaviour Prana.Behaviour.Action
+
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "wait",
+      display_name: "Wait",
+      description: "Unified wait action supporting multiple modes: interval, schedule, webhook",
+      type: :wait,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["main", "timeout", "error"]
+    }
+  end
 
   @impl true
   def prepare(node) do

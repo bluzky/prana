@@ -9,6 +9,20 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
 
   use Skema
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "webhook",
+      display_name: "Webhook Trigger",
+      description: "Configure webhook endpoint for triggering workflow execution",
+      type: :trigger,
+      module: __MODULE__,
+      input_ports: [],
+      output_ports: ["main"]
+    }
+  end
+
   defschema AuthConfigSchema do
     field(:type, :string,
       required: true,

@@ -26,6 +26,20 @@ defmodule Prana.Integrations.Logic.SwitchAction do
 
   use Prana.Actions.SimpleAction
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "switch",
+      display_name: "Switch",
+      description: "Multi-case routing based on condition expressions",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["main"],
+      output_ports: ["*"]
+    }
+  end
+
   @impl true
   def execute(params, context) do
     cases = Map.get(params, "cases", [])
@@ -49,6 +63,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
     condition = Map.get(case_config, "condition")
     case_port = Map.get(case_config, "port", "default")
 
+    # A condition is considered matching if it's truthy (not nil, not empty string)
     if condition && condition != "" do
       {:ok, case_port}
     else

@@ -5,6 +5,20 @@ defmodule Prana.Integrations.Data.MergeAction do
 
   use Prana.Actions.SimpleAction
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "merge",
+      display_name: "Merge Data",
+      description: "Combine data from multiple named input ports (diamond pattern coordination)",
+      type: :action,
+      module: __MODULE__,
+      input_ports: ["input_a", "input_b"],
+      output_ports: ["main", "error"]
+    }
+  end
+
   @impl true
   def execute(params, _context) do
     strategy = Map.get(params, "strategy", "append")

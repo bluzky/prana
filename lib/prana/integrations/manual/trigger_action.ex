@@ -5,6 +5,20 @@ defmodule Prana.Integrations.Manual.TriggerAction do
 
   use Prana.Actions.SimpleAction
 
+  alias Prana.Action
+
+  def specification do
+    %Action{
+      name: "trigger",
+      display_name: "Manual Trigger",
+      description: "Simple trigger for testing",
+      type: :trigger,
+      module: __MODULE__,
+      input_ports: [],
+      output_ports: ["main"]
+    }
+  end
+
   @impl true
   def execute(params, _context) do
     {:ok, params}
