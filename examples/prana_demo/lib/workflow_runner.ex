@@ -79,6 +79,8 @@ defmodule PranaDemo.WorkflowRunner do
   end
 
   defp handle_result(result) do
+    IO.inspect(">>> Handler result")
+
     case result do
       {:ok, execution} ->
         Logger.info("Workflow completed successfully")
@@ -87,13 +89,28 @@ defmodule PranaDemo.WorkflowRunner do
 
       {:suspend, execution} ->
         Logger.info("Workflow suspended")
-        # Update execution in storage
-        ETSStorage.update_execution(execution)
-        handle_suspend(execution)
+
+        case handle_suspend(execution) do
+          {:resume, updated_execution, resume_data} ->
+            Logger.info("Resuming execution immediately")
+            ETSStorage.update_execution(updated_execution)
+
+            GraphExecutor.resume_workflow(updated_execution, resume_data)
+            |> handle_result()
+
+          {:wait, updated_execution} ->
+            Logger.info("Execution suspended, waiting for external trigger")
+            ETSStorage.update_execution(updated_execution)
+            {:ok, updated_execution}
+
+          {:error, reason} ->
+            Logger.error("Suspension handling failed: #{inspect(reason)}")
+            update_execution_db(execution, :failed)
+            {:error, execution}
+        end
 
       {:error, execution} ->
         Logger.error("Workflow execution failed")
-        IO.inspect(execution, label: "Execution Error")
         update_execution_db(execution, :failed)
         {:error, execution}
     end
@@ -101,8 +118,8 @@ defmodule PranaDemo.WorkflowRunner do
 
   defp handle_suspend(execution) do
     case execution.suspension_type do
-      # Handle wait operations (timer, scheduler, webhook)
-      suspend_type when suspend_type in [:timer, :scheduler, :webhook] ->
+      # Handle wait operations (timer, scheduler, webhook, interval)
+      suspend_type when suspend_type in [:timer, :scheduler, :webhook, :interval] ->
         Logger.info("Handling wait suspension: #{suspend_type}")
         handle_wait_suspension(execution)
 
@@ -125,7 +142,7 @@ defmodule PranaDemo.WorkflowRunner do
 
       nil ->
         Logger.info("No suspension type specified")
-        {:ok, :suspended}
+        {:wait, execution}
     end
   end
 
@@ -137,6 +154,9 @@ defmodule PranaDemo.WorkflowRunner do
       :timer ->
         schedule_timer_resume(execution)
 
+      :interval ->
+        schedule_interval_resume(execution)
+
       :scheduler ->
         schedule_cron_resume(execution)
 
@@ -144,7 +164,7 @@ defmodule PranaDemo.WorkflowRunner do
         setup_webhook_listener(execution)
     end
 
-    {:ok, :suspended}
+    {:wait, execution}
   end
 
   defp handle_sub_workflow_suspension(execution) do
@@ -166,7 +186,8 @@ defmodule PranaDemo.WorkflowRunner do
         # 3. Resume parent workflow with sub-workflow result
         Logger.info("TODO: Load sub-workflow #{workflow_id} and execute synchronously")
         Logger.info("TODO: Resume parent execution with sub-workflow result")
-        {:ok, :suspended}
+        # For now, treat as wait until implemented
+        {:wait, execution}
 
       "async" ->
         # Enqueue for execution and suspend parent
@@ -178,7 +199,7 @@ defmodule PranaDemo.WorkflowRunner do
         # 3. When sub-workflow completes, resume parent execution
         Logger.info("TODO: Enqueue sub-workflow #{workflow_id} for async execution")
         Logger.info("TODO: Save parent execution suspension state")
-        {:ok, :suspended}
+        {:wait, execution}
 
       "fire_and_forget" ->
         # Enqueue for execution and continue parent
@@ -189,7 +210,9 @@ defmodule PranaDemo.WorkflowRunner do
         # 2. Resume parent workflow immediately with placeholder result
         Logger.info("TODO: Enqueue sub-workflow #{workflow_id} for fire-and-forget execution")
         Logger.info("TODO: Resume parent execution immediately")
-        {:ok, :suspended}
+        # Fire-and-forget should resume immediately with placeholder result
+        placeholder_result = %{"sub_workflow_status" => "enqueued", "workflow_id" => workflow_id}
+        {:resume, execution, placeholder_result}
 
       _ ->
         Logger.error("Unknown execution mode: #{execution_mode}")
@@ -209,6 +232,14 @@ defmodule PranaDemo.WorkflowRunner do
   defp schedule_timer_resume(execution) do
     delay_ms = execution.suspension_data.delay_ms
     Logger.info("Scheduling timer resume in #{delay_ms}ms")
+
+    # In a real application, use your preferred scheduling mechanism
+    Process.send_after(self(), {:resume_workflow, execution, %{}}, delay_ms)
+  end
+
+  defp schedule_interval_resume(execution) do
+    delay_ms = execution.suspension_data.duration_ms
+    Logger.info("Scheduling interval resume in #{delay_ms}ms")
 
     # In a real application, use your preferred scheduling mechanism
     Process.send_after(self(), {:resume_workflow, execution, %{}}, delay_ms)

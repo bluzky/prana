@@ -33,18 +33,34 @@ The Wait integration provides comprehensive time-based workflow control capabili
 - `webhook_config`: Additional webhook configuration (optional)
 
 **Returns**:
-- `{:suspend, :interval | :schedule | :webhook, suspend_data}` to suspend execution
+- `{:ok, %{}}` for interval mode with duration < 60 seconds (uses process sleep)
+- `{:suspend, :interval | :schedule | :webhook, suspend_data}` to suspend execution for longer durations/other modes
 - `{:error, reason, "error"}` if configuration is invalid
+
+**Sleep vs Suspend Behavior (Interval Mode)**:
+- **Short intervals** (< 60 seconds): Uses `Process.sleep()` and returns immediately with `{:ok, %{}}`
+- **Long intervals** (≥ 60 seconds): Returns suspension data for non-blocking execution via scheduler
 
 **Examples**:
 
-*Interval Wait - 5 minutes*:
+*Short Interval Wait - 30 seconds (uses sleep)*:
+```elixir
+%{
+  "mode" => "interval",
+  "duration" => 30,
+  "unit" => "seconds"
+}
+# Returns: {:ok, %{}} after sleeping for 30 seconds
+```
+
+*Long Interval Wait - 5 minutes (uses suspension)*:
 ```elixir
 %{
   "mode" => "interval",
   "duration" => 5,
   "unit" => "minutes"
 }
+# Returns: {:suspend, :interval, suspension_data} for non-blocking execution
 ```
 
 *Schedule Wait - Next Monday 9 AM*:

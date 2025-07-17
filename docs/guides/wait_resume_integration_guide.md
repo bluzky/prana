@@ -27,8 +27,10 @@ This guide demonstrates how to implement webhook-based wait/resume workflows usi
 The Wait integration supports three modes:
 
 - **`interval`**: Wait for a specific duration (e.g., 5 minutes, 2 hours)
-- **`schedule`**: Wait until a specific datetime (e.g., next Monday at 9 AM)
-- **`webhook`**: Wait for an external HTTP request (e.g., user approval, payment callback)
+  - **Short intervals** (< 60 seconds): Uses `Process.sleep()` - workflow blocks but completes synchronously
+  - **Long intervals** (≥ 60 seconds): Uses suspension - workflow suspends and resumes via scheduler
+- **`schedule`**: Wait until a specific datetime (e.g., next Monday at 9 AM) - always uses suspension
+- **`webhook`**: Wait for an external HTTP request (e.g., user approval, payment callback) - always uses suspension
 
 ### Resume URLs
 

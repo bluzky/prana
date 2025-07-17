@@ -494,7 +494,7 @@ defmodule PranaDemo.DemoWorkflow do
 
   Flow: trigger -> set_data -> wait (timer) -> process_after_wait
   """
-  def create_wait_demo do
+  def create_wait_demo(duration_ms \\ 2000) do
     # Create workflow
     workflow = Workflow.new("Wait Demo Workflow", "Demonstrates wait operations with timers")
 
@@ -509,7 +509,8 @@ defmodule PranaDemo.DemoWorkflow do
         %{
           "data" => %{
             "task_id" => "$input.task_id",
-            "started_at" => "$input.started_at"
+            "started_at" => "$input.started_at",
+            "duration_ms" => duration_ms
           }
         },
         "set_data"
@@ -522,8 +523,7 @@ defmodule PranaDemo.DemoWorkflow do
         "wait",
         %{
           "mode" => "interval",
-          # 2 second delay
-          "duration" => 2000,
+          "duration" => duration_ms,
           "unit" => "ms"
         },
         "wait_timer"
@@ -567,6 +567,26 @@ defmodule PranaDemo.DemoWorkflow do
       end)
 
     workflow
+  end
+
+  @doc """
+  Create a short wait demo workflow (< 60s) that should complete immediately.
+
+  Flow: trigger -> set_data -> wait (30s) -> process_after_wait
+  """
+  def create_short_wait_demo do
+    # 30 seconds
+    create_wait_demo(5_000)
+  end
+
+  @doc """
+  Create a long wait demo workflow (>= 60s) that should suspend.
+
+  Flow: trigger -> set_data -> wait (120s) -> process_after_wait
+  """
+  def create_long_wait_demo do
+    # 2 minutes
+    create_wait_demo(120_000)
   end
 
   @doc """
@@ -728,6 +748,135 @@ defmodule PranaDemo.DemoWorkflow do
   end
 
   @doc """
+  Run a short wait workflow demonstration (< 60s should return ok).
+  """
+  def run_short_wait_demo do
+    Logger.info("Starting short wait workflow demo (30s)")
+
+    # Start storage
+    case WorkflowRunner.start_storage() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    # Create and store workflow
+    workflow = create_short_wait_demo()
+    {:ok, _} = ETSStorage.store_workflow(workflow)
+
+    # Input data
+    input_data = %{
+      "task_id" => "short_wait_task_123",
+      "started_at" => DateTime.utc_now()
+    }
+
+    # Execute workflow
+    Logger.info("Executing workflow with 30 second wait (< 60s, should return ok)...")
+    start_time = System.monotonic_time(:millisecond)
+
+    case WorkflowRunner.execute_workflow(workflow, input_data, %{}) do
+      {:ok, execution} ->
+        end_time = System.monotonic_time(:millisecond)
+        duration = end_time - start_time
+        Logger.info("Short wait workflow completed successfully!")
+        Logger.info("Total execution time: #{duration}ms")
+        Logger.info("Final execution status: #{execution.status}")
+        Logger.info("Execution ID: #{execution.id}")
+        {:ok, execution}
+
+      {:error, reason} ->
+        Logger.error("Short wait workflow failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Run a long wait workflow demonstration (>= 60s should return suspend).
+  """
+  def run_long_wait_demo do
+    Logger.info("Starting long wait workflow demo (120s)")
+
+    # Start storage
+    case WorkflowRunner.start_storage() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    # Create and store workflow
+    workflow = create_long_wait_demo()
+    {:ok, _} = ETSStorage.store_workflow(workflow)
+
+    # Input data
+    input_data = %{
+      "task_id" => "long_wait_task_123",
+      "started_at" => DateTime.utc_now()
+    }
+
+    # Execute workflow
+    Logger.info("Executing workflow with 120 second wait (>= 60s, should suspend)...")
+    start_time = System.monotonic_time(:millisecond)
+
+    case WorkflowRunner.execute_workflow(workflow, input_data, %{}) do
+      {:ok, execution} when is_struct(execution) ->
+        end_time = System.monotonic_time(:millisecond)
+        duration = end_time - start_time
+        Logger.info("Long wait workflow completed unexpectedly!")
+        Logger.info("Total execution time: #{duration}ms")
+        Logger.info("Final execution status: #{execution.status}")
+        Logger.info("Execution ID: #{execution.id}")
+        {:ok, execution}
+
+      {:ok, :suspended} ->
+        end_time = System.monotonic_time(:millisecond)
+        duration = end_time - start_time
+        Logger.info("Long wait workflow suspended as expected!")
+        Logger.info("Time to suspension: #{duration}ms")
+        Logger.info("This demonstrates proper wait suspension behavior for long intervals")
+        {:ok, :suspended}
+
+      {:error, {:suspend, execution}} ->
+        end_time = System.monotonic_time(:millisecond)
+        duration = end_time - start_time
+
+        Logger.info(
+          "Long wait workflow suspended as expected - GraphExecutor returned suspension!"
+        )
+
+        Logger.info("Time to suspension: #{duration}ms")
+        Logger.info("Suspension type: #{execution.suspension_type}")
+        Logger.info("This demonstrates proper wait suspension behavior for long intervals")
+        {:ok, :suspended}
+
+      {:error, reason} ->
+        Logger.error("Long wait workflow failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Run both short and long wait demos to demonstrate suspension behavior.
+  """
+  def run_wait_suspension_demos do
+    Logger.info("Running wait suspension demos")
+
+    results = [
+      {"Short Wait (30s)", run_short_wait_demo()},
+      {"Long Wait (120s)", run_long_wait_demo()}
+    ]
+
+    Logger.info("\\n=== Wait Suspension Demo Results ===")
+
+    Enum.each(results, fn {name, result} ->
+      case result do
+        {:ok, :suspended} -> Logger.info("✓ #{name}: SUSPENDED as expected")
+        {:ok, _} -> Logger.info("✓ #{name}: COMPLETED as expected")
+        {:error, _} -> Logger.error("✗ #{name}: FAILED")
+      end
+    end)
+
+    results
+  end
+
+  @doc """
   Run all demos in sequence.
   """
   def run_all_demos do
@@ -738,12 +887,15 @@ defmodule PranaDemo.DemoWorkflow do
       {"Conditional", run_conditional_demo()},
       {"Loop", run_loop_demo()},
       {"Sub Workflow", run_sub_workflow_demo()},
-      {"Wait", run_wait_demo()}
+      {"Wait", run_wait_demo()},
+      {"Wait Suspension", run_wait_suspension_demos()}
     ]
 
     Logger.info("Demo results:")
 
     Enum.each(results, fn {name, result} ->
+      IO.inspect(name)
+
       case result do
         {:ok, _} -> Logger.info("✓ #{name} demo: SUCCESS")
         {:error, _} -> Logger.error("✗ #{name} demo: FAILED")

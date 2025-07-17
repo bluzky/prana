@@ -69,13 +69,13 @@ defmodule Prana.Integrations.Wait do
   - {:suspend, :interval | :schedule | :webhook, suspend_data} to suspend execution
   - {:error, reason, "error"} if configuration is invalid
   """
-  def wait(input_map) do
-    mode = Map.get(input_map, "mode")
+  def wait(params) do
+    mode = Map.get(params, "mode")
 
     case mode do
-      "interval" -> wait_interval(input_map)
-      "schedule" -> wait_schedule(input_map)
-      "webhook" -> wait_webhook(input_map)
+      "interval" -> wait_interval(params)
+      "schedule" -> wait_schedule(params)
+      "webhook" -> wait_webhook(params)
       nil -> {:error, %{type: "config_error", message: "mode is required"}, "error"}
       _ -> {:error, %{type: "config_error", message: "mode must be 'interval', 'schedule', or 'webhook'"}, "error"}
     end
@@ -84,21 +84,28 @@ defmodule Prana.Integrations.Wait do
   @doc """
   Wait interval mode - suspend execution for a specified duration
   """
-  def wait_interval(input_map) do
-    duration = Map.get(input_map, "duration")
-    unit = Map.get(input_map, "unit", "ms")
+  def wait_interval(params) do
+    duration = Map.get(params, "duration")
+    unit = Map.get(params, "unit", "ms")
 
     with :ok <- validate_duration(duration),
          :ok <- validate_unit(unit),
          {:ok, duration_ms} <- convert_to_milliseconds(duration, unit) do
-      interval_data = %{
-        mode: "interval",
-        duration_ms: duration_ms,
-        started_at: DateTime.utc_now(),
-        resume_at: DateTime.add(DateTime.utc_now(), duration_ms, :millisecond)
-      }
+      # if duration < 60 then sleep, otherwise return suspend
+      if duration_ms < 60_000 do
+        # If duration is less than 60 seconds, we can just sleep
+        Process.sleep(duration_ms)
+        {:ok, %{}}
+      else
+        interval_data = %{
+          mode: "interval",
+          duration_ms: duration_ms,
+          started_at: DateTime.utc_now(),
+          resume_at: DateTime.add(DateTime.utc_now(), duration_ms, :millisecond)
+        }
 
-      {:suspend, :interval, interval_data}
+        {:suspend, :interval, interval_data}
+      end
     else
       {:error, reason} ->
         {:error, %{type: "interval_config_error", message: reason}, "error"}
@@ -108,9 +115,9 @@ defmodule Prana.Integrations.Wait do
   @doc """
   Wait schedule mode - suspend execution until a specific datetime
   """
-  def wait_schedule(input_map) do
-    schedule_at = Map.get(input_map, "schedule_at")
-    timezone = Map.get(input_map, "timezone", "UTC")
+  def wait_schedule(params) do
+    schedule_at = Map.get(params, "schedule_at")
+    timezone = Map.get(params, "timezone", "UTC")
 
     with :ok <- validate_schedule_at(schedule_at),
          {:ok, schedule_datetime} <- parse_schedule_datetime(schedule_at, timezone),
@@ -136,9 +143,9 @@ defmodule Prana.Integrations.Wait do
   @doc """
   Wait webhook mode - suspend execution until webhook is received
   """
-  def wait_webhook(input_map) do
-    timeout_hours = Map.get(input_map, "timeout_hours", 24)
-    webhook_config = Map.get(input_map, "webhook_config", %{})
+  def wait_webhook(params) do
+    timeout_hours = Map.get(params, "timeout_hours", 24)
+    webhook_config = Map.get(params, "webhook_config", %{})
 
     case validate_timeout_hours(timeout_hours) do
       :ok ->
@@ -146,8 +153,8 @@ defmodule Prana.Integrations.Wait do
         expires_at = DateTime.add(now, timeout_hours * 3600, :second)
 
         # Try to get preparation data for webhook URLs
-        preparation_data = Map.get(input_map, "$preparation", %{})
-        current_node_preparation = get_current_node_preparation(input_map, preparation_data)
+        preparation_data = Map.get(params, "$preparation", %{})
+        current_node_preparation = get_current_node_preparation(params, preparation_data)
 
         webhook_data = %{
           mode: "webhook",
@@ -171,10 +178,10 @@ defmodule Prana.Integrations.Wait do
   # ============================================================================
 
   # Get preparation data for current node
-  defp get_current_node_preparation(input_map, preparation_data) do
+  defp get_current_node_preparation(params, preparation_data) do
     # Try to determine current node ID from context
     # This could be from a custom_id field or node_id in the input
-    node_id = Map.get(input_map, "node_id") || Map.get(input_map, "custom_id") || "current_node"
+    node_id = Map.get(params, "node_id") || Map.get(params, "custom_id") || "current_node"
 
     case Map.get(preparation_data, node_id) do
       nil -> %{}
@@ -253,13 +260,13 @@ defmodule Prana.Integrations.Wait.WaitAction do
   @behaviour Prana.Behaviour.Action
 
   @impl true
-  def prepare(input_map) do
-    mode = Map.get(input_map, "mode")
+  def prepare(node) do
+    mode = Map.get(node.params, "mode")
 
     case mode do
-      "webhook" -> prepare_webhook(input_map)
-      "interval" -> prepare_interval(input_map)
-      "schedule" -> prepare_schedule(input_map)
+      "webhook" -> prepare_webhook(node.params)
+      "interval" -> prepare_interval(node.params)
+      "schedule" -> prepare_schedule(node.params)
       nil -> {:error, "mode is required"}
       _ -> {:error, "mode must be 'interval', 'schedule', or 'webhook'"}
     end
@@ -295,15 +302,15 @@ defmodule Prana.Integrations.Wait.WaitAction do
   end
 
   # Webhook mode preparation - generates resume URLs
-  defp prepare_webhook(input_map) do
-    timeout_hours = Map.get(input_map, "timeout_hours", 24)
-    webhook_config = Map.get(input_map, "webhook_config", %{})
-    base_url = Map.get(input_map, "base_url")
+  defp prepare_webhook(params) do
+    timeout_hours = Map.get(params, "timeout_hours", 24)
+    webhook_config = Map.get(params, "webhook_config", %{})
+    base_url = Map.get(params, "base_url")
 
     case validate_webhook_prepare_config(timeout_hours, base_url) do
       :ok ->
         # Access execution context through the enriched input
-        execution_id = get_context_value(input_map, "$execution.id", "unknown_execution")
+        execution_id = get_context_value(params, "$execution.id", "unknown_execution")
 
         # Generate unique resume ID for this webhook
         resume_id = Prana.Webhook.generate_resume_id(execution_id)
@@ -331,9 +338,9 @@ defmodule Prana.Integrations.Wait.WaitAction do
   end
 
   # Interval mode preparation - calculates timing
-  defp prepare_interval(input_map) do
-    duration = Map.get(input_map, "duration")
-    unit = Map.get(input_map, "unit", "ms")
+  defp prepare_interval(params) do
+    duration = Map.get(params, "duration")
+    unit = Map.get(params, "unit", "ms")
 
     case validate_interval_config(duration, unit) do
       {:ok, duration_ms} ->
@@ -355,9 +362,9 @@ defmodule Prana.Integrations.Wait.WaitAction do
   end
 
   # Schedule mode preparation - validates and parses schedule
-  defp prepare_schedule(input_map) do
-    schedule_at = Map.get(input_map, "schedule_at")
-    timezone = Map.get(input_map, "timezone", "UTC")
+  defp prepare_schedule(params) do
+    schedule_at = Map.get(params, "schedule_at")
+    timezone = Map.get(params, "timezone", "UTC")
 
     case validate_schedule_config(schedule_at, timezone) do
       {:ok, schedule_datetime} ->
@@ -401,16 +408,16 @@ defmodule Prana.Integrations.Wait.WaitAction do
   end
 
   # Helper to safely get context values from enriched input
-  defp get_context_value(input_map, path, default) do
+  defp get_context_value(params, path, default) do
     case String.split(path, ".", parts: 2) do
       ["$execution", field] ->
-        case Map.get(input_map, "$execution") do
+        case Map.get(params, "$execution") do
           nil -> default
           execution_context -> Map.get(execution_context, field, default)
         end
 
       _ ->
-        Map.get(input_map, path, default)
+        Map.get(params, path, default)
     end
   end
 
