@@ -25,7 +25,7 @@ defmodule Prana.MixProject do
       {:req, "~> 0.5"},
       {:skema, "~> 1.0"},
       {:uuid, "~> 1.1"},
-      {:styler, "~> 0.11", only: [:dev, :test], runtime: false},
+      {:styler, "~> 1.5", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
 
       # {:dep_from_hexpm, "~> 0.3.0"},
