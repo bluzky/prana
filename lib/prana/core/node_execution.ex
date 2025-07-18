@@ -15,7 +15,7 @@ defmodule Prana.NodeExecution do
     field(:started_at, :datetime)
     field(:completed_at, :datetime)
     field(:duration_ms, :integer)
-    field(:suspension_type, :atom)
+    field(:suspension_type, :string)
     field(:suspension_data, :any)
     field(:execution_index, :integer, default: 0)
     field(:run_index, :integer, default: 0)
@@ -71,6 +71,60 @@ defmodule Prana.NodeExecution do
         completed_at: DateTime.utc_now(),
         duration_ms: duration
     }
+  end
+
+  @doc """
+  Loads a node execution from a map with string keys, converting to proper types.
+  
+  Automatically converts:
+  - String keys to atoms where appropriate (status)
+  - DateTime strings to DateTime structs
+  - Preserves all execution state and output data
+  
+  ## Examples
+  
+      node_execution_map = %{
+        "node_key" => "api_call",
+        "status" => "completed",
+        "output_data" => %{"user_id" => 123, "email" => "user@example.com"},
+        "output_port" => "success",
+        "started_at" => "2024-01-01T10:00:00Z",
+        "completed_at" => "2024-01-01T10:05:00Z",
+        "duration_ms" => 5000
+      }
+      
+      node_execution = NodeExecution.from_map(node_execution_map)
+      # Status is converted to atom, DateTime strings to DateTime structs
+  """
+  def from_map(data) when is_map(data) do
+    {:ok, data} = Skema.load(data, __MODULE__)
+    data
+  end
+
+  @doc """
+  Converts a node execution to a JSON-compatible map.
+  
+  Preserves all execution state including output data, timing, and error information
+  for round-trip serialization.
+  
+  ## Examples
+  
+      node_execution = %NodeExecution{
+        node_key: "api_call",
+        status: :completed,
+        output_data: %{"user_id" => 123, "email" => "user@example.com"},
+        output_port: "success",
+        started_at: ~U[2024-01-01 10:00:00Z],
+        completed_at: ~U[2024-01-01 10:05:00Z],
+        duration_ms: 5000
+      }
+      
+      node_execution_map = NodeExecution.to_map(node_execution)
+      json_string = Jason.encode!(node_execution_map)
+      # Ready for database storage or API transport
+  """
+  def to_map(%__MODULE__{} = node_execution) do
+    Map.from_struct(node_execution)
   end
 
   defp calculate_duration(nil), do: nil

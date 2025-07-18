@@ -32,11 +32,98 @@ defmodule Prana.Workflow do
   end
 
   @doc """
-  Loads a workflow from a map
+  Loads a workflow from a map with string keys, converting nested structures to proper types.
+  
+  Automatically converts:
+  - Nested connection maps to Connection structs
+  - Node maps to Node structs (via Skema)
+  - String keys to atoms where appropriate
+  
+  ## Examples
+  
+      workflow_map = %{
+        "id" => "wf_123",
+        "name" => "User Registration",
+        "nodes" => [%{"key" => "validate", "type" => "manual.validate"}],
+        "connections" => %{
+          "validate" => %{
+            "success" => [%{"from" => "validate", "to" => "create_user"}]
+          }
+        }
+      }
+      
+      workflow = Workflow.from_map(workflow_map)
+      # All nested structures are properly converted to structs
   """
   def from_map(data) when is_map(data) do
-    {:ok, data} = Skema.load(data, __MODULE__)
-    data
+    {:ok, workflow} = Skema.load(data, __MODULE__)
+    
+    # Convert nested connection maps to Connection structs
+    connections = convert_connections_to_structs(workflow.connections)
+    
+    %{workflow | connections: connections}
+  end
+
+  @doc """
+  Converts a workflow to a JSON-compatible map with nested structs converted to maps.
+  
+  Automatically converts:
+  - Connection structs to maps
+  - Node structs to maps  
+  - Preserves all data for round-trip serialization
+  
+  ## Examples
+  
+      workflow = %Workflow{
+        id: "wf_123",
+        name: "User Registration",
+        nodes: [%Node{key: "validate", type: "manual.validate"}],
+        connections: %{
+          "validate" => %{
+            "success" => [%Connection{from: "validate", to: "create_user"}]
+          }
+        }
+      }
+      
+      workflow_map = Workflow.to_map(workflow)
+      json_string = Jason.encode!(workflow_map)
+      # Ready for storage or API transport
+  """
+  def to_map(%__MODULE__{} = workflow) do
+    workflow
+    |> Map.from_struct()
+    |> Map.update!(:nodes, fn nodes ->
+      Enum.map(nodes, &Map.from_struct/1)
+    end)
+    |> Map.update!(:connections, fn connections ->
+      convert_connections_to_maps(connections)
+    end)
+  end
+
+  # Convert nested connection maps to Connection structs
+  defp convert_connections_to_structs(connections) when is_map(connections) do
+    Map.new(connections, fn {node_key, ports} ->
+      converted_ports = Map.new(ports, fn {port_name, conns} ->
+        converted_conns = Enum.map(conns, fn conn_map ->
+          Prana.Connection.from_map(conn_map)
+        end)
+        {port_name, converted_conns}
+      end)
+      {node_key, converted_ports}
+    end)
+  end
+
+  # Convert nested Connection structs to maps
+  defp convert_connections_to_maps(connections) when is_map(connections) do
+    Map.new(connections, fn {node_key, ports} ->
+      converted_ports = Map.new(ports, fn {port_name, conns} ->
+        converted_conns = Enum.map(conns, fn conn_struct ->
+          Map.from_struct(conn_struct)
+        end)
+        {port_name, converted_conns}
+      end)
+      {node_key, converted_ports}
+    end)
   end
 
   @doc """

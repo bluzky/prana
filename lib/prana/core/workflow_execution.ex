@@ -286,6 +286,102 @@ defmodule Prana.WorkflowExecution do
     }
   end
 
+  @doc """
+  Loads a workflow execution from a map with string keys, converting nested structures to proper types.
+  
+  Automatically converts:
+  - Nested node_execution maps to NodeExecution structs
+  - String keys to atoms where appropriate (status, execution_mode)
+  - DateTime strings to DateTime structs
+  - Preserves all execution state and audit trail
+  
+  ## Examples
+  
+      execution_map = %{
+        "id" => "exec_123",
+        "workflow_id" => "wf_456",
+        "status" => "suspended",
+        "execution_mode" => "async",
+        "node_executions" => %{
+          "node_1" => [%{
+            "node_key" => "node_1",
+            "status" => "completed",
+            "output_data" => %{"result" => "success"}
+          }]
+        },
+        "started_at" => "2024-01-01T10:00:00Z"
+      }
+      
+      execution = WorkflowExecution.from_map(execution_map)
+      # All nested NodeExecution maps are converted to proper structs
+      # DateTime strings are converted to DateTime structs
+  """
+  def from_map(data) when is_map(data) do
+    {:ok, execution} = Skema.load(data, __MODULE__)
+    
+    # Convert nested node_execution maps to NodeExecution structs
+    node_executions = convert_node_executions_to_structs(execution.node_executions)
+    
+    %{execution | node_executions: node_executions}
+  end
+
+  @doc """
+  Converts a workflow execution to a JSON-compatible map with nested structs converted to maps.
+  
+  Automatically converts:
+  - NodeExecution structs to maps
+  - DateTime structs to ISO8601 strings
+  - Preserves all execution state and audit trail for round-trip serialization
+  
+  ## Examples
+  
+      execution = %WorkflowExecution{
+        id: "exec_123",
+        workflow_id: "wf_456",
+        status: :suspended,
+        execution_mode: :async,
+        node_executions: %{
+          "node_1" => [%NodeExecution{
+            node_key: "node_1",
+            status: :completed,
+            output_data: %{"result" => "success"}
+          }]
+        },
+        started_at: ~U[2024-01-01 10:00:00Z]
+      }
+      
+      execution_map = WorkflowExecution.to_map(execution)
+      json_string = Jason.encode!(execution_map)
+      # Ready for database storage or API transport
+  """
+  def to_map(%__MODULE__{} = execution) do
+    execution
+    |> Map.from_struct()
+    |> Map.update!(:node_executions, fn node_executions ->
+      convert_node_executions_to_maps(node_executions)
+    end)
+  end
+
+  # Convert nested node_execution maps to NodeExecution structs
+  defp convert_node_executions_to_structs(node_executions) when is_map(node_executions) do
+    Map.new(node_executions, fn {node_key, executions} ->
+      converted_executions = Enum.map(executions, fn exec_map ->
+        Prana.NodeExecution.from_map(exec_map)
+      end)
+      {node_key, converted_executions}
+    end)
+  end
+
+  # Convert nested NodeExecution structs to maps
+  defp convert_node_executions_to_maps(node_executions) when is_map(node_executions) do
+    Map.new(node_executions, fn {node_key, executions} ->
+      converted_executions = Enum.map(executions, fn exec_struct ->
+        Map.from_struct(exec_struct)
+      end)
+      {node_key, converted_executions}
+    end)
+  end
+
   defp generate_id do
     UUID.uuid4()
   end
