@@ -52,4 +52,27 @@ defmodule Prana.Core.Error do
       details: details
     }
   end
+
+  @doc """
+  Creates an action error with specific error type preserved in details.
+  This helps maintain backwards compatibility while standardizing the structure.
+
+  ## Parameters
+  - `error_type`: Specific error type (e.g., "config_error", "http_error")
+  - `message`: Human-readable error description
+  - `extra_details`: Optional map with additional context
+
+  ## Examples
+
+      iex> Prana.Core.Error.action_error("config_error", "Invalid mode")
+      %Prana.Core.Error{code: "action_error", message: "Invalid mode", details: %{"error_type" => "config_error"}}
+
+      iex> Prana.Core.Error.action_error("http_error", "Request failed", %{status_code: 404})
+      %Prana.Core.Error{code: "action_error", message: "Request failed", details: %{"error_type" => "http_error", status_code: 404}}
+  """
+  @spec action_error(String.t(), String.t(), map()) :: t()
+  def action_error(error_type, message, extra_details \\ %{}) do
+    details = Map.merge(%{"error_type" => error_type}, extra_details)
+    new("action_error", message, details)
+  end
 end

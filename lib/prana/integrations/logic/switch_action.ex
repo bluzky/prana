@@ -27,6 +27,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   use Prana.Actions.SimpleAction
 
   alias Prana.Action
+  alias Prana.Core.Error
 
   def specification do
     %Action{
@@ -50,7 +51,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
         {:ok, nil, case_port}
 
       :no_match ->
-        {:error, %{type: "no_matching_case", message: "No matching case found"}}
+        {:error, Error.action_error("no_matching_case", "No matching case found")}
     end
   end
 

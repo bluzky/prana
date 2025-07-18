@@ -81,7 +81,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
       end
     else
       {:error, reason} ->
-        {:error, Error.new("action_error", reason), "error"}
+        {:error, Error.action_error("sub_workflow_setup_error", reason), "error"}
     end
   end
 
@@ -103,7 +103,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
       %{"status" => "failed", "error" => error} when failure_strategy == "fail_parent" ->
         # Sub-workflow failed and should fail parent
-        {:error, Error.new("action_error", "Sub-workflow failed", %{sub_workflow_error: error}), "error"}
+        {:error, Error.action_error("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error}), "error"}
 
       %{"status" => "failed", "error" => error} when failure_strategy == "continue" ->
         # Sub-workflow failed but parent should continue
@@ -111,7 +111,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
       %{"status" => "timeout"} when failure_strategy == "fail_parent" ->
         # Sub-workflow timed out and should fail parent
-        {:error, Error.new("action_error", "Sub-workflow execution timed out"), "error"}
+        {:error, Error.action_error("sub_workflow_timeout", "Sub-workflow execution timed out"), "error"}
 
       %{"status" => "timeout"} when failure_strategy == "continue" ->
         # Sub-workflow timed out but parent should continue
