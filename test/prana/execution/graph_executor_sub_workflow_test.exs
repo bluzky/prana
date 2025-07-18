@@ -346,9 +346,9 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         )
 
       assert {:error, error_data} = result
-      assert error_data.type == "invalid_execution_status"
+      assert error_data.code == "invalid_execution_status"
       assert error_data.message == "Can only resume suspended executions"
-      assert error_data.status == :completed
+      assert error_data.details["status"] == :completed
     end
 
     test "returns error for invalid suspended execution" do
@@ -392,7 +392,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         )
 
       assert {:error, error_data} = result
-      assert error_data.type == "invalid_suspended_execution"
+      assert error_data.code == "invalid_suspended_execution"
       assert error_data.message == "Cannot find suspended node ID"
     end
   end

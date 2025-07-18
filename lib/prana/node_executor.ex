@@ -8,6 +8,7 @@ defmodule Prana.NodeExecutor do
   - Output processing and port determination
   - Basic error handling
   """
+  alias Prana.Core.Error
   alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecution
@@ -103,11 +104,7 @@ defmodule Prana.NodeExecutor do
   end
 
   defp build_params_error(type, reason, params) do
-    %{
-      "type" => type,
-      "reason" => reason,
-      "params" => params
-    }
+    Error.new("params_error", reason, %{"error_type" => type, "params" => params})
   end
 
   # =============================================================================

@@ -837,7 +837,7 @@ defmodule Prana.WorkflowExecution do
           {:cont, {:ok, updated_prep_data}}
 
         {:error, reason} ->
-          {:halt, {:error, %{type: "action_preparation_failed", node_key: node.key, reason: reason}}}
+          {:halt, {:error, Error.new("action_preparation_failed", "Action preparation failed", %{"node_key" => node.key, "reason" => reason})}}
       end
     end)
   end

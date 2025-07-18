@@ -452,7 +452,7 @@ defmodule Prana.GraphExecutor do
   end
 
   def resume_workflow(%WorkflowExecution{status: status}, _resume_data, _options) do
-    {:error, %{type: "invalid_execution_status", message: "Can only resume suspended executions", status: status}}
+    {:error, Error.new("invalid_execution_status", "Can only resume suspended executions", %{"status" => status})}
   end
 
   # Prepare execution for resume by rebuilding runtime state
@@ -465,7 +465,7 @@ defmodule Prana.GraphExecutor do
   # Validate that the suspended execution has a valid suspended node ID
   defp validate_suspended_node_id(prepared_execution) do
     case prepared_execution.suspended_node_id do
-      nil -> {:error, %{type: "invalid_suspended_execution", message: "Cannot find suspended node ID"}}
+      nil -> {:error, Error.new("invalid_suspended_execution", "Cannot find suspended node ID")}
       suspended_node_id -> {:ok, suspended_node_id}
     end
   end
@@ -492,7 +492,7 @@ defmodule Prana.GraphExecutor do
           {:error, reason}
       end
     else
-      {:error, %{type: "suspended_node_not_found", node_key: suspended_node_id}}
+      {:error, Error.new("suspended_node_not_found", "Suspended node not found", %{"node_key" => suspended_node_id})}
     end
   end
 end

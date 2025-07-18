@@ -155,7 +155,7 @@ defmodule Prana.Integrations.LogicTest do
 
       context = %{}
 
-      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} =
+      assert {:error, %Prana.Core.Error{code: "action_error", message: "No matching case found", details: %{"error_type" => "no_matching_case"}}} =
                SwitchAction.execute(params, context)
     end
 
@@ -163,7 +163,7 @@ defmodule Prana.Integrations.LogicTest do
       params = %{"cases" => []}
       context = %{}
 
-      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} =
+      assert {:error, %Prana.Core.Error{code: "action_error", message: "No matching case found", details: %{"error_type" => "no_matching_case"}}} =
                SwitchAction.execute(params, context)
     end
 
@@ -171,7 +171,7 @@ defmodule Prana.Integrations.LogicTest do
       params = %{}
       context = %{}
 
-      assert {:error, %{type: "no_matching_case", message: "No matching case found"}} =
+      assert {:error, %Prana.Core.Error{code: "action_error", message: "No matching case found", details: %{"error_type" => "no_matching_case"}}} =
                SwitchAction.execute(params, context)
     end
 
