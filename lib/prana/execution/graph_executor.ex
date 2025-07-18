@@ -181,7 +181,7 @@ defmodule Prana.GraphExecutor do
         {:suspend, suspended_execution}
 
       {:error, failed_execution} ->
-        Middleware.call(:execution_failed, %{execution: failed_execution, reason: failed_execution.error_data})
+        Middleware.call(:execution_failed, %{execution: failed_execution, reason: failed_execution.error})
         {:error, failed_execution}
     end
   end
@@ -192,7 +192,7 @@ defmodule Prana.GraphExecutor do
       execution_graph
       |> WorkflowExecution.new("graph_executor", execution_graph.variables)
       |> WorkflowExecution.start()
-      |> WorkflowExecution.fail()
+      |> WorkflowExecution.fail(reason)
 
     Middleware.call(:execution_failed, %{execution: execution, reason: reason})
     {:error, execution}
@@ -210,7 +210,7 @@ defmodule Prana.GraphExecutor do
       execution_graph
       |> WorkflowExecution.new("graph_executor", execution_graph.variables)
       |> WorkflowExecution.start()
-      |> WorkflowExecution.fail()
+      |> WorkflowExecution.fail(reason)
 
     Middleware.call(:execution_failed, %{execution: execution, reason: reason})
     {:error, execution}
@@ -224,7 +224,13 @@ defmodule Prana.GraphExecutor do
     max_iterations = WorkflowExecution.get_max_iterations(execution)
 
     if iteration_count >= max_iterations do
-      {:error, WorkflowExecution.fail(execution)}
+      error_reason = %{
+        type: "infinite_loop_protection",
+        message: "Workflow execution exceeded maximum iterations (#{max_iterations})",
+        iteration_count: iteration_count,
+        max_iterations: max_iterations
+      }
+      {:error, WorkflowExecution.fail(execution, error_reason)}
     else
       # Increment iteration counter in both runtime and persistent metadata
       execution = WorkflowExecution.increment_iteration_count(execution)
@@ -256,7 +262,13 @@ defmodule Prana.GraphExecutor do
 
     if Enum.empty?(ready_nodes) do
       # No ready nodes but workflow not complete - likely an error condition
-      {:error, WorkflowExecution.fail(execution)}
+      error_reason = %{
+        type: "no_ready_nodes",
+        message: "No ready nodes found but workflow is not complete",
+        current_status: execution.status,
+        completed_nodes: Map.keys(execution.node_executions)
+      }
+      {:error, WorkflowExecution.fail(execution, error_reason)}
     else
       # Select single node to execute, prioritizing branch completion
       selected_node = select_node_for_branch_following(ready_nodes, execution.__runtime)
@@ -286,10 +298,17 @@ defmodule Prana.GraphExecutor do
 
         {%NodeExecution{status: :failed} = node_execution, updated_execution} ->
           # Update execution with failed node and mark execution as failed
+          error_reason = %{
+            type: "node_execution_failed",
+            message: "Node execution failed: #{selected_node.key}",
+            node_key: selected_node.key,
+            node_error: node_execution.error_data
+          }
+          
           failed_execution =
             updated_execution
             |> WorkflowExecution.fail_node(node_execution)
-            |> WorkflowExecution.fail()
+            |> WorkflowExecution.fail(error_reason)
 
           {:error, failed_execution}
 
@@ -362,6 +381,18 @@ defmodule Prana.GraphExecutor do
       {:ok, result_node_execution} ->
         # Complete the node execution at workflow level
         updated_execution = Prana.WorkflowExecution.complete_node(execution, result_node_execution)
+        # Increment execution index for next node
+        final_execution = %{updated_execution | current_execution_index: execution_index + 1}
+        Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
+        {result_node_execution, final_execution}
+
+      {:ok, result_node_execution, shared_state_updates} ->
+        # Complete the node execution at workflow level
+        updated_execution =
+          execution
+          |> Prana.WorkflowExecution.complete_node(result_node_execution)
+          |> Prana.WorkflowExecution.update_shared_state(shared_state_updates)
+
         # Increment execution index for next node
         final_execution = %{updated_execution | current_execution_index: execution_index + 1}
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})

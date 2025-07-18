@@ -6,12 +6,8 @@ defmodule Prana.Integrations.Manual do
   @behaviour Prana.Behaviour.Integration
 
   alias Prana.Integration
-  alias Prana.Integrations.Manual.AttemptOperationAction
-  alias Prana.Integrations.Manual.IncrementAction
-  alias Prana.Integrations.Manual.IncrementRetryAction
   alias Prana.Integrations.Manual.ProcessAdultAction
   alias Prana.Integrations.Manual.ProcessMinorAction
-  alias Prana.Integrations.Manual.SetDataAction
   alias Prana.Integrations.Manual.TriggerAction
 
   @impl true
@@ -25,11 +21,7 @@ defmodule Prana.Integrations.Manual do
       actions: %{
         "trigger" => TriggerAction.specification(),
         "process_adult" => ProcessAdultAction.specification(),
-        "process_minor" => ProcessMinorAction.specification(),
-        "set_data" => SetDataAction.specification(),
-        "attempt_operation" => AttemptOperationAction.specification(),
-        "increment_retry" => IncrementRetryAction.specification(),
-        "increment" => IncrementAction.specification()
+        "process_minor" => ProcessMinorAction.specification()
       }
     }
   end

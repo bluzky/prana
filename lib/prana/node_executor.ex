@@ -24,11 +24,13 @@ defmodule Prana.NodeExecutor do
 
   ## Returns
   - `{:ok, node_execution}` - Successful execution
+  - `{:ok, node_execution, shared_state_updates}` - Successful execution with shared state updates
   - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
   @spec execute_node(Node.t(), Prana.WorkflowExecution.t(), map(), integer(), integer()) ::
           {:ok, NodeExecution.t()}
+          | {:ok, NodeExecution.t(), map()}
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
   def execute_node(
@@ -258,12 +260,12 @@ defmodule Prana.NodeExecutor do
       {:suspend, suspension_type, suspend_data} when is_atom(suspension_type) ->
         {:suspend, suspension_type, suspend_data}
 
-      {:ok, data, port, context} when is_binary(port) and is_map(context) ->
-        handle_success_with_port_and_context(data, port, context, action)
+      {:ok, data, port, state_updates} when is_binary(port) and is_map(state_updates) ->
+        handle_success_with_port_and_state(data, port, state_updates, action)
 
-      {:ok, data, context} when is_map(context) ->
+      {:ok, data, state_updates} when is_map(state_updates) ->
         port = get_default_success_port(action)
-        {:ok, data, port, context}
+        handle_success_with_port_and_state(data, port, state_updates, action)
 
       {:ok, data, port} when is_binary(port) ->
         handle_success_with_port(data, port, action)
@@ -284,9 +286,9 @@ defmodule Prana.NodeExecutor do
     end
   end
 
-  defp handle_success_with_port_and_context(data, port, context, action) do
+  defp handle_success_with_port_and_state(data, port, state_updates, action) do
     if valid_port?(port, action) do
-      {:ok, data, port, context}
+      {:ok, data, port, state_updates}
     else
       {:error, build_invalid_port_error(port, action)}
     end
@@ -353,9 +355,14 @@ defmodule Prana.NodeExecutor do
         completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
         {:ok, completed_execution}
 
-      {:ok, output_data, output_port, _context} ->
+      {:ok, output_data, output_port, state_updates} ->
         completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-        {:ok, completed_execution}
+        # state_updates is the state map directly
+        if map_size(state_updates) > 0 do
+          {:ok, completed_execution, state_updates}
+        else
+          {:ok, completed_execution}
+        end
 
       {:suspend, suspension_type, suspend_data} ->
         suspended_execution = suspend_node_execution(node_execution, suspension_type, suspend_data)
@@ -406,7 +413,8 @@ defmodule Prana.NodeExecutor do
         "execution_index" => node_execution.execution_index,
         "id" => execution.id,
         "mode" => execution.execution_mode,
-        "preparation" => execution.preparation_data
+        "preparation" => execution.preparation_data,
+        "state" => execution.__runtime["shared_state"] || %{}
       }
     }
   end
@@ -418,9 +426,9 @@ defmodule Prana.NodeExecutor do
   @spec get_default_success_port(Prana.Action.t()) :: String.t()
   defp get_default_success_port(%Prana.Action{output_ports: ports}) do
     cond do
-      "output" in ports -> "output"
+      "main" in ports -> "main"
       length(ports) > 0 -> List.first(ports)
-      true -> "output"
+      true -> "main"
     end
   end
 
@@ -429,7 +437,6 @@ defmodule Prana.NodeExecutor do
     cond do
       "error" in ports -> "error"
       "failure" in ports -> "failure"
-      length(ports) > 1 -> List.last(ports)
       true -> "error"
     end
   end
