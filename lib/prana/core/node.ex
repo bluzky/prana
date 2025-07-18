@@ -25,11 +25,53 @@ defmodule Prana.Node do
   end
 
   @doc """
-  Loads a node from a map
+  Loads a node from a map with string keys, converting to proper types.
+  
+  Automatically converts:
+  - String keys to atoms where appropriate
+  - Preserves complex nested params structures
+  
+  ## Examples
+  
+      node_map = %{
+        "key" => "api_call",
+        "name" => "API Call",
+        "type" => "http.request",
+        "params" => %{
+          "method" => "GET",
+          "url" => "https://api.example.com/users",
+          "headers" => %{"Authorization" => "Bearer token"}
+        }
+      }
+      
+      node = Node.from_map(node_map)
+      # Complex params are preserved as-is
   """
   def from_map(data) when is_map(data) do
     {:ok, data} = Skema.load(data, __MODULE__)
     data
+  end
+
+  @doc """
+  Converts a node to a JSON-compatible map.
+  
+  Preserves all node data including complex nested params for round-trip serialization.
+  
+  ## Examples
+  
+      node = %Node{
+        key: "api_call",
+        name: "API Call",
+        type: "http.request",
+        params: %{"method" => "GET", "url" => "https://api.example.com"}
+      }
+      
+      node_map = Node.to_map(node)
+      json_string = Jason.encode!(node_map)
+      # Ready for storage or API transport
+  """
+  def to_map(%__MODULE__{} = node) do
+    Map.from_struct(node)
   end
 
   defp generate_custom_id(name) do

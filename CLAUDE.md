@@ -42,7 +42,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`Prana.Workflow`**: Complete workflow with nodes and double-indexed connections
 - **`Prana.Node`**: Individual workflow node with type, integration, action, and configuration
 - **`Prana.Connection`**: Port-based connections between nodes with conditions and data mapping
+- **`Prana.WorkflowExecution`**: Complete execution instance with runtime state and audit trail
 - **`Prana.NodeExecution`**: Individual node execution state tracking
+
+**Serialization Support**: All core structs implement `from_map/1` and `to_map/1` for JSON-compatible persistence with automatic type conversion and nested struct handling.
+
+```elixir
+# Serialize workflow to JSON-compatible map
+workflow_map = Prana.Workflow.to_map(workflow)
+json_string = Jason.encode!(workflow_map)
+
+# Restore from JSON with proper types
+workflow_data = Jason.decode!(json_string)
+restored_workflow = Prana.Workflow.from_map(workflow_data)
+```
 
 #### Optimized Connection Structure
 ```elixir
@@ -290,3 +303,4 @@ For detailed implementation context, refer to these documents:
 - **`docs/built-in-integrations.md`** - Complete reference for Manual, Logic, Data, and Workflow integrations
 - **`docs/guides/writing_integrations.md`** - Comprehensive guide for creating custom integrations
 - **`docs/guides/building_workflows.md`** - Guide for composing workflows using built-in integrations
+- **`docs/guides/serialization_guide.md`** - Complete guide for serializing/deserializing workflows and executions for persistence and APIs

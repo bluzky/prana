@@ -25,10 +25,48 @@ defmodule Prana.Connection do
   end
 
   @doc """
-  Loads a connection from a map
+  Loads a connection from a map with string keys, converting to proper types.
+  
+  Automatically converts:
+  - String keys to atoms where appropriate
+  - Applies default port values ("main") when not specified
+  
+  ## Examples
+  
+      connection_map = %{
+        "from" => "node_1",
+        "from_port" => "success",
+        "to" => "node_2",
+        "to_port" => "input"
+      }
+      
+      connection = Connection.from_map(connection_map)
+      # Port routing is preserved with proper defaults
   """
   def from_map(data) when is_map(data) do
     {:ok, data} = Skema.load(data, __MODULE__)
     data
+  end
+
+  @doc """
+  Converts a connection to a JSON-compatible map.
+  
+  Preserves all connection routing data for round-trip serialization.
+  
+  ## Examples
+  
+      connection = %Connection{
+        from: "node_1",
+        from_port: "success",
+        to: "node_2",
+        to_port: "input"
+      }
+      
+      connection_map = Connection.to_map(connection)
+      json_string = Jason.encode!(connection_map)
+      # Ready for storage or API transport
+  """
+  def to_map(%__MODULE__{} = connection) do
+    Map.from_struct(connection)
   end
 end
