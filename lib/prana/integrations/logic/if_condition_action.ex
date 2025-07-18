@@ -59,9 +59,9 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
           end
 
         if result do
-          {:ok, input_data, "true"}
+          {:ok, %{}, "true"}
         else
-          {:ok, input_data, "false"}
+          {:ok, %{}, "false"}
         end
 
       _ ->

@@ -12,7 +12,7 @@ The Data integration provides essential data manipulation capabilities for combi
 - **Action Name**: `merge`
 - **Description**: Combine data from multiple named input ports (diamond pattern coordination)
 - **Input Ports**: `["input_a", "input_b"]`
-- **Output Ports**: `["success", "error"]`
+- **Output Ports**: `["main", "error"]`
 
 **Input Parameters**:
 - `strategy`: Merge strategy (`"append"` | `"merge"` | `"concat"`) - defaults to `"append"`
@@ -26,8 +26,8 @@ The Data integration provides essential data manipulation capabilities for combi
 3. **concat**: Flatten and concatenate array inputs using `List.flatten/1`, ignores non-arrays
 
 **Returns**:
-- `{:ok, merged_data, "success"}` on successful merge
-- `{:error, reason, "error"}` if merge fails
+- `{:ok, merged_data}` on successful merge
+- `{:error, reason}` if merge fails
 
 **Examples**:
 
@@ -59,4 +59,26 @@ The Data integration provides essential data manipulation capabilities for combi
   "input_b" => [4, 5]
 }
 # Result: [1, 2, 3, 4, 5]
+```
+
+### Set Data
+- **Action Name**: `set_data`
+- **Description**: Set data for testing purposes
+- **Input Ports**: `["main"]`
+- **Output Ports**: `["main", "error"]`
+
+**Input Parameters**:
+- Any parameters passed will be returned as output
+
+**Returns**:
+- `{:ok, params}` - returns the input parameters unchanged
+
+**Example**:
+```elixir
+%{
+  "name" => "John",
+  "age" => 30,
+  "city" => "NYC"
+}
+# Result: %{"name" => "John", "age" => 30, "city" => "NYC"}
 ```
