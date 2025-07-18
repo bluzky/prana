@@ -41,7 +41,7 @@ defmodule Prana.NodeExecutor do
         execution_index \\ 0,
         run_index \\ 0
       ) do
-    node_execution = create_node_execution(execution, node, execution_index, run_index)
+    node_execution = create_node_execution(node, execution_index, run_index)
     context = build_expression_context(node_execution, execution, routed_input)
 
     with {:ok, prepared_params} <- prepare_params(node, context),
@@ -308,7 +308,8 @@ defmodule Prana.NodeExecutor do
   end
 
   defp build_invalid_format_error(invalid_result) do
-    Error.new("invalid_action_return_format", 
+    Error.new(
+      "invalid_action_return_format",
       "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}",
       %{"result" => inspect(invalid_result)}
     )
@@ -318,9 +319,9 @@ defmodule Prana.NodeExecutor do
   # EXECUTION HELPERS
   # =============================================================================
 
-  defp create_node_execution(execution, node, execution_index, run_index) do
-    execution.id
-    |> NodeExecution.new(node.key, execution_index, run_index)
+  defp create_node_execution(node, execution_index, run_index) do
+    node.key
+    |> NodeExecution.new(execution_index, run_index)
     |> NodeExecution.start()
   end
 

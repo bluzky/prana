@@ -6,28 +6,22 @@ defmodule Prana.NodeExecution do
   @type status :: :pending | :running | :completed | :failed | :skipped | :suspended
 
   @type t :: %__MODULE__{
-          id: String.t(),
-          execution_id: String.t(),
           node_key: String.t(),
           status: status(),
           params: map(),
           output_data: map() | nil,
           output_port: String.t() | nil,
           error_data: map() | nil,
-          retry_count: integer(),
           started_at: DateTime.t() | nil,
           completed_at: DateTime.t() | nil,
           duration_ms: integer() | nil,
           suspension_type: atom() | nil,
           suspension_data: term() | nil,
-          metadata: map(),
           execution_index: integer(),
           run_index: integer()
         }
 
   defstruct [
-    :id,
-    :execution_id,
     :node_key,
     :status,
     :output_data,
@@ -39,8 +33,6 @@ defmodule Prana.NodeExecution do
     :suspension_type,
     :suspension_data,
     params: %{},
-    retry_count: 0,
-    metadata: %{},
     execution_index: 0,
     run_index: 0
   ]
@@ -48,22 +40,18 @@ defmodule Prana.NodeExecution do
   @doc """
   Creates a new node execution
   """
-  def new(execution_id, node_key, execution_index \\ 0, run_index \\ 0) do
+  def new(node_key, execution_index \\ 0, run_index \\ 0) do
     %__MODULE__{
-      id: generate_id(),
-      execution_id: execution_id,
       node_key: node_key,
       status: :pending,
       output_data: nil,
       output_port: nil,
       error_data: nil,
-      retry_count: 0,
       started_at: nil,
       completed_at: nil,
       duration_ms: nil,
       suspension_type: nil,
       suspension_data: nil,
-      metadata: %{},
       execution_index: execution_index,
       run_index: run_index
     }
@@ -108,20 +96,9 @@ defmodule Prana.NodeExecution do
     }
   end
 
-  @doc """
-  Increments retry count
-  """
-  def increment_retry(%__MODULE__{} = node_execution) do
-    %{node_execution | retry_count: node_execution.retry_count + 1}
-  end
-
   defp calculate_duration(nil), do: nil
 
   defp calculate_duration(started_at) do
     DateTime.diff(DateTime.utc_now(), started_at, :millisecond)
-  end
-
-  defp generate_id do
-    UUID.uuid4()
   end
 end

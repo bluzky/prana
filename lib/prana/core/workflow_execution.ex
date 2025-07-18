@@ -33,9 +33,7 @@ defmodule Prana.WorkflowExecution do
       Repo.get_by(Execution, resume_token: "abc123def456")
   """
 
-  alias Prana.Core.SuspensionData
   alias Prana.Core.Error
-  alias Prana.Node
 
   @type status :: :pending | :running | :suspended | :completed | :failed | :cancelled | :timeout
   @type execution_mode :: :sync | :async | :fire_and_forget
@@ -420,6 +418,7 @@ defmodule Prana.WorkflowExecution do
     case Prana.IntegrationRegistry.get_action_by_type(node.type) do
       {:ok, action} ->
         action.input_ports || ["input"]
+
       {:error, _reason} ->
         ["input"]
     end
@@ -837,7 +836,12 @@ defmodule Prana.WorkflowExecution do
           {:cont, {:ok, updated_prep_data}}
 
         {:error, reason} ->
-          {:halt, {:error, Error.new("action_preparation_failed", "Action preparation failed", %{"node_key" => node.key, "reason" => reason})}}
+          {:halt,
+           {:error,
+            Error.new("action_preparation_failed", "Action preparation failed", %{
+              "node_key" => node.key,
+              "reason" => reason
+            })}}
       end
     end)
   end

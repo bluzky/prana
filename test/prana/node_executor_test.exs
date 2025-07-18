@@ -513,8 +513,6 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test.with_context", %{})
 
       suspended_execution = %NodeExecution{
-        id: "suspended_node_exec",
-        execution_id: execution.id,
         node_key: "test_node",
         status: :suspended,
         params: %{"original" => "param"},
@@ -538,8 +536,6 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test.error_action", %{})
 
       suspended_execution = %NodeExecution{
-        id: "suspended_node_exec",
-        execution_id: execution.id,
         node_key: "test_node",
         status: :suspended,
         params: %{},
@@ -563,8 +559,6 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test.exception_action", %{})
 
       suspended_execution = %NodeExecution{
-        id: "suspended_node_exec",
-        execution_id: execution.id,
         node_key: "test_node",
         status: :suspended,
         params: %{},
@@ -589,8 +583,6 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "nonexistent.action", %{})
 
       suspended_execution = %NodeExecution{
-        id: "suspended_node_exec",
-        execution_id: execution.id,
         node_key: "test_node",
         status: :suspended,
         params: %{},

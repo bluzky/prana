@@ -169,8 +169,7 @@ defmodule Prana.ExecutionTest do
 
       # Create and complete a NodeExecution first
       node_execution =
-        "exec_1"
-        |> NodeExecution.new("node_1", 0, 0)
+        NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
@@ -204,8 +203,7 @@ defmodule Prana.ExecutionTest do
 
       # Create and complete a NodeExecution independently
       node_execution =
-        "exec_1"
-        |> NodeExecution.new("node_1", 0, 0)
+        NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
@@ -234,8 +232,7 @@ defmodule Prana.ExecutionTest do
 
       # Create and complete a NodeExecution first
       node_execution =
-        "exec_1"
-        |> NodeExecution.new("node_1", 0, 0)
+        NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       completed_node_execution = NodeExecution.complete(node_execution, %{data: "test"}, "main")
@@ -261,8 +258,6 @@ defmodule Prana.ExecutionTest do
         node_executions: %{
           "node_1" => [
             %NodeExecution{
-              id: "ne_1",
-              execution_id: "exec_1",
               node_key: "node_1",
               status: :running,
               started_at: ~U[2024-01-01 10:00:00Z],
@@ -312,8 +307,7 @@ defmodule Prana.ExecutionTest do
 
       # Create and fail a NodeExecution first
       node_execution =
-        "exec_1"
-        |> NodeExecution.new("node_1", 0, 0)
+        NodeExecution.new("node_1", 0, 0)
         |> NodeExecution.start()
 
       error_data = %{error: "test error"}
@@ -359,8 +353,7 @@ defmodule Prana.ExecutionTest do
 
       # Complete another node
       node_execution_2 =
-        "exec_1"
-        |> NodeExecution.new("node_2", 0, 0)
+        NodeExecution.new("node_2", 0, 0)
         |> NodeExecution.start()
 
       completed_node_execution_2 = NodeExecution.complete(node_execution_2, %{email: "test@example.com"}, "primary")
@@ -404,10 +397,10 @@ defmodule Prana.ExecutionTest do
       }
 
       # Build incrementally using the new interface
-      node_exec_1 = "exec_1" |> NodeExecution.new("node_1", 0, 0) |> NodeExecution.start()
+      node_exec_1 = NodeExecution.new("node_1", 0, 0) |> NodeExecution.start()
       completed_node_1 = NodeExecution.complete(node_exec_1, %{user_id: 123}, "main")
 
-      node_exec_2 = "exec_1" |> NodeExecution.new("node_2", 0, 0) |> NodeExecution.start()
+      node_exec_2 = NodeExecution.new("node_2", 0, 0) |> NodeExecution.start()
       completed_node_2 = NodeExecution.complete(node_exec_2, %{email: "test@example.com"}, "primary")
 
       incremental_result =
@@ -416,7 +409,7 @@ defmodule Prana.ExecutionTest do
         |> WorkflowExecution.complete_node(completed_node_2)
         |> then(fn exec ->
           # Create and fail node execution for node_3
-          node_exec_3 = "exec_1" |> NodeExecution.new("node_3", 0, 0) |> NodeExecution.start()
+          node_exec_3 = NodeExecution.new("node_3", 0, 0) |> NodeExecution.start()
           failed_node_3 = NodeExecution.fail(node_exec_3, %{error: "timeout"})
           WorkflowExecution.fail_node(exec, failed_node_3)
         end)
