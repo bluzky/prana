@@ -107,7 +107,7 @@ defmodule Prana.Integrations.DataTest do
       }
 
       assert {:error, error} = MergeAction.execute(input_map, %{})
-      assert error.type == "merge_error"
+      assert error.code == "action_error"
       assert String.contains?(error.message, "unknown_strategy")
     end
   end

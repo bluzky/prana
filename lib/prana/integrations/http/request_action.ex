@@ -10,6 +10,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   use Skema
 
   alias Prana.Action
+  alias Prana.Core.Error
 
   def specification do
     %Action{
@@ -96,13 +97,13 @@ defmodule Prana.Integrations.HTTP.RequestAction do
         {:ok, format_response(response), "success"}
 
       {:error, :timeout} ->
-        {:error, %{type: "timeout", message: "Request timed out"}, "timeout"}
+        {:error, Error.new("action_error", "Request timed out"), "timeout"}
 
       {:error, reason} when is_binary(reason) ->
-        {:error, %{type: "http_error", message: reason}, "error"}
+        {:error, Error.new("action_error", reason), "error"}
 
       {:error, reason} ->
-        {:error, %{type: "http_error", message: format_error(reason)}, "error"}
+        {:error, Error.new("action_error", format_error(reason)), "error"}
     end
   end
 

@@ -6,6 +6,7 @@ defmodule Prana.Integrations.Data.MergeAction do
   use Prana.Actions.SimpleAction
 
   alias Prana.Action
+  alias Prana.Core.Error
 
   def specification do
     %Action{
@@ -31,7 +32,7 @@ defmodule Prana.Integrations.Data.MergeAction do
         {:ok, merged_data}
 
       {:error, reason} ->
-        {:error, %{type: "merge_error", message: reason}}
+        {:error, Error.new("action_error", reason)}
     end
   end
 
