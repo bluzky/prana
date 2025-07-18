@@ -20,7 +20,7 @@ defmodule Prana.Integrations.WaitTest do
       definition = Wait.definition()
       wait_action = definition.actions["wait"]
 
-      assert wait_action.name == "wait"
+      assert wait_action.name == "wait.wait"
       assert wait_action.display_name == "Wait"
       assert wait_action.module == Prana.Integrations.Wait.WaitAction
       assert wait_action.input_ports == ["main"]
@@ -220,8 +220,8 @@ defmodule Prana.Integrations.WaitTest do
       assert integration.display_name == "Wait"
 
       # Get wait action
-      assert {:ok, wait_action} = IntegrationRegistry.get_action("wait", "wait")
-      assert wait_action.name == "wait"
+      assert {:ok, wait_action} = IntegrationRegistry.get_action_by_type("wait.wait")
+      assert wait_action.name == "wait.wait"
 
       # Cleanup
       GenServer.stop(registry_pid)

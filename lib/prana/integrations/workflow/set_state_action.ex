@@ -38,7 +38,7 @@ defmodule Prana.Integrations.Workflow.SetStateAction do
 
   def specification do
     %Action{
-      name: "set_state",
+      name: "workflow.set_state",
       display_name: "Set State",
       description: "Set or update values in workflow execution state",
       type: :action,

@@ -9,7 +9,7 @@ defmodule Prana.Integrations.Data.SetDataAction do
 
   def specification do
     %Action{
-      name: "set_data",
+      name: "data.set_data",
       display_name: "Set Data",
       description: "Set data",
       type: :action,

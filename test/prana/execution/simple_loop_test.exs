@@ -104,8 +104,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "start",
           name: "Start",
-          integration_name: "manual",
-          action_name: "trigger",
+          type: "manual.trigger",
           params: %{},
           metadata: %{}
         },
@@ -114,8 +113,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "init_counter",
           name: "Initialize Counter",
-          integration_name: "data",
-          action_name: "set_data",
+          type: "data.set_data",
           params: %{"counter" => 0, "max_count" => 3},
           metadata: %{}
         },
@@ -124,8 +122,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "increment",
           name: "Increment Counter",
-          integration_name: "data",
-          action_name: "set_data",
+          type: "data.set_data",
           params: %{
             "counter" => "{{$execution.run_index + 1}}"
           },
@@ -136,8 +133,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "loop_condition",
           name: "Loop Condition",
-          integration_name: "logic",
-          action_name: "if_condition",
+          type: "logic.if_condition",
           params: %{
             "condition" => "{{$execution.run_index < 3}}"
           },
@@ -148,8 +144,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "complete",
           name: "Complete",
-          integration_name: "data",
-          action_name: "set_data",
+          type: "data.set_data",
           params: %{"result" => "loop_completed"},
           metadata: %{}
         }

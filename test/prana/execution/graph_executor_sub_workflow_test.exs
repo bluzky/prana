@@ -62,13 +62,11 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         nodes: [
           %Node{
             key: "trigger",
-            integration_name: "manual",
-            action_name: "trigger"
+            type: "manual.trigger"
           },
           %Node{
             key: "sub_workflow_node",
-            integration_name: "workflow",
-            action_name: "execute_workflow",
+            type: "workflow.execute_workflow",
             params: %{
               "workflow_id" => "child_workflow",
               "execution_mode" => "sync",
@@ -77,8 +75,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
           },
           %Node{
             key: "output",
-            integration_name: "manual",
-            action_name: "process_adult",
+            type: "manual.process_adult",
             params: %{"data" => "$input"}
           }
         ],
@@ -150,13 +147,11 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         nodes: [
           %Node{
             key: "trigger",
-            integration_name: "manual",
-            action_name: "trigger"
+            type: "manual.trigger"
           },
           %Node{
             key: "fire_forget_sub",
-            integration_name: "workflow",
-            action_name: "execute_workflow",
+            type: "workflow.execute_workflow",
             params: %{
               "workflow_id" => "background_task",
               "execution_mode" => "fire_and_forget"
@@ -164,8 +159,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
           },
           %Node{
             key: "output",
-            integration_name: "manual",
-            action_name: "process_adult",
+            type: "manual.process_adult",
             params: %{"data" => "$input"}
           }
         ],
@@ -442,13 +436,11 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       nodes: [
         %Node{
           key: "trigger",
-          integration_name: "manual",
-          action_name: "trigger"
+          type: "manual.trigger"
         },
         %Node{
           key: "sub_workflow_node",
-          integration_name: "workflow",
-          action_name: "execute_workflow",
+          type: "workflow.execute_workflow",
           params: %{
             "workflow_id" => "child_workflow",
             "execution_mode" => "sync"
@@ -456,8 +448,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         },
         %Node{
           key: "output",
-          integration_name: "manual",
-          action_name: "process_adult"
+          type: "manual.process_adult"
         }
       ],
       connections: [
@@ -484,13 +475,11 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       nodes: [
         %Node{
           key: "trigger",
-          integration_name: "manual",
-          action_name: "trigger"
+          type: "manual.trigger"
         },
         %Node{
           key: "first_sub_workflow",
-          integration_name: "workflow",
-          action_name: "execute_workflow",
+          type: "workflow.execute_workflow",
           params: %{
             "workflow_id" => "stage_1_workflow",
             "execution_mode" => "sync"
@@ -498,8 +487,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         },
         %Node{
           key: "second_sub_workflow",
-          integration_name: "workflow",
-          action_name: "execute_workflow",
+          type: "workflow.execute_workflow",
           params: %{
             "workflow_id" => "stage_2_workflow",
             "execution_mode" => "sync"
@@ -507,8 +495,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         },
         %Node{
           key: "output",
-          integration_name: "manual",
-          action_name: "process_adult"
+          type: "manual.process_adult"
         }
       ],
       connections: [

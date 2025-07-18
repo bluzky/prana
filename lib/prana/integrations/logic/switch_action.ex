@@ -31,7 +31,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
 
   def specification do
     %Action{
-      name: "switch",
+      name: "logic.switch",
       display_name: "Switch",
       description: "Multi-case routing based on condition expressions",
       type: :action,

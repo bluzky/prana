@@ -9,8 +9,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{
           "mode" => "webhook",
           "timeout_hours" => 24,
@@ -32,8 +31,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{
           "mode" => "webhook",
           "timeout_hours" => 12,
@@ -53,8 +51,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{
           "mode" => "webhook",
           "timeout_hours" => -1,
@@ -70,8 +67,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{
           "mode" => "interval",
           "duration" => 30,
@@ -96,8 +92,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{
           "mode" => "schedule",
           "schedule_at" => future_time,
@@ -120,8 +115,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{
           "mode" => "schedule",
           "schedule_at" => past_time
@@ -136,8 +130,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{}
       }
 
@@ -149,8 +142,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{"mode" => "invalid"}
       }
 
@@ -246,8 +238,7 @@ defmodule Prana.Integrations.Wait.WaitActionTest do
       prepare_node = %Node{
         key: "test_node",
         name: "Test Wait Node",
-        integration_name: "wait",
-        action_name: "wait",
+        type: "wait.wait",
         params: %{
           "mode" => "webhook",
           "timeout_hours" => 24,

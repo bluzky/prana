@@ -17,7 +17,7 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   def specification do
     %Action{
-      name: "if_condition",
+      name: "logic.if_condition",
       display_name: "IF Condition",
       description: "Evaluate condition and route to true/false",
       type: :action,

@@ -256,7 +256,7 @@ defmodule Prana.Integrations.Wait.WaitAction do
 
   def specification do
     %Action{
-      name: "wait",
+      name: "wait.wait",
       display_name: "Wait",
       description: "Unified wait action supporting multiple modes: interval, schedule, webhook",
       type: :wait,

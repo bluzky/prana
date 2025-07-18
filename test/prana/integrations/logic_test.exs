@@ -18,7 +18,7 @@ defmodule Prana.Integrations.LogicTest do
       # Check if_condition action
       assert Map.has_key?(definition.actions, "if_condition")
       if_action = definition.actions["if_condition"]
-      assert if_action.name == "if_condition"
+      assert if_action.name == "logic.if_condition"
       assert if_action.display_name == "IF Condition"
       assert if_action.module == Prana.Integrations.Logic.IfConditionAction
       assert if_action.input_ports == ["main"]
@@ -27,7 +27,7 @@ defmodule Prana.Integrations.LogicTest do
       # Check switch action
       assert Map.has_key?(definition.actions, "switch")
       switch_action = definition.actions["switch"]
-      assert switch_action.name == "switch"
+      assert switch_action.name == "logic.switch"
       assert switch_action.display_name == "Switch"
       assert switch_action.module == Prana.Integrations.Logic.SwitchAction
       assert switch_action.input_ports == ["main"]

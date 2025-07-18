@@ -9,7 +9,7 @@ defmodule Prana.Integrations.Manual.ProcessAdultAction do
 
   def specification do
     %Action{
-      name: "process_adult",
+      name: "manual.process_adult",
       display_name: "Process Adult",
       description: "Process adult data",
       type: :action,

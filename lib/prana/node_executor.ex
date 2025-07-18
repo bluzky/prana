@@ -111,32 +111,25 @@ defmodule Prana.NodeExecutor do
   # ACTION MANAGEMENT
   # =============================================================================
 
-  defp get_action(%Node{integration_name: integration_name, action_name: action_name}) do
-    case IntegrationRegistry.get_action(integration_name, action_name) do
+  defp get_action(%Node{} = node) do
+    case IntegrationRegistry.get_action_by_type(node.type) do
       {:ok, action} ->
         {:ok, action}
 
       {:error, :not_found} ->
-        {:error, build_action_error("action_not_found", integration_name, action_name)}
+        {:error, build_action_error("action_not_found", node.type)}
 
       {:error, reason} ->
         {:error, build_registry_error(reason)}
     end
   end
 
-  defp build_action_error(type, integration_name, action_name) do
-    %{
-      "type" => type,
-      "integration_name" => integration_name,
-      "action_name" => action_name
-    }
+  defp build_action_error(type, action_name) do
+    Error.new(type, "Action not found", %{"action_name" => action_name})
   end
 
   defp build_registry_error(reason) do
-    %{
-      "type" => "registry_error",
-      "reason" => reason
-    }
+    Error.new("registry_error", "Registry error occurred", %{"reason" => reason})
   end
 
   # =============================================================================
@@ -174,22 +167,11 @@ defmodule Prana.NodeExecutor do
   end
 
   defp build_action_execution_error(type, error_data, action) do
-    error_key =
-      case type do
-        "action_execution_failed" -> "error"
-        "action_resume_failed" -> "error"
-        "action_exit" -> "reason"
-        "action_resume_exit" -> "reason"
-        "action_throw" -> "value"
-        "action_resume_throw" -> "value"
-      end
-
-    %{
-      "type" => type,
-      error_key => inspect(error_data),
+    Error.new(type, "Action execution failed", %{
+      "details" => inspect(error_data),
       "module" => action.module,
       "action" => action.name
-    }
+    })
   end
 
   # =============================================================================
@@ -312,28 +294,24 @@ defmodule Prana.NodeExecutor do
   end
 
   defp build_action_error_result(error, port) do
-    %{
-      "type" => "action_error",
+    Error.new("action_error", "Action returned error", %{
       "error" => error,
       "port" => port
-    }
+    })
   end
 
   defp build_invalid_port_error(port, action) do
-    %{
-      "type" => "invalid_output_port",
+    Error.new("invalid_output_port", "Invalid output port specified", %{
       "port" => port,
       "available_ports" => action.output_ports
-    }
+    })
   end
 
   defp build_invalid_format_error(invalid_result) do
-    %{
-      "type" => "invalid_action_return_format",
-      "result" => inspect(invalid_result),
-      "message" =>
-        "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}"
-    }
+    Error.new("invalid_action_return_format", 
+      "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}",
+      %{"result" => inspect(invalid_result)}
+    )
   end
 
   # =============================================================================

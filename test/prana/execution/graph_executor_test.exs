@@ -51,8 +51,7 @@ defmodule Prana.GraphExecutorTest do
       node = %Node{
         key: "test_node",
         name: "Test Node",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 

@@ -54,8 +54,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "handles synchronous sub-workflow suspension", %{execution: execution} do
       node = %Node{
         key: "sub_workflow_node",
-        integration_name: "workflow",
-        action_name: "execute_workflow",
+        type: "workflow.execute_workflow",
         params: %{
           "workflow_id" => "user_onboarding",
           "execution_mode" => "sync",
@@ -92,8 +91,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "handles fire-and-forget sub-workflow execution", %{execution: execution} do
       node = %Node{
         key: "notification_node",
-        integration_name: "workflow",
-        action_name: "execute_workflow",
+        type: "workflow.execute_workflow",
         params: %{
           "workflow_id" => "notification_flow",
           "execution_mode" => "fire_and_forget"
@@ -120,8 +118,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "handles sub-workflow validation errors", %{execution: execution} do
       node = %Node{
         key: "invalid_node",
-        integration_name: "workflow",
-        action_name: "execute_workflow",
+        type: "workflow.execute_workflow",
         params: %{
           # Invalid empty workflow_id
           "workflow_id" => "",
@@ -135,10 +132,10 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert {:error, {error_data, failed_node_execution}} = result
 
       # Verify error details - the structure is nested under "error" with atom keys
-      assert error_data["type"] == "action_error"
-      assert error_data["error"].code == "action_error"
-      assert error_data["error"].message == "workflow_id cannot be empty"
-      assert error_data["port"] == "error"
+      assert error_data.code == "action_error"
+      assert error_data.details["error"].code == "action_error"
+      assert error_data.details["error"].message == "workflow_id cannot be empty"
+      assert error_data.details["port"] == "error"
 
       # Verify failed node execution
       assert failed_node_execution.node_key == "invalid_node"
@@ -150,8 +147,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
     test "preserves node execution timing for suspended nodes", %{execution: execution} do
       node = %Node{
         key: "timing_node",
-        integration_name: "workflow",
-        action_name: "execute_workflow",
+        type: "workflow.execute_workflow",
         params: %{
           "workflow_id" => "timing_flow",
           "wait_for_completion" => true
@@ -234,8 +230,8 @@ defmodule Prana.NodeExecutorSuspensionTest do
       processed = NodeExecutor.process_action_result(invalid_result, action)
 
       assert {:error, error_data} = processed
-      assert error_data["type"] == "invalid_action_return_format"
-      assert error_data["message"] =~ "Actions must return"
+      assert error_data.code == "invalid_action_return_format"
+      assert error_data.message =~ "Actions must return"
     end
   end
 end

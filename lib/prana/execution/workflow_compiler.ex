@@ -99,8 +99,8 @@ defmodule Prana.WorkflowCompiler do
 
   # Helper function to get action type from node via integration registry
   @spec get_action_type(Node.t()) :: {:ok, atom()} | {:error, term()}
-  defp get_action_type(%Node{integration_name: integration_name, action_name: action_name}) do
-    case IntegrationRegistry.get_action(integration_name, action_name) do
+  defp get_action_type(%Node{} = node) do
+    case IntegrationRegistry.get_action_by_type(node.type) do
       {:ok, %Prana.Action{type: action_type}} -> {:ok, action_type}
       {:error, reason} -> {:error, reason}
     end

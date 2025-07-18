@@ -63,8 +63,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
@@ -72,16 +71,14 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       branch_a1 = %Node{
         key: "branch_a1",
         name: "Branch A Step 1",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       branch_a2 = %Node{
         key: "branch_a2",
         name: "Branch A Step 2",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -89,16 +86,14 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       branch_b1 = %Node{
         key: "branch_b1",
         name: "Branch B Step 1",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       branch_b2 = %Node{
         key: "branch_b2",
         name: "Branch B Step 2",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -106,8 +101,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       merge_node = %Node{
         key: "merge",
         name: "Merge",
-        integration_name: "data",
-        action_name: "merge",
+        type: "data.merge",
         params: %{}
       }
 

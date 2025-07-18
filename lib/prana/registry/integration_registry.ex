@@ -24,10 +24,10 @@ defmodule Prana.IntegrationRegistry do
   end
 
   @doc """
-  Get an action definition by integration and action name
+  Get an action definition by type format "<integration>.<action>"
   """
-  def get_action(integration_name, action_name) do
-    GenServer.call(__MODULE__, {:get_action, integration_name, action_name})
+  def get_action_by_type(type) when is_binary(type) do
+    GenServer.call(__MODULE__, {:get_action_by_type, type})
   end
 
   @doc """
@@ -96,8 +96,8 @@ defmodule Prana.IntegrationRegistry do
   end
 
   @impl GenServer
-  def handle_call({:get_action, integration_name, action_name}, _from, state) do
-    result = get_action_from_state(state, integration_name, action_name)
+  def handle_call({:get_action_by_type, type}, _from, state) do
+    result = get_action_by_type_from_state(state, type)
     {:reply, result, state}
   end
 
@@ -210,9 +210,21 @@ defmodule Prana.IntegrationRegistry do
       {:error, "Registration failed: #{inspect(error)}"}
   end
 
-  defp get_action_from_state(state, integration_name, action_name) do
-    case get_in(state.integrations, [integration_name, Access.key(:actions), action_name]) do
-      %Prana.Action{} = action -> {:ok, action}
+  defp get_action_by_type_from_state(state, type) do
+    # Search through all integrations and their actions using action.name
+    result = 
+      state.integrations
+      |> Enum.reduce_while(nil, fn {_integration_name, %Prana.Integration{actions: actions}}, _acc ->
+        case Enum.find(actions, fn {_action_key, action} ->
+          action.name == type
+        end) do
+          {_action_key, action} -> {:halt, {:ok, action}}
+          nil -> {:cont, nil}
+        end
+      end)
+    
+    case result do
+      {:ok, action} -> {:ok, action}
       nil -> {:error, :not_found}
     end
   end

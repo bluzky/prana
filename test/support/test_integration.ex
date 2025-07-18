@@ -17,7 +17,7 @@ defmodule Prana.TestSupport.TestIntegration do
       category: "testing",
       actions: %{
         "simple_action" => %Action{
-          name: "simple_action",
+          name: "test.simple_action",
           display_name: "Simple Action",
           description: "A simple test action that can succeed or fail",
           type: :action,
@@ -26,7 +26,7 @@ defmodule Prana.TestSupport.TestIntegration do
           output_ports: ["main", "error"]
         },
         "trigger_action" => %Action{
-          name: "trigger_action",
+          name: "test.trigger_action",
           display_name: "Test Trigger",
           description: "A simple test trigger",
           type: :trigger,

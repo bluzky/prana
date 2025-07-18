@@ -30,11 +30,11 @@ defmodule Prana.WorkflowCompilerTest do
   # ============================================================================
 
   defp create_trigger_node(key, name) do
-    Node.new(name, "test", "trigger_action", %{}, key)
+    Node.new(name, "test.trigger_action", %{}, key)
   end
 
   defp create_action_node(key, name) do
-    Node.new(name, "test", "simple_action", %{}, key)
+    Node.new(name, "test.simple_action", %{}, key)
   end
 
   defp create_simple_workflow do

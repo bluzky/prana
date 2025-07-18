@@ -9,7 +9,7 @@ defmodule Prana.Integrations.Manual.ProcessMinorAction do
 
   def specification do
     %Action{
-      name: "process_minor",
+      name: "manual.process_minor",
       display_name: "Process Minor",
       description: "Process minor data",
       type: :action,

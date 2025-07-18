@@ -9,7 +9,7 @@ defmodule Prana.Integrations.Manual.TriggerAction do
 
   def specification do
     %Action{
-      name: "trigger",
+      name: "manual.trigger",
       display_name: "Manual Trigger",
       description: "Simple trigger for testing",
       type: :trigger,

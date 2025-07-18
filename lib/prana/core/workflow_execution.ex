@@ -35,6 +35,7 @@ defmodule Prana.WorkflowExecution do
 
   alias Prana.Core.SuspensionData
   alias Prana.Core.Error
+  alias Prana.Node
 
   @type status :: :pending | :running | :suspended | :completed | :failed | :cancelled | :timeout
   @type execution_mode :: :sync | :async | :fire_and_forget
@@ -416,10 +417,9 @@ defmodule Prana.WorkflowExecution do
 
   # Get input ports for a node, with fallback to default "input" port
   defp get_node_input_ports(node) do
-    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
+    case Prana.IntegrationRegistry.get_action_by_type(node.type) do
       {:ok, action} ->
         action.input_ports || ["input"]
-
       {:error, _reason} ->
         ["input"]
     end
@@ -845,7 +845,7 @@ defmodule Prana.WorkflowExecution do
   # Prepare a single action
   defp prepare_single_action(node) do
     # Look up action from integration registry
-    case Prana.IntegrationRegistry.get_action(node.integration_name, node.action_name) do
+    case Prana.IntegrationRegistry.get_action_by_type(node.type) do
       {:ok, action} ->
         # Call prepare/1 on the action module
         try do

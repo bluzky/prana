@@ -10,7 +10,7 @@ defmodule Prana.Integrations.Data.MergeAction do
 
   def specification do
     %Action{
-      name: "merge",
+      name: "data.merge",
       display_name: "Merge Data",
       description: "Combine data from multiple named input ports (diamond pattern coordination)",
       type: :action,

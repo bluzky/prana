@@ -28,7 +28,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
   def specification do
     %Action{
-      name: "execute_workflow",
+      name: "workflow.execute_workflow",
       display_name: "Execute Sub-workflow",
       description: "Execute a sub-workflow with synchronous or asynchronous coordination",
       type: :action,

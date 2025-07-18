@@ -90,8 +90,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
         %Node{
           key: "start",
           name: "Start",
-          integration_name: "manual",
-          action_name: "trigger",
+          type: "manual.trigger",
           params: %{}
         },
 
@@ -99,8 +98,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
         %Node{
           key: "branch_b",
           name: "Branch B",
-          integration_name: "test",
-          action_name: "simple_action",
+          type: "test.simple_action",
           params: %{
             "data" => "$input.data",
             "branch" => "B"
@@ -111,8 +109,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
         %Node{
           key: "branch_c",
           name: "Branch C",
-          integration_name: "test",
-          action_name: "simple_action",
+          type: "test.simple_action",
           params: %{
             "data" => "$input.data",
             "branch" => "C"
@@ -123,8 +120,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
         %Node{
           key: "merge",
           name: "Merge",
-          integration_name: "data",
-          action_name: "merge",
+          type: "data.merge",
           params: %{
             "strategy" => "append",
             "input_a" => "$nodes.branch_b",
@@ -136,8 +132,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
         %Node{
           key: "final",
           name: "Final",
-          integration_name: "test",
-          action_name: "simple_action",
+          type: "test.simple_action",
           params: %{
             "data" => "$input.data",
             "final_step" => "true"

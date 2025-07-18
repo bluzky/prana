@@ -89,32 +89,28 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       if_node = %Node{
         key: "if_condition",
         name: "IF Condition",
-        integration_name: "logic",
-        action_name: "if_condition",
+        type: "logic.if_condition",
         params: %{"condition" => "true"}
       }
 
       true_branch = %Node{
         key: "true_branch",
         name: "True Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       false_branch = %Node{
         key: "false_branch",
         name: "False Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -158,32 +154,28 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       if_node = %Node{
         key: "if_condition",
         name: "IF Condition",
-        integration_name: "logic",
-        action_name: "if_condition",
+        type: "logic.if_condition",
         params: %{"condition" => ""}
       }
 
       true_branch = %Node{
         key: "true_branch",
         name: "True Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       false_branch = %Node{
         key: "false_branch",
         name: "False Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -227,40 +219,35 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       if_node = %Node{
         key: "if_condition",
         name: "IF Condition",
-        integration_name: "logic",
-        action_name: "if_condition",
+        type: "logic.if_condition",
         params: %{"condition" => "true"}
       }
 
       true_branch = %Node{
         key: "true_branch",
         name: "True Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       false_branch = %Node{
         key: "false_branch",
         name: "False Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       merge_node = %Node{
         key: "merge",
         name: "Merge",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -309,16 +296,14 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       switch_node = %Node{
         key: "switch",
         name: "Switch",
-        integration_name: "logic",
-        action_name: "switch",
+        type: "logic.switch",
         params: %{
           "cases" => [
             %{"condition" => "match1", "port" => "case1"},
@@ -330,16 +315,14 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       case1_branch = %Node{
         key: "case1_branch",
         name: "Case 1 Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       case2_branch = %Node{
         key: "case2_branch",
         name: "Case 2 Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -383,16 +366,14 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       switch_node = %Node{
         key: "switch",
         name: "Switch",
-        integration_name: "logic",
-        action_name: "switch",
+        type: "logic.switch",
         params: %{
           "cases" => [
             %{"condition" => "", "port" => "case1"},
@@ -404,16 +385,14 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       case1_branch = %Node{
         key: "case1_branch",
         name: "Case 1 Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       case2_branch = %Node{
         key: "case2_branch",
         name: "Case 2 Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -457,16 +436,14 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       switch_node = %Node{
         key: "switch",
         name: "Switch",
-        integration_name: "logic",
-        action_name: "switch",
+        type: "logic.switch",
         params: %{
           "cases" => [
             %{"condition" => "", "port" => "case1"},
@@ -479,32 +456,28 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       case1_branch = %Node{
         key: "case1_branch",
         name: "Case 1 Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       case2_branch = %Node{
         key: "case2_branch",
         name: "Case 2 Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       case3_branch = %Node{
         key: "case3_branch",
         name: "Case 3 Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       merge_node = %Node{
         key: "merge",
         name: "Merge",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
@@ -554,16 +527,14 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       switch_node = %Node{
         key: "switch",
         name: "Switch",
-        integration_name: "logic",
-        action_name: "switch",
+        type: "logic.switch",
         params: %{
           "cases" => [
             %{"condition" => "", "port" => "case1"},
@@ -607,16 +578,14 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       trigger_node = %Node{
         key: "trigger",
         name: "Trigger",
-        integration_name: "test",
-        action_name: "trigger_action",
+        type: "test.trigger_action",
         params: %{}
       }
 
       switch_node = %Node{
         key: "switch",
         name: "Switch",
-        integration_name: "logic",
-        action_name: "switch",
+        type: "logic.switch",
         params: %{
           "cases" => [
             %{"condition" => "match1", "port" => "case1"}
@@ -627,24 +596,21 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       if_node = %Node{
         key: "if_condition",
         name: "IF Condition",
-        integration_name: "logic",
-        action_name: "if_condition",
+        type: "logic.if_condition",
         params: %{"condition" => ""}
       }
 
       true_branch = %Node{
         key: "true_branch",
         name: "True Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
       false_branch = %Node{
         key: "false_branch",
         name: "False Branch",
-        integration_name: "test",
-        action_name: "simple_action",
+        type: "test.simple_action",
         params: %{}
       }
 
