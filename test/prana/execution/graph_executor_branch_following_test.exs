@@ -110,8 +110,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
         name: "Branch Following Test",
         nodes: [trigger_node, branch_a1, branch_a2, branch_b1, branch_b2, merge_node],
         connections: %{},
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Add connections using the proper add_connection function
@@ -173,8 +172,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute workflow
@@ -232,8 +230,8 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       # Test the node selection logic directly
 
       # Create nodes
-      shallow_node = %Node{key: "shallow"}
-      deep_node = %Node{key: "deep"}
+      shallow_node = %Node{key: "shallow", type: "test.shallow_action"}
+      deep_node = %Node{key: "deep", type: "test.deep_action"}
 
       # Context with node depths
       execution_context = %{
@@ -255,8 +253,8 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
     test "select_node_for_branch_following handles nodes with same depth" do
       # Test when nodes have the same depth (should select first one)
 
-      node_a = %Node{key: "node_a"}
-      node_b = %Node{key: "node_b"}
+      node_a = %Node{key: "node_a", type: "test.node_a_action"}
+      node_b = %Node{key: "node_b", type: "test.node_b_action"}
 
       # Context with same depth for both nodes
       execution_context = %{

@@ -33,64 +33,47 @@ defmodule Prana.WorkflowExecution do
       Repo.get_by(Execution, resume_token: "abc123def456")
   """
 
+  use Skema
+
   alias Prana.Core.Error
+
+  defschema do
+    field(:id, :string, required: true)
+    field(:workflow_id, :string, required: true)
+    field(:workflow_version, :integer, default: 1)
+    field(:execution_graph, Prana.ExecutionGraph)
+    field(:parent_execution_id, :string)
+    field(:execution_mode, :atom, default: :async)
+    field(:status, :atom, default: :pending)
+    field(:error, :any)
+    field(:trigger_type, :string)
+    field(:trigger_data, :map, default: %{})
+    field(:vars, :map, default: %{})
+
+    #   node_executions: %{String.t() => [Prana.NodeExecution.t()]},
+    field(:node_executions, :map, default: %{})
+    field(:current_execution_index, :integer, default: 0)
+
+    # Structured suspension fields
+    field(:suspended_node_id, :string)
+    field(:suspension_type, :string)
+    field(:suspension_data, :map)
+    field(:suspended_at, :datetime)
+
+    # Execution timestamps
+    field(:started_at, :datetime)
+    field(:completed_at, :datetime)
+
+    # Runtime state
+    field(:__runtime, :map, default: %{})
+
+    # Additional metadata
+    field(:preparation_data, :map, default: %{})
+    field(:metadata, :map, default: %{})
+  end
 
   @type status :: :pending | :running | :suspended | :completed | :failed | :cancelled | :timeout
   @type execution_mode :: :sync | :async | :fire_and_forget
-
-  @type t :: %__MODULE__{
-          id: String.t(),
-          workflow_id: String.t(),
-          workflow_version: integer(),
-          execution_graph: Prana.ExecutionGraph.t(),
-          parent_execution_id: String.t() | nil,
-          execution_mode: execution_mode(),
-          status: status(),
-          error: String.t() | map() | nil,
-          trigger_type: String.t(),
-          trigger_data: map(),
-          vars: map(),
-          node_executions: %{String.t() => [Prana.NodeExecution.t()]},
-          current_execution_index: integer(),
-          preparation_data: map(),
-          suspended_node_id: String.t() | nil,
-          suspension_type: SuspensionData.suspension_type() | nil,
-          suspension_data: SuspensionData.suspension_data() | nil,
-          suspended_at: DateTime.t() | nil,
-          started_at: DateTime.t() | nil,
-          completed_at: DateTime.t() | nil,
-          metadata: map(),
-          __runtime:
-            %{
-              String.t() => any()
-            }
-            | nil
-        }
-
-  defstruct [
-    :id,
-    :workflow_id,
-    :workflow_version,
-    :execution_graph,
-    :parent_execution_id,
-    :execution_mode,
-    :status,
-    :error,
-    :trigger_type,
-    :trigger_data,
-    :vars,
-    :node_executions,
-    :current_execution_index,
-    :suspended_node_id,
-    :suspension_type,
-    :suspension_data,
-    :suspended_at,
-    :started_at,
-    :completed_at,
-    :__runtime,
-    preparation_data: %{},
-    metadata: %{}
-  ]
 
   @doc """
   Creates a new execution
@@ -98,28 +81,15 @@ defmodule Prana.WorkflowExecution do
   def new(graph, trigger_type, vars) do
     execution_id = generate_id()
 
-    %__MODULE__{
+    new(%{
       id: execution_id,
       workflow_id: graph.workflow_id,
       execution_graph: graph,
-      parent_execution_id: nil,
       execution_mode: :async,
       status: :pending,
-      error: nil,
       trigger_type: trigger_type,
-      trigger_data: %{},
-      vars: vars,
-      node_executions: %{},
-      current_execution_index: 0,
-      preparation_data: %{},
-      suspended_node_id: nil,
-      suspension_type: nil,
-      suspension_data: nil,
-      suspended_at: nil,
-      started_at: nil,
-      completed_at: nil,
-      metadata: %{}
-    }
+      vars: vars
+    })
   end
 
   @doc """

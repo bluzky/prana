@@ -176,8 +176,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
           to_port: "main"
         }
       ],
-      variables: %{},
-      metadata: %{}
+      variables: %{}
     }
   end
 
@@ -208,8 +207,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -251,8 +249,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -277,8 +274,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -310,8 +306,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -331,8 +326,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -352,8 +346,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -379,8 +372,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -405,8 +397,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -436,8 +427,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow

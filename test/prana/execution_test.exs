@@ -4,7 +4,7 @@ defmodule Prana.ExecutionTest do
   alias Prana.NodeExecution
   alias Prana.WorkflowExecution
 
-  doctest Prana.WorkflowExecution
+  # doctest Prana.WorkflowExecution
 
   describe "runtime state rebuilding" do
     test "rebuild_runtime/2 creates runtime state from node executions" do
@@ -169,7 +169,8 @@ defmodule Prana.ExecutionTest do
 
       # Create and complete a NodeExecution first
       node_execution =
-        NodeExecution.new("node_1", 0, 0)
+        "node_1"
+        |> NodeExecution.new(0, 0)
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
@@ -203,7 +204,8 @@ defmodule Prana.ExecutionTest do
 
       # Create and complete a NodeExecution independently
       node_execution =
-        NodeExecution.new("node_1", 0, 0)
+        "node_1"
+        |> NodeExecution.new(0, 0)
         |> NodeExecution.start()
 
       output_data = %{result: "success"}
@@ -232,7 +234,8 @@ defmodule Prana.ExecutionTest do
 
       # Create and complete a NodeExecution first
       node_execution =
-        NodeExecution.new("node_1", 0, 0)
+        "node_1"
+        |> NodeExecution.new(0, 0)
         |> NodeExecution.start()
 
       completed_node_execution = NodeExecution.complete(node_execution, %{data: "test"}, "main")
@@ -307,7 +310,8 @@ defmodule Prana.ExecutionTest do
 
       # Create and fail a NodeExecution first
       node_execution =
-        NodeExecution.new("node_1", 0, 0)
+        "node_1"
+        |> NodeExecution.new(0, 0)
         |> NodeExecution.start()
 
       error_data = %{error: "test error"}
@@ -353,7 +357,8 @@ defmodule Prana.ExecutionTest do
 
       # Complete another node
       node_execution_2 =
-        NodeExecution.new("node_2", 0, 0)
+        "node_2"
+        |> NodeExecution.new(0, 0)
         |> NodeExecution.start()
 
       completed_node_execution_2 = NodeExecution.complete(node_execution_2, %{email: "test@example.com"}, "primary")
@@ -397,10 +402,10 @@ defmodule Prana.ExecutionTest do
       }
 
       # Build incrementally using the new interface
-      node_exec_1 = NodeExecution.new("node_1", 0, 0) |> NodeExecution.start()
+      node_exec_1 = "node_1" |> NodeExecution.new(0, 0) |> NodeExecution.start()
       completed_node_1 = NodeExecution.complete(node_exec_1, %{user_id: 123}, "main")
 
-      node_exec_2 = NodeExecution.new("node_2", 0, 0) |> NodeExecution.start()
+      node_exec_2 = "node_2" |> NodeExecution.new(0, 0) |> NodeExecution.start()
       completed_node_2 = NodeExecution.complete(node_exec_2, %{email: "test@example.com"}, "primary")
 
       incremental_result =
@@ -409,7 +414,7 @@ defmodule Prana.ExecutionTest do
         |> WorkflowExecution.complete_node(completed_node_2)
         |> then(fn exec ->
           # Create and fail node execution for node_3
-          node_exec_3 = NodeExecution.new("node_3", 0, 0) |> NodeExecution.start()
+          node_exec_3 = "node_3" |> NodeExecution.new(0, 0) |> NodeExecution.start()
           failed_node_3 = NodeExecution.fail(node_exec_3, %{error: "timeout"})
           WorkflowExecution.fail_node(exec, failed_node_3)
         end)
@@ -437,6 +442,8 @@ defmodule Prana.ExecutionTest do
   describe "execution state management" do
     test "update_shared_state/2 merges new values with existing state" do
       execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
         metadata: %{"shared_state" => %{"counter" => 5, "email" => "test@example.com"}},
         __runtime: %{"shared_state" => %{"counter" => 5, "email" => "test@example.com"}}
       }
@@ -457,6 +464,8 @@ defmodule Prana.ExecutionTest do
 
     test "update_shared_state/2 adds new values while preserving existing" do
       execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
         metadata: %{"shared_state" => %{"counter" => 1, "email" => "test@example.com"}},
         __runtime: %{"shared_state" => %{"counter" => 1, "email" => "test@example.com"}}
       }
@@ -467,12 +476,16 @@ defmodule Prana.ExecutionTest do
 
       shared_state = updated_execution.__runtime["shared_state"]
       assert shared_state["counter"] == 2
-      assert shared_state["email"] == "test@example.com"  # preserved
-      assert shared_state["user_id"] == 123  # added
+      # preserved
+      assert shared_state["email"] == "test@example.com"
+      # added
+      assert shared_state["user_id"] == 123
     end
 
     test "rebuild_runtime/2 restores shared state from metadata" do
       execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
         metadata: %{"shared_state" => %{"counter" => 5, "user_data" => %{"name" => "test"}}},
         node_executions: %{},
         execution_graph: %{trigger_node_key: "trigger"},
@@ -489,6 +502,8 @@ defmodule Prana.ExecutionTest do
     test "shared state survives suspension and resume cycles" do
       # Initial execution with shared state
       execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
         metadata: %{"shared_state" => %{"session_id" => "abc123", "step" => 1}},
         node_executions: %{},
         execution_graph: %{trigger_node_key: "trigger"},

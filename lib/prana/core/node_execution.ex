@@ -3,58 +3,35 @@ defmodule Prana.NodeExecution do
   Represents execution state of an individual node
   """
 
+  use Skema
+
+  defschema do
+    field(:node_key, :string, required: true)
+    field(:status, :atom, default: :pending)
+    field(:params, :map, default: %{})
+    field(:output_data, :map)
+    field(:output_port, :string)
+    field(:error_data, :map)
+    field(:started_at, :datetime)
+    field(:completed_at, :datetime)
+    field(:duration_ms, :integer)
+    field(:suspension_type, :atom)
+    field(:suspension_data, :any)
+    field(:execution_index, :integer, default: 0)
+    field(:run_index, :integer, default: 0)
+  end
+
   @type status :: :pending | :running | :completed | :failed | :skipped | :suspended
-
-  @type t :: %__MODULE__{
-          node_key: String.t(),
-          status: status(),
-          params: map(),
-          output_data: map() | nil,
-          output_port: String.t() | nil,
-          error_data: map() | nil,
-          started_at: DateTime.t() | nil,
-          completed_at: DateTime.t() | nil,
-          duration_ms: integer() | nil,
-          suspension_type: atom() | nil,
-          suspension_data: term() | nil,
-          execution_index: integer(),
-          run_index: integer()
-        }
-
-  defstruct [
-    :node_key,
-    :status,
-    :output_data,
-    :output_port,
-    :error_data,
-    :started_at,
-    :completed_at,
-    :duration_ms,
-    :suspension_type,
-    :suspension_data,
-    params: %{},
-    execution_index: 0,
-    run_index: 0
-  ]
 
   @doc """
   Creates a new node execution
   """
-  def new(node_key, execution_index \\ 0, run_index \\ 0) do
-    %__MODULE__{
+  def new(node_key, execution_index, run_index) do
+    new(%{
       node_key: node_key,
-      status: :pending,
-      output_data: nil,
-      output_port: nil,
-      error_data: nil,
-      started_at: nil,
-      completed_at: nil,
-      duration_ms: nil,
-      suspension_type: nil,
-      suspension_data: nil,
       execution_index: execution_index,
       run_index: run_index
-    }
+    })
   end
 
   @doc """
