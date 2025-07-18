@@ -24,13 +24,12 @@ defmodule PranaDemo.DemoWorkflow do
     workflow = Workflow.new("Simple Demo Workflow", "A simple workflow for demonstration")
 
     # Create nodes
-    trigger_node = Node.new("Trigger", "manual", "trigger", %{}, "trigger")
+    trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
 
     set_data_node =
       Node.new(
         "Set Data",
-        "manual",
-        "set_data",
+        "data.set_data",
         %{
           "data" => %{
             "user_id" => "$input.user_id",
@@ -44,8 +43,7 @@ defmodule PranaDemo.DemoWorkflow do
     process_node =
       Node.new(
         "Process Adult",
-        "manual",
-        "process_adult",
+        "manual.process_adult",
         %{
           "user_data" => "$nodes.set_data.data"
         },
@@ -90,13 +88,12 @@ defmodule PranaDemo.DemoWorkflow do
       Workflow.new("Conditional Demo Workflow", "A conditional workflow for demonstration")
 
     # Create nodes
-    trigger_node = Node.new("Trigger", "manual", "trigger", %{}, "trigger")
+    trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
 
     set_data_node =
       Node.new(
         "Set Data",
-        "manual",
-        "set_data",
+        "data.set_data",
         %{
           "data" => %{
             "user_id" => "$input.user_id",
@@ -110,8 +107,7 @@ defmodule PranaDemo.DemoWorkflow do
     condition_node =
       Node.new(
         "Age Check",
-        "logic",
-        "if_condition",
+        "logic.if_condition",
         %{
           "condition" => "$nodes.set_data.data.age >= 18"
         },
@@ -121,8 +117,7 @@ defmodule PranaDemo.DemoWorkflow do
     process_adult_node =
       Node.new(
         "Process Adult",
-        "manual",
-        "process_adult",
+        "manual.process_adult",
         %{
           "user_data" => "$nodes.set_data.data"
         },
@@ -132,8 +127,7 @@ defmodule PranaDemo.DemoWorkflow do
     process_minor_node =
       Node.new(
         "Process Minor",
-        "manual",
-        "process_minor",
+        "manual.process_minor",
         %{
           "user_data" => "$nodes.set_data.data"
         },
@@ -267,49 +261,33 @@ defmodule PranaDemo.DemoWorkflow do
     workflow = Workflow.new("Loop Demo Workflow", "A loop workflow demonstrating retry patterns")
 
     # Create nodes
-    trigger_node = Node.new("Trigger", "manual", "trigger", %{}, "trigger")
-
-    attempt_node =
-      Node.new(
-        "Attempt Operation",
-        "manual",
-        "attempt_operation",
-        %{
-          "max_attempts" => 3,
-          "data" => "$input"
-        },
-        "attempt_operation"
-      )
+    trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
 
     # Check if retry is needed (attempt_count < max_attempts)
     retry_check_node =
       Node.new(
         "Check Retry",
-        "logic",
-        "if_condition",
+        "logic.if_condition",
         %{
-          "condition" =>
-            "$nodes.attempt_operation.attempt_count < $nodes.attempt_operation.max_attempts"
+          "condition" => "{{$execution.run_index < 3}}"
         },
         "retry_check"
       )
 
-    increment_node =
+    process_data_node =
       Node.new(
-        "Increment Retry",
-        "manual",
-        "increment_retry",
+        "Process data",
+        "data.set_data",
         %{
-          "attempt_count" => "$nodes.attempt_operation.attempt_count"
+          "name" => "me"
         },
-        "increment_retry"
+        "process_data"
       )
 
     process_success_node =
       Node.new(
         "Process Success",
-        "manual",
-        "process_adult",
+        "manual.process_adult",
         %{
           "result" => "$nodes.attempt_operation"
         },
@@ -318,9 +296,8 @@ defmodule PranaDemo.DemoWorkflow do
 
     # Add nodes to workflow
     {:ok, workflow} = Workflow.add_node(workflow, trigger_node)
-    {:ok, workflow} = Workflow.add_node(workflow, attempt_node)
     {:ok, workflow} = Workflow.add_node(workflow, retry_check_node)
-    {:ok, workflow} = Workflow.add_node(workflow, increment_node)
+    {:ok, workflow} = Workflow.add_node(workflow, process_data_node)
     {:ok, workflow} = Workflow.add_node(workflow, process_success_node)
 
     # Create connections for loop pattern
@@ -328,25 +305,13 @@ defmodule PranaDemo.DemoWorkflow do
       %Connection{
         from: "trigger",
         from_port: "main",
-        to: "attempt_operation",
-        to_port: "main"
-      },
-      %Connection{
-        from: "attempt_operation",
-        from_port: "main",
-        to: "process_success",
-        to_port: "main"
-      },
-      %Connection{
-        from: "attempt_operation",
-        from_port: "error",
         to: "retry_check",
         to_port: "main"
       },
       %Connection{
         from: "retry_check",
         from_port: "true",
-        to: "increment_retry",
+        to: "process_data",
         to_port: "main"
       },
       %Connection{
@@ -356,9 +321,9 @@ defmodule PranaDemo.DemoWorkflow do
         to_port: "main"
       },
       %Connection{
-        from: "increment_retry",
+        from: "process_data",
         from_port: "main",
-        to: "attempt_operation",
+        to: "retry_check",
         to_port: "main"
       }
     ]
@@ -390,13 +355,12 @@ defmodule PranaDemo.DemoWorkflow do
     sub_workflow = create_simple_sub_workflow()
 
     # Create main workflow nodes
-    trigger_node = Node.new("Trigger", "manual", "trigger", %{}, "trigger")
+    trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
 
     sub_workflow_node =
       Node.new(
         "Execute Sub Workflow",
-        "workflow",
-        "execute_workflow",
+        "workflow.execute_workflow",
         %{
           "workflow_id" => sub_workflow.id,
           "execution_mode" => execution_mode,
@@ -411,8 +375,7 @@ defmodule PranaDemo.DemoWorkflow do
     process_result_node =
       Node.new(
         "Process Result",
-        "manual",
-        "process_adult",
+        "manual.process_adult",
         %{
           "sub_workflow_result" => "$nodes.execute_sub_workflow"
         },
@@ -455,13 +418,12 @@ defmodule PranaDemo.DemoWorkflow do
     sub_workflow = Workflow.new("Simple Sub Workflow", "A simple sub workflow for demonstration")
 
     # Create nodes
-    trigger_node = Node.new("Sub Trigger", "manual", "trigger", %{}, "sub_trigger")
+    trigger_node = Node.new("Sub Trigger", "manual.trigger", %{}, "sub_trigger")
 
     process_node =
       Node.new(
         "Sub Process",
-        "manual",
-        "set_data",
+        "data.set_data",
         %{
           "result" => %{
             "sub_task_completed" => true,
@@ -499,13 +461,12 @@ defmodule PranaDemo.DemoWorkflow do
     workflow = Workflow.new("Wait Demo Workflow", "Demonstrates wait operations with timers")
 
     # Create nodes
-    trigger_node = Node.new("Trigger", "manual", "trigger", %{}, "trigger")
+    trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
 
     set_data_node =
       Node.new(
         "Set Data",
-        "manual",
-        "set_data",
+        "data.set_data",
         %{
           "data" => %{
             "task_id" => "$input.task_id",
@@ -519,8 +480,7 @@ defmodule PranaDemo.DemoWorkflow do
     wait_node =
       Node.new(
         "Wait Timer",
-        "wait",
-        "wait",
+        "wait.wait",
         %{
           "mode" => "interval",
           "duration" => duration_ms,
@@ -532,8 +492,7 @@ defmodule PranaDemo.DemoWorkflow do
     process_after_wait_node =
       Node.new(
         "Process After Wait",
-        "manual",
-        "process_adult",
+        "manual.process_adult",
         %{
           "original_data" => "$nodes.set_data.data",
           "wait_completed" => true

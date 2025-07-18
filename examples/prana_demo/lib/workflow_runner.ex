@@ -6,7 +6,6 @@ defmodule PranaDemo.WorkflowRunner do
   workflow execution, suspension/resume patterns, and database persistence.
   """
 
-  alias Prana.WorkflowExecution
   alias Prana.GraphExecutor
   alias Prana.WorkflowCompiler
   alias PranaDemo.ETSStorage
@@ -37,7 +36,7 @@ defmodule PranaDemo.WorkflowRunner do
   def resume_workflow(execution, resume_input) do
     Logger.info("Resuming workflow execution: #{execution.id}")
 
-    GraphExecutor.resume_workflow(execution, resume_input)
+    GraphExecutor.resume_workflow(execution, resume_input, %{})
     |> handle_result()
   end
 
@@ -51,26 +50,19 @@ defmodule PranaDemo.WorkflowRunner do
   defp init_execution(execution_graph, input, opts) do
     Logger.debug("Initializing execution context")
 
-    # Create execution using WorkflowExecution.new
-    execution = WorkflowExecution.new(execution_graph, "manual_trigger", input)
-
-    # Rebuild runtime state with environment data
-    env_data = Map.get(opts, :env, %{})
-    execution_with_runtime = WorkflowExecution.rebuild_runtime(execution, env_data)
-
-    # Add application-specific metadata
-    enhanced_execution = %{
-      execution_with_runtime
-      | metadata:
-          Map.merge(execution_with_runtime.metadata, %{
-            "created_at" => DateTime.utc_now(),
-            "updated_at" => DateTime.utc_now(),
-            "input" => input,
-            "options" => opts
-          })
+    # Use GraphExecutor.initialize_execution instead of manual creation
+    context = %{
+      env: Map.get(opts, :env, %{}),
+      variables: Map.merge(execution_graph.variables, %{"input" => input}),
+      metadata: %{
+        "created_at" => DateTime.utc_now(),
+        "updated_at" => DateTime.utc_now(),
+        "input" => input,
+        "options" => opts
+      }
     }
 
-    {:ok, enhanced_execution}
+    GraphExecutor.initialize_execution(execution_graph, context)
   end
 
   defp insert_db(execution) do
@@ -93,7 +85,7 @@ defmodule PranaDemo.WorkflowRunner do
             Logger.info("Resuming execution immediately")
             ETSStorage.update_execution(updated_execution)
 
-            GraphExecutor.resume_workflow(updated_execution, resume_data)
+            GraphExecutor.resume_workflow(updated_execution, resume_data, %{})
             |> handle_result()
 
           {:wait, updated_execution} ->
@@ -261,17 +253,6 @@ defmodule PranaDemo.WorkflowRunner do
     :ok
   end
 
-  defp enqueue_for_execution(_workflow, _input, _parent_execution) do
-    Logger.info("Enqueueing workflow for background execution")
-
-    # In a real application, enqueue to your job processing system
-    # For example, with Oban:
-    # %{workflow: workflow, input: input, parent_execution_id: parent_execution&.id}
-    # |> MyApp.Workers.WorkflowExecutor.new()
-    # |> Oban.insert()
-
-    :ok
-  end
 
   @doc """
   Start the ETS storage for the demo.

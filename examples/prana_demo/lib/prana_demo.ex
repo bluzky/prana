@@ -18,6 +18,19 @@ defmodule PranaDemo do
   def start do
     Logger.info("Starting Prana Demo")
 
+    # Start the ETS storage
+    case WorkflowRunner.start_storage() do
+      {:ok, _pid} ->
+        Logger.info("ETS storage started successfully")
+
+      {:error, {:already_started, _pid}} ->
+        Logger.info("ETS storage already started")
+
+      error ->
+        Logger.error("Failed to start ETS storage: #{inspect(error)}")
+        error
+    end
+
     # Start the integration registry
     case IntegrationRegistry.start_link([]) do
       {:ok, _pid} ->
