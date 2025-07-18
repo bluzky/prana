@@ -836,6 +836,290 @@ defmodule PranaDemo.DemoWorkflow do
   end
 
   @doc """
+  Create a workflow from a string key map using Workflow.from_map/1.
+  
+  This demonstrates how to load workflow data from serialized formats
+  like JSON or database storage.
+  """
+  def create_workflow_from_map(workflow_data) do
+    try do
+      Workflow.from_map(workflow_data)
+    rescue
+      error ->
+        Logger.error("Failed to create workflow from map: #{inspect(error)}")
+        {:error, error}
+    end
+  end
+
+  @doc """
+  Get the simple workflow as a string key map.
+  """
+  def get_simple_workflow_map do
+    %{
+      "id" => "simple_demo_workflow",
+      "name" => "Simple Demo Workflow",
+      "description" => "A simple workflow for demonstration",
+      "version" => 1,
+      "variables" => %{},
+      "nodes" => [
+        %{
+          "name" => "Trigger",
+          "type" => "manual.trigger",
+          "params" => %{},
+          "key" => "trigger"
+        },
+        %{
+          "name" => "Set Data",
+          "type" => "data.set_data",
+          "params" => %{
+            "data" => %{
+              "user_id" => "$input.user_id",
+              "name" => "$input.name",
+              "age" => "$input.age"
+            }
+          },
+          "key" => "set_data"
+        },
+        %{
+          "name" => "Process Adult",
+          "type" => "manual.process_adult",
+          "params" => %{
+            "user_data" => "$nodes.set_data.data"
+          },
+          "key" => "process_adult"
+        }
+      ],
+      "connections" => %{
+        "trigger" => %{
+          "main" => [
+            %{
+              "from" => "trigger",
+              "from_port" => "main",
+              "to" => "set_data",
+              "to_port" => "main"
+            }
+          ]
+        },
+        "set_data" => %{
+          "main" => [
+            %{
+              "from" => "set_data",
+              "from_port" => "main",
+              "to" => "process_adult",
+              "to_port" => "main"
+            }
+          ]
+        }
+      }
+    }
+  end
+
+  @doc """
+  Get the conditional workflow as a string key map.
+  """
+  def get_conditional_workflow_map do
+    %{
+      "id" => "conditional_demo_workflow",
+      "name" => "Conditional Demo Workflow",
+      "description" => "A conditional workflow for demonstration",
+      "version" => 1,
+      "variables" => %{},
+      "nodes" => [
+        %{
+          "name" => "Trigger",
+          "type" => "manual.trigger",
+          "params" => %{},
+          "key" => "trigger"
+        },
+        %{
+          "name" => "Set Data",
+          "type" => "data.set_data",
+          "params" => %{
+            "data" => %{
+              "user_id" => "$input.user_id",
+              "name" => "$input.name",
+              "age" => "$input.age"
+            }
+          },
+          "key" => "set_data"
+        },
+        %{
+          "name" => "Age Check",
+          "type" => "logic.if_condition",
+          "params" => %{
+            "condition" => "$nodes.set_data.data.age >= 18"
+          },
+          "key" => "age_check"
+        },
+        %{
+          "name" => "Process Adult",
+          "type" => "manual.process_adult",
+          "params" => %{
+            "user_data" => "$nodes.set_data.data"
+          },
+          "key" => "process_adult"
+        },
+        %{
+          "name" => "Process Minor",
+          "type" => "manual.process_minor",
+          "params" => %{
+            "user_data" => "$nodes.set_data.data"
+          },
+          "key" => "process_minor"
+        }
+      ],
+      "connections" => %{
+        "trigger" => %{
+          "main" => [
+            %{
+              "from" => "trigger",
+              "from_port" => "main",
+              "to" => "set_data",
+              "to_port" => "main"
+            }
+          ]
+        },
+        "set_data" => %{
+          "main" => [
+            %{
+              "from" => "set_data",
+              "from_port" => "main",
+              "to" => "age_check",
+              "to_port" => "main"
+            }
+          ]
+        },
+        "age_check" => %{
+          "true" => [
+            %{
+              "from" => "age_check",
+              "from_port" => "true",
+              "to" => "process_adult",
+              "to_port" => "main"
+            }
+          ],
+          "false" => [
+            %{
+              "from" => "age_check",
+              "from_port" => "false",
+              "to" => "process_minor",
+              "to_port" => "main"
+            }
+          ]
+        }
+      }
+    }
+  end
+
+  @doc """
+  Create a simple workflow from a string key map.
+  """
+  def create_simple_workflow_from_map do
+    workflow_data = get_simple_workflow_map()
+    create_workflow_from_map(workflow_data)
+  end
+
+  @doc """
+  Create a conditional workflow from a string key map.
+  """
+  def create_conditional_workflow_from_map do
+    workflow_data = get_conditional_workflow_map()
+    create_workflow_from_map(workflow_data)
+  end
+
+  @doc """
+  Run a simple workflow demo using the from_map approach.
+  """
+  def run_simple_demo_from_map do
+    Logger.info("Starting simple workflow demo (from map)")
+
+    # Start storage
+    case WorkflowRunner.start_storage() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    # Create workflow from map
+    workflow = create_simple_workflow_from_map()
+    {:ok, _} = ETSStorage.store_workflow(workflow)
+
+    # Input data
+    input_data = %{
+      "user_id" => "user123",
+      "name" => "John Doe",
+      "age" => 25
+    }
+
+    # Execute workflow
+    case WorkflowRunner.execute_workflow(workflow, input_data, %{}) do
+      {:ok, execution} ->
+        Logger.info("Workflow (from map) completed successfully!")
+        Logger.info("Final execution status: #{execution.status}")
+        Logger.info("Execution ID: #{execution.id}")
+        {:ok, execution}
+
+      {:error, reason} ->
+        Logger.error("Workflow (from map) failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Run a conditional workflow demo using the from_map approach.
+  """
+  def run_conditional_demo_from_map do
+    Logger.info("Starting conditional workflow demo (from map)")
+
+    # Start storage
+    case WorkflowRunner.start_storage() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    # Create workflow from map
+    workflow = create_conditional_workflow_from_map()
+    {:ok, _} = ETSStorage.store_workflow(workflow)
+
+    # Test with adult user
+    adult_input = %{
+      "user_id" => "user123",
+      "name" => "John Doe",
+      "age" => 25
+    }
+
+    Logger.info("Testing with adult user (age 25)")
+
+    case WorkflowRunner.execute_workflow(workflow, adult_input, %{}) do
+      {:ok, execution} ->
+        Logger.info("Adult workflow (from map) completed successfully!")
+        Logger.info("Final execution status: #{execution.status}")
+
+      {:error, reason} ->
+        Logger.error("Adult workflow (from map) failed: #{inspect(reason)}")
+    end
+
+    # Test with minor user
+    minor_input = %{
+      "user_id" => "user456",
+      "name" => "Jane Smith",
+      "age" => 16
+    }
+
+    Logger.info("Testing with minor user (age 16)")
+
+    case WorkflowRunner.execute_workflow(workflow, minor_input, %{}) do
+      {:ok, execution} ->
+        Logger.info("Minor workflow (from map) completed successfully!")
+        Logger.info("Final execution status: #{execution.status}")
+        {:ok, execution}
+
+      {:error, reason} ->
+        Logger.error("Minor workflow (from map) failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @doc """
   Run all demos in sequence.
   """
   def run_all_demos do
