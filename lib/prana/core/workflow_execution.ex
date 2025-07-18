@@ -34,6 +34,7 @@ defmodule Prana.WorkflowExecution do
   """
 
   alias Prana.Core.SuspensionData
+  alias Prana.Core.Error
 
   @type status :: :pending | :running | :suspended | :completed | :failed | :cancelled | :timeout
   @type execution_mode :: :sync | :async | :fire_and_forget
@@ -857,7 +858,7 @@ defmodule Prana.WorkflowExecution do
           end
         rescue
           error ->
-            {:error, %{type: "preparation_exception", message: Exception.message(error)}}
+            {:error, Error.new("preparation_exception", Exception.message(error))}
         end
 
       {:error, _reason} ->

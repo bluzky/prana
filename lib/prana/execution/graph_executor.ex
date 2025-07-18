@@ -108,6 +108,7 @@ defmodule Prana.GraphExecutor do
   alias Prana.NodeExecution
   alias Prana.NodeExecutor
   alias Prana.WorkflowExecution
+  alias Prana.Core.Error
 
   require Logger
 
@@ -132,7 +133,7 @@ defmodule Prana.GraphExecutor do
     {:ok, execution}
   rescue
     error ->
-      {:error, %{type: "initialization_error", message: Exception.message(error), error: error}}
+      {:error, Error.new("initialization_error", Exception.message(error), %{exception: error})}
   end
 
   @doc """

@@ -78,7 +78,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:error, error_data, "error"} = result
-      assert error_data.type == "sub_workflow_setup_error"
+      assert error_data.code == "action_error"
       assert error_data.message == "workflow_id is required"
     end
 
@@ -88,7 +88,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:error, error_data, "error"} = result
-      assert error_data.type == "sub_workflow_setup_error"
+      assert error_data.code == "action_error"
       assert error_data.message == "workflow_id cannot be empty"
     end
 
@@ -98,7 +98,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:error, error_data, "error"} = result
-      assert error_data.type == "sub_workflow_setup_error"
+      assert error_data.code == "action_error"
       assert error_data.message == "workflow_id must be a string"
     end
 
@@ -111,7 +111,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:error, error_data, "error"} = result
-      assert error_data.type == "sub_workflow_setup_error"
+      assert error_data.code == "action_error"
       assert error_data.message == "execution_mode must be 'sync', 'async', or 'fire_and_forget'"
     end
 
@@ -124,7 +124,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:error, error_data, "error"} = result
-      assert error_data.type == "sub_workflow_setup_error"
+      assert error_data.code == "action_error"
       assert error_data.message == "timeout_ms must be a positive integer"
     end
 
@@ -137,7 +137,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:error, error_data, "error"} = result
-      assert error_data.type == "sub_workflow_setup_error"
+      assert error_data.code == "action_error"
       assert error_data.message == "failure_strategy must be 'fail_parent' or 'continue'"
     end
 
