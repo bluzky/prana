@@ -17,6 +17,7 @@ defmodule Prana.Integrations.Workflow do
 
   alias Prana.Integration
   alias Prana.Integrations.Workflow.ExecuteWorkflowAction
+  alias Prana.Integrations.Workflow.SetStateAction
 
   @doc """
   Returns the integration definition with all available actions
@@ -30,7 +31,8 @@ defmodule Prana.Integrations.Workflow do
       version: "1.0.0",
       category: "coordination",
       actions: %{
-        "execute_workflow" => ExecuteWorkflowAction.specification()
+        "execute_workflow" => ExecuteWorkflowAction.specification(),
+        "set_state" => SetStateAction.specification()
       }
     }
   end

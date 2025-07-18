@@ -319,12 +319,13 @@ defmodule Prana.NodeExecutorTest do
       node = Node.new("test_node", "test", "with_context", %{"data" => "test"})
       routed_input = %{"data" => "test"}
 
-      assert {:ok, node_execution} =
+      assert {:ok, node_execution, state_updates} =
                NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
 
       assert node_execution.status == :completed
       assert node_execution.output_data == %{data: %{"data" => "test"}}
       assert node_execution.output_port == "main"
+      assert state_updates == %{processing_time: 100}
     end
 
     test "handles action errors", %{execution: execution} do

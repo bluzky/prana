@@ -440,4 +440,82 @@ defmodule Prana.ExecutionTest do
       # Note: executed_nodes not included in simplified rebuild_runtime
     end
   end
+
+  describe "execution state management" do
+    test "update_shared_state/2 merges new values with existing state" do
+      execution = %WorkflowExecution{
+        metadata: %{"shared_state" => %{"counter" => 5, "email" => "test@example.com"}},
+        __runtime: %{"shared_state" => %{"counter" => 5, "email" => "test@example.com"}}
+      }
+
+      # Update only counter, email should be preserved
+      updates = %{"counter" => 10}
+      updated_execution = WorkflowExecution.update_shared_state(execution, updates)
+
+      # Check runtime state - counter updated, email preserved
+      shared_state = updated_execution.__runtime["shared_state"]
+      assert shared_state["counter"] == 10
+      assert shared_state["email"] == "test@example.com"
+
+      # Check persistent metadata
+      assert updated_execution.metadata["shared_state"]["counter"] == 10
+      assert updated_execution.metadata["shared_state"]["email"] == "test@example.com"
+    end
+
+    test "update_shared_state/2 adds new values while preserving existing" do
+      execution = %WorkflowExecution{
+        metadata: %{"shared_state" => %{"counter" => 1, "email" => "test@example.com"}},
+        __runtime: %{"shared_state" => %{"counter" => 1, "email" => "test@example.com"}}
+      }
+
+      # Add user_id, update counter, preserve email
+      updates = %{"user_id" => 123, "counter" => 2}
+      updated_execution = WorkflowExecution.update_shared_state(execution, updates)
+
+      shared_state = updated_execution.__runtime["shared_state"]
+      assert shared_state["counter"] == 2
+      assert shared_state["email"] == "test@example.com"  # preserved
+      assert shared_state["user_id"] == 123  # added
+    end
+
+    test "rebuild_runtime/2 restores shared state from metadata" do
+      execution = %WorkflowExecution{
+        metadata: %{"shared_state" => %{"counter" => 5, "user_data" => %{"name" => "test"}}},
+        node_executions: %{},
+        execution_graph: %{trigger_node_key: "trigger"},
+        __runtime: nil
+      }
+
+      rebuilt_execution = WorkflowExecution.rebuild_runtime(execution, %{})
+      shared_state = rebuilt_execution.__runtime["shared_state"]
+
+      assert shared_state["counter"] == 5
+      assert shared_state["user_data"]["name"] == "test"
+    end
+
+    test "shared state survives suspension and resume cycles" do
+      # Initial execution with shared state
+      execution = %WorkflowExecution{
+        metadata: %{"shared_state" => %{"session_id" => "abc123", "step" => 1}},
+        node_executions: %{},
+        execution_graph: %{trigger_node_key: "trigger"},
+        __runtime: %{"shared_state" => %{"session_id" => "abc123", "step" => 1}}
+      }
+
+      # Update shared state before suspension
+      updated_execution = WorkflowExecution.update_shared_state(execution, %{"step" => 2, "data" => "important"})
+
+      # Simulate suspension (runtime state lost)
+      suspended_execution = %{updated_execution | __runtime: nil}
+
+      # Rebuild runtime (simulating resume)
+      resumed_execution = WorkflowExecution.rebuild_runtime(suspended_execution, %{})
+      shared_state = resumed_execution.__runtime["shared_state"]
+
+      # Shared state should be restored
+      assert shared_state["session_id"] == "abc123"
+      assert shared_state["step"] == 2
+      assert shared_state["data"] == "important"
+    end
+  end
 end

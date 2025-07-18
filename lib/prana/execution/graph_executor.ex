@@ -367,6 +367,18 @@ defmodule Prana.GraphExecutor do
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
         {result_node_execution, final_execution}
 
+      {:ok, result_node_execution, shared_state_updates} ->
+        # Complete the node execution at workflow level
+        updated_execution =
+          execution
+          |> Prana.WorkflowExecution.complete_node(result_node_execution)
+          |> Prana.WorkflowExecution.update_shared_state(shared_state_updates)
+
+        # Increment execution index for next node
+        final_execution = %{updated_execution | current_execution_index: execution_index + 1}
+        Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
+        {result_node_execution, final_execution}
+
       {:suspend, suspended_node_execution} ->
         # Handle node suspension - emit middleware event for application handling
         Middleware.call(:node_suspended, %{

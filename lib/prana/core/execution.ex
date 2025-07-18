@@ -361,6 +361,7 @@ defmodule Prana.WorkflowExecution do
   - `"active_paths"` - Active conditional branching paths
   - `"executed_nodes"` - Chronological list of executed node IDs
   - `"active_nodes"` - List of node that is actively to check for executable. They are nodes without input or node with fresh input data. Or nodes that are waiting for all inputs to be ready.
+  - `"shared_state"` - Shared state data that persists across node executions within the same workflow
 
   ## Example
 
@@ -376,6 +377,7 @@ defmodule Prana.WorkflowExecution do
       execution.__runtime["env"]           # %{"api_key" => "abc123", ...}
       execution.__runtime["active_paths"]  # %{"path_1" => true, "path_2" => true}
       execution.__runtime["executed_nodes"] # ["node_1", "node_2"]
+      execution.__runtime["shared_state"]  # %{"counter" => 5, "user_data" => %{...}}
   """
   def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
     node_outputs = rebuild_completed_node_outputs(execution.node_executions)
@@ -383,6 +385,9 @@ defmodule Prana.WorkflowExecution do
 
     max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
     current_iteration_count = execution.metadata["iteration_count"] || 0
+    
+    # Restore shared state from metadata if available
+    shared_state = execution.metadata["shared_state"] || %{}
 
     runtime = %{
       "nodes" => node_outputs,
@@ -390,7 +395,8 @@ defmodule Prana.WorkflowExecution do
       "active_nodes" => active_nodes,
       "iteration_count" => current_iteration_count,
       "max_iterations" => max_iterations,
-      "node_depth" => %{}
+      "node_depth" => %{},
+      "shared_state" => shared_state
     }
 
     %{execution | __runtime: runtime}
@@ -761,6 +767,31 @@ defmodule Prana.WorkflowExecution do
   """
   def get_active_nodes(execution) do
     execution.__runtime["active_nodes"] || MapSet.new()
+  end
+
+  @doc """
+  Update shared state with new or modified values.
+
+  This function updates the shared state both in runtime context and persists
+  it to metadata for recovery after suspension/resume cycles.
+
+  ## Parameters
+  - `execution` - The execution to update
+  - `updates` - Map of key-value pairs to update in shared state
+
+  ## Returns
+  Updated execution with modified shared state
+  """
+  def update_shared_state(execution, updates) when is_map(updates) do
+    current_shared_state = execution.__runtime["shared_state"] || %{}
+    new_shared_state = Map.merge(current_shared_state, updates)
+    
+    # Update both runtime and persistent metadata
+    execution
+    |> update_runtime_safely(fn runtime ->
+      Map.put(runtime, "shared_state", new_shared_state)
+    end)
+    |> put_in([Access.key(:metadata), "shared_state"], new_shared_state)
   end
 
   @doc """
