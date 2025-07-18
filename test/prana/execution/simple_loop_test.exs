@@ -15,9 +15,9 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
   # alias Prana.WorkflowExecution
   # alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
+  alias Prana.Integrations.Data
   alias Prana.Integrations.Logic
   alias Prana.Integrations.Manual
-  alias Prana.Integrations.Data
   alias Prana.Integrations.Workflow, as: WorkflowIntegration
   alias Prana.Node
   alias Prana.Workflow
@@ -105,8 +105,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           key: "start",
           name: "Start",
           type: "manual.trigger",
-          params: %{},
-          metadata: %{}
+          params: %{}
         },
 
         # Initialize counter
@@ -114,8 +113,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           key: "init_counter",
           name: "Initialize Counter",
           type: "data.set_data",
-          params: %{"counter" => 0, "max_count" => 3},
-          metadata: %{}
+          params: %{"counter" => 0, "max_count" => 3}
         },
 
         # Loop body - increment counter using runIndex
@@ -125,8 +123,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           type: "data.set_data",
           params: %{
             "counter" => "{{$execution.run_index + 1}}"
-          },
-          metadata: %{}
+          }
         },
 
         # Loop condition - check if counter < max_count
@@ -136,8 +133,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           type: "logic.if_condition",
           params: %{
             "condition" => "{{$execution.run_index < 3}}"
-          },
-          metadata: %{}
+          }
         },
 
         # Final result node
@@ -145,8 +141,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           key: "complete",
           name: "Complete",
           type: "data.set_data",
-          params: %{"result" => "loop_completed"},
-          metadata: %{}
+          params: %{"result" => "loop_completed"}
         }
       ],
       connections: [
@@ -155,8 +150,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "start",
           from_port: "main",
           to: "init_counter",
-          to_port: "main",
-          metadata: %{}
+          to_port: "main"
         },
 
         # Initialize Counter -> Increment (first iteration)
@@ -164,8 +158,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "init_counter",
           from_port: "main",
           to: "increment",
-          to_port: "main",
-          metadata: %{}
+          to_port: "main"
         },
 
         # Increment -> Loop Condition
@@ -173,8 +166,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "increment",
           from_port: "main",
           to: "loop_condition",
-          to_port: "main",
-          metadata: %{}
+          to_port: "main"
         },
 
         # Loop Condition -> Increment (loop back - true branch)
@@ -182,8 +174,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "loop_condition",
           from_port: "true",
           to: "increment",
-          to_port: "main",
-          metadata: %{}
+          to_port: "main"
         },
 
         # Loop Condition -> Complete (exit loop - false branch)
@@ -191,15 +182,12 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
           from: "loop_condition",
           from_port: "false",
           to: "complete",
-          to_port: "main",
-          metadata: %{}
+          to_port: "main"
         }
       ],
-      variables: %{},
-      metadata: %{}
+      variables: %{}
     }
   end
-
 
   # ============================================================================
   # Test Cases
@@ -216,8 +204,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       # Create execution context
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow
@@ -242,7 +229,6 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
     end
   end
 
-
   describe "loop termination" do
     test "prevents infinite loops with proper condition design" do
       workflow = convert_connections_to_map(create_simple_counter_loop_workflow())
@@ -253,8 +239,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       # Create execution context
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
-        variables: %{},
-        metadata: %{}
+        variables: %{}
       }
 
       # Execute the workflow with a timeout to prevent infinite loops
