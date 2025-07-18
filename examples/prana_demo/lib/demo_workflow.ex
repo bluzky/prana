@@ -1028,10 +1028,13 @@ defmodule PranaDemo.DemoWorkflow do
   end
 
   @doc """
-  Run a simple workflow demo using the from_map approach.
+  Create and execute a simple workflow from a string key map.
+  
+  This combines workflow creation from map data with execution in one step,
+  demonstrating how to load and run workflows from serialized data.
   """
-  def run_simple_demo_from_map do
-    Logger.info("Starting simple workflow demo (from map)")
+  def create_and_execute_simple_workflow_from_map do
+    Logger.info("Creating and executing simple workflow from map")
 
     # Start storage
     case WorkflowRunner.start_storage() do
@@ -1039,14 +1042,15 @@ defmodule PranaDemo.DemoWorkflow do
       {:error, {:already_started, _pid}} -> :ok
     end
 
-    # Create workflow from map
-    workflow = create_simple_workflow_from_map()
+    # Create workflow from map data
+    workflow_data = get_simple_workflow_map()
+    workflow = create_workflow_from_map(workflow_data)
     {:ok, _} = ETSStorage.store_workflow(workflow)
 
     # Input data
     input_data = %{
       "user_id" => "user123",
-      "name" => "John Doe",
+      "name" => "John Doe", 
       "age" => 25
     }
 
@@ -1065,10 +1069,20 @@ defmodule PranaDemo.DemoWorkflow do
   end
 
   @doc """
-  Run a conditional workflow demo using the from_map approach.
+  Run a simple workflow demo using the from_map approach.
   """
-  def run_conditional_demo_from_map do
-    Logger.info("Starting conditional workflow demo (from map)")
+  def run_simple_demo_from_map do
+    create_and_execute_simple_workflow_from_map()
+  end
+
+  @doc """
+  Create and execute a conditional workflow from a string key map.
+  
+  This combines workflow creation from map data with execution in one step,
+  testing both adult and minor user scenarios.
+  """
+  def create_and_execute_conditional_workflow_from_map do
+    Logger.info("Creating and executing conditional workflow from map")
 
     # Start storage
     case WorkflowRunner.start_storage() do
@@ -1076,8 +1090,9 @@ defmodule PranaDemo.DemoWorkflow do
       {:error, {:already_started, _pid}} -> :ok
     end
 
-    # Create workflow from map
-    workflow = create_conditional_workflow_from_map()
+    # Create workflow from map data
+    workflow_data = get_conditional_workflow_map()
+    workflow = create_workflow_from_map(workflow_data)
     {:ok, _} = ETSStorage.store_workflow(workflow)
 
     # Test with adult user
@@ -1115,6 +1130,46 @@ defmodule PranaDemo.DemoWorkflow do
 
       {:error, reason} ->
         Logger.error("Minor workflow (from map) failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Run a conditional workflow demo using the from_map approach.
+  """
+  def run_conditional_demo_from_map do
+    create_and_execute_conditional_workflow_from_map()
+  end
+
+  @doc """
+  Create and execute a workflow from any string key map with input data.
+  
+  This is a generic function that takes workflow data and input data,
+  creates the workflow from the map, and executes it in one step.
+  """
+  def create_and_execute_workflow_from_map(workflow_data, input_data, variables \\ %{}) do
+    Logger.info("Creating and executing workflow from map data")
+
+    # Start storage
+    case WorkflowRunner.start_storage() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    # Create workflow from map data
+    workflow = create_workflow_from_map(workflow_data)
+    {:ok, _} = ETSStorage.store_workflow(workflow)
+
+    # Execute workflow
+    case WorkflowRunner.execute_workflow(workflow, input_data, variables) do
+      {:ok, execution} ->
+        Logger.info("Workflow (from map) completed successfully!")
+        Logger.info("Final execution status: #{execution.status}")
+        Logger.info("Execution ID: #{execution.id}")
+        {:ok, execution}
+
+      {:error, reason} ->
+        Logger.error("Workflow (from map) failed: #{inspect(reason)}")
         {:error, reason}
     end
   end
