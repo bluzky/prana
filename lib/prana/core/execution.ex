@@ -46,6 +46,7 @@ defmodule Prana.WorkflowExecution do
           parent_execution_id: String.t() | nil,
           execution_mode: execution_mode(),
           status: status(),
+          error: String.t() | map() | nil,
           trigger_type: String.t(),
           trigger_data: map(),
           vars: map(),
@@ -74,6 +75,7 @@ defmodule Prana.WorkflowExecution do
     :parent_execution_id,
     :execution_mode,
     :status,
+    :error,
     :trigger_type,
     :trigger_data,
     :vars,
@@ -103,6 +105,7 @@ defmodule Prana.WorkflowExecution do
       parent_execution_id: nil,
       execution_mode: :async,
       status: :pending,
+      error: nil,
       trigger_type: trigger_type,
       trigger_data: %{},
       vars: vars,
@@ -136,8 +139,8 @@ defmodule Prana.WorkflowExecution do
   @doc """
   Marks execution as failed
   """
-  def fail(%__MODULE__{} = execution) do
-    %{execution | status: :failed, completed_at: DateTime.utc_now()}
+  def fail(%__MODULE__{} = execution, error \\ nil) do
+    %{execution | status: :failed, error: error, completed_at: DateTime.utc_now()}
   end
 
   @doc """
@@ -385,7 +388,7 @@ defmodule Prana.WorkflowExecution do
 
     max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
     current_iteration_count = execution.metadata["iteration_count"] || 0
-    
+
     # Restore shared state from metadata if available
     shared_state = execution.metadata["shared_state"] || %{}
 
@@ -785,7 +788,7 @@ defmodule Prana.WorkflowExecution do
   def update_shared_state(execution, updates) when is_map(updates) do
     current_shared_state = execution.__runtime["shared_state"] || %{}
     new_shared_state = Map.merge(current_shared_state, updates)
-    
+
     # Update both runtime and persistent metadata
     execution
     |> update_runtime_safely(fn runtime ->

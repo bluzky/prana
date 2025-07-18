@@ -17,6 +17,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
   alias Prana.GraphExecutor
   alias Prana.Integrations.Logic
   alias Prana.Integrations.Manual
+  alias Prana.Integrations.Data
   alias Prana.Integrations.Workflow, as: WorkflowIntegration
   alias Prana.Node
   alias Prana.Workflow
@@ -43,6 +44,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
     # Start integration registry for each test
     Code.ensure_loaded(Prana.Integrations.Logic)
     Code.ensure_loaded(Prana.Integrations.Manual)
+    Code.ensure_loaded(Prana.Integrations.Data)
     Code.ensure_loaded(Prana.Integrations.Workflow)
     {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
@@ -63,6 +65,15 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       {:error, reason} ->
         GenServer.stop(registry_pid)
         raise "Failed to register Manual integration: #{inspect(reason)}"
+    end
+
+    case Prana.IntegrationRegistry.register_integration(Data) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        GenServer.stop(registry_pid)
+        raise "Failed to register Data integration: #{inspect(reason)}"
     end
 
     case Prana.IntegrationRegistry.register_integration(WorkflowIntegration) do
@@ -103,7 +114,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "init_counter",
           name: "Initialize Counter",
-          integration_name: "manual",
+          integration_name: "data",
           action_name: "set_data",
           params: %{"counter" => 0, "max_count" => 3},
           metadata: %{}
@@ -113,7 +124,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "increment",
           name: "Increment Counter",
-          integration_name: "manual",
+          integration_name: "data",
           action_name: "set_data",
           params: %{
             "counter" => "{{$execution.run_index + 1}}"
@@ -137,7 +148,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
         %Node{
           key: "complete",
           name: "Complete",
-          integration_name: "manual",
+          integration_name: "data",
           action_name: "set_data",
           params: %{"result" => "loop_completed"},
           metadata: %{}

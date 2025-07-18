@@ -8,7 +8,6 @@ defmodule Prana.Integrations.Manual do
   alias Prana.Integration
   alias Prana.Integrations.Manual.ProcessAdultAction
   alias Prana.Integrations.Manual.ProcessMinorAction
-  alias Prana.Integrations.Manual.SetDataAction
   alias Prana.Integrations.Manual.TriggerAction
 
   @impl true
@@ -22,8 +21,7 @@ defmodule Prana.Integrations.Manual do
       actions: %{
         "trigger" => TriggerAction.specification(),
         "process_adult" => ProcessAdultAction.specification(),
-        "process_minor" => ProcessMinorAction.specification(),
-        "set_data" => SetDataAction.specification()
+        "process_minor" => ProcessMinorAction.specification()
       }
     }
   end
