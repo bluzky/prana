@@ -19,21 +19,19 @@ defmodule MyApp.CustomIntegration do
       description: "Custom actions for workflows",
       actions: %{
         "my_action" => %Prana.Action{
-          name: "my_action",
+          name: "custom.my_action",
           display_name: "My Action",
           description: "Performs custom logic",
+          type: :action,
           module: __MODULE__,
-          function: :my_action,
           input_ports: ["input"],
-          output_ports: ["success", "error"],
-          
-
+          output_ports: ["success", "error"]
         }
       }
     }
   end
 
-  def my_action(input) do
+  def execute(input, _context) do
     # Your action implementation here
     {:ok, %{result: "processed"}}
   end
@@ -48,7 +46,7 @@ Actions must return specific tuple formats that Prana understands. The NodeExecu
 
 #### 1. Simple Success
 ```elixir
-def my_action(input) do
+def execute(input, _context) do
   result = process_data(input)
   {:ok, result}
 end
@@ -58,7 +56,7 @@ end
 
 #### 2. Simple Error
 ```elixir
-def my_action(input) do
+def execute(input, _context) do
   case validate_params(input) do
     :ok -> {:ok, process_data(input)}
     {:error, reason} -> {:error, reason}
@@ -70,7 +68,7 @@ end
 
 #### 3. Explicit Port Selection
 ```elixir
-def my_action(input) do
+def execute(input, _context) do
   case input["operation_type"] do
     "create" -> {:ok, create_result, "created"}
     "update" -> {:ok, update_result, "updated"}
@@ -85,7 +83,7 @@ end
 
 #### 4. Suspension for Async Operations
 ```elixir
-def execute_sub_workflow(input) do
+def execute(input, _context) do
   # Validate and prepare sub-workflow execution
   case setup_sub_workflow(input) do
     {:ok, workflow_data} ->
@@ -190,7 +188,7 @@ end
 Create actions with multiple output ports for complex routing:
 
 ```elixir
-def classify_data(input) do
+def execute(input, _context) do
   confidence = calculate_confidence(input["data"])
 
   cond do
@@ -205,8 +203,12 @@ end
 Action definition:
 ```elixir
 %Prana.Action{
-  name: "classify_data",
-  # ... other fields
+  name: "custom.classify_data",
+  display_name: "Classify Data",
+  description: "Classifies data based on confidence levels",
+  type: :action,
+  module: __MODULE__,
+  input_ports: ["input"],
   output_ports: ["high_confidence", "medium_confidence", "low_confidence", "manual_review", "error"]
 }
 ```
@@ -217,14 +219,18 @@ For integrations that need unlimited output routing:
 
 ```elixir
 %Prana.Action{
-  name: "dynamic_router",
-  # ... other fields
+  name: "custom.dynamic_router",
+  display_name: "Dynamic Router",
+  description: "Routes to dynamic ports based on input",
+  type: :action,
+  module: __MODULE__,
+  input_ports: ["input"],
   output_ports: ["*"]  # Allows any port name
 }
 
-def execute(input_map) do
-  port_name = determine_route(input_map)
-  {:ok, input_map, port_name}
+def execute(input, _context) do
+  port_name = determine_route(input)
+  {:ok, input, port_name}
 end
 ```
 
@@ -232,7 +238,7 @@ end
 
 #### Structured Error Returns
 ```elixir
-def risky_operation(input) do
+def execute(input, _context) do
   case perform_operation(input) do
     {:ok, result} ->
       {:ok, result}
@@ -251,7 +257,7 @@ end
 
 #### Graceful Degradation
 ```elixir
-def fetch_with_fallback(input) do
+def execute(input, _context) do
   case primary_fetch(input) do
     {:ok, data} -> {:ok, data, "primary"}
     {:error, _} ->
@@ -272,28 +278,26 @@ Actions receive enriched input that combines both their explicitly mapped data A
 #### Input Structure
 
 ```elixir
-def my_action(enriched_input) do
-  # enriched_input contains:
-  # 1. Explicitly mapped data from the node's input_map
-  # 2. Full context access via prefixed keys
+def execute(input, context) do
+  # input contains explicitly mapped data from the node's params
+  user_email = input["user_email"]      # From "$input.user.email"
+  api_key = input["api_key"]            # From "$variables.api_key"
+  prev_result = input["previous_data"]  # From "$nodes.step1.result"
 
-  # Explicitly mapped data (from node's input_map)
-  user_email = enriched_input["user_email"]      # From "$input.user.email"
-  api_key = enriched_input["api_key"]            # From "$variables.api_key"
-  prev_result = enriched_input["previous_data"]  # From "$nodes.step1.result"
-
-  # Full context access (always available)
-  full_input = enriched_input["$input"]      # Complete workflow input
-  all_nodes = enriched_input["$nodes"]       # All completed node results
-  variables = enriched_input["$variables"]   # All workflow variables
+  # context provides full workflow context access
+  full_input = context["$input"]      # Complete workflow input
+  all_nodes = context["$nodes"]       # All completed node results
+  variables = context["$vars"]        # All workflow variables
 
   # Use explicit data for primary logic
   send_email(to: user_email, api_key: api_key)
 
   # Use context access for advanced scenarios
-  if enriched_input["$input"]["debug_mode"] do
+  if context["$input"]["debug_mode"] do
     log_debug_info(all_nodes)
   end
+
+  {:ok, %{message_sent: true}}
 end
 ```
 
@@ -313,7 +317,7 @@ end
 }
 
 # Action receives
-def send_email(input) do
+def execute(input, context) do
   # Clean, explicit dependencies
   to = input["to"]                    # "user@example.com"
   subject = input["subject"]          # "Welcome!"
@@ -321,7 +325,7 @@ def send_email(input) do
   api_key = input["api_key"]          # "key123"
 
   # Full context also available if needed
-  debug_mode = input["$input"]["debug_mode"]  # Optional debugging
+  debug_mode = context["$input"]["debug_mode"]  # Optional debugging
 
   {:ok, %{message_id: "123", sent_to: to}}
 end
@@ -338,24 +342,24 @@ end
 }
 
 # Action uses context for dynamic data access
-def dynamic_processor(input) do
+def execute(input, context) do
   operation = input["operation_type"]  # Explicit mapping
 
   case operation do
     "user_data" ->
       # Access specific user data from context
-      user_data = input["$input"]["user"]
+      user_data = context["$input"]["user"]
       {:ok, process_user(user_data)}
 
     "node_results" ->
       # Access all previous node results
-      results = input["$nodes"]
+      results = context["$nodes"]
       {:ok, aggregate_results(results)}
 
     "variable_lookup" ->
       # Access workflow variables dynamically
-      var_name = input["$input"]["variable_name"]
-      value = input["$variables"][var_name]
+      var_name = context["$input"]["variable_name"]
+      value = context["$vars"][var_name]
       {:ok, %{variable: var_name, value: value}}
   end
 end
@@ -363,15 +367,17 @@ end
 
 ### Context Structure
 
-The enriched input always includes these context keys:
+Actions receive two parameters: `input` (prepared parameters) and `context` (full workflow context):
 
 ```elixir
-%{
-  # Your explicitly mapped data
+# Input parameter - your explicitly mapped data from node params
+input = %{
   "user_id" => 123,
-  "status" => "active",
+  "status" => "active"
+}
 
-  # Full context access (safe prefixed keys)
+# Context parameter - full workflow context
+context = %{
   "$input" => %{
     # Complete workflow input data
     "user_id" => 123,
@@ -379,16 +385,25 @@ The enriched input always includes these context keys:
     "settings" => %{"theme" => "dark"}
   },
   "$nodes" => %{
-    # Results from all completed nodes (keyed by custom_id)
+    # Results from all completed nodes (keyed by node key)
     "validation_step" => %{"valid" => true, "score" => 95},
     "api_call" => %{"response" => %{"status" => "success"}},
     "transform" => %{"processed_data" => [...]}
   },
-  "$variables" => %{
+  "$vars" => %{
     # All workflow variables
     "api_key" => "secret123",
     "timeout_ms" => 5000,
     "environment" => "production"
+  },
+  "$workflow" => %{
+    "id" => "user_processing_workflow",
+    "version" => 1
+  },
+  "$execution" => %{
+    "id" => "exec_123",
+    "mode" => :async,
+    "state" => %{}  # Shared execution state
   }
 }
 ```
@@ -398,7 +413,7 @@ The enriched input always includes these context keys:
 Validate input data within your actions:
 
 ```elixir
-def validate_and_process(input) do
+def execute(input, _context) do
   with :ok <- validate_required_fields(input),
        :ok <- validate_data_types(input),
        {:ok, processed} <- process_data(input) do
@@ -438,16 +453,18 @@ defmodule MyApp.CustomIntegrationTest do
 
   alias MyApp.CustomIntegration
 
-  test "my_action processes input correctly" do
+  test "execute processes input correctly" do
     input = %{"data" => "test"}
-    result = CustomIntegration.my_action(input)
+    context = %{"$input" => %{}, "$nodes" => %{}, "$vars" => %{}}
+    result = CustomIntegration.execute(input, context)
 
     assert {:ok, %{result: "processed"}} = result
   end
 
-  test "my_action handles suspension" do
+  test "execute handles suspension" do
     input = %{"operation" => "async_task"}
-    result = CustomIntegration.my_action(input)
+    context = %{"$input" => %{}, "$nodes" => %{}, "$vars" => %{}}
+    result = CustomIntegration.execute(input, context)
 
     assert {:suspend, :custom_suspension, suspend_data} = result
     assert suspend_data.task_id
@@ -464,9 +481,8 @@ test "integration works in workflow" do
   workflow = %Workflow{
     nodes: [
       %Node{
-        id: "test_node",
-        integration_name: "custom",
-        action_name: "my_action",
+        key: "test_node",
+        type: "custom.my_action",
         params: %{"data" => "$input.user_data"}
       }
     ]
@@ -502,9 +518,9 @@ See the [Built-in Integrations Guide](../built-in-integrations.md) for detailed 
 ### Memory Management
 
 ```elixir
-def execute(input_map) do
+def execute(input, _context) do
   # Instead of loading everything into memory
-  result = input_map["file_path"]
+  result = input["file_path"]
   |> File.stream!()
   |> Stream.map(&process_line/1)
   |> Enum.reduce(%{count: 0}, &accumulate_results/2)
@@ -518,10 +534,10 @@ end
 Design actions to be idempotent when possible, especially for suspended operations:
 
 ```elixir
-def execute(input_map) do
-  case check_if_already_processed(input_map["request_id"]) do
+def execute(input, _context) do
+  case check_if_already_processed(input["request_id"]) do
     {:ok, existing_result} -> {:ok, existing_result, "success"}
-    {:error, :not_found} -> perform_action(input_map)
+    {:error, :not_found} -> perform_action(input)
   end
 end
 ```
