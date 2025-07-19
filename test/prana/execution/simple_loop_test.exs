@@ -98,7 +98,6 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
     %Workflow{
       id: "counter_loop_test",
       name: "Counter Loop Test Workflow",
-      description: "Test simple counter-based loop using Logic integration",
       nodes: [
         # Start/trigger node
         %Node{

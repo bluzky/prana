@@ -21,7 +21,7 @@ defmodule PranaDemo.DemoWorkflow do
   """
   def create_simple_workflow do
     # Create workflow
-    workflow = Workflow.new("Simple Demo Workflow", "A simple workflow for demonstration")
+    workflow = Workflow.new("Simple Demo Workflow")
 
     # Create nodes
     trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
@@ -85,7 +85,7 @@ defmodule PranaDemo.DemoWorkflow do
   def create_conditional_workflow do
     # Create workflow
     workflow =
-      Workflow.new("Conditional Demo Workflow", "A conditional workflow for demonstration")
+      Workflow.new("Conditional Demo Workflow")
 
     # Create nodes
     trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
@@ -258,7 +258,7 @@ defmodule PranaDemo.DemoWorkflow do
   """
   def create_loop_workflow do
     # Create workflow
-    workflow = Workflow.new("Loop Demo Workflow", "A loop workflow demonstrating retry patterns")
+    workflow = Workflow.new("Loop Demo Workflow")
 
     # Create nodes
     trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
@@ -415,7 +415,7 @@ defmodule PranaDemo.DemoWorkflow do
 
   defp create_simple_sub_workflow do
     # Create a simple sub workflow
-    sub_workflow = Workflow.new("Simple Sub Workflow", "A simple sub workflow for demonstration")
+    sub_workflow = Workflow.new("Simple Sub Workflow")
 
     # Create nodes
     trigger_node = Node.new("Sub Trigger", "manual.trigger", %{}, "sub_trigger")
@@ -458,7 +458,7 @@ defmodule PranaDemo.DemoWorkflow do
   """
   def create_wait_demo(duration_ms \\ 2000) do
     # Create workflow
-    workflow = Workflow.new("Wait Demo Workflow", "Demonstrates wait operations with timers")
+    workflow = Workflow.new("Wait Demo Workflow")
 
     # Create nodes
     trigger_node = Node.new("Trigger", "manual.trigger", %{}, "trigger")
@@ -837,7 +837,7 @@ defmodule PranaDemo.DemoWorkflow do
 
   @doc """
   Create a workflow from a string key map using Workflow.from_map/1.
-  
+
   This demonstrates how to load workflow data from serialized formats
   like JSON or database storage.
   """
@@ -1029,7 +1029,7 @@ defmodule PranaDemo.DemoWorkflow do
 
   @doc """
   Create and execute a simple workflow from a string key map.
-  
+
   This combines workflow creation from map data with execution in one step,
   demonstrating how to load and run workflows from serialized data.
   """
@@ -1050,7 +1050,7 @@ defmodule PranaDemo.DemoWorkflow do
     # Input data
     input_data = %{
       "user_id" => "user123",
-      "name" => "John Doe", 
+      "name" => "John Doe",
       "age" => 25
     }
 
@@ -1077,7 +1077,7 @@ defmodule PranaDemo.DemoWorkflow do
 
   @doc """
   Create and execute a conditional workflow from a string key map.
-  
+
   This combines workflow creation from map data with execution in one step,
   testing both adult and minor user scenarios.
   """
@@ -1143,7 +1143,7 @@ defmodule PranaDemo.DemoWorkflow do
 
   @doc """
   Create and execute a workflow from any string key map with input data.
-  
+
   This is a generic function that takes workflow data and input data,
   creates the workflow from the map, and executes it in one step.
   """

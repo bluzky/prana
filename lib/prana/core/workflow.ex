@@ -8,27 +8,12 @@ defmodule Prana.Workflow do
   defschema do
     field(:id, :string, required: true)
     field(:name, :string, required: true)
-    field(:description, :string, default: nil)
     field(:version, :integer, default: 1)
     field(:nodes, {:array, Prana.Node}, default: [])
 
     # connections: %{String.t() => %{String.t() => [Prana.Connection.t()]}},
     field(:connections, :map, default: %{})
     field(:variables, :map, default: %{})
-  end
-
-  @doc """
-  Creates a new workflow
-  """
-  def new(name, description) do
-    new(%{
-      id: generate_id(),
-      name: name,
-      description: description,
-      nodes: [],
-      connections: %{},
-      variables: %{}
-    })
   end
 
   @doc """
@@ -51,7 +36,7 @@ defmodule Prana.Workflow do
           }
         }
       }
-      
+
       workflow = Workflow.from_map(workflow_map)
       # All nested structures are properly converted to structs
   """
@@ -69,7 +54,7 @@ defmodule Prana.Workflow do
 
   Automatically converts:
   - Connection structs to maps
-  - Node structs to maps  
+  - Node structs to maps
   - Preserves all data for round-trip serialization
 
   ## Examples
@@ -84,7 +69,7 @@ defmodule Prana.Workflow do
           }
         }
       }
-      
+
       workflow_map = Workflow.to_map(workflow)
       json_string = Jason.encode!(workflow_map)
       # Ready for storage or API transport
@@ -177,9 +162,5 @@ defmodule Prana.Workflow do
       end)
 
     {:ok, %{workflow | connections: updated_connections}}
-  end
-
-  defp generate_id do
-    UUID.uuid4()
   end
 end

@@ -84,7 +84,6 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
     %Workflow{
       id: "diamond_test",
       name: "Diamond Fork Test Workflow",
-      description: "Test basic diamond pattern execution",
       nodes: [
         # A: Start/trigger node
         %Node{

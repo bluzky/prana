@@ -10,7 +10,6 @@ defmodule Prana.Core.WorkflowStructTest do
       workflow_map = %{
         "id" => "wf_123",
         "name" => "Test Workflow",
-        "description" => "A test workflow",
         "version" => 2,
         "nodes" => [
           %{
@@ -39,7 +38,6 @@ defmodule Prana.Core.WorkflowStructTest do
 
       assert workflow.id == "wf_123"
       assert workflow.name == "Test Workflow"
-      assert workflow.description == "A test workflow"
       assert workflow.version == 2
       assert length(workflow.nodes) == 1
       assert workflow.variables == %{"env" => "test"}
@@ -70,7 +68,6 @@ defmodule Prana.Core.WorkflowStructTest do
 
       assert workflow.id == "wf_minimal"
       assert workflow.name == "Minimal Workflow"
-      assert workflow.description == nil
       assert workflow.version == 1
       assert workflow.nodes == []
       assert workflow.connections == %{}
@@ -342,7 +339,6 @@ defmodule Prana.Core.WorkflowStructTest do
       workflow = %Workflow{
         id: "wf_roundtrip",
         name: "Roundtrip Test",
-        description: "Test workflow for roundtrip serialization",
         version: 2,
         nodes: [
           %Node{key: "n1", name: "Node 1", type: "manual.test", params: %{"value" => 123}},
@@ -365,7 +361,6 @@ defmodule Prana.Core.WorkflowStructTest do
       # Verify all data is preserved
       assert restored_workflow.id == workflow.id
       assert restored_workflow.name == workflow.name
-      assert restored_workflow.description == workflow.description
       assert restored_workflow.version == workflow.version
       assert length(restored_workflow.nodes) == length(workflow.nodes)
       assert restored_workflow.variables == workflow.variables

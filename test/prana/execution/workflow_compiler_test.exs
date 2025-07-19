@@ -39,7 +39,7 @@ defmodule Prana.WorkflowCompilerTest do
 
   defp create_simple_workflow do
     # webhook -> validate -> save
-    workflow = Workflow.new("simple_workflow", "Test workflow")
+    workflow = Workflow.new(%{name: "simple_workflow"})
 
     webhook = create_trigger_node("webhook", "Webhook")
     validate = create_action_node("validate", "Validate")
@@ -61,7 +61,7 @@ defmodule Prana.WorkflowCompilerTest do
 
   defp create_parallel_workflow do
     # webhook -> [email, log]
-    workflow = Workflow.new("parallel_workflow", "Parallel test")
+    workflow = Workflow.new(%{name: "parallel_workflow"})
 
     webhook = create_trigger_node("webhook", "Webhook")
     email = create_action_node("email", "Email")
@@ -84,7 +84,7 @@ defmodule Prana.WorkflowCompilerTest do
   defp create_multiple_trigger_workflow do
     # [webhook:trigger] -> validate
     # [schedule:trigger] -> validate
-    workflow = Workflow.new("multi_trigger_workflow", "Multiple triggers")
+    workflow = Workflow.new(%{name: "multi_trigger_workflow"})
 
     webhook = create_trigger_node("webhook", "Webhook Trigger")
     schedule = create_trigger_node("schedule", "Schedule Trigger")
@@ -107,7 +107,7 @@ defmodule Prana.WorkflowCompilerTest do
   defp create_diamond_dependency_workflow do
     # trigger -> [process_a, process_b] -> final
     # final depends on both process_a and process_b completing
-    workflow = Workflow.new("diamond_workflow", "Diamond dependency pattern")
+    workflow = Workflow.new(%{name: "diamond_workflow"})
 
     trigger = create_trigger_node("trigger", "Trigger")
     process_a = create_action_node("process_a", "Process A")
@@ -136,7 +136,7 @@ defmodule Prana.WorkflowCompilerTest do
 
   defp create_multi_port_workflow do
     # webhook -> validate -> [save (success), error_log (error)]
-    workflow = Workflow.new("multi_port_workflow", "Multiple output ports")
+    workflow = Workflow.new(%{name: "multi_port_workflow"})
 
     webhook = create_trigger_node("webhook", "Webhook")
     validate = create_action_node("validate", "Validate")
@@ -163,7 +163,7 @@ defmodule Prana.WorkflowCompilerTest do
 
   defp create_terminal_node_workflow do
     # webhook -> process -> output (no outgoing connections)
-    workflow = Workflow.new("terminal_workflow", "Workflow with terminal node")
+    workflow = Workflow.new(%{name: "terminal_workflow"})
 
     webhook = create_trigger_node("webhook", "Webhook")
     process = create_action_node("process", "Process")
@@ -225,7 +225,7 @@ defmodule Prana.WorkflowCompilerTest do
     end
 
     test "returns error for empty workflow" do
-      workflow = Workflow.new("empty", "Empty workflow")
+      workflow = Workflow.new(%{name: "empty"})
 
       assert {:error, :no_trigger_nodes} = WorkflowCompiler.compile(workflow)
     end
