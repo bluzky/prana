@@ -39,8 +39,8 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
   setup do
     # Start integration registry for each test
-    Code.ensure_loaded(Prana.Integrations.Data)
-    Code.ensure_loaded(Prana.Integrations.Manual)
+    Code.ensure_loaded(Data)
+    Code.ensure_loaded(Manual)
     {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
     # Register required integrations with error handling
@@ -214,7 +214,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       result = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify successful execution
-      assert {:ok, %WorkflowExecution{status: :completed} = execution} = result
+      assert {:ok, %WorkflowExecution{status: "completed"} = execution} = result
 
       # Verify all nodes executed by checking node_executions
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
@@ -259,7 +259,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
       merge_execution = Enum.find(all_executions, &(&1.node_key == "merge"))
       assert merge_execution != nil
-      assert merge_execution.status == :completed
+      assert merge_execution.status == "completed"
       assert merge_execution.output_port == "main"
 
       # Verify merge output contains data from both branches
@@ -284,13 +284,13 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
       final_execution = Enum.find(all_executions, &(&1.node_key == "final"))
       assert final_execution != nil
-      assert final_execution.status == :completed
+      assert final_execution.status == "completed"
       assert final_execution.output_port == "main"
 
       # Verify merge node also executed successfully
       merge_execution = Enum.find(all_executions, &(&1.node_key == "merge"))
       assert merge_execution != nil
-      assert merge_execution.status == :completed
+      assert merge_execution.status == "completed"
     end
   end
 
@@ -314,7 +314,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       # Verify workflow failed with fail-fast behavior
       assert {:error, failed_execution} = result
-      assert failed_execution.status == :failed
+      assert failed_execution.status == "failed"
 
       # In fail-fast mode, execution stops early and may not execute the failing node
       # The important thing is that merge and final nodes do not execute
@@ -334,7 +334,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       # Verify workflow failed with fail-fast behavior
       assert {:error, failed_execution} = result
-      assert failed_execution.status == :failed
+      assert failed_execution.status == "failed"
 
       # In fail-fast mode, execution stops early and may not execute the failing node
       # The important thing is that merge and final nodes do not execute
@@ -354,7 +354,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       # Verify workflow failed with fail-fast behavior
       assert {:error, failed_execution} = result
-      assert failed_execution.status == :failed
+      assert failed_execution.status == "failed"
 
       # In fail-fast mode, execution stops early and may not execute the failing node
       # The important thing is that merge and final nodes do not execute
@@ -414,7 +414,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       assert merge_execution != nil
 
       # Verify merge result contains combined data
-      assert merge_execution.status == :completed
+      assert merge_execution.status == "completed"
       assert merge_execution.output_port == "main"
       merged_output = merge_execution.output_data
       assert is_list(merged_output)
@@ -442,7 +442,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       assert merge_execution != nil
 
       # Verify final node executed successfully with access to context
-      assert final_execution.status == :completed
+      assert final_execution.status == "completed"
       assert final_execution.output_port == "main"
 
       # Verify all diamond pattern nodes are accessible in execution

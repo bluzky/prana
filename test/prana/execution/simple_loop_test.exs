@@ -42,10 +42,10 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
 
   setup do
     # Start integration registry for each test
-    Code.ensure_loaded(Prana.Integrations.Logic)
-    Code.ensure_loaded(Prana.Integrations.Manual)
-    Code.ensure_loaded(Prana.Integrations.Data)
-    Code.ensure_loaded(Prana.Integrations.Workflow)
+    Code.ensure_loaded(Logic)
+    Code.ensure_loaded(Manual)
+    Code.ensure_loaded(Data)
+    Code.ensure_loaded(WorkflowIntegration)
     {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
     # Register required integrations with error handling
@@ -211,7 +211,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution completed successfully
-      assert execution.status == :completed
+      assert execution.status == "completed"
 
       # Verify that multiple iterations occurred
       # The increment node should have been executed multiple times
@@ -252,7 +252,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       result = Task.await(task, 5000)
 
       assert {:ok, execution} = result
-      assert execution.status == :completed
+      assert execution.status == "completed"
 
       # Total node executions should be reasonable (not infinite)
       total_executions = execution.node_executions |> Map.values() |> List.flatten() |> length()

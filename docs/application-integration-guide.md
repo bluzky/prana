@@ -630,7 +630,7 @@ defmodule MyApp.SuspensionTest do
     workflow = create_test_workflow_with_wait()
 
     # Execute workflow - should suspend
-    {:suspended, execution_id, _} = Prana.WorkflowManager.execute_workflow(workflow, %{})
+    {"suspended", execution_id, _} = Prana.WorkflowManager.execute_workflow(workflow, %{})
 
     # Verify suspension was handled
     assert MyApp.Database.get_suspended_workflow(execution_id)
@@ -640,7 +640,7 @@ defmodule MyApp.SuspensionTest do
     {:ok, result} = Prana.WorkflowManager.resume_workflow(execution_id, event_data)
 
     # Verify completion
-    assert result.status == :completed
+    assert result.status == "completed"
     refute MyApp.Database.get_suspended_workflow(execution_id)
   end
 end

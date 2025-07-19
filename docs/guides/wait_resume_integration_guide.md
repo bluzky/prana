@@ -147,7 +147,7 @@ defmodule MyApp.WebhookController do
       {:ok, execution_id} ->
         json(conn, %{status: "completed", execution_id: execution_id})
 
-      {:suspended, execution_id, webhook_data} ->
+      {"suspended", execution_id, webhook_data} ->
         json(conn, %{status: "suspended", execution_id: execution_id})
 
       {:error, reason} ->
@@ -173,7 +173,7 @@ defmodule MyApp.WebhookController do
             json(conn, %{status: "completed", execution_id: execution_id})
         end
 
-      {:suspended, execution_id} ->
+      {"suspended", execution_id} ->
         json(conn, %{status: "suspended", execution_id: execution_id})
 
       {:error, reason} ->
@@ -218,7 +218,7 @@ defmodule MyApp.WorkflowEngine do
         # Save execution state and activate webhook
         save_suspended_execution(execution_id, suspend_data, context)
         activate_webhook(suspend_data, context)
-        {:suspended, execution_id, suspend_data}
+        {"suspended", execution_id, suspend_data}
 
       {:error, reason} ->
         cleanup_webhooks(execution_id)
@@ -250,7 +250,7 @@ defmodule MyApp.WorkflowEngine do
           # Another suspension - save state and activate new webhook
           save_suspended_execution(webhook.execution_id, suspend_data, execution.context)
           activate_webhook(suspend_data, execution.context)
-          {:suspended, webhook.execution_id}
+          {"suspended", webhook.execution_id}
 
         {:error, reason} ->
           ExecutionStorage.mark_failed(webhook.execution_id, reason)
@@ -350,7 +350,7 @@ defmodule MyApp.WebhookStorage do
       resume_id: resume_id,
       execution_id: execution_id,
       node_id: node_id,
-      status: :pending,
+      status: "pending",
       created_at: DateTime.utc_now(),
       expires_at: nil,
       webhook_config: %{}
@@ -440,7 +440,7 @@ defmodule MyApp.ExecutionStorage do
   def mark_failed(execution_id, reason) do
     case :ets.lookup(:executions, execution_id) do
       [{^execution_id, execution}] ->
-        updated = %{execution | status: :failed, error: reason}
+        updated = %{execution | status: "failed", error: reason}
         :ets.insert(:executions, {execution_id, updated})
         :ok
       [] ->
@@ -619,7 +619,7 @@ defmodule MyApp.WebhookStorage do
       resume_id: resume_id,
       execution_id: execution_id,
       node_id: node_id,
-      status: :pending
+      status: "pending"
     }
     |> Repo.insert()
   end

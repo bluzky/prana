@@ -221,7 +221,7 @@ prana/
   id: String.t(),
   execution_id: String.t(),
   node_id: String.t(),
-  status: :pending | :running | :completed | :failed | :skipped | :suspended,
+  status: "pending" | "running" | "completed" | "failed" | :skipped | "suspended",
   input_data: map(),
   output_data: map() | nil,
   output_port: String.t() | nil,   # nil for failed executions

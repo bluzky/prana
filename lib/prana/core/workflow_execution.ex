@@ -44,8 +44,8 @@ defmodule Prana.WorkflowExecution do
     field(:execution_graph, Prana.ExecutionGraph)
     field(:parent_execution_id, :string)
     field(:execution_mode, :atom, default: :async)
-    field(:status, :atom, default: :pending)
-    field(:error, :any)
+    field(:status, :string, default: "pending")
+    field(:error, :map)
     field(:trigger_type, :string)
     field(:trigger_data, :map, default: %{})
     field(:vars, :map, default: %{})
@@ -72,7 +72,7 @@ defmodule Prana.WorkflowExecution do
     field(:metadata, :map, default: %{})
   end
 
-  @type status :: :pending | :running | :suspended | :completed | :failed | :cancelled | :timeout
+  # status :: "pending" | "running" | "suspended" | "completed" | "failed" | "cancelled" | "timeout"
   @type execution_mode :: :sync | :async | :fire_and_forget
 
   @doc """
@@ -86,7 +86,7 @@ defmodule Prana.WorkflowExecution do
       workflow_id: graph.workflow_id,
       execution_graph: graph,
       execution_mode: :async,
-      status: :pending,
+      status: "pending",
       trigger_type: trigger_type,
       vars: vars
     })
@@ -96,21 +96,21 @@ defmodule Prana.WorkflowExecution do
   Marks execution as started
   """
   def start(%__MODULE__{} = execution) do
-    %{execution | status: :running, started_at: DateTime.utc_now()}
+    %{execution | status: "running", started_at: DateTime.utc_now()}
   end
 
   @doc """
   Marks execution as completed
   """
   def complete(%__MODULE__{} = execution) do
-    %{execution | status: :completed, completed_at: DateTime.utc_now()}
+    %{execution | status: "completed", completed_at: DateTime.utc_now()}
   end
 
   @doc """
   Marks execution as failed
   """
   def fail(%__MODULE__{} = execution, error \\ nil) do
-    %{execution | status: :failed, error: error, completed_at: DateTime.utc_now()}
+    %{execution | status: "failed", error: error, completed_at: DateTime.utc_now()}
   end
 
   @doc """
@@ -140,7 +140,7 @@ defmodule Prana.WorkflowExecution do
   def suspend(%__MODULE__{} = execution, node_key, suspension_type, suspension_data) do
     %{
       execution
-      | status: :suspended,
+      | status: "suspended",
         suspended_node_id: node_key,
         suspension_type: suspension_type,
         suspension_data: suspension_data,
@@ -156,7 +156,7 @@ defmodule Prana.WorkflowExecution do
   """
   @deprecated "Use suspend/4 with structured suspension data"
   def suspend(%__MODULE__{} = execution, resume_token) when is_binary(resume_token) do
-    %{execution | status: :suspended}
+    %{execution | status: "suspended"}
   end
 
   @doc """
@@ -176,14 +176,14 @@ defmodule Prana.WorkflowExecution do
   Checks if execution is in a terminal state
   """
   def terminal?(%__MODULE__{status: status}) do
-    status in [:completed, :failed, :cancelled]
+    status in ["completed", "failed", :cancelled]
   end
 
   @doc """
   Checks if execution is still running
   """
   def running?(%__MODULE__{status: status}) do
-    status in [:pending, :running, :suspended]
+    status in ["pending", "running", "suspended"]
   end
 
   # Rebuild active_nodes from execution state with loop support
@@ -243,7 +243,7 @@ defmodule Prana.WorkflowExecution do
     Map.new(execution.node_executions, fn {node_key, executions} ->
       last_execution = List.last(executions)
 
-      if last_execution && last_execution.status == :completed do
+      if last_execution && last_execution.status == "completed" do
         {node_key, last_execution}
       else
         {node_key, nil}
@@ -274,7 +274,7 @@ defmodule Prana.WorkflowExecution do
 
       execution
       |> resume_suspension()
-      |> Map.put(:status, :running)
+      |> Map.put(:status, "running")
   """
   def resume_suspension(%__MODULE__{} = execution) do
     %{
@@ -288,15 +288,15 @@ defmodule Prana.WorkflowExecution do
 
   @doc """
   Loads a workflow execution from a map with string keys, converting nested structures to proper types.
-  
+
   Automatically converts:
   - Nested node_execution maps to NodeExecution structs
   - String keys to atoms where appropriate (status, execution_mode)
   - DateTime strings to DateTime structs
   - Preserves all execution state and audit trail
-  
+
   ## Examples
-  
+
       execution_map = %{
         "id" => "exec_123",
         "workflow_id" => "wf_456",
@@ -311,45 +311,45 @@ defmodule Prana.WorkflowExecution do
         },
         "started_at" => "2024-01-01T10:00:00Z"
       }
-      
+
       execution = WorkflowExecution.from_map(execution_map)
       # All nested NodeExecution maps are converted to proper structs
       # DateTime strings are converted to DateTime structs
   """
   def from_map(data) when is_map(data) do
     {:ok, execution} = Skema.load(data, __MODULE__)
-    
+
     # Convert nested node_execution maps to NodeExecution structs
     node_executions = convert_node_executions_to_structs(execution.node_executions)
-    
+
     %{execution | node_executions: node_executions}
   end
 
   @doc """
   Converts a workflow execution to a JSON-compatible map with nested structs converted to maps.
-  
+
   Automatically converts:
   - NodeExecution structs to maps
   - DateTime structs to ISO8601 strings
   - Preserves all execution state and audit trail for round-trip serialization
-  
+
   ## Examples
-  
+
       execution = %WorkflowExecution{
         id: "exec_123",
         workflow_id: "wf_456",
-        status: :suspended,
+        status: "suspended",
         execution_mode: :async,
         node_executions: %{
           "node_1" => [%NodeExecution{
             node_key: "node_1",
-            status: :completed,
+            status: "completed",
             output_data: %{"result" => "success"}
           }]
         },
         started_at: ~U[2024-01-01 10:00:00Z]
       }
-      
+
       execution_map = WorkflowExecution.to_map(execution)
       json_string = Jason.encode!(execution_map)
       # Ready for database storage or API transport
@@ -365,9 +365,11 @@ defmodule Prana.WorkflowExecution do
   # Convert nested node_execution maps to NodeExecution structs
   defp convert_node_executions_to_structs(node_executions) when is_map(node_executions) do
     Map.new(node_executions, fn {node_key, executions} ->
-      converted_executions = Enum.map(executions, fn exec_map ->
-        Prana.NodeExecution.from_map(exec_map)
-      end)
+      converted_executions =
+        Enum.map(executions, fn exec_map ->
+          Prana.NodeExecution.from_map(exec_map)
+        end)
+
       {node_key, converted_executions}
     end)
   end
@@ -375,9 +377,11 @@ defmodule Prana.WorkflowExecution do
   # Convert nested NodeExecution structs to maps
   defp convert_node_executions_to_maps(node_executions) when is_map(node_executions) do
     Map.new(node_executions, fn {node_key, executions} ->
-      converted_executions = Enum.map(executions, fn exec_struct ->
-        Map.from_struct(exec_struct)
-      end)
+      converted_executions =
+        Enum.map(executions, fn exec_struct ->
+          Map.from_struct(exec_struct)
+        end)
+
       {node_key, converted_executions}
     end)
   end
@@ -393,7 +397,7 @@ defmodule Prana.WorkflowExecution do
       last_execution =
         executions
         |> Enum.reverse()
-        |> Enum.find(&(&1.status == :completed))
+        |> Enum.find(&(&1.status == "completed"))
 
       case last_execution do
         nil -> {node_key, nil}
@@ -522,7 +526,7 @@ defmodule Prana.WorkflowExecution do
       execution.__runtime["nodes"]["api_call"]  # Contains %{user_id: 123}
       execution.__runtime["active_nodes"]  # Updated based on completed node's outputs
   """
-  def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :completed} = completed_node_execution) do
+  def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: "completed"} = completed_node_execution) do
     node_key = completed_node_execution.node_key
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
@@ -567,7 +571,7 @@ defmodule Prana.WorkflowExecution do
       execution.node_executions  # Contains the failed NodeExecution
       execution.__runtime["nodes"]["api_call"]  # Not present (failed nodes don't provide output)
   """
-  def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :failed} = failed_node_execution) do
+  def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: "failed"} = failed_node_execution) do
     node_key = failed_node_execution.node_key
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
@@ -964,7 +968,7 @@ defmodule Prana.WorkflowExecution do
     completed_node_ids =
       execution.node_executions
       |> Enum.map(fn {node_key, executions} -> {node_key, List.last(executions)} end)
-      |> Enum.filter(fn {_, exec} -> exec.status == :completed end)
+      |> Enum.filter(fn {_, exec} -> exec.status == "completed" end)
       |> MapSet.new(fn {node_key, _} -> node_key end)
 
     # Only check active nodes instead of all nodes

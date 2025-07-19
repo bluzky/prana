@@ -137,15 +137,15 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
-      assert result.status == :completed
+      assert result.status == "completed"
       # trigger, if_condition, true_branch
       assert count_node_executions(result) == 3
 
       # Verify only true branch was executed
-      assert get_node_execution(result, "trigger").status == :completed
-      assert get_node_execution(result, "if_condition").status == :completed
+      assert get_node_execution(result, "trigger").status == "completed"
+      assert get_node_execution(result, "if_condition").status == "completed"
       assert get_node_execution(result, "if_condition").output_port == "true"
-      assert get_node_execution(result, "true_branch").status == :completed
+      assert get_node_execution(result, "true_branch").status == "completed"
       assert get_node_execution(result, "false_branch") == nil
     end
 
@@ -202,15 +202,15 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
-      assert result.status == :completed
+      assert result.status == "completed"
       # trigger, if_condition, false_branch
       assert count_node_executions(result) == 3
 
       # Verify only false branch was executed
-      assert get_node_execution(result, "trigger").status == :completed
-      assert get_node_execution(result, "if_condition").status == :completed
+      assert get_node_execution(result, "trigger").status == "completed"
+      assert get_node_execution(result, "if_condition").status == "completed"
       assert get_node_execution(result, "if_condition").output_port == "false"
-      assert get_node_execution(result, "false_branch").status == :completed
+      assert get_node_execution(result, "false_branch").status == "completed"
       assert get_node_execution(result, "true_branch") == nil
     end
 
@@ -276,16 +276,16 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
-      assert result.status == :completed
+      assert result.status == "completed"
       # trigger, if_condition, true_branch, merge
       assert count_node_executions(result) == 4
 
       # Verify execution path
-      assert get_node_execution(result, "trigger").status == :completed
-      assert get_node_execution(result, "if_condition").status == :completed
+      assert get_node_execution(result, "trigger").status == "completed"
+      assert get_node_execution(result, "if_condition").status == "completed"
       assert get_node_execution(result, "if_condition").output_port == "true"
-      assert get_node_execution(result, "true_branch").status == :completed
-      assert get_node_execution(result, "merge").status == :completed
+      assert get_node_execution(result, "true_branch").status == "completed"
+      assert get_node_execution(result, "merge").status == "completed"
       assert get_node_execution(result, "false_branch") == nil
     end
   end
@@ -349,15 +349,15 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
-      assert result.status == :completed
+      assert result.status == "completed"
       # trigger, switch, case1_branch
       assert count_node_executions(result) == 3
 
       # Verify only case1 branch was executed
-      assert get_node_execution(result, "trigger").status == :completed
-      assert get_node_execution(result, "switch").status == :completed
+      assert get_node_execution(result, "trigger").status == "completed"
+      assert get_node_execution(result, "switch").status == "completed"
       assert get_node_execution(result, "switch").output_port == "case1"
-      assert get_node_execution(result, "case1_branch").status == :completed
+      assert get_node_execution(result, "case1_branch").status == "completed"
       assert get_node_execution(result, "case2_branch") == nil
     end
 
@@ -419,15 +419,15 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
-      assert result.status == :completed
+      assert result.status == "completed"
       # trigger, switch, case2_branch
       assert count_node_executions(result) == 3
 
       # Verify only case2 branch was executed
-      assert get_node_execution(result, "trigger").status == :completed
-      assert get_node_execution(result, "switch").status == :completed
+      assert get_node_execution(result, "trigger").status == "completed"
+      assert get_node_execution(result, "switch").status == "completed"
       assert get_node_execution(result, "switch").output_port == "case2"
-      assert get_node_execution(result, "case2_branch").status == :completed
+      assert get_node_execution(result, "case2_branch").status == "completed"
       assert get_node_execution(result, "case1_branch") == nil
     end
 
@@ -508,16 +508,16 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
-      assert result.status == :completed
+      assert result.status == "completed"
       # trigger, switch, case3_branch, merge
       assert count_node_executions(result) == 4
 
       # Verify only case3 branch was executed (first non-empty condition)
-      assert get_node_execution(result, "trigger").status == :completed
-      assert get_node_execution(result, "switch").status == :completed
+      assert get_node_execution(result, "trigger").status == "completed"
+      assert get_node_execution(result, "switch").status == "completed"
       assert get_node_execution(result, "switch").output_port == "case3"
-      assert get_node_execution(result, "case3_branch").status == :completed
-      assert get_node_execution(result, "merge").status == :completed
+      assert get_node_execution(result, "case3_branch").status == "completed"
+      assert get_node_execution(result, "merge").status == "completed"
       assert get_node_execution(result, "case1_branch") == nil
       assert get_node_execution(result, "case2_branch") == nil
     end
@@ -565,7 +565,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
 
       # Verify execution failed with fail-fast behavior
       assert {:error, result} = execution_result
-      assert result.status == :failed
+      assert result.status == "failed"
 
       # In fail-fast mode, execution stops early when invalid conditions are detected
       # The switch node with empty/nil conditions is detected as invalid before execution
@@ -638,17 +638,17 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
       {:ok, result} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution results
-      assert result.status == :completed
+      assert result.status == "completed"
       # trigger, switch, if_condition, false_branch
       assert count_node_executions(result) == 4
 
       # Verify execution path
-      assert get_node_execution(result, "trigger").status == :completed
-      assert get_node_execution(result, "switch").status == :completed
+      assert get_node_execution(result, "trigger").status == "completed"
+      assert get_node_execution(result, "switch").status == "completed"
       assert get_node_execution(result, "switch").output_port == "case1"
-      assert get_node_execution(result, "if_condition").status == :completed
+      assert get_node_execution(result, "if_condition").status == "completed"
       assert get_node_execution(result, "if_condition").output_port == "false"
-      assert get_node_execution(result, "false_branch").status == :completed
+      assert get_node_execution(result, "false_branch").status == "completed"
       assert get_node_execution(result, "true_branch") == nil
     end
   end

@@ -28,11 +28,11 @@ We will implement a **Distributed Webhook System** with clear separation of resp
 
 ### Prana Library Responsibilities
 - **Webhook URL generation**: Generate unique resume URLs at execution start
-- **Webhook data structures**: Provide structs and utilities for webhook management  
+- **Webhook data structures**: Provide structs and utilities for webhook management
 - **Execution integration**: Include webhook data in execution results when suspended
 - **Resume coordination**: Handle webhook resume via existing `resume_workflow/4` API
 
-### Application Responsibilities  
+### Application Responsibilities
 - **HTTP routing**: Handle webhook endpoints (`/webhook/workflow/trigger/:workflow_id`, `/webhook/workflow/resume/:resume_id`)
 - **Persistence**: Store webhook data from execution results in distributed database
 - **Security & validation**: Authenticate webhook requests and validate state
@@ -42,7 +42,7 @@ We will implement a **Distributed Webhook System** with clear separation of resp
 ```
 1. Execution Start → Scan workflow for wait nodes → Generate resume URLs for each wait node
 2. Resume URLs available as $execution.{node_id}.resume_url expressions
-3. Email Node → Uses $execution.wait_approval.resume_url in email template  
+3. Email Node → Uses $execution.wait_approval.resume_url in email template
 4. Wait Node → Activates its pre-generated webhook URL
 5. Webhook Request → Application validates → Calls resume_workflow/4
 6. Execution Resume → Normal Prana workflow continuation at specific node
@@ -50,7 +50,7 @@ We will implement a **Distributed Webhook System** with clear separation of resp
 
 ### Multiple Wait Node Support
 - **Pre-generate resume URLs** for all wait nodes at execution start
-- **Node-specific expressions**: `$execution.{node_id}.resume_url` 
+- **Node-specific expressions**: `$execution.{node_id}.resume_url`
 - **Multiple active webhooks** supported simultaneously
 - **Deterministic URLs** available before wait nodes execute
 
@@ -62,7 +62,7 @@ defmodule Prana.Webhook do
   @doc "Generate resume webhook ID at execution start"
   def generate_execution_resume_id(execution_id)
 
-  @doc "Parse webhook URLs for routing"  
+  @doc "Parse webhook URLs for routing"
   def parse_webhook_url(url_path)
 
   @doc "Build full webhook URLs"
@@ -96,7 +96,7 @@ Resume webhooks follow a strict lifecycle with validation:
 
 ```elixir
 # Webhook states
-:pending    # Created at execution start, not yet active
+"pending"    # Created at execution start, not yet active
 :active     # Wait node activated, ready to receive requests
 :consumed   # Successfully used to resume execution (one-time use)
 :expired    # Timed out or execution completed without use
@@ -109,7 +109,7 @@ Resume webhooks follow a strict lifecycle with validation:
 %{
   "webhook_12345_abc789" => %{
     execution_id: "exec_123",
-    status: :pending,        # State transition: pending → active → consumed/expired
+    status: "pending",        # State transition: pending → active → consumed/expired
     waiting_node_id: nil,    # Set when wait node activates
     expires_at: nil,         # Set when wait node activates with timeout
     created_at: DateTime.utc_now(),
@@ -120,9 +120,9 @@ Resume webhooks follow a strict lifecycle with validation:
 # State validation and data extraction for existing GraphExecutor API
 def handle_resume_webhook(webhook_id, payload) do
   case get_webhook_state(webhook_id) do
-    %{status: :pending} -> 
+    %{status: "pending"} ->
       {:error, :wait_node_not_active}
-    %{status: :active, execution_id: exec_id, waiting_node_id: node_id, expires_at: expires} 
+    %{status: :active, execution_id: exec_id, waiting_node_id: node_id, expires_at: expires}
     when expires > DateTime.utc_now() ->
       mark_consumed(webhook_id)
       {:ok, exec_id, node_id, payload}  # Return data for GraphExecutor.resume_workflow/4
@@ -171,7 +171,7 @@ webhook_registration = %{
   webhook_url: "/webhook/workflow/resume/webhook_12345_abc789",
   full_url: "https://app.domain.com/webhook/workflow/resume/webhook_12345_abc789",
   execution_id: "exec_123",
-  status: :pending,        # Initial state
+  status: "pending",        # Initial state
   created_at: ~U[2025-01-02 10:00:00Z],
   expires_at: nil,         # Set when activated
   webhook_config: %{}      # Set when activated
@@ -184,25 +184,25 @@ webhook_registration = %{
 # HTTP Router Setup
 defmodule MyApp.Router do
   use Phoenix.Router
-  
+
   # Trigger webhooks - start new executions
   post "/webhook/workflow/trigger/:workflow_id", WebhookController, :handle_trigger
-  
-  # Resume webhooks - resume suspended executions  
+
+  # Resume webhooks - resume suspended executions
   post "/webhook/workflow/resume/:webhook_id", WebhookController, :handle_resume
 end
 
 # 1. Trigger Webhook Handler
 def handle_trigger(conn, %{"workflow_id" => workflow_id}) do
   payload = extract_payload(conn)
-  
+
   case MyApp.WorkflowEngine.start_workflow(workflow_id, payload) do
     {:ok, execution_id} ->
       json(conn, %{status: "started", execution_id: execution_id})
-      
-    {:suspended, webhook_url} ->
+
+    {"suspended", webhook_url} ->
       json(conn, %{status: "suspended", resume_url: webhook_url})
-      
+
     {:error, reason} ->
       conn |> put_status(400) |> json(%{error: reason})
   end
@@ -213,27 +213,27 @@ defmodule MyApp.WorkflowEngine do
   def start_workflow(workflow_id, input_data) do
     execution_id = generate_execution_id()
     resume_url = Prana.WebhookRegistry.generate_resume_url(execution_id)
-    
+
     context = %Prana.WorkflowExecutionContext{
       execution_id: execution_id,
       resume_url: resume_url,
       # ... other fields
     }
-    
+
     # Create pending webhook in database
     MyApp.WebhookDB.create_pending_webhook(resume_url, execution_id)
-    
+
     case Prana.GraphExecutor.execute_workflow(workflow_id, input_data, context) do
       {:suspend, :external_event, suspend_data} ->
         # Activate webhook and save execution state
         MyApp.WebhookDB.activate_webhook(resume_url, suspend_data)
         MyApp.ExecutionDB.save_suspended(execution_id, suspend_data)
-        {:suspended, build_full_webhook_url(resume_url)}
-        
+        {"suspended", build_full_webhook_url(resume_url)}
+
       {:ok, result} ->
         MyApp.WebhookDB.expire_webhook(resume_url)
         {:ok, execution_id}
-        
+
       {:error, reason} ->
         MyApp.WebhookDB.expire_webhook(resume_url)
         {:error, reason}
@@ -244,36 +244,36 @@ end
 # 2. Resume Webhook Handler
 def handle_resume(conn, %{"webhook_id" => webhook_id}) do
   payload = extract_payload(conn)
-  
+
   case Prana.WebhookRegistry.handle_resume_webhook(webhook_id, payload) do
     {:ok, execution_id, node_id, resume_data} ->
       # Load execution context and resume using existing GraphExecutor API
       context = MyApp.ExecutionDB.load_context(execution_id)
-      
+
       case Prana.GraphExecutor.resume_workflow(execution_id, node_id, resume_data, context) do
         {:ok, result} ->
           MyApp.WebhookDB.mark_consumed(webhook_id)
           json(conn, %{status: "completed", result: result})
-          
+
         {:suspend, :external_event, suspend_data} ->
           # Another suspension - reactivate webhook
           MyApp.WebhookDB.reactivate_webhook(webhook_id, suspend_data)
           MyApp.ExecutionDB.save_suspended(execution_id, suspend_data)
           json(conn, %{status: "suspended"})
-          
+
         {:error, reason} ->
           conn |> put_status(500) |> json(%{error: reason})
       end
-      
+
     {:error, :wait_node_not_active} ->
       conn |> put_status(400) |> json(%{error: "Wait node not active"})
-      
+
     {:error, :webhook_expired} ->
       conn |> put_status(410) |> json(%{error: "Webhook expired"})
-      
+
     {:error, :webhook_already_used} ->
       conn |> put_status(409) |> json(%{error: "Webhook already used"})
-      
+
     {:error, :webhook_not_found} ->
       conn |> put_status(404) |> json(%{error: "Webhook not found"})
   end
@@ -285,12 +285,12 @@ defmodule MyApp.WebhookCleanupMiddleware do
     MyApp.WebhookDB.expire_webhook(context.resume_url)
     next.(%{context: context})
   end
-  
+
   def call(:execution_failed, %{context: context}, next) do
     MyApp.WebhookDB.expire_webhook(context.resume_url)
     next.(%{context: context})
   end
-  
+
   def call(event, data, next), do: next.(data)
 end
 ```

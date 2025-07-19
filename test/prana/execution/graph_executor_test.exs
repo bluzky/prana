@@ -31,7 +31,7 @@ defmodule Prana.GraphExecutorTest do
 
   setup do
     # Start the IntegrationRegistry GenServer for testing using ExUnit supervision
-    {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
+    {:ok, registry_pid} = IntegrationRegistry.start_link()
 
     # Register test integration for the test
     :ok = IntegrationRegistry.register_integration(TestIntegration)
@@ -76,12 +76,12 @@ defmodule Prana.GraphExecutorTest do
 
       # Should return successful execution
       assert {:ok, execution} = result
-      assert execution.status == :completed
+      assert execution.status == "completed"
       assert count_node_executions(execution) == 1
 
       # Check that the node was executed successfully
       node_execution = get_first_node_execution(execution)
-      assert node_execution.status == :completed
+      assert node_execution.status == "completed"
       assert node_execution.node_key == "test_node"
       assert node_execution.output_port == "main"
     end

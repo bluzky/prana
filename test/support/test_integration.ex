@@ -7,6 +7,7 @@ defmodule Prana.TestSupport.TestIntegration do
 
   alias Prana.Action
   alias Prana.Integration
+  alias Prana.TestSupport.TestIntegration.SimpleTestAction
 
   def definition do
     %Integration{
@@ -21,7 +22,7 @@ defmodule Prana.TestSupport.TestIntegration do
           display_name: "Simple Action",
           description: "A simple test action that can succeed or fail",
           type: :action,
-          module: Prana.TestSupport.TestIntegration.SimpleTestAction,
+          module: SimpleTestAction,
           input_ports: ["input"],
           output_ports: ["main", "error"]
         },
@@ -30,7 +31,7 @@ defmodule Prana.TestSupport.TestIntegration do
           display_name: "Test Trigger",
           description: "A simple test trigger",
           type: :trigger,
-          module: Prana.TestSupport.TestIntegration.SimpleTestAction,
+          module: SimpleTestAction,
           input_ports: [],
           output_ports: ["main"]
         }

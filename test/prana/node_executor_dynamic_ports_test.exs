@@ -2,6 +2,7 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
   use ExUnit.Case
 
   alias Prana.Action
+  alias Prana.Core.Error
   alias Prana.NodeExecutor
 
   describe "dynamic output ports with ['*']" do
@@ -26,7 +27,7 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
                )
 
       # Test error cases with custom ports
-      assert {:error, %Prana.Core.Error{code: "action_error", details: %{"port" => "error_port"}}} =
+      assert {:error, %Error{code: "action_error", details: %{"port" => "error_port"}}} =
                NodeExecutor.process_action_result(
                  {:error, "something failed", "error_port"},
                  dynamic_action
@@ -48,7 +49,7 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
                )
 
       # Invalid port should be rejected
-      assert {:error, %Prana.Core.Error{code: "invalid_output_port", details: %{"port" => "invalid_port"}}} =
+      assert {:error, %Error{code: "invalid_output_port", details: %{"port" => "invalid_port"}}} =
                NodeExecutor.process_action_result(
                  {:ok, %{result: "data"}, "invalid_port"},
                  fixed_action

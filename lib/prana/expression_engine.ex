@@ -322,10 +322,10 @@ defmodule Prana.ExpressionEngine do
 
         case Integer.parse(index_string) do
           {index, ""} ->
-            if base != "" do
-              [base, index]
-            else
+            if base == "" do
               [index]
+            else
+              [base, index]
             end
 
           _ ->

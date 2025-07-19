@@ -3,7 +3,7 @@ defmodule Prana.MiddlewareTest do
 
   alias Prana.Middleware
 
-  doctest Prana.Middleware
+  doctest Middleware
 
   # Test middleware modules
   defmodule TestMiddleware1 do
@@ -450,7 +450,7 @@ defmodule Prana.MiddlewareTest do
       Middleware.add_middleware(NotificationMiddleware)
 
       # Test execution started
-      execution = %{id: "exec_123", status: :running}
+      execution = %{id: "exec_123", status: "running"}
       result = Middleware.call(:execution_started, execution)
 
       assert result.persisted == true
@@ -465,7 +465,7 @@ defmodule Prana.MiddlewareTest do
       assert result.node_id == "node_456"
 
       # Test execution completed
-      completed_execution = %{id: "exec_123", status: :completed}
+      completed_execution = %{id: "exec_123", status: "completed"}
       result = Middleware.call(:execution_completed, completed_execution)
 
       assert result.notification_sent == true

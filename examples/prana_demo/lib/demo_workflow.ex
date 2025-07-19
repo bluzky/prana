@@ -615,11 +615,11 @@ defmodule PranaDemo.DemoWorkflow do
         Logger.info("Execution ID: #{execution.id}")
         {:ok, execution}
 
-      {:ok, :suspended} ->
+      {:ok, "suspended"} ->
         Logger.info("Sub workflow demo (#{execution_mode}) suspended successfully!")
         Logger.info("This demonstrates sub-workflow coordination patterns")
         Logger.info("In a real application, the sub-workflow would be executed in the background")
-        {:ok, :suspended}
+        {:ok, "suspended"}
 
       {:error, {:suspend, execution}} ->
         Logger.info(
@@ -629,7 +629,7 @@ defmodule PranaDemo.DemoWorkflow do
         Logger.info("Suspension type: #{execution.suspension_type}")
         Logger.info("Execution mode: #{execution.suspension_data.execution_mode}")
         Logger.info("This demonstrates proper sub-workflow suspension behavior")
-        {:ok, :suspended}
+        {:ok, "suspended"}
 
       {:error, reason} ->
         Logger.error("Sub workflow demo (#{execution_mode}) failed: #{inspect(reason)}")
@@ -784,13 +784,13 @@ defmodule PranaDemo.DemoWorkflow do
         Logger.info("Execution ID: #{execution.id}")
         {:ok, execution}
 
-      {:ok, :suspended} ->
+      {:ok, "suspended"} ->
         end_time = System.monotonic_time(:millisecond)
         duration = end_time - start_time
         Logger.info("Long wait workflow suspended as expected!")
         Logger.info("Time to suspension: #{duration}ms")
         Logger.info("This demonstrates proper wait suspension behavior for long intervals")
-        {:ok, :suspended}
+        {:ok, "suspended"}
 
       {:error, {:suspend, execution}} ->
         end_time = System.monotonic_time(:millisecond)
@@ -803,7 +803,7 @@ defmodule PranaDemo.DemoWorkflow do
         Logger.info("Time to suspension: #{duration}ms")
         Logger.info("Suspension type: #{execution.suspension_type}")
         Logger.info("This demonstrates proper wait suspension behavior for long intervals")
-        {:ok, :suspended}
+        {:ok, "suspended"}
 
       {:error, reason} ->
         Logger.error("Long wait workflow failed: #{inspect(reason)}")
@@ -826,7 +826,7 @@ defmodule PranaDemo.DemoWorkflow do
 
     Enum.each(results, fn {name, result} ->
       case result do
-        {:ok, :suspended} -> Logger.info("✓ #{name}: SUSPENDED as expected")
+        {:ok, "suspended"} -> Logger.info("✓ #{name}: SUSPENDED as expected")
         {:ok, _} -> Logger.info("✓ #{name}: COMPLETED as expected")
         {:error, _} -> Logger.error("✗ #{name}: FAILED")
       end

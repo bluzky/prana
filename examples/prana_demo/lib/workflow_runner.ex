@@ -74,7 +74,7 @@ defmodule PranaDemo.WorkflowRunner do
     case result do
       {:ok, execution} ->
         Logger.info("Workflow completed successfully")
-        update_execution_db(execution, :completed)
+        update_execution_db(execution, "completed")
         {:ok, execution}
 
       {:suspend, execution} ->
@@ -95,13 +95,13 @@ defmodule PranaDemo.WorkflowRunner do
 
           {:error, reason} ->
             Logger.error("Suspension handling failed: #{inspect(reason)}")
-            update_execution_db(execution, :failed)
+            update_execution_db(execution, "failed")
             {:error, execution}
         end
 
       {:error, execution} ->
         Logger.error("Workflow execution failed")
-        update_execution_db(execution, :failed)
+        update_execution_db(execution, "failed")
         {:error, execution}
     end
   end

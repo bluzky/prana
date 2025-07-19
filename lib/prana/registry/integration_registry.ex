@@ -212,17 +212,16 @@ defmodule Prana.IntegrationRegistry do
 
   defp get_action_by_type_from_state(state, type) do
     # Search through all integrations and their actions using action.name
-    result = 
-      state.integrations
-      |> Enum.reduce_while(nil, fn {_integration_name, %Prana.Integration{actions: actions}}, _acc ->
+    result =
+      Enum.reduce_while(state.integrations, nil, fn {_integration_name, %Prana.Integration{actions: actions}}, _acc ->
         case Enum.find(actions, fn {_action_key, action} ->
-          action.name == type
-        end) do
+               action.name == type
+             end) do
           {_action_key, action} -> {:halt, {:ok, action}}
           nil -> {:cont, nil}
         end
       end)
-    
+
     case result do
       {:ok, action} -> {:ok, action}
       nil -> {:error, :not_found}

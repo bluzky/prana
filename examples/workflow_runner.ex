@@ -128,7 +128,7 @@ defmodule Examples.WorkflowRunner do
     case result_tuple do
       {:ok, execution} ->
         Logger.info("Workflow completed successfully")
-        update_execution_db(execution, :completed)
+        update_execution_db(execution, "completed")
         {:ok, execution}
 
       {:suspend, execution} ->
@@ -137,7 +137,7 @@ defmodule Examples.WorkflowRunner do
 
       {:error, execution} ->
         Logger.error("Workflow execution failed")
-        update_execution_db(execution, :failed)
+        update_execution_db(execution, "failed")
         {:error, execution}
     end
   end
@@ -160,7 +160,7 @@ defmodule Examples.WorkflowRunner do
     Logger.info("Setting up wait operation: #{suspension_data.suspend_type}")
 
     # Update execution status to suspended
-    update_execution_db(suspension_data, :suspended)
+    update_execution_db(suspension_data, "suspended")
 
     # Set up external trigger based on suspension type
     case suspension_data.suspend_type do
@@ -174,7 +174,7 @@ defmodule Examples.WorkflowRunner do
         setup_webhook_listener(suspension_data)
     end
 
-    {:ok, :suspended}
+    {:ok, "suspended"}
   end
 
   defp handle_sub_workflow_suspension(suspension_data) do
@@ -203,8 +203,8 @@ defmodule Examples.WorkflowRunner do
         # Enqueue for execution and suspend parent
         Logger.info("Enqueueing sub-workflow for asynchronous execution")
         enqueue_for_execution(sub_workflow, sub_input, suspension_data.execution)
-        update_execution_db(suspension_data, :suspended)
-        {:ok, :suspended}
+        update_execution_db(suspension_data, "suspended")
+        {:ok, "suspended"}
 
       :fire_and_forget ->
         # Enqueue for execution and continue parent

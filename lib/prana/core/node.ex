@@ -26,13 +26,13 @@ defmodule Prana.Node do
 
   @doc """
   Loads a node from a map with string keys, converting to proper types.
-  
+
   Automatically converts:
   - String keys to atoms where appropriate
   - Preserves complex nested params structures
-  
+
   ## Examples
-  
+
       node_map = %{
         "key" => "api_call",
         "name" => "API Call",
@@ -54,11 +54,11 @@ defmodule Prana.Node do
 
   @doc """
   Converts a node to a JSON-compatible map.
-  
+
   Preserves all node data including complex nested params for round-trip serialization.
-  
+
   ## Examples
-  
+
       node = %Node{
         key: "api_call",
         name: "API Call",

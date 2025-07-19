@@ -3,21 +3,23 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
   alias Prana.Action
   alias Prana.IntegrationRegistry
+  alias Prana.Integrations.Manual
+  alias Prana.Integrations.Workflow
   alias Prana.Node
   alias Prana.NodeExecutor
   alias Prana.WorkflowExecution
 
   setup do
     # Start registry for tests
-    {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
+    {:ok, registry_pid} = IntegrationRegistry.start_link()
 
     # Ensure modules are loaded before registration
-    Code.ensure_loaded!(Prana.Integrations.Workflow)
-    Code.ensure_loaded!(Prana.Integrations.Manual)
+    Code.ensure_loaded!(Workflow)
+    Code.ensure_loaded!(Manual)
 
     # Register integrations for testing
-    :ok = IntegrationRegistry.register_integration(Prana.Integrations.Workflow)
-    :ok = IntegrationRegistry.register_integration(Prana.Integrations.Manual)
+    :ok = IntegrationRegistry.register_integration(Workflow)
+    :ok = IntegrationRegistry.register_integration(Manual)
 
     # Create test execution with unified architecture
     execution = %WorkflowExecution{
@@ -28,7 +30,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
         trigger_node_key: "start_node"
       },
       execution_mode: "node_executor_test",
-      status: :running,
+      status: "running",
       vars: %{"api_url" => "https://api.test.com"},
       node_executions: [],
       __runtime: %{
@@ -72,7 +74,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       # Verify suspended node execution
       assert suspended_node_execution.node_key == "sub_workflow_node"
-      assert suspended_node_execution.status == :suspended
+      assert suspended_node_execution.status == "suspended"
       assert suspended_node_execution.output_data == nil
       assert suspended_node_execution.output_port == nil
       assert suspended_node_execution.completed_at == nil
@@ -105,7 +107,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       # Verify suspended node execution
       assert suspended_node_execution.node_key == "notification_node"
-      assert suspended_node_execution.status == :suspended
+      assert suspended_node_execution.status == "suspended"
 
       # Verify suspension data stored in NodeExecution
       assert suspended_node_execution.suspension_type == :sub_workflow_fire_forget
@@ -139,7 +141,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       # Verify failed node execution
       assert failed_node_execution.node_key == "invalid_node"
-      assert failed_node_execution.status == :failed
+      assert failed_node_execution.status == "failed"
       assert failed_node_execution.error_data == error_data
       assert failed_node_execution.output_port == nil
     end

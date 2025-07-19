@@ -9,7 +9,7 @@ defmodule Prana.Webhook do
 
   Resume webhooks follow a strict lifecycle:
 
-  - `:pending` - Created at execution start, not yet active
+  - `"pending"` - Created at execution start, not yet active
   - `:active` - Wait node activated, ready to receive requests
   - `:consumed` - Successfully used to resume execution (one-time use)
   - `:expired` - Timed out or execution completed without use
@@ -103,10 +103,10 @@ defmodule Prana.Webhook do
     case String.split(resume_id, "_", parts: 2) do
       [execution_id, token] ->
         # Validate that execution_id is not empty and token looks like base64 with reasonable length
-        if String.trim(execution_id) != "" do
-          {:ok, %{execution_id: execution_id, token: token}}
-        else
+        if String.trim(execution_id) == "" do
           {:error, "Invalid resume_id format"}
+        else
+          {:ok, %{execution_id: execution_id, token: token}}
         end
 
       _ ->
@@ -150,7 +150,7 @@ defmodule Prana.Webhook do
 
   ## Valid States
 
-  - `:pending` - Created at execution start, not yet active
+  - `"pending"` - Created at execution start, not yet active
   - `:active` - Wait node activated, ready to receive requests
   - `:consumed` - Successfully used to resume execution (one-time use)
   - `:expired` - Timed out or execution completed without use
@@ -168,7 +168,7 @@ defmodule Prana.Webhook do
       {:error, "Invalid webhook state: :invalid"}
   """
   @spec validate_webhook_state(any()) :: :ok | {:error, String.t()}
-  def validate_webhook_state(state) when state in [:pending, :active, :consumed, :expired] do
+  def validate_webhook_state(state) when state in ["pending", :active, :consumed, :expired] do
     :ok
   end
 
@@ -208,7 +208,7 @@ defmodule Prana.Webhook do
       iex> data.token
       "AbC123def"
       iex> data.status
-      :pending
+      "pending"
   """
   @spec create_webhook_data(String.t(), String.t(), String.t(), map()) :: webhook_data()
   def create_webhook_data(token, execution_id, node_id, config \\ %{})
@@ -217,7 +217,7 @@ defmodule Prana.Webhook do
       token: token,
       execution_id: execution_id,
       node_id: node_id,
-      status: :pending,
+      status: "pending",
       created_at: DateTime.utc_now(),
       expires_at: nil,
       webhook_config: config
@@ -230,8 +230,8 @@ defmodule Prana.Webhook do
   Ensures webhook state transitions follow the valid lifecycle flow.
 
   Valid transitions:
-  - `:pending` → `:active`
-  - `:pending` → `:expired`
+  - `"pending"` → `:active`
+  - `"pending"` → `:expired`
   - `:active` → `:consumed`
   - `:active` → `:expired`
 
@@ -242,7 +242,7 @@ defmodule Prana.Webhook do
 
   ## Examples
 
-      iex> Prana.Webhook.validate_state_transition(:pending, :active)
+      iex> Prana.Webhook.validate_state_transition("pending", :active)
       :ok
 
       iex> Prana.Webhook.validate_state_transition(:consumed, :active)
@@ -251,8 +251,8 @@ defmodule Prana.Webhook do
   @spec validate_state_transition(webhook_state(), webhook_state()) :: :ok | {:error, String.t()}
   def validate_state_transition(from_state, to_state) do
     case {from_state, to_state} do
-      {:pending, :active} -> :ok
-      {:pending, :expired} -> :ok
+      {"pending", :active} -> :ok
+      {"pending", :expired} -> :ok
       {:active, :consumed} -> :ok
       {:active, :expired} -> :ok
       # Allow same state (idempotent)

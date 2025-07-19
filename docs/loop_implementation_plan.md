@@ -67,7 +67,7 @@ defstruct [
 
 **Update `complete_node/2`:**
 ```elixir
-def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :completed} = completed_node_execution) do
+def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: "completed"} = completed_node_execution) do
   node_id = completed_node_execution.node_id
 
   # Get existing executions for this node
@@ -105,7 +105,7 @@ end
 
 **Update `fail_node/2`:**
 ```elixir
-def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: :failed} = failed_node_execution) do
+def fail_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: "failed"} = failed_node_execution) do
   node_id = failed_node_execution.node_id
 
   # Get existing executions for this node
@@ -136,7 +136,7 @@ def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
     |> Enum.map(fn {node_id, executions} ->
       last_execution =
         executions
-        |> Enum.filter(fn exec -> exec.status == :completed end)
+        |> Enum.filter(fn exec -> exec.status == "completed" end)
         |> Enum.max_by(& &1.run_index, fn -> nil end)
 
       case last_execution do

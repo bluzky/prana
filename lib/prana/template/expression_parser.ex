@@ -90,7 +90,7 @@ defmodule Prana.Template.ExpressionParser do
 
   defp split_filters("", filters, current_filter, _paren_count, _in_quotes, _quote_char) do
     # End of string - add final filter if non-empty
-    final_filters = if String.trim(current_filter) != "", do: [current_filter | filters], else: filters
+    final_filters = if String.trim(current_filter) == "", do: filters, else: [current_filter | filters]
     Enum.reverse(final_filters)
   end
 
@@ -114,7 +114,7 @@ defmodule Prana.Template.ExpressionParser do
 
       # Pipe outside quotes and parentheses - split filter
       not in_quotes and paren_count == 0 and char == ?| ->
-        new_filters = if String.trim(current_filter) != "", do: [current_filter | filters], else: filters
+        new_filters = if String.trim(current_filter) == "", do: filters, else: [current_filter | filters]
         split_filters(rest, new_filters, "", 0, false, nil)
 
       # Any other character - add to current filter
@@ -140,7 +140,7 @@ defmodule Prana.Template.ExpressionParser do
 
   defp parse_arguments("", args, current_arg, _in_quotes, _quote_char) do
     # End of string - add final argument if non-empty
-    final_args = if String.trim(current_arg) != "", do: [current_arg | args], else: args
+    final_args = if String.trim(current_arg) == "", do: args, else: [current_arg | args]
     Enum.reverse(final_args)
   end
 
@@ -156,7 +156,7 @@ defmodule Prana.Template.ExpressionParser do
 
       # Comma outside quotes - split argument
       not in_quotes and char == ?, ->
-        new_args = if String.trim(current_arg) != "", do: [current_arg | args], else: args
+        new_args = if String.trim(current_arg) == "", do: args, else: [current_arg | args]
         parse_arguments(rest, new_args, "", false, nil)
 
       # Any other character - add to current argument

@@ -373,7 +373,7 @@ defmodule Prana.NodeExecutor do
   # CONTEXT BUILDING
   # =============================================================================
 
-  @spec build_expression_context(Prana.NodeExecution.t(), Prana.WorkflowExecution.t(), map()) :: map()
+  @spec build_expression_context(NodeExecution.t(), Prana.WorkflowExecution.t(), map()) :: map()
   defp build_expression_context(node_execution, %Prana.WorkflowExecution{} = execution, routed_input) do
     %{
       "$input" => routed_input,
@@ -423,7 +423,7 @@ defmodule Prana.NodeExecutor do
   defp suspend_node_execution(%NodeExecution{} = node_execution, suspension_type, suspend_data) do
     %{
       node_execution
-      | status: :suspended,
+      | status: "suspended",
         output_data: nil,
         output_port: nil,
         completed_at: nil,

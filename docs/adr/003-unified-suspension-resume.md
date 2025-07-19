@@ -40,7 +40,7 @@ def handle_internal_suspension(graph, node, suspend_type, suspend_data) do
   })
   
   # Return suspended execution
-  {:suspended, graph.execution_id, suspend_data}
+  {"suspended", graph.execution_id, suspend_data}
 end
 
 # 3. Application handles via middleware

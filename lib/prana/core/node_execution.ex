@@ -7,7 +7,7 @@ defmodule Prana.NodeExecution do
 
   defschema do
     field(:node_key, :string, required: true)
-    field(:status, :atom, default: :pending)
+    field(:status, :string, default: "pending")
     field(:params, :map, default: %{})
     field(:output_data, :map)
     field(:output_port, :string)
@@ -21,7 +21,7 @@ defmodule Prana.NodeExecution do
     field(:run_index, :integer, default: 0)
   end
 
-  @type status :: :pending | :running | :completed | :failed | :skipped | :suspended
+  #  status :: "pending" | "running" | "completed" | "failed" | "suspended"
 
   @doc """
   Creates a new node execution
@@ -38,7 +38,7 @@ defmodule Prana.NodeExecution do
   Marks node execution as started
   """
   def start(%__MODULE__{} = node_execution) do
-    %{node_execution | status: :running, started_at: DateTime.utc_now()}
+    %{node_execution | status: "running", started_at: DateTime.utc_now()}
   end
 
   @doc """
@@ -49,7 +49,7 @@ defmodule Prana.NodeExecution do
 
     %{
       node_execution
-      | status: :completed,
+      | status: "completed",
         output_data: output_data,
         output_port: output_port,
         completed_at: DateTime.utc_now(),
@@ -65,7 +65,7 @@ defmodule Prana.NodeExecution do
 
     %{
       node_execution
-      | status: :failed,
+      | status: "failed",
         error_data: error_data,
         output_port: nil,
         completed_at: DateTime.utc_now(),
@@ -75,14 +75,14 @@ defmodule Prana.NodeExecution do
 
   @doc """
   Loads a node execution from a map with string keys, converting to proper types.
-  
+
   Automatically converts:
   - String keys to atoms where appropriate (status)
   - DateTime strings to DateTime structs
   - Preserves all execution state and output data
-  
+
   ## Examples
-  
+
       node_execution_map = %{
         "node_key" => "api_call",
         "status" => "completed",
@@ -92,7 +92,7 @@ defmodule Prana.NodeExecution do
         "completed_at" => "2024-01-01T10:05:00Z",
         "duration_ms" => 5000
       }
-      
+
       node_execution = NodeExecution.from_map(node_execution_map)
       # Status is converted to atom, DateTime strings to DateTime structs
   """
@@ -103,22 +103,22 @@ defmodule Prana.NodeExecution do
 
   @doc """
   Converts a node execution to a JSON-compatible map.
-  
+
   Preserves all execution state including output data, timing, and error information
   for round-trip serialization.
-  
+
   ## Examples
-  
+
       node_execution = %NodeExecution{
         node_key: "api_call",
-        status: :completed,
+        status: "completed",
         output_data: %{"user_id" => 123, "email" => "user@example.com"},
         output_port: "success",
         started_at: ~U[2024-01-01 10:00:00Z],
         completed_at: ~U[2024-01-01 10:05:00Z],
         duration_ms: 5000
       }
-      
+
       node_execution_map = NodeExecution.to_map(node_execution)
       json_string = Jason.encode!(node_execution_map)
       # Ready for database storage or API transport

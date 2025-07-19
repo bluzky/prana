@@ -164,7 +164,7 @@ def new_iteration(base_execution, iteration, run_index) do
     id: "#{base_execution.id}_iter_#{iteration}",
     execution_id: base_execution.execution_id,
     node_id: base_execution.node_id,
-    status: :pending,
+    status: "pending",
     iteration: iteration,
     run_index: run_index,
     params: base_execution.params,
@@ -317,7 +317,7 @@ defp dependencies_satisfied_with_iterations?(node, dependencies, latest_executio
   Enum.all?(node_dependencies, fn dep_node_id ->
     case Map.get(latest_execution_status, dep_node_id) do
       nil -> false  # Dependency never executed
-      %{status: :completed} -> true  # Dependency completed
+      %{status: "completed"} -> true  # Dependency completed
       _ -> false  # Dependency not completed
     end
   end)
@@ -502,7 +502,7 @@ def initialize_execution_with_loops(workflow, trigger_data) do
     %WorkflowExecution{
       id: generate_id(),
       workflow_id: workflow.id,
-      status: :running,
+      status: "running",
       metadata: %{
         "loop_compile_info" => loop_compile_metadata
       }
@@ -528,7 +528,7 @@ defp execute_single_node_with_loop_tracking(selected_node, execution_graph, exec
   loop_id = find_node_loop_id(selected_node, execution)
 
   case execute_single_node_with_events(selected_node, execution_graph, execution) do
-    {%NodeExecution{status: :completed} = node_execution, updated_execution} ->
+    {%NodeExecution{status: "completed"} = node_execution, updated_execution} ->
       # Update loop state if this is a loop node
       final_execution =
         if loop_id do
@@ -700,7 +700,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
       assert Enum.map(increment_executions, & &1.iteration) == [1, 2, 3]
 
       # Verify final state
-      assert execution.status == :completed
+      assert execution.status == "completed"
     end
 
     test "respects maximum iteration limit" do
@@ -712,7 +712,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
       {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Should stop at max iterations and have error
-      assert execution.status == :failed
+      assert execution.status == "failed"
       failed_execution = get_failed_node_execution(execution)
       assert failed_execution.error_data["message"] =~ "exceeded maximum iterations"
     end
@@ -733,7 +733,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
       assert length(attempt_executions) == 3
 
       # Verify final success
-      assert execution.status == :completed
+      assert execution.status == "completed"
     end
   end
 
@@ -749,7 +749,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
       {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Should detect rapid execution and fail
-      assert execution.status == :failed
+      assert execution.status == "failed"
       failed_execution = get_failed_node_execution(execution)
       assert failed_execution.error_data["message"] =~ "rapid execution detected"
     end
@@ -765,7 +765,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
   end
 
   defp get_failed_node_execution(execution) do
-    Enum.find(execution.node_executions, &(&1.status == :failed))
+    Enum.find(execution.node_executions, &(&1.status == "failed"))
   end
 end
 ```

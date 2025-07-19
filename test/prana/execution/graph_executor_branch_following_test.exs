@@ -15,6 +15,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   alias Prana.Connection
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
+  alias Prana.Integrations.Data
   alias Prana.Node
   alias Prana.TestSupport.TestIntegration
   alias Prana.Workflow
@@ -40,12 +41,12 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   describe "branch following execution" do
     setup do
       # Start the IntegrationRegistry GenServer for testing
-      {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
+      {:ok, registry_pid} = IntegrationRegistry.start_link()
 
       # Register test integration and data integration for merge
       :ok = IntegrationRegistry.register_integration(TestIntegration)
-      Code.ensure_loaded(Prana.Integrations.Data)
-      :ok = IntegrationRegistry.register_integration(Prana.Integrations.Data)
+      Code.ensure_loaded(Data)
+      :ok = IntegrationRegistry.register_integration(Data)
 
       on_exit(fn ->
         if Process.alive?(registry_pid) do
@@ -179,7 +180,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution completed successfully
-      assert execution.status == :completed
+      assert execution.status == "completed"
       assert count_node_executions(execution) == 6
 
       # Analyze execution order to verify branch following

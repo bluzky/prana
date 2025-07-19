@@ -116,7 +116,7 @@ workflow_map = Prana.Workflow.to_map(complex_workflow)
 execution = %Prana.WorkflowExecution{
   id: "exec_123",
   workflow_id: "user_registration", 
-  status: :running,
+  status: "running",
   trigger_type: "webhook",
   trigger_data: %{"user_email" => "user@example.com"},
   vars: %{"user_id" => "user_456"},
@@ -124,7 +124,7 @@ execution = %Prana.WorkflowExecution{
     "validate_email" => [
       %Prana.NodeExecution{
         node_key: "validate_email",
-        status: :completed,
+        status: "completed",
         execution_index: 0,
         run_index: 0,
         output_data: %{"email_valid" => true},
@@ -163,7 +163,7 @@ ready_execution = Prana.WorkflowExecution.rebuild_runtime(restored_execution, en
 # Execution suspended waiting for webhook
 suspended_execution = %Prana.WorkflowExecution{
   id: "exec_suspended",
-  status: :suspended,
+  status: "suspended",
   suspended_node_id: "webhook_wait",
   suspension_type: "webhook", 
   suspension_data: %{
@@ -185,7 +185,7 @@ execution = Prana.WorkflowExecution.from_map(execution_data)
 # Resume execution
 resumed_execution = execution
 |> Prana.WorkflowExecution.resume_suspension()
-|> Map.put(:status, :running)
+|> Map.put(:status, "running")
 ```
 
 ## Type Handling
@@ -214,7 +214,7 @@ node_exec_map = %{
 }
 
 node_exec = Prana.NodeExecution.from_map(node_exec_map)
-node_exec.status  # :completed (atom)
+node_exec.status  # "completed" (atom)
 
 # Execution modes
 execution_map = %{

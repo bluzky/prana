@@ -15,8 +15,8 @@ defmodule Prana.Integrations.Wait do
   @behaviour Prana.Behaviour.Integration
 
   alias Prana.Action
-  alias Prana.Integration
   alias Prana.Core.Error
+  alias Prana.Integration
 
   @doc """
   Returns the integration definition with all available actions

@@ -1,8 +1,10 @@
 defmodule Prana.Core.ExecutionStructTest do
   use ExUnit.Case, async: true
 
-  alias Prana.{WorkflowExecution, NodeExecution}
-  alias Prana.{ExecutionGraph, Node}
+  alias Prana.ExecutionGraph
+  alias Prana.Node
+  alias Prana.NodeExecution
+  alias Prana.WorkflowExecution
 
   describe "WorkflowExecution.from_map/1" do
     test "restores workflow execution from map with string keys" do
@@ -46,7 +48,7 @@ defmodule Prana.Core.ExecutionStructTest do
       assert execution.workflow_version == 3
       assert execution.parent_execution_id == "parent_exec_789"
       assert execution.execution_mode == :sync
-      assert execution.status == :running
+      assert execution.status == "running"
       assert execution.trigger_type == "webhook"
       assert execution.trigger_data == %{"webhook_id" => "wh_123"}
       assert execution.vars == %{"user_id" => "user_456"}
@@ -64,7 +66,7 @@ defmodule Prana.Core.ExecutionStructTest do
       assert Map.has_key?(execution.node_executions, "node_1")
       node_exec = hd(execution.node_executions["node_1"])
       assert node_exec.node_key == "node_1"
-      assert node_exec.status == :completed
+      assert node_exec.status == "completed"
       assert node_exec.execution_index == 0
       assert node_exec.run_index == 0
       assert node_exec.output_data == %{"result" => "success"}
@@ -84,7 +86,7 @@ defmodule Prana.Core.ExecutionStructTest do
       assert execution.workflow_version == 1
       assert execution.parent_execution_id == nil
       assert execution.execution_mode == :async
-      assert execution.status == :pending
+      assert execution.status == "pending"
       assert execution.trigger_type == nil
       assert execution.trigger_data == %{}
       assert execution.vars == %{}
@@ -135,25 +137,25 @@ defmodule Prana.Core.ExecutionStructTest do
 
       assert execution.id == "exec_complex"
       assert execution.workflow_id == "wf_complex"
-      
+
       # Check trigger execution
       trigger_execs = execution.node_executions["trigger"]
       assert length(trigger_execs) == 1
       trigger_exec = hd(trigger_execs)
       assert trigger_exec.node_key == "trigger"
-      assert trigger_exec.status == :completed
+      assert trigger_exec.status == "completed"
       assert trigger_exec.output_data == %{"event" => "user_created"}
-      
+
       # Check processor executions (retry scenario)
       processor_execs = execution.node_executions["processor"]
       assert length(processor_execs) == 2
-      
+
       [failed_exec, successful_exec] = processor_execs
-      assert failed_exec.status == :failed
+      assert failed_exec.status == "failed"
       assert failed_exec.run_index == 0
       assert failed_exec.error_data == %{"error" => "timeout"}
-      
-      assert successful_exec.status == :completed
+
+      assert successful_exec.status == "completed"
       assert successful_exec.run_index == 1
       assert successful_exec.output_data == %{"processed" => true}
     end
@@ -206,14 +208,16 @@ defmodule Prana.Core.ExecutionStructTest do
 
       assert execution.id == "exec_suspended"
       assert execution.workflow_id == "wf_suspended"
-      assert execution.status == :suspended
+      assert execution.status == "suspended"
       assert execution.suspended_node_id == "webhook_node"
       assert execution.suspension_type == "webhook"
+
       assert execution.suspension_data == %{
-        "webhook_url" => "https://example.com/webhook/abc123",
-        "webhook_id" => "wh_456",
-        "timeout_seconds" => 3600
-      }
+               "webhook_url" => "https://example.com/webhook/abc123",
+               "webhook_id" => "wh_456",
+               "timeout_seconds" => 3600
+             }
+
       assert execution.suspended_at == ~U[2024-01-01 14:30:00Z]
     end
 
@@ -237,16 +241,17 @@ defmodule Prana.Core.ExecutionStructTest do
 
       assert execution.id == "exec_runtime"
       assert execution.workflow_id == "wf_runtime"
+
       assert execution.__runtime == %{
-        "nodes" => %{
-          "api_call" => %{"output" => %{"user_id" => 123}},
-          "processor" => %{"output" => %{"processed" => true}}
-        },
-        "env" => %{"api_key" => "test_key"},
-        "active_nodes" => ["next_node"],
-        "iteration_count" => 5,
-        "shared_state" => %{"counter" => 10}
-      }
+               "nodes" => %{
+                 "api_call" => %{"output" => %{"user_id" => 123}},
+                 "processor" => %{"output" => %{"processed" => true}}
+               },
+               "env" => %{"api_key" => "test_key"},
+               "active_nodes" => ["next_node"],
+               "iteration_count" => 5,
+               "shared_state" => %{"counter" => 10}
+             }
     end
   end
 
@@ -269,7 +274,7 @@ defmodule Prana.Core.ExecutionStructTest do
       node_execution = NodeExecution.from_map(node_execution_map)
 
       assert node_execution.node_key == "api_call"
-      assert node_execution.status == :completed
+      assert node_execution.status == "completed"
       assert node_execution.params == %{"method" => "GET", "url" => "https://api.example.com"}
       assert node_execution.output_data == %{"response" => %{"status" => 200, "body" => "success"}}
       assert node_execution.output_port == "success"
@@ -289,7 +294,7 @@ defmodule Prana.Core.ExecutionStructTest do
       node_execution = NodeExecution.from_map(node_execution_map)
 
       assert node_execution.node_key == "minimal_node"
-      assert node_execution.status == :pending
+      assert node_execution.status == "pending"
       assert node_execution.params == %{}
       assert node_execution.output_data == nil
       assert node_execution.output_port == nil
@@ -313,7 +318,7 @@ defmodule Prana.Core.ExecutionStructTest do
         "output_port" => nil,
         "started_at" => "2024-01-01T10:00:00Z",
         "completed_at" => "2024-01-01T10:01:00Z",
-        "duration_ms" => 60000,
+        "duration_ms" => 60_000,
         "execution_index" => 2,
         "run_index" => 2
       }
@@ -321,16 +326,18 @@ defmodule Prana.Core.ExecutionStructTest do
       node_execution = NodeExecution.from_map(node_execution_map)
 
       assert node_execution.node_key == "failed_node"
-      assert node_execution.status == :failed
+      assert node_execution.status == "failed"
+
       assert node_execution.error_data == %{
-        "error" => "connection_timeout",
-        "message" => "Could not connect to external service",
-        "retry_count" => 3
-      }
+               "error" => "connection_timeout",
+               "message" => "Could not connect to external service",
+               "retry_count" => 3
+             }
+
       assert node_execution.output_port == nil
       assert node_execution.started_at == ~U[2024-01-01 10:00:00Z]
       assert node_execution.completed_at == ~U[2024-01-01 10:01:00Z]
-      assert node_execution.duration_ms == 60000
+      assert node_execution.duration_ms == 60_000
       assert node_execution.execution_index == 2
       assert node_execution.run_index == 2
     end
@@ -353,13 +360,15 @@ defmodule Prana.Core.ExecutionStructTest do
       node_execution = NodeExecution.from_map(node_execution_map)
 
       assert node_execution.node_key == "webhook_node"
-      assert node_execution.status == :suspended
+      assert node_execution.status == "suspended"
       assert node_execution.params == %{"webhook_url" => "https://example.com/webhook"}
       assert node_execution.suspension_type == "webhook"
+
       assert node_execution.suspension_data == %{
-        "webhook_id" => "wh_123",
-        "timeout_seconds" => 3600
-      }
+               "webhook_id" => "wh_123",
+               "timeout_seconds" => 3600
+             }
+
       assert node_execution.started_at == ~U[2024-01-01 10:00:00Z]
       assert node_execution.completed_at == nil
       assert node_execution.execution_index == 1
@@ -394,11 +403,13 @@ defmodule Prana.Core.ExecutionStructTest do
       node_execution = NodeExecution.from_map(node_execution_map)
 
       assert node_execution.node_key == "complex_node"
-      assert node_execution.status == :completed
+      assert node_execution.status == "completed"
+
       assert node_execution.params["conditions"] == [
-        %{"field" => "user.role", "operator" => "eq", "value" => "admin"},
-        %{"field" => "user.active", "operator" => "eq", "value" => true}
-      ]
+               %{"field" => "user.role", "operator" => "eq", "value" => "admin"},
+               %{"field" => "user.active", "operator" => "eq", "value" => true}
+             ]
+
       assert node_execution.params["logic"] == "AND"
       assert node_execution.params["default_output"] == "reject"
       assert node_execution.output_data["matched"] == true
@@ -414,7 +425,7 @@ defmodule Prana.Core.ExecutionStructTest do
         "status" => "completed",
         "started_at" => "2024-01-01T10:00:00Z",
         "completed_at" => "2024-01-01T10:05:30Z",
-        "duration_ms" => 330000,
+        "duration_ms" => 330_000,
         "execution_index" => 1,
         "run_index" => 0
       }
@@ -422,10 +433,10 @@ defmodule Prana.Core.ExecutionStructTest do
       node_execution = NodeExecution.from_map(node_execution_map)
 
       assert node_execution.node_key == "timed_node"
-      assert node_execution.status == :completed
+      assert node_execution.status == "completed"
       assert node_execution.started_at == ~U[2024-01-01 10:00:00Z]
       assert node_execution.completed_at == ~U[2024-01-01 10:05:30Z]
-      assert node_execution.duration_ms == 330000
+      assert node_execution.duration_ms == 330_000
       assert node_execution.execution_index == 1
       assert node_execution.run_index == 0
     end
@@ -435,7 +446,7 @@ defmodule Prana.Core.ExecutionStructTest do
     test "WorkflowExecution.from_map handles invalid data gracefully" do
       # Test with missing required fields - should raise error
       execution_map = %{}
-      
+
       # This should raise an error because id and workflow_id are required
       assert_raise MatchError, fn ->
         WorkflowExecution.from_map(execution_map)
@@ -445,7 +456,7 @@ defmodule Prana.Core.ExecutionStructTest do
     test "NodeExecution.from_map handles invalid data gracefully" do
       # Test with missing required fields - should raise error
       node_execution_map = %{}
-      
+
       # This should raise an error because node_key is required
       assert_raise MatchError, fn ->
         NodeExecution.from_map(node_execution_map)
@@ -461,7 +472,7 @@ defmodule Prana.Core.ExecutionStructTest do
         workflow_id: "wf_roundtrip",
         workflow_version: 2,
         execution_mode: :sync,
-        status: :suspended,
+        status: "suspended",
         trigger_type: "webhook",
         trigger_data: %{"webhook_id" => "wh_123"},
         vars: %{"user_id" => 456},
@@ -469,7 +480,7 @@ defmodule Prana.Core.ExecutionStructTest do
           "node_1" => [
             %NodeExecution{
               node_key: "node_1",
-              status: :completed,
+              status: "completed",
               execution_index: 0,
               run_index: 0,
               output_data: %{"result" => "success"},
@@ -502,12 +513,12 @@ defmodule Prana.Core.ExecutionStructTest do
       assert restored_execution.suspension_type == execution.suspension_type
       assert restored_execution.suspension_data == execution.suspension_data
       assert restored_execution.metadata == execution.metadata
-      
+
       # Verify node executions are preserved
       assert Map.has_key?(restored_execution.node_executions, "node_1")
       node_exec = hd(restored_execution.node_executions["node_1"])
       assert node_exec.node_key == "node_1"
-      assert node_exec.status == :completed
+      assert node_exec.status == "completed"
       assert node_exec.execution_index == 0
       assert node_exec.run_index == 0
       assert node_exec.output_data == %{"result" => "success"}
@@ -518,7 +529,7 @@ defmodule Prana.Core.ExecutionStructTest do
       # Create a node execution with complex data
       node_execution = %NodeExecution{
         node_key: "complex_node",
-        status: :completed,
+        status: "completed",
         params: %{
           "conditions" => [
             %{"field" => "user.role", "operator" => "eq", "value" => "admin"}

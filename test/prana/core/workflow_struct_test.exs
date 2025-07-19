@@ -1,7 +1,9 @@
 defmodule Prana.Core.WorkflowStructTest do
   use ExUnit.Case, async: true
 
-  alias Prana.{Workflow, Node, Connection}
+  alias Prana.Connection
+  alias Prana.Node
+  alias Prana.Workflow
 
   describe "Workflow.from_map/1" do
     test "restores workflow from basic map with string keys" do
@@ -133,22 +135,22 @@ defmodule Prana.Core.WorkflowStructTest do
 
       assert workflow.id == "wf_complex"
       assert workflow.name == "Complex Workflow"
-      
+
       # Check nested connections structure
       assert Map.has_key?(workflow.connections, "trigger")
       assert Map.has_key?(workflow.connections["trigger"], "main")
       assert Map.has_key?(workflow.connections, "process")
       assert Map.has_key?(workflow.connections["process"], "success")
       assert Map.has_key?(workflow.connections["process"], "error")
-      
+
       trigger_conn = hd(workflow.connections["trigger"]["main"])
       assert trigger_conn.from == "trigger"
       assert trigger_conn.to == "process"
-      
+
       success_conn = hd(workflow.connections["process"]["success"])
       assert success_conn.from == "process"
       assert success_conn.to == "notify"
-      
+
       error_conn = hd(workflow.connections["process"]["error"])
       assert error_conn.from == "process"
       assert error_conn.to == "log_error"
@@ -173,11 +175,12 @@ defmodule Prana.Core.WorkflowStructTest do
       assert node.key == "api_call"
       assert node.name == "API Call Node"
       assert node.type == "http.request"
+
       assert node.params == %{
-        "method" => "GET",
-        "url" => "https://api.example.com/users",
-        "headers" => %{"Authorization" => "Bearer token"}
-      }
+               "method" => "GET",
+               "url" => "https://api.example.com/users",
+               "headers" => %{"Authorization" => "Bearer token"}
+             }
     end
 
     test "restores node with minimal required fields" do
@@ -236,18 +239,21 @@ defmodule Prana.Core.WorkflowStructTest do
       assert node.key == "complex_node"
       assert node.name == "Complex Node"
       assert node.type == "data.transform"
+
       assert node.params["mappings"] == [
-        %{"from" => "input.user.id", "to" => "user_id"},
-        %{"from" => "input.user.name", "to" => "full_name"}
-      ]
+               %{"from" => "input.user.id", "to" => "user_id"},
+               %{"from" => "input.user.name", "to" => "full_name"}
+             ]
+
       assert node.params["filters"] == %{
-        "status" => "active",
-        "role" => ["admin", "user"]
-      }
+               "status" => "active",
+               "role" => ["admin", "user"]
+             }
+
       assert node.params["options"] == %{
-        "strict" => true,
-        "default_value" => nil
-      }
+               "strict" => true,
+               "default_value" => nil
+             }
     end
   end
 
@@ -302,7 +308,7 @@ defmodule Prana.Core.WorkflowStructTest do
     test "Node.from_map handles invalid data gracefully" do
       # Test with missing required fields - should raise error
       node_map = %{}
-      
+
       # This should raise an error because key and type are required
       assert_raise MatchError, fn ->
         Node.from_map(node_map)
@@ -312,7 +318,7 @@ defmodule Prana.Core.WorkflowStructTest do
     test "Connection.from_map handles invalid data gracefully" do
       # Test with missing required fields - should raise error
       connection_map = %{}
-      
+
       # This should raise an error because from and to are required
       assert_raise MatchError, fn ->
         Connection.from_map(connection_map)
@@ -322,7 +328,7 @@ defmodule Prana.Core.WorkflowStructTest do
     test "Workflow.from_map handles invalid data gracefully" do
       # Test with missing required fields - should raise error
       workflow_map = %{}
-      
+
       # This should raise an error because id and name are required
       assert_raise MatchError, fn ->
         Workflow.from_map(workflow_map)
@@ -363,19 +369,19 @@ defmodule Prana.Core.WorkflowStructTest do
       assert restored_workflow.version == workflow.version
       assert length(restored_workflow.nodes) == length(workflow.nodes)
       assert restored_workflow.variables == workflow.variables
-      
+
       # Verify nodes are preserved
       [n1, n2] = restored_workflow.nodes
       assert n1.key == "n1"
       assert n1.name == "Node 1"
       assert n1.type == "manual.test"
       assert n1.params == %{"value" => 123}
-      
+
       assert n2.key == "n2"
       assert n2.name == "Node 2"
       assert n2.type == "logic.condition"
       assert n2.params == %{"condition" => "true"}
-      
+
       # Verify connections are preserved
       assert Map.has_key?(restored_workflow.connections, "n1")
       conn = hd(restored_workflow.connections["n1"]["output"])

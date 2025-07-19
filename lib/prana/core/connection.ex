@@ -26,13 +26,13 @@ defmodule Prana.Connection do
 
   @doc """
   Loads a connection from a map with string keys, converting to proper types.
-  
+
   Automatically converts:
   - String keys to atoms where appropriate
   - Applies default port values ("main") when not specified
-  
+
   ## Examples
-  
+
       connection_map = %{
         "from" => "node_1",
         "from_port" => "success",
@@ -50,11 +50,11 @@ defmodule Prana.Connection do
 
   @doc """
   Converts a connection to a JSON-compatible map.
-  
+
   Preserves all connection routing data for round-trip serialization.
-  
+
   ## Examples
-  
+
       connection = %Connection{
         from: "node_1",
         from_port: "success",

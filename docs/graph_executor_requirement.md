@@ -154,7 +154,7 @@ end
 #### 3.2.1 Async Sub-workflow Execution
 ```elixir
 # Async mode: Execute sub-workflow with suspension/resume
-{:suspended, resume_token} = execute_sub_workflow_async(child_graph, input_data, context)
+{"suspended", resume_token} = execute_sub_workflow_async(child_graph, input_data, context)
 # Parent workflow suspends, returns control to application
 # Later: resume_workflow(resume_token, sub_workflow_result)
 ```

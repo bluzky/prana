@@ -25,7 +25,7 @@ defmodule Prana.ExecutionTest do
           "node_1" => [
             %NodeExecution{
               node_key: "node_1",
-              status: :completed,
+              status: "completed",
               output_data: %{user_id: 123},
               output_port: "main",
               started_at: ~U[2024-01-01 10:00:00Z],
@@ -36,7 +36,7 @@ defmodule Prana.ExecutionTest do
           "node_2" => [
             %NodeExecution{
               node_key: "node_2",
-              status: :completed,
+              status: "completed",
               output_data: %{email: "test@example.com"},
               output_port: "primary",
               started_at: ~U[2024-01-01 10:01:00Z],
@@ -47,7 +47,7 @@ defmodule Prana.ExecutionTest do
           "node_3" => [
             %NodeExecution{
               node_key: "node_3",
-              status: :failed,
+              status: "failed",
               error_data: %{error: "network timeout"},
               output_port: nil,
               started_at: ~U[2024-01-01 10:02:00Z],
@@ -112,7 +112,7 @@ defmodule Prana.ExecutionTest do
           "node_1" => [
             %NodeExecution{
               node_key: "node_1",
-              status: :pending,
+              status: "pending",
               output_data: nil,
               output_port: nil,
               started_at: ~U[2024-01-01 10:00:00Z],
@@ -123,7 +123,7 @@ defmodule Prana.ExecutionTest do
           "node_2" => [
             %NodeExecution{
               node_key: "node_2",
-              status: :running,
+              status: "running",
               output_data: nil,
               output_port: nil,
               started_at: ~U[2024-01-01 10:01:00Z],
@@ -134,7 +134,7 @@ defmodule Prana.ExecutionTest do
           "node_3" => [
             %NodeExecution{
               node_key: "node_3",
-              status: :completed,
+              status: "completed",
               output_data: %{result: "success"},
               output_port: "done",
               started_at: ~U[2024-01-01 10:02:00Z],
@@ -181,7 +181,7 @@ defmodule Prana.ExecutionTest do
       # Verify persistent state (map structure)
       assert Map.has_key?(result.node_executions, "node_1")
       [completed_node] = result.node_executions["node_1"]
-      assert completed_node.status == :completed
+      assert completed_node.status == "completed"
       assert completed_node.output_data == output_data
       assert completed_node.output_port == "main"
 
@@ -218,7 +218,7 @@ defmodule Prana.ExecutionTest do
       [integrated_node] = result.node_executions["node_1"]
       assert integrated_node == completed_node_execution
       assert integrated_node.node_key == "node_1"
-      assert integrated_node.status == :completed
+      assert integrated_node.status == "completed"
       assert integrated_node.output_data == output_data
     end
 
@@ -245,7 +245,7 @@ defmodule Prana.ExecutionTest do
       # Should still update persistent state
       assert map_size(result.node_executions) == 1
       [integrated_node] = result.node_executions["node_1"]
-      assert integrated_node.status == :completed
+      assert integrated_node.status == "completed"
 
       # Runtime should remain nil
       assert result.__runtime == nil
@@ -262,7 +262,7 @@ defmodule Prana.ExecutionTest do
           "node_1" => [
             %NodeExecution{
               node_key: "node_1",
-              status: :running,
+              status: "running",
               started_at: ~U[2024-01-01 10:00:00Z],
               execution_index: 0,
               run_index: 0
@@ -285,7 +285,7 @@ defmodule Prana.ExecutionTest do
 
       # Verify persistent state
       [failed_node] = result.node_executions["node_1"]
-      assert failed_node.status == :failed
+      assert failed_node.status == "failed"
       assert failed_node.error_data == error_data
       assert failed_node.output_port == nil
 
@@ -323,7 +323,7 @@ defmodule Prana.ExecutionTest do
       assert map_size(result.node_executions) == 1
       [failed_node] = result.node_executions["node_1"]
       assert failed_node.node_key == "node_1"
-      assert failed_node.status == :failed
+      assert failed_node.status == "failed"
       assert failed_node.error_data == error_data
     end
   end
@@ -339,7 +339,7 @@ defmodule Prana.ExecutionTest do
           "node_1" => [
             %NodeExecution{
               node_key: "node_1",
-              status: :completed,
+              status: "completed",
               output_data: %{user_id: 123},
               output_port: "main",
               started_at: ~U[2024-01-01 10:00:00Z],
@@ -375,7 +375,7 @@ defmodule Prana.ExecutionTest do
       assert map_size(result.node_executions) == 2
       # All nodes in the map are completed (map size check above is sufficient)
       all_executions = result.node_executions |> Map.values() |> List.flatten()
-      completed_nodes = Enum.filter(all_executions, &(&1.status == :completed))
+      completed_nodes = Enum.filter(all_executions, &(&1.status == "completed"))
       assert length(completed_nodes) == 2
     end
 

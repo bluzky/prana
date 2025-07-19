@@ -63,7 +63,7 @@
   node_id: "node_123",
   output_data: %{...},       # Existing output data
   context_data: %{...},      # New context data (added)
-  status: :completed,        # Existing status
+  status: "completed",        # Existing status
   # ... other fields
 }
 ```
@@ -171,7 +171,7 @@ end
   node_id: "node_123",
   output: %{...},
   output_port: "success",
-  status: :completed,
+  status: "completed",
   error: nil,
   started_at: ~U[...],
   completed_at: ~U[...]
@@ -183,7 +183,7 @@ end
   output: %{...},           # Existing output data
   context: %{},             # New context data (empty by default)
   output_port: "success",
-  status: :completed,
+  status: "completed",
   error: nil,
   started_at: ~U[...],
   completed_at: ~U[...]

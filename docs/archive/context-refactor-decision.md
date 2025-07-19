@@ -27,7 +27,7 @@ Refactor to a single, authoritative execution context that eliminates ExecutionC
   # Persistent metadata (for database storage)
   id: String.t(),
   workflow_id: String.t(), 
-  status: :running | :completed | :failed | :suspended,
+  status: "running" | "completed" | "failed" | "suspended",
   vars: map(),  # workflow variables (renamed from input_data)
   node_executions: [NodeExecution.t()],  # execution audit trail
   

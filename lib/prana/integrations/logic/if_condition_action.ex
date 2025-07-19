@@ -36,7 +36,7 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   def execute(params, _context) do
     case Map.fetch(params, "condition") do
       {:ok, value} ->
-        if value == true do
+        if value && value != "" do
           {:ok, %{}, "true"}
         else
           {:ok, %{}, "false"}
