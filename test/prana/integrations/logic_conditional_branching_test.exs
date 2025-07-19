@@ -63,7 +63,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
 
   setup do
     # Start the IntegrationRegistry GenServer for testing
-    {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
+    {:ok, registry_pid} = IntegrationRegistry.start_link()
 
     # Register integrations - ensure modules are loaded first
     Code.ensure_loaded(TestIntegration)
@@ -97,7 +97,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         key: "if_condition",
         name: "IF Condition",
         type: "logic.if_condition",
-        params: %{"condition" => "true"}
+        params: %{"condition" => true}
       }
 
       true_branch = %Node{
@@ -227,7 +227,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         key: "if_condition",
         name: "IF Condition",
         type: "logic.if_condition",
-        params: %{"condition" => "true"}
+        params: %{"condition" => true}
       }
 
       true_branch = %Node{

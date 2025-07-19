@@ -33,32 +33,10 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   end
 
   @impl true
-  def execute(params, context) do
+  def execute(params, _context) do
     case Map.fetch(params, "condition") do
       {:ok, value} ->
-        # Pass input data through to output for downstream nodes
-        input_data = get_in(context, ["$input", "main"]) || %{}
-
-        # Manually evaluate expression if needed
-        evaluated_value =
-          case value do
-            "$input.should_retry" -> get_in(context, ["$input", "main", "should_retry"])
-            "$input.main.should_retry" -> get_in(context, ["$input", "main", "should_retry"])
-            other -> other
-          end
-
-        # Handle different value types correctly
-        result =
-          cond do
-            is_boolean(evaluated_value) -> evaluated_value
-            evaluated_value == nil -> false
-            evaluated_value == "" -> false
-            evaluated_value == "false" -> false
-            evaluated_value == "true" -> true
-            evaluated_value -> true
-          end
-
-        if result do
+        if value == true do
           {:ok, %{}, "true"}
         else
           {:ok, %{}, "false"}
