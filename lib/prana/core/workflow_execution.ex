@@ -474,11 +474,21 @@ defmodule Prana.WorkflowExecution do
   end
 
   # Update node executions list, handling retries by replacing same run_index
-  defp update_node_executions(existing_executions, new_execution) do
-    remaining_executions =
-      Enum.reject(existing_executions, fn ne -> ne.run_index == new_execution.run_index end)
+  defp update_node_executions([], new_execution), do: [new_execution]
 
-    Enum.sort_by([new_execution | remaining_executions], & &1.execution_index, :desc)
+  defp update_node_executions(existing_executions, new_execution) do
+    # remaining_executions =
+    #   Enum.reject(existing_executions, fn ne -> ne.run_index == new_execution.run_index end)
+
+    # Enum.sort_by([new_execution | remaining_executions], & &1.execution_index, :desc)
+    [last | remaining_executions] = existing_executions
+
+    if last.run_index == new_execution.run_index do
+      # Replace existing execution with same run_index
+      [new_execution | remaining_executions]
+    else
+      [new_execution | existing_executions]
+    end
   end
 
   # Get input ports for a node, with fallback to default "input" port
