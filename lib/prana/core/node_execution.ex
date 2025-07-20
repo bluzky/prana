@@ -41,6 +41,25 @@ defmodule Prana.NodeExecution do
     %{node_execution | status: "running", started_at: DateTime.utc_now()}
   end
 
+  def suspend(%__MODULE__{} = node_execution, suspension_type, suspension_data) do
+    %{
+      node_execution
+      | status: "suspended",
+        suspension_type: suspension_type,
+        suspension_data: suspension_data
+    }
+  end
+
+  def resume(%__MODULE__{} = node_execution) do
+    %{
+      node_execution
+      | status: "running",
+        suspension_type: nil,
+        suspension_data: nil,
+        started_at: DateTime.utc_now()
+    }
+  end
+
   @doc """
   Marks node execution as completed
   """

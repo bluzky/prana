@@ -136,6 +136,7 @@ defmodule Prana.NodeExecutor do
   # ACTION INVOCATION
   # =============================================================================
 
+  # Public for test purposes, but generally not used directly
   @spec invoke_action(Prana.Action.t(), map(), map()) :: {:ok, term(), String.t()} | {:error, term()}
   def invoke_action(%Prana.Action{} = action, input, context) do
     result = action.module.execute(input, context)
@@ -151,6 +152,7 @@ defmodule Prana.NodeExecutor do
       {:error, build_action_execution_error("action_throw", value, action)}
   end
 
+  # Public for test purposes, but generally not used directly
   @spec invoke_resume_action(Prana.Action.t(), map(), map(), term()) :: {:ok, term(), String.t()} | {:error, term()}
   def invoke_resume_action(%Prana.Action{} = action, params, context, resume_data) do
     result = action.module.resume(params, context, resume_data)
@@ -179,6 +181,8 @@ defmodule Prana.NodeExecutor do
   # =============================================================================
 
   @doc """
+  PUBLIC FOR TESTING
+
   Process different action return formats and determine output port.
 
   Supports suspension for sub-workflow orchestration and other async patterns.
@@ -341,7 +345,7 @@ defmodule Prana.NodeExecutor do
         end
 
       {:suspend, suspension_type, suspension_data} ->
-        suspended_execution = suspend_node_execution(node_execution, suspension_type, suspension_data)
+        suspended_execution = NodeExecution.suspend(node_execution, suspension_type, suspension_data)
         {:suspend, suspended_execution}
 
       {:error, reason} ->
@@ -350,17 +354,23 @@ defmodule Prana.NodeExecutor do
   end
 
   defp handle_resume_action(action, params, context, resume_data, suspended_node_execution) do
+    resume_execution = NodeExecution.resume(suspended_node_execution)
+
     case invoke_resume_action(action, params, context, resume_data) do
       {:ok, output_data, output_port} ->
-        completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+        completed_execution = NodeExecution.complete(resume_execution, output_data, output_port)
         {:ok, completed_execution}
 
       {:ok, output_data, output_port, _context} ->
-        completed_execution = NodeExecution.complete(suspended_node_execution, output_data, output_port)
+        completed_execution = NodeExecution.complete(resume_execution, output_data, output_port)
         {:ok, completed_execution}
 
+      {:suspend, suspension_type, suspension_data} ->
+        suspended_execution = NodeExecution.suspend(resume_execution, suspension_type, suspension_data)
+        {:suspend, suspended_execution}
+
       {:error, reason} ->
-        handle_execution_error(suspended_node_execution, reason)
+        handle_execution_error(resume_execution, reason)
     end
   end
 
@@ -419,17 +429,4 @@ defmodule Prana.NodeExecutor do
 
   defp allows_dynamic_ports?(%Prana.Action{output_ports: ["*"]}), do: true
   defp allows_dynamic_ports?(_action), do: false
-
-  defp suspend_node_execution(%NodeExecution{} = node_execution, suspension_type, suspension_data) do
-    %{
-      node_execution
-      | status: "suspended",
-        output_data: nil,
-        output_port: nil,
-        completed_at: nil,
-        duration_ms: nil,
-        suspension_type: suspension_type,
-        suspension_data: suspension_data
-    }
-  end
 end

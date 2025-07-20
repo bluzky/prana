@@ -272,7 +272,8 @@ defmodule Prana.WorkflowExecution do
       | suspended_node_id: nil,
         suspension_type: nil,
         suspension_data: nil,
-        suspended_at: nil
+        suspended_at: nil,
+        current_execution_index: execution.current_execution_index - 1
     }
   end
 
