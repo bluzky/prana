@@ -116,7 +116,7 @@ When a suspended node is resumed, the resume data is processed to extract the ac
 ```elixir
 # Resume data structure for sub-workflows
 resume_data = %{
-  "sub_workflow_output" => %{         # <- Actual workflow output (extracted)
+  "output" => %{         # <- Actual workflow output (extracted)
     "processed_user_id" => 456,
     "status" => "completed"
   },
@@ -124,7 +124,7 @@ resume_data = %{
   "workflow_id" => "user_processing"  # <- Metadata (excluded from node output)
 }
 
-# The node's output_data will contain only the sub_workflow_output:
+# The node's output_data will contain only the output:
 # %{"processed_user_id" => 456, "status" => "completed"}
 ```
 

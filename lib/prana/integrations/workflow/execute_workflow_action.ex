@@ -93,11 +93,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
     # Process sub-workflow completion data
     case resume_data do
-      %{"sub_workflow_output" => output, "status" => "completed"} ->
+      %{"output" => output, "status" => "completed"} ->
         # Sub-workflow completed successfully
         {:ok, output, "main"}
 
-      %{"sub_workflow_output" => output} ->
+      %{"output" => output} ->
         # Sub-workflow completed successfully (no explicit status)
         {:ok, output, "main"}
 

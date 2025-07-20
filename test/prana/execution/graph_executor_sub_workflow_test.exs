@@ -249,7 +249,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
 
       # Resume with sub-workflow results
       resume_data = %{
-        "sub_workflow_output" => %{"processed_user_id" => 456, "status" => "completed"},
+        "output" => %{"processed_user_id" => 456, "status" => "completed"},
         "execution_time_ms" => 2500
       }
 
