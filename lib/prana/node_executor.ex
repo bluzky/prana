@@ -196,7 +196,7 @@ defmodule Prana.NodeExecutor do
   - `{:ok, data, context}` - Success with context data (default port)
 
   ### Suspension Returns
-  - `{:suspend, suspension_type, suspend_data}` - Pause execution for async coordination
+  - `{:suspend, suspension_type, suspension_data}` - Pause execution for async coordination
 
   #### Built-in Suspension Types:
   - `:sub_workflow_sync` - Synchronous sub-workflow execution
@@ -236,8 +236,8 @@ defmodule Prana.NodeExecutor do
           {:ok, term(), String.t()} | {:ok, term(), String.t(), map()} | {:error, term()} | {:suspend, atom(), term()}
   def process_action_result(result, %Prana.Action{} = action) do
     case result do
-      {:suspend, suspension_type, suspend_data} when is_atom(suspension_type) ->
-        {:suspend, suspension_type, suspend_data}
+      {:suspend, suspension_type, suspension_data} when is_atom(suspension_type) ->
+        {:suspend, suspension_type, suspension_data}
 
       {:ok, data, port, state_updates} when is_binary(port) and is_map(state_updates) ->
         handle_success_with_port_and_state(data, port, state_updates, action)
@@ -340,8 +340,8 @@ defmodule Prana.NodeExecutor do
           {:ok, completed_execution}
         end
 
-      {:suspend, suspension_type, suspend_data} ->
-        suspended_execution = suspend_node_execution(node_execution, suspension_type, suspend_data)
+      {:suspend, suspension_type, suspension_data} ->
+        suspended_execution = suspend_node_execution(node_execution, suspension_type, suspension_data)
         {:suspend, suspended_execution}
 
       {:error, reason} ->
@@ -420,7 +420,7 @@ defmodule Prana.NodeExecutor do
   defp allows_dynamic_ports?(%Prana.Action{output_ports: ["*"]}), do: true
   defp allows_dynamic_ports?(_action), do: false
 
-  defp suspend_node_execution(%NodeExecution{} = node_execution, suspension_type, suspend_data) do
+  defp suspend_node_execution(%NodeExecution{} = node_execution, suspension_type, suspension_data) do
     %{
       node_execution
       | status: "suspended",
@@ -429,7 +429,7 @@ defmodule Prana.NodeExecutor do
         completed_at: nil,
         duration_ms: nil,
         suspension_type: suspension_type,
-        suspension_data: suspend_data
+        suspension_data: suspension_data
     }
   end
 end

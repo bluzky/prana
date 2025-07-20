@@ -59,7 +59,7 @@ defmodule Prana.Integrations.Wait do
   - (none)
 
   Returns:
-  - {:suspend, :interval | :schedule | :webhook, suspend_data} to suspend execution
+  - {:suspend, :interval | :schedule | :webhook, suspension_data} to suspend execution
   - {:error, reason, "error"} if configuration is invalid
   """
   def wait(params) do

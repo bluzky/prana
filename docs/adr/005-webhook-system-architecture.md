@@ -224,10 +224,10 @@ defmodule MyApp.WorkflowEngine do
     MyApp.WebhookDB.create_pending_webhook(resume_url, execution_id)
 
     case Prana.GraphExecutor.execute_workflow(workflow_id, input_data, context) do
-      {:suspend, :external_event, suspend_data} ->
+      {:suspend, :external_event, suspension_data} ->
         # Activate webhook and save execution state
-        MyApp.WebhookDB.activate_webhook(resume_url, suspend_data)
-        MyApp.ExecutionDB.save_suspended(execution_id, suspend_data)
+        MyApp.WebhookDB.activate_webhook(resume_url, suspension_data)
+        MyApp.ExecutionDB.save_suspended(execution_id, suspension_data)
         {"suspended", build_full_webhook_url(resume_url)}
 
       {:ok, result} ->
@@ -255,10 +255,10 @@ def handle_resume(conn, %{"webhook_id" => webhook_id}) do
           MyApp.WebhookDB.mark_consumed(webhook_id)
           json(conn, %{status: "completed", result: result})
 
-        {:suspend, :external_event, suspend_data} ->
+        {:suspend, :external_event, suspension_data} ->
           # Another suspension - reactivate webhook
-          MyApp.WebhookDB.reactivate_webhook(webhook_id, suspend_data)
-          MyApp.ExecutionDB.save_suspended(execution_id, suspend_data)
+          MyApp.WebhookDB.reactivate_webhook(webhook_id, suspension_data)
+          MyApp.ExecutionDB.save_suspended(execution_id, suspension_data)
           json(conn, %{status: "suspended"})
 
         {:error, reason} ->

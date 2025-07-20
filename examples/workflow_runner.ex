@@ -178,9 +178,9 @@ defmodule Examples.WorkflowRunner do
   end
 
   defp handle_sub_workflow_suspension(suspension_data) do
-    execution_mode = suspension_data.suspend_data.execution_mode
-    sub_workflow = suspension_data.suspend_data.workflow
-    sub_input = suspension_data.suspend_data.input
+    execution_mode = suspension_data.suspension_data.execution_mode
+    sub_workflow = suspension_data.suspension_data.workflow
+    sub_input = suspension_data.suspension_data.input
 
     Logger.info("Handling sub-workflow with mode: #{execution_mode}")
 
@@ -237,7 +237,7 @@ defmodule Examples.WorkflowRunner do
   end
 
   defp schedule_timer_resume(suspension_data) do
-    delay_ms = suspension_data.suspend_data.delay_ms
+    delay_ms = suspension_data.suspension_data.delay_ms
     Logger.info("Scheduling timer resume in #{delay_ms}ms")
 
     # In a real application, use your preferred scheduling mechanism
@@ -245,7 +245,7 @@ defmodule Examples.WorkflowRunner do
   end
 
   defp schedule_cron_resume(suspension_data) do
-    cron_expression = suspension_data.suspend_data.cron_expression
+    cron_expression = suspension_data.suspension_data.cron_expression
     Logger.info("Scheduling cron resume: #{cron_expression}")
 
     # In a real application, integrate with a cron scheduler
@@ -254,7 +254,7 @@ defmodule Examples.WorkflowRunner do
   end
 
   defp setup_webhook_listener(suspension_data) do
-    webhook_url = suspension_data.suspend_data.webhook_url
+    webhook_url = suspension_data.suspension_data.webhook_url
     Logger.info("Setting up webhook listener: #{webhook_url}")
 
     # In a real application, register webhook endpoint

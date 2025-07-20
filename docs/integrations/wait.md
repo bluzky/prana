@@ -34,7 +34,7 @@ The Wait integration provides comprehensive time-based workflow control capabili
 
 **Returns**:
 - `{:ok, %{}}` for interval mode with duration < 60 seconds (uses process sleep)
-- `{:suspend, :interval | :schedule | :webhook, suspend_data}` to suspend execution for longer durations/other modes
+- `{:suspend, :interval | :schedule | :webhook, suspension_data}` to suspend execution for longer durations/other modes
 - `{:error, reason, "error"}` if configuration is invalid
 
 **Sleep vs Suspend Behavior (Interval Mode)**:

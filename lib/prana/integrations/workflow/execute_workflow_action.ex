@@ -4,10 +4,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
   Expected params:
   - workflow_id: The ID of the sub-workflow to execute
-  - input_data: Data to pass to the sub-workflow (optional, defaults to full input)
+  - input_data: Data to pass to the sub-workflow (optional, defaults to full input from parent workflow)
   - execution_mode: Execution mode - "sync" | "async" | "fire_and_forget" (optional, defaults to "sync")
   - timeout_ms: Maximum time to wait for sub-workflow completion in milliseconds (optional, defaults to 5 minutes)
   - failure_strategy: How to handle sub-workflow failures - "fail_parent" | "continue" (optional, defaults to "fail_parent")
+
+  Input data from parent workflow is automatically passed to the sub-workflow trigger node.
 
   Execution Modes:
   - Synchronous ("sync"): Parent workflow suspends until sub-workflow completes
@@ -15,9 +17,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   - Fire-and-Forget ("fire_and_forget"): Parent workflow triggers sub-workflow and continues immediately
 
   Returns:
-  - {:suspend, :sub_workflow_sync, suspend_data} for synchronous execution
-  - {:suspend, :sub_workflow_async, suspend_data} for asynchronous execution
-  - {:suspend, :sub_workflow_fire_forget, suspend_data} for fire-and-forget execution
+  - {:suspend, :sub_workflow_sync, suspension_data} for synchronous execution
+  - {:suspend, :sub_workflow_async, suspension_data} for asynchronous execution
+  - {:suspend, :sub_workflow_fire_forget, suspension_data} for fire-and-forget execution
   - {:error, reason} if sub-workflow setup fails
   """
 
@@ -44,7 +46,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   end
 
   @impl true
-  def execute(params, _context) do
+  def execute(params, context) do
     # Extract configuration
     workflow_id = Map.get(params, "workflow_id")
     execution_mode = Map.get(params, "execution_mode", "sync")
@@ -57,12 +59,16 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
          :ok <- validate_execution_mode(execution_mode),
          :ok <- validate_timeout(timeout_ms),
          :ok <- validate_failure_strategy(failure_strategy) do
-      # Prepare sub-workflow execution data
+      # Prepare sub-workflow execution data with input from parent workflow
+
+      input_data = context["$input"]["main"] || %{}
+
       sub_workflow_data = %{
         workflow_id: workflow_id,
         execution_mode: execution_mode,
         timeout_ms: timeout_ms,
         failure_strategy: failure_strategy,
+        input_data: input_data,
         triggered_at: DateTime.utc_now()
       }
 

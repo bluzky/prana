@@ -14,12 +14,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:suspend, :sub_workflow_sync, suspend_data} = result
-      assert suspend_data.workflow_id == "user_onboarding"
-      assert suspend_data.execution_mode == "sync"
-      assert suspend_data.timeout_ms == 300_000
-      assert suspend_data.failure_strategy == "fail_parent"
-      assert %DateTime{} = suspend_data.triggered_at
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.workflow_id == "user_onboarding"
+      assert suspension_data.execution_mode == "sync"
+      assert suspension_data.timeout_ms == 300_000
+      assert suspension_data.failure_strategy == "fail_parent"
+      assert %DateTime{} = suspension_data.triggered_at
     end
 
     test "returns suspension for fire-and-forget execution" do
@@ -31,10 +31,10 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:suspend, :sub_workflow_fire_forget, suspend_data} = result
-      assert suspend_data.workflow_id == "notification_flow"
-      assert suspend_data.execution_mode == "fire_and_forget"
-      assert suspend_data.timeout_ms == 60_000
+      assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
+      assert suspension_data.workflow_id == "notification_flow"
+      assert suspension_data.execution_mode == "fire_and_forget"
+      assert suspension_data.timeout_ms == 60_000
     end
 
     test "returns suspension for asynchronous execution" do
@@ -47,12 +47,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:suspend, :sub_workflow_async, suspend_data} = result
-      assert suspend_data.workflow_id == "user_processing"
-      assert suspend_data.execution_mode == "async"
-      assert suspend_data.timeout_ms == 600_000
-      assert suspend_data.failure_strategy == "continue"
-      assert %DateTime{} = suspend_data.triggered_at
+      assert {:suspend, :sub_workflow_async, suspension_data} = result
+      assert suspension_data.workflow_id == "user_processing"
+      assert suspension_data.execution_mode == "async"
+      assert suspension_data.timeout_ms == 600_000
+      assert suspension_data.failure_strategy == "continue"
+      assert %DateTime{} = suspension_data.triggered_at
     end
 
     test "uses default values for optional parameters" do
@@ -62,14 +62,14 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:suspend, :sub_workflow_sync, suspend_data} = result
-      assert suspend_data.workflow_id == "simple_flow"
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.workflow_id == "simple_flow"
       # default
-      assert suspend_data.execution_mode == "sync"
+      assert suspension_data.execution_mode == "sync"
       # default 5 minutes
-      assert suspend_data.timeout_ms == 300_000
+      assert suspension_data.timeout_ms == 300_000
       # default
-      assert suspend_data.failure_strategy == "fail_parent"
+      assert suspension_data.failure_strategy == "fail_parent"
     end
 
     test "returns error for missing workflow_id" do
@@ -149,8 +149,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:suspend, :sub_workflow_sync, suspend_data} = result
-      assert suspend_data.failure_strategy == "continue"
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.failure_strategy == "continue"
     end
 
     test "correctly handles different execution modes" do
@@ -173,7 +173,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       assert {:suspend, :sub_workflow_fire_forget, _} = result
     end
 
-    test "preserves all configuration in suspend_data for middleware handling" do
+    test "preserves all configuration in suspension_data for middleware handling" do
       input_map = %{
         "workflow_id" => "detailed_flow",
         "execution_mode" => "sync",
@@ -183,14 +183,14 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:suspend, :sub_workflow_sync, suspend_data} = result
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
 
       # Verify all configuration is preserved for middleware
-      assert suspend_data.workflow_id == "detailed_flow"
-      assert suspend_data.execution_mode == "sync"
-      assert suspend_data.timeout_ms == 120_000
-      assert suspend_data.failure_strategy == "continue"
-      assert is_struct(suspend_data.triggered_at, DateTime)
+      assert suspension_data.workflow_id == "detailed_flow"
+      assert suspension_data.execution_mode == "sync"
+      assert suspension_data.timeout_ms == 120_000
+      assert suspension_data.failure_strategy == "continue"
+      assert is_struct(suspension_data.triggered_at, DateTime)
     end
   end
 end

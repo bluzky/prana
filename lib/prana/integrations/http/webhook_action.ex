@@ -106,13 +106,13 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   end
 
   # Public helper to get webhook configuration for external use
-  # def get_webhook_config(suspend_data) do
+  # def get_webhook_config(suspension_data) do
   #   %{
-  #     path: Map.get(suspend_data, :webhook_path, "/webhook"),
-  #     methods: Map.get(suspend_data, :allowed_methods, ["POST"]),
-  #     auth: Map.get(suspend_data, :auth_config, %{"type" => "none"}),
-  #     response_type: Map.get(suspend_data, :response_type, "immediately"),
-  #     webhook_url: Map.get(suspend_data, :webhook_url)
+  #     path: Map.get(suspension_data, :webhook_path, "/webhook"),
+  #     methods: Map.get(suspension_data, :allowed_methods, ["POST"]),
+  #     auth: Map.get(suspension_data, :auth_config, %{"type" => "none"}),
+  #     response_type: Map.get(suspension_data, :response_type, "immediately"),
+  #     webhook_url: Map.get(suspension_data, :webhook_url)
   #   }
   # end
 

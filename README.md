@@ -274,7 +274,7 @@ end
 {:error, error_reason, "error_port"}
 
 # Suspension for async operations
-{:suspend, :custom_suspension_type, suspend_data}
+{:suspend, :custom_suspension_type, suspension_data}
 ```
 
 ### Registration

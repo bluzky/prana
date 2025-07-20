@@ -82,12 +82,12 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       # Verify suspension data stored in NodeExecution
       assert suspended_node_execution.suspension_type == :sub_workflow_sync
-      suspend_data = suspended_node_execution.suspension_data
-      assert suspend_data.workflow_id == "user_onboarding"
-      assert suspend_data.execution_mode == "sync"
-      assert suspend_data.timeout_ms == 300_000
-      assert suspend_data.failure_strategy == "fail_parent"
-      assert %DateTime{} = suspend_data.triggered_at
+      suspension_data = suspended_node_execution.suspension_data
+      assert suspension_data.workflow_id == "user_onboarding"
+      assert suspension_data.execution_mode == "sync"
+      assert suspension_data.timeout_ms == 300_000
+      assert suspension_data.failure_strategy == "fail_parent"
+      assert %DateTime{} = suspension_data.triggered_at
     end
 
     test "handles fire-and-forget sub-workflow execution", %{execution: execution} do
@@ -111,10 +111,10 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       # Verify suspension data stored in NodeExecution
       assert suspended_node_execution.suspension_type == :sub_workflow_fire_forget
-      suspend_data = suspended_node_execution.suspension_data
-      assert suspend_data.workflow_id == "notification_flow"
-      assert suspend_data.execution_mode == "fire_and_forget"
-      assert %DateTime{} = suspend_data.triggered_at
+      suspension_data = suspended_node_execution.suspension_data
+      assert suspension_data.workflow_id == "notification_flow"
+      assert suspension_data.execution_mode == "fire_and_forget"
+      assert %DateTime{} = suspension_data.triggered_at
     end
 
     test "handles sub-workflow validation errors", %{execution: execution} do
@@ -186,12 +186,12 @@ defmodule Prana.NodeExecutorSuspensionTest do
         output_ports: ["main", "error"]
       }
 
-      suspend_data = %{workflow_id: "test", data: %{}}
-      result = {:suspend, :sub_workflow_sync, suspend_data}
+      suspension_data = %{workflow_id: "test", data: %{}}
+      result = {:suspend, :sub_workflow_sync, suspension_data}
 
       processed = NodeExecutor.process_action_result(result, action)
 
-      assert {:suspend, :sub_workflow_sync, ^suspend_data} = processed
+      assert {:suspend, :sub_workflow_sync, ^suspension_data} = processed
     end
 
     test "handles different suspension types" do
@@ -211,12 +211,12 @@ defmodule Prana.NodeExecutorSuspensionTest do
       ]
 
       for suspension_type <- suspension_types do
-        suspend_data = %{type: suspension_type, config: %{}}
-        result = {:suspend, suspension_type, suspend_data}
+        suspension_data = %{type: suspension_type, config: %{}}
+        result = {:suspend, suspension_type, suspension_data}
 
         processed = NodeExecutor.process_action_result(result, action)
 
-        assert {:suspend, ^suspension_type, ^suspend_data} = processed
+        assert {:suspend, ^suspension_type, ^suspension_data} = processed
       end
     end
 

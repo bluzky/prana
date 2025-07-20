@@ -174,24 +174,24 @@ end
 **Middleware Implementation**:
 ```elixir
 defp handle_external_event_suspension(data) do
-  suspend_data = data.suspend_data
+  suspension_data = data.suspension_data
   execution_id = data.execution_id
 
   # 1. Save suspension state to database
   MyApp.Database.save_suspended_workflow(%{
     execution_id: execution_id,
     suspend_type: :external_event,
-    event_type: suspend_data.event_type,
-    event_filter: suspend_data.event_filter,
+    event_type: suspension_data.event_type,
+    event_filter: suspension_data.event_filter,
     suspended_at: DateTime.utc_now(),
-    timeout_at: DateTime.add(DateTime.utc_now(), suspend_data.timeout_ms, :millisecond)
+    timeout_at: DateTime.add(DateTime.utc_now(), suspension_data.timeout_ms, :millisecond)
   })
 
   # 2. Register for event notifications
-  MyApp.EventRouter.register_waiting_workflow(execution_id, suspend_data.event_type, suspend_data.event_filter)
+  MyApp.EventRouter.register_waiting_workflow(execution_id, suspension_data.event_type, suspension_data.event_filter)
 
   # 3. Schedule timeout handling
-  MyApp.Scheduler.schedule_timeout(execution_id, suspend_data.timeout_ms, suspend_data.on_timeout)
+  MyApp.Scheduler.schedule_timeout(execution_id, suspension_data.timeout_ms, suspension_data.on_timeout)
 
   :ok
 end
@@ -246,14 +246,14 @@ end
 **Middleware Implementation**:
 ```elixir
 defp handle_sub_workflow_suspension(data) do
-  suspend_data = data.suspend_data
+  suspension_data = data.suspension_data
   execution_id = data.execution_id
 
   # 1. Load sub-workflow
-  case MyApp.WorkflowLoader.load_workflow(suspend_data.workflow_id) do
+  case MyApp.WorkflowLoader.load_workflow(suspension_data.workflow_id) do
     {:ok, sub_workflow} ->
       # 2. Execute sub-workflow
-      case MyApp.WorkflowRunner.execute_workflow(sub_workflow, suspend_data.input_data) do
+      case MyApp.WorkflowRunner.execute_workflow(sub_workflow, suspension_data.input_data) do
         {:ok, sub_execution_id} ->
           # 3. Track parent-child relationship
           MyApp.Database.save_workflow_relationship(%{
@@ -335,11 +335,11 @@ end
 **Middleware Implementation**:
 ```elixir
 defp handle_polling_suspension(data) do
-  suspend_data = data.suspend_data
+  suspension_data = data.suspension_data
   execution_id = data.execution_id
 
   # Start polling worker
-  case MyApp.PollingWorker.start_polling(execution_id, suspend_data) do
+  case MyApp.PollingWorker.start_polling(execution_id, suspension_data) do
     {:ok, _pid} -> :ok
     {:error, reason} ->
       # Resume with error immediately
@@ -435,9 +435,9 @@ end
 **Middleware Implementation**:
 ```elixir
 defp handle_delay_suspension(data) do
-  suspend_data = data.suspend_data
+  suspension_data = data.suspension_data
   execution_id = data.execution_id
-  duration_ms = suspend_data.duration_ms
+  duration_ms = suspension_data.duration_ms
 
   if duration_ms > @long_delay_threshold do
     # Long delay - persist to database for restart resilience
@@ -571,7 +571,7 @@ end
 CREATE TABLE suspended_workflows (
   execution_id VARCHAR(255) PRIMARY KEY,
   suspend_type VARCHAR(50) NOT NULL,
-  suspend_data JSONB NOT NULL,
+  suspension_data JSONB NOT NULL,
   suspended_at TIMESTAMP NOT NULL,
   timeout_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW()

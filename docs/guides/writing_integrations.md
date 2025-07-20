@@ -103,11 +103,11 @@ The suspension system allows actions to pause workflow execution for async opera
 ### Suspension Tuple Format
 
 ```elixir
-{:suspend, suspension_type, suspend_data}
+{:suspend, suspension_type, suspension_data}
 ```
 
 - **`suspension_type`**: Atom identifying the suspension type
-- **`suspend_data`**: Map containing data needed to resume the operation
+- **`suspension_data`**: Map containing data needed to resume the operation
 
 ### Resume Data Handling
 
@@ -466,8 +466,8 @@ defmodule MyApp.CustomIntegrationTest do
     context = %{"$input" => %{}, "$nodes" => %{}, "$vars" => %{}}
     result = CustomIntegration.execute(input, context)
 
-    assert {:suspend, :custom_suspension, suspend_data} = result
-    assert suspend_data.task_id
+    assert {:suspend, :custom_suspension, suspension_data} = result
+    assert suspension_data.task_id
   end
 end
 ```

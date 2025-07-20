@@ -100,9 +100,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
 
       # Execute workflow
-      context = %{variables: %{}}
-
-      result = GraphExecutor.execute_workflow(execution_graph, context)
+      result = GraphExecutor.execute_workflow(execution_graph, %{})
 
       # Should suspend at sub-workflow node
       assert {:suspend, suspended_execution} = result
@@ -418,7 +416,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       assert_receive {:middleware_event, :node_suspended, event_data}
       assert event_data.node.key == "sub_workflow_node"
       assert event_data.suspension_type == :sub_workflow_sync
-      assert event_data.suspend_data.workflow_id == "child_workflow"
+      assert event_data.suspension_data.workflow_id == "child_workflow"
 
       assert_receive {:middleware_event, :execution_suspended, event_data}
       assert event_data.execution.status == "suspended"

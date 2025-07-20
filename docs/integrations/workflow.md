@@ -25,16 +25,16 @@ The Workflow integration provides sub-workflow execution capabilities with suspe
 
 1. **Synchronous (`"sync"`)** - Default
    - Parent workflow suspends until sub-workflow completes
-   - Returns: `{:suspend, :sub_workflow_sync, suspend_data}`
+   - Returns: `{:suspend, :sub_workflow_sync, suspension_data}`
 
 2. **Asynchronous (`"async"`)**
    - Parent workflow suspends, sub-workflow executes async
    - Parent resumes when sub-workflow completes
-   - Returns: `{:suspend, :sub_workflow_async, suspend_data}`
+   - Returns: `{:suspend, :sub_workflow_async, suspension_data}`
 
 3. **Fire-and-Forget (`"fire_and_forget"`)**
    - Parent workflow triggers sub-workflow and continues immediately
-   - Returns: `{:suspend, :sub_workflow_fire_forget, suspend_data}`
+   - Returns: `{:suspend, :sub_workflow_fire_forget, suspension_data}`
 
 **Examples**:
 

@@ -150,17 +150,6 @@ defmodule Prana.WorkflowExecution do
   end
 
   @doc """
-  Legacy suspend function for backward compatibility.
-
-  This function is deprecated and will be removed in a future version.
-  Use suspend/4 with structured suspension data instead.
-  """
-  @deprecated "Use suspend/4 with structured suspension data"
-  def suspend(%__MODULE__{} = execution, resume_token) when is_binary(resume_token) do
-    %{execution | status: "suspended"}
-  end
-
-  @doc """
   Gets execution duration in milliseconds
   """
   def duration(%__MODULE__{started_at: nil}), do: nil
@@ -543,7 +532,11 @@ defmodule Prana.WorkflowExecution do
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     # Update execution with persistent state
-    updated_execution = %{execution | node_executions: updated_node_executions}
+    updated_execution = %{
+      execution
+      | node_executions: updated_node_executions,
+        current_execution_index: execution.current_execution_index + 1
+    }
 
     # Update runtime state if present
     updated_execution =
@@ -587,7 +580,11 @@ defmodule Prana.WorkflowExecution do
     updated_executions = update_node_executions(existing_executions, failed_node_execution)
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
-    %{execution | node_executions: updated_node_executions}
+    %{
+      execution
+      | node_executions: updated_node_executions,
+        current_execution_index: execution.current_execution_index + 1
+    }
   end
 
   @doc """
@@ -787,7 +784,11 @@ defmodule Prana.WorkflowExecution do
     updated_executions = update_node_executions(existing_executions, node_execution)
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
-    %{execution | node_executions: updated_node_executions}
+    %{
+      execution
+      | node_executions: updated_node_executions,
+        current_execution_index: execution.current_execution_index + 1
+    }
   end
 
   @doc """

@@ -47,18 +47,18 @@ defmodule Prana.Integrations.WaitTest do
     test "interval mode works correctly" do
       input_map = %{"mode" => "interval", "duration" => 500_000}
 
-      assert {:suspend, :interval, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.mode == "interval"
-      assert suspend_data.duration_ms == 500_000
-      assert %DateTime{} = suspend_data.started_at
-      assert %DateTime{} = suspend_data.resume_at
+      assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.mode == "interval"
+      assert suspension_data.duration_ms == 500_000
+      assert %DateTime{} = suspension_data.started_at
+      assert %DateTime{} = suspension_data.resume_at
     end
 
     test "interval mode supports different time units" do
       input_map = %{"mode" => "interval", "duration" => 2, "unit" => "minutes"}
 
-      assert {:suspend, :interval, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.duration_ms == 120_000
+      assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.duration_ms == 120_000
     end
 
     test "interval mode returns error for missing duration" do
@@ -79,13 +79,13 @@ defmodule Prana.Integrations.WaitTest do
       future_time = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
       input_map = %{"mode" => "schedule", "schedule_at" => future_time}
 
-      assert {:suspend, :schedule, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.mode == "schedule"
-      assert suspend_data.timezone == "UTC"
-      assert %DateTime{} = suspend_data.schedule_at
-      assert %DateTime{} = suspend_data.started_at
-      assert is_integer(suspend_data.duration_ms)
-      assert suspend_data.duration_ms > 0
+      assert {:suspend, :schedule, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.mode == "schedule"
+      assert suspension_data.timezone == "UTC"
+      assert %DateTime{} = suspension_data.schedule_at
+      assert %DateTime{} = suspension_data.started_at
+      assert is_integer(suspension_data.duration_ms)
+      assert suspension_data.duration_ms > 0
     end
 
     test "schedule mode returns error for past time" do
@@ -113,18 +113,18 @@ defmodule Prana.Integrations.WaitTest do
     test "webhook mode works correctly" do
       input_map = %{"mode" => "webhook", "timeout_hours" => 48}
 
-      assert {:suspend, :webhook, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.mode == "webhook"
-      assert suspend_data.timeout_hours == 48
-      assert %DateTime{} = suspend_data.started_at
-      assert %DateTime{} = suspend_data.expires_at
+      assert {:suspend, :webhook, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.mode == "webhook"
+      assert suspension_data.timeout_hours == 48
+      assert %DateTime{} = suspension_data.started_at
+      assert %DateTime{} = suspension_data.expires_at
     end
 
     test "webhook mode defaults timeout_hours to 24" do
       input_map = %{"mode" => "webhook"}
 
-      assert {:suspend, :webhook, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.timeout_hours == 24
+      assert {:suspend, :webhook, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.timeout_hours == 24
     end
 
     test "webhook mode returns error for invalid timeout_hours" do
@@ -163,15 +163,15 @@ defmodule Prana.Integrations.WaitTest do
     test "converts minutes to milliseconds correctly" do
       input_map = %{"mode" => "interval", "duration" => 1, "unit" => "minutes"}
 
-      assert {:suspend, :interval, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.duration_ms == 60_000
+      assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.duration_ms == 60_000
     end
 
     test "converts hours to milliseconds correctly" do
       input_map = %{"mode" => "interval", "duration" => 1, "unit" => "hours"}
 
-      assert {:suspend, :interval, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.duration_ms == 3_600_000
+      assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.duration_ms == 3_600_000
     end
 
     test "handles fractional conversions" do
@@ -199,8 +199,8 @@ defmodule Prana.Integrations.WaitTest do
     test "still suspends for durations >= 60 seconds" do
       input_map = %{"mode" => "interval", "duration" => 60, "unit" => "seconds"}
 
-      assert {:suspend, :interval, suspend_data} = Wait.wait(input_map)
-      assert suspend_data.duration_ms == 60_000
+      assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
+      assert suspension_data.duration_ms == 60_000
     end
   end
 

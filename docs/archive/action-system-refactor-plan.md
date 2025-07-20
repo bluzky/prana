@@ -19,9 +19,9 @@ Complete architectural refactor to implement a clean action behavior system with
     {:ok, preparation_data :: map()} | {:error, reason :: term()}
   
   @callback execute(input_data :: map()) :: 
-    {:ok, output, output_port} | {:suspend, type, suspend_data} | {:error, reason, output_port}
+    {:ok, output, output_port} | {:suspend, type, suspension_data} | {:error, reason, output_port}
   
-  @callback resume(suspend_data :: term(), resume_input :: map()) :: 
+  @callback resume(suspension_data :: term(), resume_input :: map()) :: 
     {:ok, output} | {:error, reason}
   ```
 - **Default implementation module** for actions that only need execute/2

@@ -18,7 +18,7 @@ Initial analysis suggested implementing separate APIs and integrations for each 
 
 We will implement a **unified suspension/resume mechanism** that handles all async coordination patterns through:
 
-1. **Single return pattern** from integrations: `{:suspend, suspend_type, suspend_data}`
+1. **Single return pattern** from integrations: `{:suspend, suspend_type, suspension_data}`
 2. **Minimal public API**: Only `resume_workflow/2` and `cancel_workflow/2`
 3. **Middleware-based callbacks** for application integration
 4. **Internal coordination** by GraphExecutor
@@ -31,16 +31,16 @@ We will implement a **unified suspension/resume mechanism** that handles all asy
 {:suspend, :external_event, %{event_type: "approval", timeout_ms: 86400000}}
 
 # 2. GraphExecutor handles suspension internally
-def handle_internal_suspension(graph, node, suspend_type, suspend_data) do
+def handle_internal_suspension(graph, node, suspend_type, suspension_data) do
   # Fire middleware event
   fire_middleware_event(:node_suspended, %{
     execution_id: graph.execution_id,
     suspend_type: suspend_type,
-    suspend_data: suspend_data
+    suspension_data: suspension_data
   })
   
   # Return suspended execution
-  {"suspended", graph.execution_id, suspend_data}
+  {"suspended", graph.execution_id, suspension_data}
 end
 
 # 3. Application handles via middleware
@@ -145,7 +145,7 @@ Prana.TimerManager.schedule_delay/2
 ### 2. Behavior-Based Callbacks
 ```elixir
 # Rejected - rigid interface  
-@callback on_workflow_suspended(execution_id, suspend_data) :: :ok | {:error, term()}
+@callback on_workflow_suspended(execution_id, suspension_data) :: :ok | {:error, term()}
 @callback on_workflow_resumed(execution_id, result_data) :: :ok | {:error, term()}
 ```
 

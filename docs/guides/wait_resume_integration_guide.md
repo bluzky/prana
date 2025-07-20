@@ -214,11 +214,11 @@ defmodule MyApp.WorkflowEngine do
         cleanup_webhooks(execution_id)
         {:ok, execution_id}
 
-      {:suspend, :webhook, suspend_data} ->
+      {:suspend, :webhook, suspension_data} ->
         # Save execution state and activate webhook
-        save_suspended_execution(execution_id, suspend_data, context)
-        activate_webhook(suspend_data, context)
-        {"suspended", execution_id, suspend_data}
+        save_suspended_execution(execution_id, suspension_data, context)
+        activate_webhook(suspension_data, context)
+        {"suspended", execution_id, suspension_data}
 
       {:error, reason} ->
         cleanup_webhooks(execution_id)
@@ -246,10 +246,10 @@ defmodule MyApp.WorkflowEngine do
           cleanup_webhooks(webhook.execution_id)
           {:ok, webhook.execution_id}
 
-        {:suspend, :webhook, suspend_data} ->
+        {:suspend, :webhook, suspension_data} ->
           # Another suspension - save state and activate new webhook
-          save_suspended_execution(webhook.execution_id, suspend_data, execution.context)
-          activate_webhook(suspend_data, execution.context)
+          save_suspended_execution(webhook.execution_id, suspension_data, execution.context)
+          activate_webhook(suspension_data, execution.context)
           {"suspended", webhook.execution_id}
 
         {:error, reason} ->
@@ -285,18 +285,18 @@ defmodule MyApp.WorkflowEngine do
     %{}
   end
 
-  defp save_suspended_execution(execution_id, suspend_data, context) do
+  defp save_suspended_execution(execution_id, suspension_data, context) do
     ExecutionStorage.save_suspended(%{
       execution_id: execution_id,
-      suspend_data: suspend_data,
+      suspension_data: suspension_data,
       context: context,
       suspended_at: DateTime.utc_now()
     })
   end
 
-  defp activate_webhook(suspend_data, context) do
-    # Extract webhook info from suspend_data
-    node_id = suspend_data.node_id  # This would come from NodeExecutor
+  defp activate_webhook(suspension_data, context) do
+    # Extract webhook info from suspension_data
+    node_id = suspension_data.node_id  # This would come from NodeExecutor
     resume_url = context.resume_urls[node_id]
 
     if resume_url do
@@ -304,8 +304,8 @@ defmodule MyApp.WorkflowEngine do
         resume_id: resume_url,
         execution_id: context.execution_id,
         node_id: node_id,
-        expires_at: suspend_data.expires_at,
-        webhook_config: suspend_data.webhook_config || %{}
+        expires_at: suspension_data.expires_at,
+        webhook_config: suspension_data.webhook_config || %{}
       })
     end
   end

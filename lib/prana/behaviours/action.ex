@@ -71,16 +71,16 @@ defmodule Prana.Behaviour.Action do
         {:ok, request_id} = start_async_operation(params, webhook_url)
         
         # Suspend with webhook data
-        suspend_data = %{
+        suspension_data = %{
           request_id: request_id,
           webhook_url: webhook_url,
           started_at: DateTime.utc_now()
         }
         
-        {:suspend, :webhook, suspend_data}
+        {:suspend, :webhook, suspension_data}
       end
 
-      def resume(suspend_data, resume_input) do
+      def resume(suspension_data, resume_input) do
         # Process webhook callback
         case resume_input do
           %{"status" => "success", "result" => result} ->
@@ -92,7 +92,7 @@ defmodule Prana.Behaviour.Action do
   """
 
   @type suspension_type :: :webhook | :interval | :schedule | :sub_workflow | atom()
-  @type suspend_data :: term()
+  @type suspension_data :: term()
   @type preparation_data :: map()
   @type params :: map()
   @type output_data :: term()
@@ -133,7 +133,7 @@ defmodule Prana.Behaviour.Action do
 
   ## Returns
   - `{:ok, output_data}` - Action completed successfully
-  - `{:suspend, suspension_type, suspend_data}` - Action suspended, waiting for external event
+  - `{:suspend, suspension_type, suspension_data}` - Action suspended, waiting for external event
   - `{:error, reason}` - Action failed
 
   ## Examples
@@ -165,12 +165,12 @@ defmodule Prana.Behaviour.Action do
         webhook_url = params["webhook_url"]
         {:ok, request_id} = start_async_operation(params, webhook_url)
         
-        suspend_data = %{request_id: request_id, webhook_url: webhook_url}
-        {:suspend, :webhook, suspend_data}
+        suspension_data = %{request_id: request_id, webhook_url: webhook_url}
+        {:suspend, :webhook, suspension_data}
       end
   """
   @callback execute(params(), context :: map()) ::
-              {:ok, output_data()} | {:suspend, suspension_type(), suspend_data()} | {:error, reason :: term()}
+              {:ok, output_data()} | {:suspend, suspension_type(), suspension_data()} | {:error, reason :: term()}
 
   @doc """
   Resume suspended action with external input.
