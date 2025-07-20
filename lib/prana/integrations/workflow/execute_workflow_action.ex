@@ -117,13 +117,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
         # Sub-workflow timed out but parent should continue
         {:ok, %{sub_workflow_timeout: true}, "timeout"}
 
-      # For fire-and-forget, any resume data indicates successful trigger
       _ when execution_mode == "fire_and_forget" ->
-        {:ok, resume_data, "main"}
+        {:ok, nil, "main"}
 
-      # Default case - treat as successful completion
       _ ->
-        {:ok, resume_data, "main"}
+        {:ok, nil, "main"}
     end
   end
 

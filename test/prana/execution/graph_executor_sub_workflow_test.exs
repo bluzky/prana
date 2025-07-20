@@ -213,7 +213,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       assert fire_forget_execution.suspension_data.execution_mode == "fire_and_forget"
 
       # Simulate caller handling fire-and-forget: trigger child async + immediate resume
-      resume_data = %{sub_workflow_triggered: true, workflow_id: "background_task"}
+      resume_data = %{workflow_id: "background_task"}
       execution_context = build_resume_context(suspended_execution, resume_data)
 
       resume_result =
@@ -234,8 +234,6 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       all_completed_executions = completed_execution.node_executions |> Map.values() |> List.flatten()
       fire_forget_completed = Enum.find(all_completed_executions, &(&1.node_key == "fire_forget_sub"))
       assert fire_forget_completed.status == "completed"
-      assert fire_forget_completed.output_data.sub_workflow_triggered == true
-      assert fire_forget_completed.output_data.workflow_id == "background_task"
     end
   end
 

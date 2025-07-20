@@ -51,6 +51,7 @@ defmodule Prana.WorkflowExecution do
     field(:vars, :map, default: %{})
 
     #   node_executions: %{String.t() => [Prana.NodeExecution.t()]},
+    # NodeExecution list is stored in reverse order from newest to oldest. This helps reducing traversal when accessing the latest execution.
     field(:node_executions, :map, default: %{})
     field(:current_execution_index, :integer, default: 0)
 
@@ -241,7 +242,7 @@ defmodule Prana.WorkflowExecution do
   # Get completed nodes with their execution information
   defp get_completed_nodes_with_execution_info(execution) do
     Map.new(execution.node_executions, fn {node_key, executions} ->
-      last_execution = List.last(executions)
+      last_execution = List.first(executions)
 
       if last_execution && last_execution.status == "completed" do
         {node_key, last_execution}
@@ -394,10 +395,7 @@ defmodule Prana.WorkflowExecution do
   defp rebuild_completed_node_outputs(node_executions) do
     node_executions
     |> Enum.map(fn {node_key, executions} ->
-      last_execution =
-        executions
-        |> Enum.reverse()
-        |> Enum.find(&(&1.status == "completed"))
+      last_execution = Enum.find(executions, &(&1.status == "completed"))
 
       case last_execution do
         nil -> {node_key, nil}
@@ -480,7 +478,7 @@ defmodule Prana.WorkflowExecution do
     remaining_executions =
       Enum.reject(existing_executions, fn ne -> ne.run_index == new_execution.run_index end)
 
-    Enum.sort_by(remaining_executions ++ [new_execution], & &1.execution_index)
+    Enum.sort_by([new_execution | remaining_executions], & &1.execution_index, :desc)
   end
 
   # Get input ports for a node, with fallback to default "input" port
@@ -668,7 +666,7 @@ defmodule Prana.WorkflowExecution do
   # Get valid connection data for a source node
   defp get_connection_data(connection, execution) do
     node_executions = Map.get(execution.node_executions, connection.from, [])
-    latest_execution = List.last(node_executions)
+    latest_execution = List.first(node_executions)
 
     if latest_execution && latest_execution.output_port == connection.from_port do
       source_node_data = execution.__runtime["nodes"][connection.from]
@@ -967,7 +965,7 @@ defmodule Prana.WorkflowExecution do
     # Extract completed node IDs from map structure for dependency checking
     completed_node_ids =
       execution.node_executions
-      |> Enum.map(fn {node_key, executions} -> {node_key, List.last(executions)} end)
+      |> Enum.map(fn {node_key, executions} -> {node_key, List.first(executions)} end)
       |> Enum.filter(fn {_, exec} -> exec.status == "completed" end)
       |> MapSet.new(fn {node_key, _} -> node_key end)
 
