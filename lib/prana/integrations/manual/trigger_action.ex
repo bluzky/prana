@@ -20,7 +20,8 @@ defmodule Prana.Integrations.Manual.TriggerAction do
   end
 
   @impl true
-  def execute(params, _context) do
-    {:ok, params}
+  def execute(_params, context) do
+    input = context["$input"]["main"] || %{}
+    {:ok, input}
   end
 end
