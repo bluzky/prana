@@ -205,10 +205,10 @@ defmodule Prana.Behaviour.Action do
               {:ok, output_data()} | {:error, reason :: term()}
 
   @doc """
-  Returns the input schema for this action.
+  Returns the params schema for this action.
   Used for validation and UI generation.
   """
-  @callback input_schema() :: module() | map()
+  @callback params_schema() :: module() | map()
 
   @doc """
   Validates params for this action using schema.
@@ -224,7 +224,7 @@ defmodule Prana.Behaviour.Action do
   """
   @callback suspendable?() :: boolean()
 
-  @optional_callbacks [suspendable?: 0, input_schema: 0, validate_params: 1]
+  @optional_callbacks [suspendable?: 0, params_schema: 0, validate_params: 1]
 
   defmacro __using__(_opts) do
     quote do

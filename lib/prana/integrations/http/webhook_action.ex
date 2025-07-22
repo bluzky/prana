@@ -58,7 +58,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   end
 
   @impl true
-  def input_schema, do: WebhookSchema
+  def params_schema, do: WebhookSchema
 
   @impl true
   def validate_params(input_map) do

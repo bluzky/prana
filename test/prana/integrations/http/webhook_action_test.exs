@@ -127,8 +127,8 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
       assert validated.webhook_config.headers == %{"X-Custom" => "value"}
     end
 
-    test "returns input_schema" do
-      assert WebhookAction.input_schema() == Prana.Integrations.HTTP.WebhookAction.WebhookSchema
+    test "returns params_schema" do
+      assert WebhookAction.params_schema() == Prana.Integrations.HTTP.WebhookAction.WebhookSchema
     end
   end
 
