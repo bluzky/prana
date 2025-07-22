@@ -2,17 +2,17 @@
 
 **Prana** is a powerful Elixir workflow automation platform built around a node-based graph execution model. It orchestrates complex workflows consisting of nodes (triggers, actions, logic, wait, output) connected through explicit ports with conditional routing and expression-based data flow.
 
-## ✨ Key Features
+## Key Features
 
-- **🏗️ Node-Based Architecture**: Visual workflow design with explicit node connections and port-based data routing
-- **🔄 Conditional Branching**: Advanced IF/ELSE and switch/case patterns with exclusive path execution
-- **🎯 Expression Engine**: Dynamic data access with `$input.field`, `$nodes.api.response`, wildcards, and filtering
-- **⚡ Sub-workflow Orchestration**: Synchronous, asynchronous, and fire-and-forget execution modes with suspension/resume
-- **🔌 Extensible Integration System**: Clean behavior-driven integration framework with Action behavior pattern
-- **🛡️ Type Safety**: All core entities use proper Elixir structs with compile-time checking
-- **🚀 Production Ready**: Comprehensive test coverage with 205+ passing tests
+- **Node-Based Architecture**: Visual workflow design with explicit node connections and port-based data routing
+- **Conditional Branching**: Advanced IF/ELSE and switch/case patterns with exclusive path execution
+- **Template Engine**: Dynamic data access with `{{ $input.field }}`, `{{ $nodes.api.response }}`, filters, and expressions
+- **Sub-workflow Orchestration**: Synchronous, asynchronous, and fire-and-forget execution modes with suspension/resume
+- **Extensible Integration System**: Clean behavior-driven integration framework with Action behavior pattern
+- **Type Safety**: All core entities use proper Elixir structs with compile-time checking
+- **Production Ready**: Comprehensive test coverage with 353+ passing tests
 
-## 🏃 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -40,37 +40,37 @@ end
 workflow = %Prana.Workflow{
   id: "hello_world",
   name: "Hello World Workflow",
+  version: 1,
   nodes: [
     %Prana.Node{
-      id: "start",
-      custom_id: "start",
-      type: :trigger,
-      integration_name: "manual",
-      action_name: "trigger",
-      params: %{},
-      output_ports: ["success"]
+      key: "start",
+      name: "Start Trigger",
+      type: "manual.trigger",
+      params: %{}
     },
     %Prana.Node{
-      id: "process",
-      custom_id: "process", 
-      type: :action,
-      integration_name: "manual",
-      action_name: "process_adult",
+      key: "process",
+      name: "Process Data",
+      type: "manual.process_adult",
       params: %{
-        "message" => "$input.message",
-        "user" => "$input.user"
-      },
-      output_ports: ["success"]
+        "message" => "{{ $input.message }}",
+        "user" => "{{ $input.user }}"
+      }
     }
   ],
-  connections: [
-    %Prana.Connection{
-      from: "start",
-      from_port: "success",
-      to: "process",
-      to_port: "input"
+  connections: %{
+    "start" => %{
+      "main" => [
+        %Prana.Connection{
+          from: "start",
+          from_port: "main",
+          to: "process",
+          to_port: "main"
+        }
+      ]
     }
-  ]
+  },
+  variables: %{}
 }
 
 # 4. Compile and execute
@@ -85,7 +85,7 @@ result = Prana.GraphExecutor.execute_workflow(
 {:ok, completed_execution} = result
 ```
 
-## 🧠 Core Concepts
+## Core Concepts
 
 ### Workflow Structure
 
@@ -95,61 +95,53 @@ result = Prana.GraphExecutor.execute_workflow(
 - **Input/Output Ports**: Named channels for data flow
 - **Expression Mapping**: Dynamic data transformation using expressions
 
-### Expression System
+### Template System
 
 Access data anywhere in your workflow:
 
 ```elixir
 # Simple field access
-"$input.user.email"                    # Input data
-"$nodes.api_call.response.user_id"     # Previous node results  
-"$variables.api_url"                   # Workflow variables
+"{{ $input.user.email }}"                    # Input data
+"{{ $nodes.api_call.response.user_id }}"     # Previous node results  
+"{{ $variables.api_url }}"                   # Workflow variables
 
 # Array operations
-"$input.users[0].name"                 # Index access
-"$input.users.*.email"                 # Wildcard extraction (returns array)
+"{{ $input.users[0].name }}"                 # Index access
+"{{ $input.users }}"                         # Full arrays
 
-# Filtering 
-"$input.users.{role: \"admin\"}.email"        # Filter by conditions
-"$input.orders.{status: \"completed\"}"       # Multiple conditions
+# Arithmetic and boolean expressions
+"{{ $input.age + 10 }}"                      # Math operations
+"{{ $input.age >= 18 && $input.verified }}" # Boolean logic
+
+# Filters
+"{{ $input.name | upper_case }}"             # Transform data
+"{{ $input.price | format_currency('USD') }}" # Formatted output
 ```
 
 ### Node Types
 
-- **Trigger**: Entry points for workflow execution (HTTP, schedule, manual)
-- **Action**: Processing nodes that perform operations (HTTP requests, transformations, custom logic)
+- **Trigger**: Entry points for workflow execution (HTTP webhooks, cron schedules, manual triggers)
+- **Action**: Processing nodes that perform operations (HTTP requests, data transformations, custom logic)
 - **Logic**: Conditional branching (IF/ELSE, switch/case, merge operations)
 - **Wait**: Time-based delays and coordination
 - **Output**: Final result processing and responses
 
-### Execution Patterns
 
-**Sequential Execution**: Nodes execute in dependency order
-```
-A → B → C → D
-```
-
-**Conditional Branching**: Exclusive path execution based on conditions
-```
-A → Condition → (B OR C) → D
-```
-
-**Diamond Patterns**: Fork-join execution with data merging
-```
-A → (B, C) → Merge → D
-```
-
-**Sub-workflow Coordination**: Parent-child workflow orchestration
-```
-A → Sub-workflow(sync/async/fire-forget) → B
-```
-
-## 🔌 Built-in Integrations
+## Built-in Integrations
 
 ### Manual Integration
 Simple test actions for development and debugging:
 - `trigger`: Basic workflow trigger
 - `process_adult`/`process_minor`: Data processing actions
+
+### HTTP Integration
+HTTP requests and webhooks:
+- `request`: Make HTTP requests with full configuration support
+- `webhook`: Handle incoming webhook requests and responses
+
+### Schedule Integration
+Time-based workflow triggers:
+- `cron_trigger`: Schedule workflows with cron expressions
 
 ### Logic Integration
 Conditional workflow control:
@@ -159,12 +151,18 @@ Conditional workflow control:
 ### Data Integration  
 Data combination and transformation:
 - `merge`: Combine data from multiple sources (append, merge, concat strategies)
+- `set_data`: Set workflow variables and state
+
+### Wait Integration
+Time-based coordination:
+- Delay actions and timeout handling for time-based workflows
 
 ### Workflow Integration
 Sub-workflow orchestration:
 - `execute_workflow`: Synchronous, asynchronous, and fire-and-forget execution modes
+- `set_state`: Manage workflow state and variables
 
-## 🛠️ Development
+## Development
 
 ### Setup
 ```bash
@@ -209,99 +207,25 @@ iex> {:ok, _} = Prana.IntegrationRegistry.start_link()
 iex> Prana.IntegrationRegistry.register_integration(Prana.Integrations.Manual)
 ```
 
-## 🏗️ Creating Custom Integrations
+## Creating Custom Integrations
 
-### Basic Integration Structure
+For detailed guidance on creating custom integrations, see the [Writing Integrations Guide](docs/guides/writing_integrations.md). This comprehensive guide covers:
 
-```elixir
-defmodule MyApp.CustomIntegration do
-  @behaviour Prana.Behaviour.Integration
+- Integration and Action behavior implementation
+- Template processing and context handling
+- Action return formats and error handling
+- Suspension/resume patterns for async operations
+- Registration and usage in workflows
+- Testing strategies and best practices
 
-  def definition do
-    %Prana.Integration{
-      name: "custom",
-      display_name: "Custom Integration",
-      description: "Custom workflow actions",
-      actions: %{
-        "my_action" => %Prana.Action{
-          name: "my_action",
-          display_name: "My Action",
-          module: MyApp.CustomIntegration.MyAction,
-          input_ports: ["input"],
-          output_ports: ["success", "error"]
-        }
-      }
-    }
-  end
-
-end
-
-defmodule MyApp.CustomIntegration.MyAction do
-  @behaviour Prana.Behaviour.Action
-
-  def prepare(_input_map), do: {:ok, %{}}
-
-  def execute(enriched_input) do
-    # Access explicitly mapped data
-    user_id = enriched_input["user_id"]
-    
-    # Access full context when needed
-    all_input = enriched_input["$input"]
-    prev_results = enriched_input["$nodes"]
-    variables = enriched_input["$variables"]
-    
-    # Your logic here
-    {:ok, %{result: "processed", user_id: user_id}, "success"}
-  end
-
-  def resume(_suspend_data, _resume_input) do
-    {:error, "Resume not supported"}
-  end
-end
-```
-
-### Action Return Formats
-
-```elixir
-# Simple success
-{:ok, result_data}
-
-# Explicit port routing  
-{:ok, result_data, "custom_port"}
-
-# Error handling
-{:error, error_reason}
-{:error, error_reason, "error_port"}
-
-# Suspension for async operations
-{:suspend, :custom_suspension_type, suspension_data}
-```
-
-### Registration
-
-```elixir
-# Register your integration
-:ok = Prana.IntegrationRegistry.register_integration(MyApp.CustomIntegration)
-
-# Use in workflows
-%Prana.Node{
-  integration_name: "custom",
-  action_name: "my_action",
-  params: %{
-    "user_id" => "$input.user_id",
-    "api_key" => "$variables.api_key"
-  }
-}
-```
-
-## 📋 Architecture
+## Architecture
 
 ### Core Components
 
 - **NodeExecutor**: Individual node execution with expression evaluation and suspension/resume
 - **GraphExecutor**: Workflow orchestration with conditional branching and sub-workflow coordination
 - **WorkflowCompiler**: Optimizes workflows into ExecutionGraphs with O(1) connection lookups
-- **ExpressionEngine**: Path-based expression evaluation with wildcards and filtering
+- **TemplateEngine**: Template rendering with expressions, filters, and data interpolation
 - **IntegrationRegistry**: Runtime integration management and action discovery
 
 ### Execution Flow
@@ -309,7 +233,7 @@ end
 1. **Compilation**: Workflow → ExecutionGraph (optimized for execution)
 2. **Initialization**: Create execution context with input data and variables
 3. **Node Execution**: Sequential execution following dependencies and conditions
-4. **Expression Evaluation**: Dynamic data access and transformation
+4. **Template Processing**: Dynamic data access, expressions, and filters
 5. **Port Routing**: Data flow through explicit connections
 6. **Completion**: Final execution state with all node results
 
@@ -321,17 +245,17 @@ end
 - **Suspension/Resume**: First-class support for async operations
 - **Middleware Integration**: Event-driven lifecycle hooks
 
-## 📚 Documentation
+## Documentation
 
 - **[Writing Integrations Guide](docs/guides/writing_integrations.md)**: Comprehensive integration development guide
 - **[Building Workflows Guide](docs/guides/building_workflows.md)**: Workflow composition patterns and best practices
 - **[Built-in Integrations](docs/built-in-integrations.md)**: Complete reference for all built-in actions
 - **[Architecture Documentation](docs/)**: Detailed implementation and design docs
 
-## 🧪 Testing
+## Testing
 
 Prana has comprehensive test coverage:
-- **205+ tests** covering all core functionality
+- **353+ tests** covering all core functionality
 - **Unit tests** for individual components
 - **Integration tests** for complete workflow execution
 - **Performance tests** for optimization validation
@@ -339,29 +263,32 @@ Prana has comprehensive test coverage:
 ```bash
 # Current test status
 mix test
-# => 205 tests, 0 failures
+# => 353 tests, 0 failures
 ```
 
-## 📈 Implementation Status
+## Implementation Status
 
-**Overall Progress**: ~95% Complete (Production Ready Core Platform)
+**Overall Progress**: ~98% Complete (Production Ready Platform)
 
-### ✅ Complete
+### Complete
 - Core execution engine (NodeExecutor, GraphExecutor)
-- All built-in integrations (Manual, Logic, Data, Workflow)
+- All built-in integrations (Manual, HTTP, Schedule, Logic, Data, Wait, Workflow)
 - Sub-workflow orchestration with suspension/resume
 - Conditional branching (IF/ELSE, switch/case patterns)
-- Expression engine with wildcards and filtering
+- Template engine with expressions, filters, and data interpolation
 - Integration registry and middleware system
-- Comprehensive test coverage
+- Comprehensive test coverage with 353+ tests
+- HTTP requests and webhook handling
+- Time-based scheduling with cron triggers
 
-### 🎯 Future Enhancements
-- Additional integrations (HTTP, Transform, Wait, Log)
+### Future Enhancements
+- Additional integrations (Transform, Log, Database)
 - Enhanced error handling and retry policies
 - Performance optimizations for large workflows
 - Workflow builder and validation tools
+- Advanced scheduling features
 
-## 🤝 Contributing
+## Contributing
 
 1. **Fork the repository**
 2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
@@ -379,16 +306,16 @@ mix test
 - Use `mix credo` for code quality checks
 - Format code with `mix format`
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- Built with ❤️ using Elixir and OTP
+- Built with Elixir and OTP
 - Inspired by modern workflow orchestration platforms
 - Designed for developer productivity and type safety
 
 ---
 
-**Ready to build powerful workflows?** Check out the [Quick Start](#-quick-start) guide and start orchestrating your processes with Prana! 🚀
+**Ready to build powerful workflows?** Check out the [Quick Start](#quick-start) guide and start orchestrating your processes with Prana!
