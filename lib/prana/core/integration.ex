@@ -20,7 +20,7 @@ defmodule Prana.Integration do
             output_ports: ["success", "error"],
             
            
-            input_schema: %{
+            params_schema: %{
               type: "object",
               required: ["channel", "message"],
               properties: %{

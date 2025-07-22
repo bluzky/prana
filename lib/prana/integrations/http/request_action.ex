@@ -72,7 +72,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   end
 
   @impl true
-  def input_schema, do: HTTPRequestSchema
+  def params_schema, do: HTTPRequestSchema
 
   @impl true
   def validate_params(input_map) do

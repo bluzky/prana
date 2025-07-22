@@ -170,8 +170,8 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       assert validated.auth.password == "pass"
     end
 
-    test "returns input_schema" do
-      assert RequestAction.input_schema() == Prana.Integrations.HTTP.RequestAction.HTTPRequestSchema
+    test "returns params_schema" do
+      assert RequestAction.params_schema() == Prana.Integrations.HTTP.RequestAction.HTTPRequestSchema
     end
   end
 end

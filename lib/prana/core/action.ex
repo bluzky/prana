@@ -13,7 +13,7 @@ defmodule Prana.Action do
         input_ports: ["input"],
         output_ports: ["main", "error", "timeout"],
 
-        input_schema: %{
+        params_schema: %{
           type: "object",
           required: ["url"],
           properties: %{
@@ -41,7 +41,7 @@ defmodule Prana.Action do
           module: atom(),
           input_ports: [String.t()],
           output_ports: [String.t()],
-          input_schema: map() | nil,
+          params_schema: map() | nil,
           metadata: map()
         }
 
@@ -53,7 +53,7 @@ defmodule Prana.Action do
     :module,
     :input_ports,
     :output_ports,
-    :input_schema,
+    :params_schema,
     metadata: %{}
   ]
 end
