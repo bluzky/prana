@@ -177,7 +177,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       }
 
       # Execute workflow
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, _} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution completed successfully
       assert execution.status == "completed"

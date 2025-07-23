@@ -213,7 +213,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       result = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify successful execution
-      assert {:ok, %WorkflowExecution{status: "completed"} = execution} = result
+      assert {:ok, %WorkflowExecution{status: "completed"} = execution, _} = result
 
       # Verify all nodes executed by checking node_executions
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
@@ -252,7 +252,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, _} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify merge node executed successfully
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
@@ -277,7 +277,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, _} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify final node executed successfully
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
@@ -330,7 +330,6 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
 
       # Execute the workflow
       result = GraphExecutor.execute_workflow(execution_graph, context)
-
       # Verify workflow failed with fail-fast behavior
       assert {:error, failed_execution} = result
       assert failed_execution.status == "failed"

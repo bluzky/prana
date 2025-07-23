@@ -207,7 +207,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, _} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify execution completed successfully
       assert execution.status == "completed"
@@ -250,7 +250,7 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       # Should complete within reasonable time (5 seconds)
       result = Task.await(task, 5000)
 
-      assert {:ok, execution} = result
+      assert {:ok, execution, _} = result
       assert execution.status == "completed"
 
       # Total node executions should be reasonable (not infinite)

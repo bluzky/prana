@@ -13,7 +13,7 @@ workflow = %Workflow{nodes: [...], connections: [...]}
 
 {:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
 
-{:ok, execution} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
+{:ok, execution, last_output} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
 ```
 
 ### Key Components
@@ -248,7 +248,7 @@ workflow = %Workflow{
 input_data = %{"user_id" => 123}
 context = %{workflow_loader: &my_loader/1}
 
-{:ok, execution} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
+{:ok, execution, last_output} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
 ```
 
 ### Auto-Trigger Selection
@@ -305,7 +305,7 @@ end
 
 # New approach
 {:ok, execution_graph} = WorkflowCompiler.compile(workflow, trigger_node_key)
-{:ok, execution} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
+{:ok, execution, last_output} = GraphExecutor.execute_workflow(execution_graph, input_data, context)
 ```
 
 ### Backward Compatibility

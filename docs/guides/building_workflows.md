@@ -17,7 +17,7 @@ connections: %{
 
 **Benefits**:
 - **O(1) connection lookups** instead of O(n) scans
-- **Ultra-fast routing** during workflow execution  
+- **Ultra-fast routing** during workflow execution
 - **Scalable performance** for large workflows
 - **Direct port access** for conditional branching
 
@@ -95,7 +95,7 @@ Simple sequential execution where each node processes the output of the previous
       "success" => [
         %Connection{
           from: "start",
-          to: "process_user", 
+          to: "process_user",
           from_port: "success",
           to_port: "input"
         }
@@ -106,7 +106,7 @@ Simple sequential execution where each node processes the output of the previous
         %Connection{
           from: "process_user",
           to: "send_welcome",
-          from_port: "success", 
+          from_port: "success",
           to_port: "input"
         }
       ]
@@ -152,7 +152,7 @@ Route data to different paths based on conditions using the Logic integration.
     },
     %Node{
       id: "process_minor",
-      custom_id: "process_minor", 
+      custom_id: "process_minor",
       type: :action,
       integration_name: "manual",
       action_name: "process_minor",
@@ -193,7 +193,7 @@ Route to multiple different paths based on field values using switch logic.
   nodes: [
     %Node{
       id: "trigger",
-      custom_id: "trigger", 
+      custom_id: "trigger",
       type: :trigger,
       integration_name: "manual",
       action_name: "trigger"
@@ -213,14 +213,14 @@ Route to multiple different paths based on field values using switch logic.
             "data" => %{"features" => ["all"], "priority" => "high"}
           },
           %{
-            "condition" => "$input.subscription_tier", 
+            "condition" => "$input.subscription_tier",
             "value" => "standard",
             "port" => "standard_flow",
             "data" => %{"features" => ["basic", "advanced"], "priority" => "medium"}
           },
           %{
             "condition" => "$input.subscription_tier",
-            "value" => "basic", 
+            "value" => "basic",
             "port" => "basic_flow",
             "data" => %{"features" => ["basic"], "priority" => "low"}
           }
@@ -238,7 +238,7 @@ Route to multiple different paths based on field values using switch logic.
       params: "$input"
     },
     %Node{
-      id: "standard_processor", 
+      id: "standard_processor",
       custom_id: "standard_processor",
       type: :action,
       integration_name: "manual",
@@ -249,7 +249,7 @@ Route to multiple different paths based on field values using switch logic.
       id: "basic_processor",
       custom_id: "basic_processor",
       type: :action,
-      integration_name: "manual", 
+      integration_name: "manual",
       action_name: "process_minor",
       params: "$input"
     }
@@ -269,14 +269,14 @@ Route to multiple different paths based on field values using switch logic.
     },
     %Connection{
       from: "tier_router",
-      to: "standard_processor", 
+      to: "standard_processor",
       from_port: "standard_flow",
       to_port: "input"
     },
     %Connection{
       from: "tier_router",
       to: "basic_processor",
-      from_port: "basic_flow", 
+      from_port: "basic_flow",
       to_port: "input"
     }
   ]
@@ -337,7 +337,7 @@ Split execution into parallel paths and merge results back together.
       to_port: "input"
     },
     %Connection{
-      from: "start", 
+      from: "start",
       to: "enrichment_path",
       from_port: "success",
       to_port: "input"
@@ -394,7 +394,7 @@ Coordinate parent and child workflows for complex business processes.
     },
     %Node{
       id: "biometric_verification",
-      custom_id: "biometric_verification", 
+      custom_id: "biometric_verification",
       type: :action,
       integration_name: "workflow",
       action_name: "execute_workflow",
@@ -459,7 +459,7 @@ Use expressions to access and transform data throughout the workflow.
 "$input.user_id"           # Gets user_id from workflow input
 "$input.profile.name"      # Nested field access
 
-# Access node results  
+# Access node results
 "$nodes.validation.status" # Gets status from validation node output
 "$nodes.api_call.response.data" # Nested access to node results
 
@@ -497,14 +497,14 @@ Use expressions to access and transform data throughout the workflow.
     # Simple field mapping
     "user_id" => "$input.user_id",
     "email" => "$input.contact.email",
-    
+
     # Using previous node results
     "validation_result" => "$nodes.validate_input.status",
     "enriched_data" => "$nodes.enrich_profile.user_data",
-    
+
     # Using variables
     "api_endpoint" => "$variables.service_config.user_api",
-    
+
     # Complex expressions
     "admin_emails" => "$input.users.{role: \"admin\"}.email",
     "first_order_total" => "$input.orders[0].total"
@@ -558,7 +558,7 @@ Combines map inputs using deep merge.
 }
 
 # Input A: %{"name" => "John", "age" => 30, "email" => "john@example.com"}
-# Input B: %{"city" => "NYC", "verified" => true, "age" => 31}  
+# Input B: %{"city" => "NYC", "verified" => true, "age" => 31}
 # Result: %{"name" => "John", "age" => 31, "email" => "john@example.com", "city" => "NYC", "verified" => true}
 ```
 
@@ -569,7 +569,7 @@ Flattens and concatenates array inputs.
 ```elixir
 %Node{
   id: "combine_lists",
-  custom_id: "combine_lists", 
+  custom_id: "combine_lists",
   type: :action,
   integration_name: "data",
   action_name: "merge",
@@ -796,7 +796,7 @@ test_workflow = %Workflow{
 
 # Execute test
 {:ok, execution_graph} = WorkflowCompiler.compile(test_workflow, "trigger")
-{:ok, result} = GraphExecutor.execute_workflow(execution_graph, %{"user_id" => 123}, %{})
+{:ok, result, last_output} = GraphExecutor.execute_workflow(execution_graph, %{"user_id" => 123}, %{})
 ```
 
 ### Testing with Variables

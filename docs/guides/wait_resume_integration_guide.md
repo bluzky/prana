@@ -208,7 +208,7 @@ defmodule MyApp.WorkflowEngine do
     # Create execution context with pre-generated resume URLs
     context = create_execution_context(execution_id, workflow_id)
 
-    case GraphExecutor.execute_workflow(workflow_id, input_data, context) do
+    case GraphExecutor.execute_workflow(workflow_id, input_data, context, last_output) do
       {:ok, result} ->
         # Workflow completed without suspension
         cleanup_webhooks(execution_id)

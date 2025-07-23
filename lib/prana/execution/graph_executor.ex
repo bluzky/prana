@@ -170,7 +170,7 @@ defmodule Prana.GraphExecutor do
       {:ok, prepared_execution} ->
         # Execute trigger node with input data, then continue with normal execution
         case execute_trigger_node(prepared_execution, input_data) do
-          {:ok, execution_after_trigger} ->
+          {:ok, execution_after_trigger, _} ->
             execute_workflow_loop(execution_after_trigger)
 
           {:error, failed_execution} ->
@@ -214,7 +214,7 @@ defmodule Prana.GraphExecutor do
 
   # Main workflow execution loop - continues until workflow is complete or error occurs.
   # Uses WorkflowExecution.__runtime for all workflow-level coordination.
-  defp execute_workflow_loop(execution) do
+  defp execute_workflow_loop(execution, previous_node_output \\ nil) do
     # Check for infinite loop protection
     iteration_count = WorkflowExecution.get_iteration_count(execution)
     max_iterations = WorkflowExecution.get_max_iterations(execution)
@@ -241,14 +241,14 @@ defmodule Prana.GraphExecutor do
         completed_execution = WorkflowExecution.complete(execution)
         Middleware.call(:execution_completed, %{execution: completed_execution})
 
-        {:ok, completed_execution}
+        {:ok, completed_execution, previous_node_output}
       else
         case find_and_execute_ready_nodes(execution) do
-          {:ok, updated_execution} ->
-            execute_workflow_loop(updated_execution)
+          {:ok, updated_execution, node_ouput} ->
+            execute_workflow_loop(updated_execution, node_ouput)
 
-          {:suspend, suspended_execution} ->
-            {:suspend, suspended_execution}
+          {:suspend, suspended_execution, suspension_data} ->
+            {:suspend, suspended_execution, suspension_data}
 
           {:error, failed_execution} ->
             {:error, failed_execution}
@@ -337,7 +337,7 @@ defmodule Prana.GraphExecutor do
       {:ok, result_node_execution} ->
         updated_execution = WorkflowExecution.complete_node(execution, result_node_execution)
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
-        {:ok, updated_execution}
+        {:ok, updated_execution, result_node_execution.output_data}
 
       {:ok, result_node_execution, shared_state_updates} ->
         # completed node with additional state update
@@ -347,7 +347,7 @@ defmodule Prana.GraphExecutor do
           |> WorkflowExecution.update_shared_state(shared_state_updates)
 
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
-        {:ok, updated_execution}
+        {:ok, updated_execution, result_node_execution.output_data}
 
       {:suspend, suspended_node_execution} ->
         %{suspension_type: suspension_type, suspension_data: suspension_data} = suspended_node_execution
@@ -370,7 +370,7 @@ defmodule Prana.GraphExecutor do
           node_execution: suspended_node_execution
         })
 
-        {:suspend, suspended_execution}
+        {:suspend, suspended_execution, suspension_data}
 
       {:error, {_reason, error_node_execution}} ->
         error_reason = %{
@@ -415,9 +415,9 @@ defmodule Prana.GraphExecutor do
     with {:ok, prepared_execution} <-
            prepare_execution_for_resume(suspended_execution, options),
          {:ok, suspended_node_id} <- validate_suspended_node_id(prepared_execution),
-         {:ok, updated_execution} <-
+         {:ok, updated_execution, previous_node_output} <-
            resume_suspended_node(prepared_execution, suspended_node_id, resume_data) do
-      execute_workflow_loop(updated_execution)
+      execute_workflow_loop(updated_execution, previous_node_output)
     end
   end
 
@@ -470,7 +470,7 @@ defmodule Prana.GraphExecutor do
           updated_execution = WorkflowExecution.complete_node(resume_execution, completed_node_execution)
           Middleware.call(:node_completed, %{node: suspended_node, node_execution: completed_node_execution})
 
-          {:ok, updated_execution}
+          {:ok, updated_execution, completed_node_execution.output_data}
 
         {:error, {reason, _failed_node_execution}} ->
           {:error, reason}

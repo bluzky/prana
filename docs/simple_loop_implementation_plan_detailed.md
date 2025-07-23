@@ -690,7 +690,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
         metadata: %{}
       }
 
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, last_output} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify increment node executed 3 times
       increment_executions = get_node_executions(execution, "increment")
@@ -709,7 +709,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
 
       context = %{"max_iterations" => 5}
 
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, last_output} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Should stop at max iterations and have error
       assert execution.status == "failed"
@@ -726,7 +726,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
 
       context = %{workflow_loader: fn _id -> {:error, "not implemented"} end}
 
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, last_output} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify attempt node executed 3 times (fail, fail, success)
       attempt_executions = get_node_executions(execution, "attempt")
@@ -746,7 +746,7 @@ defmodule Prana.SimpleLoopIntegrationTest do
       # Mock very fast execution times
       context = %{mock_fast_execution: true}
 
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, last_output} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Should detect rapid execution and fail
       assert execution.status == "failed"

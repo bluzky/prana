@@ -75,7 +75,7 @@ defmodule Prana.GraphExecutorTest do
       result = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Should return successful execution
-      assert {:ok, execution} = result
+      assert {:ok, execution, _} = result
       assert execution.status == "completed"
       assert count_node_executions(execution) == 1
 
