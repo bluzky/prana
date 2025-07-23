@@ -13,7 +13,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
 
   def specification do
     %Action{
-      name: "webhook",
+      name: "http.webhook_trigger",
       display_name: "Webhook Trigger",
       description: "Configure webhook endpoint for triggering workflow execution",
       type: :trigger,
@@ -46,7 +46,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
 
     field(:response_type, :string,
       default: "immediately",
-      in: ["immediately", "end_of_flow"]
+      in: ["immediately", "on_completion", "at_return_node"]
     )
 
     field(:secret, :string)
@@ -151,170 +151,6 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
 
   @impl true
   def suspendable?, do: false
-
-  # Validate incoming webhook request (used by application layer)
-  def validate_webhook_request(webhook_config, request_data) do
-    method = Map.get(request_data, :method) || Map.get(request_data, "method")
-    headers = Map.get(request_data, :headers, %{}) || Map.get(request_data, "headers", %{})
-    body = Map.get(request_data, :body) || Map.get(request_data, "body")
-
-    # Get configuration from webhook_config
-    allowed_methods = Map.get(webhook_config, :allowed_methods, ["POST"])
-    auth_config = Map.get(webhook_config, :auth_config, %{"type" => "none"})
-
-    with :ok <- validate_method(allowed_methods, method),
-         :ok <- validate_authentication(auth_config, headers, body) do
-      {:ok, %{method: method, headers: headers, body: body}}
-    end
-  end
-
-  # Validate HTTP method
-  defp validate_method(allowed_methods, method) when is_binary(method) do
-    method_upper = String.upcase(method)
-    allowed_methods_upper = Enum.map(allowed_methods, &String.upcase/1)
-
-    if method_upper in allowed_methods_upper do
-      :ok
-    else
-      {:error, "Method #{method} not allowed. Allowed methods: #{Enum.join(allowed_methods, ", ")}"}
-    end
-  end
-
-  defp validate_method(_allowed_methods, nil) do
-    {:error, "HTTP method is required"}
-  end
-
-  # Validate authentication
-  defp validate_authentication(%{"type" => "none"}, _headers, _body), do: :ok
-  defp validate_authentication(%{type: "none"}, _headers, _body), do: :ok
-
-  defp validate_authentication(%{"type" => "basic", "username" => username, "password" => password}, headers, _body)
-       when is_binary(username) and is_binary(password) do
-    validate_basic_auth(headers, username, password)
-  end
-
-  defp validate_authentication(%{type: "basic", username: username, password: password}, headers, _body)
-       when is_binary(username) and is_binary(password) do
-    validate_basic_auth(headers, username, password)
-  end
-
-  defp validate_authentication(
-         %{"type" => "header", "header_name" => header_name, "header_value" => expected_value},
-         headers,
-         _body
-       )
-       when is_binary(header_name) and is_binary(expected_value) do
-    validate_header_auth(headers, header_name, expected_value)
-  end
-
-  defp validate_authentication(%{type: "header", header_name: header_name, header_value: expected_value}, headers, _body)
-       when is_binary(header_name) and is_binary(expected_value) do
-    validate_header_auth(headers, header_name, expected_value)
-  end
-
-  defp validate_authentication(%{"type" => "jwt", "jwt_secret" => secret}, headers, _body) when is_binary(secret) do
-    validate_jwt_auth(headers, secret)
-  end
-
-  defp validate_authentication(%{type: "jwt", jwt_secret: secret}, headers, _body) when is_binary(secret) do
-    validate_jwt_auth(headers, secret)
-  end
-
-  defp validate_authentication(auth_config, _headers, _body) do
-    {:error, "Invalid authentication configuration: #{inspect(auth_config)}"}
-  end
-
-  # Helper functions for authentication validation
-  defp validate_basic_auth(headers, username, password) do
-    auth_header = Map.get(headers, "authorization") || Map.get(headers, "Authorization")
-
-    case auth_header do
-      "Basic " <> encoded ->
-        case Base.decode64(encoded) do
-          {:ok, decoded} ->
-            case String.split(decoded, ":", parts: 2) do
-              [^username, ^password] -> :ok
-              _ -> {:error, "Invalid basic authentication credentials"}
-            end
-
-          :error ->
-            {:error, "Invalid base64 encoding in Authorization header"}
-        end
-
-      _ ->
-        {:error, "Missing or invalid Authorization header for basic auth"}
-    end
-  end
-
-  defp validate_header_auth(headers, header_name, expected_value) do
-    actual_value = Map.get(headers, header_name) || Map.get(headers, String.downcase(header_name))
-
-    if actual_value == expected_value do
-      :ok
-    else
-      {:error, "Invalid or missing header authentication"}
-    end
-  end
-
-  defp validate_jwt_auth(headers, secret) do
-    auth_header = Map.get(headers, "authorization") || Map.get(headers, "Authorization")
-
-    case auth_header do
-      "Bearer " <> token ->
-        validate_jwt_token(token, secret)
-
-      _ ->
-        {:error, "Missing or invalid Authorization header for JWT auth"}
-    end
-  end
-
-  # Basic JWT validation (in production, use a proper JWT library)
-  defp validate_jwt_token(token, secret) do
-    case String.split(token, ".", parts: 3) do
-      [header_b64, payload_b64, signature] ->
-        # Decode header to get algorithm
-        case Base.url_decode64(header_b64, padding: false) do
-          {:ok, header_json} ->
-            case Jason.decode(header_json) do
-              {:ok, %{"alg" => algorithm}} ->
-                # Basic signature verification
-                expected_signature = generate_jwt_signature("#{header_b64}.#{payload_b64}", secret, algorithm)
-
-                if signature == expected_signature do
-                  :ok
-                else
-                  {:error, "Invalid JWT signature"}
-                end
-
-              _ ->
-                {:error, "Invalid JWT header format"}
-            end
-
-          _ ->
-            {:error, "Invalid JWT header encoding"}
-        end
-
-      _ ->
-        {:error, "Invalid JWT format"}
-    end
-  end
-
-  # Generate JWT signature (simplified - use proper JWT library in production)
-  defp generate_jwt_signature(data, secret, "HS256") do
-    :hmac
-    |> :crypto.mac(:sha256, secret, data)
-    |> Base.url_encode64(padding: false)
-  end
-
-  defp generate_jwt_signature(data, secret, "HS512") do
-    :hmac
-    |> :crypto.mac(:sha512, secret, data)
-    |> Base.url_encode64(padding: false)
-  end
-
-  defp generate_jwt_signature(_data, _secret, algorithm) do
-    raise "Unsupported JWT algorithm: #{algorithm}"
-  end
 
   # Format validation errors
   defp format_errors(errors) do

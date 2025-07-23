@@ -14,7 +14,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
 
   def specification do
     %Action{
-      name: "request",
+      name: "http.request",
       display_name: "HTTP Request",
       description: "Make HTTP requests with configurable method, headers, and body",
       type: :action,
