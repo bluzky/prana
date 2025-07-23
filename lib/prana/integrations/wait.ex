@@ -85,16 +85,15 @@ defmodule Prana.Integrations.Wait do
          :ok <- validate_unit(unit),
          {:ok, duration_ms} <- convert_to_milliseconds(duration, unit) do
       # if duration < 60 then sleep, otherwise return suspend
+      now = DateTime.utc_now()
+
       if duration_ms < 60_000 do
-        # If duration is less than 60 seconds, we can just sleep
         Process.sleep(duration_ms)
-        {:ok, %{}}
+        {:ok, %{}, "main"}
       else
         interval_data = %{
           mode: "interval",
-          duration_ms: duration_ms,
-          started_at: DateTime.utc_now(),
-          resume_at: DateTime.add(DateTime.utc_now(), duration_ms, :millisecond)
+          resume_at: DateTime.add(now, duration_ms, :millisecond),
         }
 
         {:suspend, :interval, interval_data}
@@ -115,15 +114,11 @@ defmodule Prana.Integrations.Wait do
     with :ok <- validate_schedule_at(schedule_at),
          {:ok, schedule_datetime} <- parse_schedule_datetime(schedule_at, timezone),
          :ok <- validate_schedule_future(schedule_datetime) do
-      now = DateTime.utc_now()
-      duration_ms = DateTime.diff(schedule_datetime, now, :millisecond)
 
       schedule_data = %{
         mode: "schedule",
-        schedule_at: schedule_datetime,
-        timezone: timezone,
-        duration_ms: duration_ms,
-        started_at: now
+        resume_at: schedule_datetime,
+        timezone: timezone
       }
 
       {:suspend, :schedule, schedule_data}
@@ -138,25 +133,15 @@ defmodule Prana.Integrations.Wait do
   """
   def wait_webhook(params) do
     timeout_hours = Map.get(params, "timeout_hours", 24)
-    webhook_config = Map.get(params, "webhook_config", %{})
 
     case validate_timeout_hours(timeout_hours) do
       :ok ->
         now = DateTime.utc_now()
         expires_at = DateTime.add(now, timeout_hours * 3600, :second)
-
-        # Try to get preparation data for webhook URLs
-        preparation_data = Map.get(params, "$preparation", %{})
-        current_node_preparation = get_current_node_preparation(params, preparation_data)
-
         webhook_data = %{
           mode: "webhook",
-          timeout_hours: timeout_hours,
-          webhook_config: webhook_config,
-          started_at: now,
           expires_at: expires_at,
-          resume_id: Map.get(current_node_preparation, :resume_id),
-          webhook_url: Map.get(current_node_preparation, :webhook_url)
+          timeout_hours: timeout_hours
         }
 
         {:suspend, :webhook, webhook_data}
@@ -169,19 +154,6 @@ defmodule Prana.Integrations.Wait do
   # ============================================================================
   # Private Helper Functions
   # ============================================================================
-
-  # Get preparation data for current node
-  defp get_current_node_preparation(params, preparation_data) do
-    # Try to determine current node ID from context
-    # This could be from a custom_id field or node_id in the input
-    node_id = Map.get(params, "node_id") || Map.get(params, "custom_id") || "current_node"
-
-    case Map.get(preparation_data, node_id) do
-      nil -> %{}
-      prep_data when is_map(prep_data) -> prep_data
-      _ -> %{}
-    end
-  end
 
   # Validate duration parameter
   defp validate_duration(nil), do: {:error, "duration/timeout is required"}
@@ -268,14 +240,9 @@ defmodule Prana.Integrations.Wait.WaitAction do
 
   @impl true
   def prepare(node) do
-    mode = Map.get(node.params, "mode")
-
-    case mode do
+    case Map.get(node.params, "mode") do
       "webhook" -> prepare_webhook(node.params)
-      "interval" -> prepare_interval(node.params)
-      "schedule" -> prepare_schedule(node.params)
-      nil -> {:error, "mode is required"}
-      _ -> {:error, "mode must be 'interval', 'schedule', or 'webhook'"}
+      _ -> {:ok, nil}
     end
   end
 
@@ -297,134 +264,30 @@ defmodule Prana.Integrations.Wait.WaitAction do
   end
 
   @impl true
-  def resume(params, _context, resume_data) do
-    mode = Map.get(params, "mode")
-
-    case mode do
-      "webhook" -> resume_webhook(params, resume_data)
-      "interval" -> resume_interval(params, resume_data)
-      "schedule" -> resume_schedule(params, resume_data)
-      _ -> {:error, "Unknown suspension mode: #{inspect(mode)}"}
-    end
+  def resume(_params, _context, resume_data) do
+    {:ok, resume_data, "main"}
   end
 
   # Webhook mode preparation - generates resume URLs
   defp prepare_webhook(params) do
     timeout_hours = Map.get(params, "timeout_hours", 24)
-    webhook_config = Map.get(params, "webhook_config", %{})
-    base_url = Map.get(params, "base_url")
+    base_url = System.get_env("PRANA_BASE_URL")
 
     case validate_webhook_prepare_config(timeout_hours, base_url) do
       :ok ->
-        # Access execution context through the enriched input
-        execution_id = get_context_value(params, "$execution.id", "unknown_execution")
+        execution_id = "# TODO"
+        webhook_url = "#{base_url}/resume/#{execution_id}"
 
-        # Generate unique resume ID for this webhook
-        resume_id = Prana.Webhook.generate_resume_id(execution_id)
-
-        # Build webhook URL if base_url provided
-        webhook_url =
-          if base_url do
-            Prana.Webhook.build_webhook_url(base_url, :resume, resume_id)
-          end
 
         preparation_data = %{
-          resume_id: resume_id,
           webhook_url: webhook_url,
-          timeout_hours: timeout_hours,
-          webhook_config: webhook_config,
-          execution_id: execution_id,
-          prepared_at: DateTime.utc_now()
+          timeout_hours: timeout_hours
         }
 
         {:ok, preparation_data}
 
       {:error, reason} ->
         {:error, reason}
-    end
-  end
-
-  # Interval mode preparation - calculates timing
-  defp prepare_interval(params) do
-    duration = Map.get(params, "duration")
-    unit = Map.get(params, "unit", "ms")
-
-    case validate_interval_config(duration, unit) do
-      {:ok, duration_ms} ->
-        now = DateTime.utc_now()
-        resume_at = DateTime.add(now, duration_ms, :millisecond)
-
-        preparation_data = %{
-          mode: "interval",
-          duration_ms: duration_ms,
-          resume_at: resume_at,
-          prepared_at: now
-        }
-
-        {:ok, preparation_data}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  # Schedule mode preparation - validates and parses schedule
-  defp prepare_schedule(params) do
-    schedule_at = Map.get(params, "schedule_at")
-    timezone = Map.get(params, "timezone", "UTC")
-
-    case validate_schedule_config(schedule_at, timezone) do
-      {:ok, schedule_datetime} ->
-        now = DateTime.utc_now()
-        duration_ms = DateTime.diff(schedule_datetime, now, :millisecond)
-
-        preparation_data = %{
-          mode: "schedule",
-          schedule_at: schedule_datetime,
-          timezone: timezone,
-          duration_ms: duration_ms,
-          prepared_at: now
-        }
-
-        {:ok, preparation_data}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  # Resume webhook mode - process webhook data
-  defp resume_webhook(_params, resume_data) do
-    # For webhook mode, we'd need to check expiration based on original start time
-    # For now, just return the resume data
-    {:ok, resume_data}
-  end
-
-  # Resume interval mode - validate timing
-  defp resume_interval(_params, _resume_data) do
-    # For interval mode, timing is handled by the scheduler
-    # Just return success when resumed
-    {:ok, %{}}
-  end
-
-  # Resume schedule mode - validate timing
-  defp resume_schedule(_params, _resume_data) do
-    # For schedule mode, timing is handled by the scheduler
-    # Just return success when resumed
-    {:ok, %{}}
-  end
-
-  # Helper to safely get context values from enriched input
-  defp get_context_value(params, path, default) do
-    case String.split(path, ".", parts: 2) do
-      ["$execution", field] ->
-        case Map.get(params, "$execution") do
-          nil -> default
-          execution_context -> Map.get(execution_context, field, default)
-        end
-
-      _ ->
-        Map.get(params, path, default)
     end
   end
 
@@ -434,61 +297,6 @@ defmodule Prana.Integrations.Wait.WaitAction do
       :ok
     else
       {:error, "timeout_hours must be a positive number between 1 and 8760 (1 year)"}
-    end
-  end
-
-  defp validate_interval_config(duration, unit) do
-    with :ok <- validate_duration(duration),
-         :ok <- validate_unit(unit) do
-      convert_to_milliseconds(duration, unit)
-    end
-  end
-
-  defp validate_schedule_config(schedule_at, timezone) do
-    with :ok <- validate_schedule_at(schedule_at),
-         {:ok, schedule_datetime} <- parse_schedule_datetime(schedule_at, timezone),
-         :ok <- validate_schedule_future(schedule_datetime) do
-      {:ok, schedule_datetime}
-    end
-  end
-
-  # Reuse existing validation functions from main module
-  defp validate_duration(nil), do: {:error, "duration is required"}
-  defp validate_duration(duration) when is_integer(duration) and duration > 0, do: :ok
-  defp validate_duration(duration) when is_float(duration) and duration > 0, do: :ok
-  defp validate_duration(_), do: {:error, "duration must be a positive number"}
-
-  defp validate_unit(unit) when unit in ["ms", "seconds", "minutes", "hours"], do: :ok
-  defp validate_unit(_), do: {:error, "unit must be 'ms', 'seconds', 'minutes', or 'hours'"}
-
-  defp convert_to_milliseconds(duration, "ms"), do: {:ok, trunc(duration)}
-  defp convert_to_milliseconds(duration, "seconds"), do: {:ok, trunc(duration * 1000)}
-  defp convert_to_milliseconds(duration, "minutes"), do: {:ok, trunc(duration * 60 * 1000)}
-  defp convert_to_milliseconds(duration, "hours"), do: {:ok, trunc(duration * 60 * 60 * 1000)}
-
-  defp validate_schedule_at(nil), do: {:error, "schedule_at is required"}
-  defp validate_schedule_at(schedule_at) when is_binary(schedule_at), do: :ok
-  defp validate_schedule_at(_), do: {:error, "schedule_at must be an ISO8601 datetime string"}
-
-  defp parse_schedule_datetime(schedule_at, timezone) do
-    case DateTime.from_iso8601(schedule_at) do
-      {:ok, datetime, _offset} ->
-        case timezone do
-          "UTC" -> {:ok, datetime}
-          # For now, just use UTC
-          tz when is_binary(tz) -> {:ok, datetime}
-        end
-
-      {:error, reason} ->
-        {:error, "Invalid datetime format: #{inspect(reason)}"}
-    end
-  end
-
-  defp validate_schedule_future(schedule_datetime) do
-    if DateTime.after?(schedule_datetime, DateTime.utc_now()) do
-      :ok
-    else
-      {:error, "schedule_at must be in the future"}
     end
   end
 end

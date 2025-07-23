@@ -5,8 +5,6 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   Suspends execution and waits for incoming HTTP webhook requests.
   """
 
-  @behaviour Prana.Behaviour.Action
-
   use Skema
   use Prana.Actions.SimpleAction
 

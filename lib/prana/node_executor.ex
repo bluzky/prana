@@ -400,7 +400,8 @@ defmodule Prana.NodeExecutor do
         "id" => execution.id,
         "mode" => execution.execution_mode,
         "preparation" => execution.preparation_data,
-        "state" => execution.__runtime["shared_state"] || %{}
+        "state" => execution.__runtime["shared_state"] || %{},
+        "now" => DateTime.utc_now(),
       }
     }
   end

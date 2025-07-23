@@ -34,10 +34,10 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
     field(:status_code, :integer, default: 200)
     field(:headers, :map, default: %{})
 
-    # Conditional fields based on respond_with type
-    field(:text_data, :string, required: true)
-    field(:json_data, :map, required: true)
-    field(:redirect_url, :string, required: true)
+    # Conditional fields based on respond_with type (made optional, validated separately)
+    field(:text_data, :string, required: false)
+    field(:json_data, :map, required: false)
+    field(:redirect_url, :string, required: false)
     field(:redirect_type, :string, default: "temporary", in: ["temporary", "permanent"])
   end
 
@@ -100,8 +100,6 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
         Map.put(base_config, :text, params["text_data"])
 
       "json" ->
-        json_response = Map.get(params, "json_response", %{})
-
         base_config
         |> Map.put(:json_data, Map.get(params, "json_data"))
         |> Map.put(:headers, Map.put(base_config.headers, "Content-Type", "application/json"))
@@ -125,29 +123,29 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
   end
 
   # Validate that required fields are present for each response type
-  defp validate_response_fields(%{respond_with: "text", text_response: text_response}) when not is_nil(text_response) do
+  defp validate_response_fields(%{respond_with: "text", text_data: text_data}) when not is_nil(text_data) do
     :ok
   end
 
   defp validate_response_fields(%{respond_with: "text"}) do
-    {:error, "text_response is required when respond_with is 'text'"}
+    {:error, "text_data is required when respond_with is 'text'"}
   end
 
-  defp validate_response_fields(%{respond_with: "json", json_response: json_response}) when not is_nil(json_response) do
+  defp validate_response_fields(%{respond_with: "json", json_data: json_data}) when not is_nil(json_data) do
     :ok
   end
 
   defp validate_response_fields(%{respond_with: "json"}) do
-    {:error, "json_response is required when respond_with is 'json'"}
+    {:error, "json_data is required when respond_with is 'json'"}
   end
 
-  defp validate_response_fields(%{respond_with: "redirect", redirect_response: redirect_response})
-       when not is_nil(redirect_response) do
+  defp validate_response_fields(%{respond_with: "redirect", redirect_url: redirect_url})
+       when not is_nil(redirect_url) do
     :ok
   end
 
   defp validate_response_fields(%{respond_with: "redirect"}) do
-    {:error, "redirect_response is required when respond_with is 'redirect'"}
+    {:error, "redirect_url is required when respond_with is 'redirect'"}
   end
 
   defp validate_response_fields(%{respond_with: "no_data"}) do
