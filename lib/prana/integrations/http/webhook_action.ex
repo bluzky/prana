@@ -8,6 +8,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   @behaviour Prana.Behaviour.Action
 
   use Skema
+  use Prana.Actions.SimpleAction
 
   alias Prana.Action
 
@@ -88,19 +89,6 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
     {:error, "Methods must be a list of strings"}
   end
 
-  @impl true
-  def prepare(node) do
-    # Webhook preparation could include URL generation
-    config = Map.get(node, :config, %{})
-
-    preparation_data = %{
-      webhook_path: Map.get(config, "webhook_path", "/webhook"),
-      prepared_at: DateTime.utc_now()
-    }
-
-    {:ok, preparation_data}
-  end
-
   # Public helper to get webhook configuration for external use
   # def get_webhook_config(suspension_data) do
   #   %{
@@ -113,38 +101,10 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
   # end
 
   @impl true
-  def execute(params, _context) do
-    # Build webhook URL using base_url from environment variable only
-    webhook_url =
-      case System.get_env("PRANA_BASE_URL") do
-        nil ->
-          nil
-
-        base_url ->
-          webhook_path = Map.get(params, "path", "/webhook")
-          "#{base_url}#{webhook_path}"
-      end
-
-    # Extract configuration and return webhook setup
-    result = %{
-      webhook_path: Map.get(params, "path", "/webhook"),
-      allowed_methods: Map.get(params, "methods", ["POST"]),
-      auth_config: Map.get(params, "auth", %{"type" => "none"}),
-      response_type: Map.get(params, "response_type", "immediately"),
-      webhook_url: webhook_url,
-      configured_at: DateTime.utc_now()
-    }
-
-    {:ok, result, "success"}
+  def execute(_params, context) do
+    request_params = context["$input"]["main"]
+    {:ok, request_params, "main"}
   end
-
-  @impl true
-  def resume(_params, _context, _resume_data) do
-    {:error, "Webhook action does not support resume"}
-  end
-
-  @impl true
-  def suspendable?, do: false
 
   # Format validation errors
   defp format_errors(errors) do

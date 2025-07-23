@@ -19,28 +19,15 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
       description: "Send custom response back to webhook caller",
       type: :action,
       module: __MODULE__,
-      input_ports: ["input"],
-      output_ports: ["success", "error"]
+      input_ports: ["main"],
+      output_ports: ["main", "error"]
     }
-  end
-
-  defschema TextResponseSchema do
-    field(:text, :string, required: true)
-    field(:content_type, :string, default: "text/plain")
-  end
-
-  defschema JsonResponseSchema do
-    field(:json_data, :map, required: true)
-  end
-
-  defschema RedirectResponseSchema do
-    field(:redirect_url, :string, required: true)
-    field(:redirect_type, :string, default: "temporary", in: ["temporary", "permanent"])
   end
 
   defschema WebhookRespondSchema do
     field(:respond_with, :string,
       required: true,
+      default: "text",
       in: ["text", "json", "redirect", "no_data"]
     )
 
@@ -48,9 +35,10 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
     field(:headers, :map, default: %{})
 
     # Conditional fields based on respond_with type
-    field(:text_response, TextResponseSchema)
-    field(:json_response, JsonResponseSchema)
-    field(:redirect_response, RedirectResponseSchema)
+    field(:text_data, :string, required: true)
+    field(:json_data, :map, required: true)
+    field(:redirect_url, :string, required: true)
+    field(:redirect_type, :string, default: "temporary", in: ["temporary", "permanent"])
   end
 
   @impl true
@@ -73,14 +61,14 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
   @impl true
   def execute(params, context) do
     # Build response configuration
-    respond_config = build_respond_config(params)
+    response_config = build_respond_config(params)
 
     # Create suspension data for application to handle HTTP response
     suspension_data = %{
       type: :webhook_response,
       execution_id: Map.get(context, :execution_id),
       node_id: Map.get(context, :node_id),
-      respond_config: respond_config,
+      response_config: response_config,
       suspended_at: DateTime.utc_now()
     }
 
@@ -90,7 +78,7 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
   @impl true
   def resume(_params, _context, _resume_data) do
     # Simple resume - webhook response already sent by application
-    {:ok, nil, "success"}
+    {:ok, nil, "main"}
   end
 
   @impl true
@@ -103,39 +91,28 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
 
     base_config = %{
       respond_with: respond_with,
-      status_code: Map.get(params, "status_code", 200),
+      status_code: Map.get(params, "status_code"),
       headers: custom_headers
     }
 
     case respond_with do
       "text" ->
-        text_response = Map.get(params, "text_response", %{})
-        content_type = Map.get(text_response, "content_type", "text/plain")
-
-        base_config
-        |> Map.merge(%{
-          text: Map.get(text_response, "text"),
-          content_type: content_type
-        })
-        |> Map.put(:headers, Map.put(base_config.headers, "Content-Type", content_type))
+        Map.put(base_config, :text, params["text_data"])
 
       "json" ->
         json_response = Map.get(params, "json_response", %{})
 
         base_config
-        |> Map.merge(%{
-          json_data: Map.get(json_response, "json_data")
-        })
+        |> Map.put(:json_data, Map.get(params, "json_data"))
         |> Map.put(:headers, Map.put(base_config.headers, "Content-Type", "application/json"))
 
       "redirect" ->
-        redirect_response = Map.get(params, "redirect_response", %{})
-        redirect_url = Map.get(redirect_response, "redirect_url")
+        redirect_url = Map.get(params, "redirect_url")
 
         base_config
         |> Map.merge(%{
           redirect_url: redirect_url,
-          redirect_type: Map.get(redirect_response, "redirect_type", "temporary")
+          redirect_type: Map.get(params, "redirect_type", "temporary")
         })
         |> Map.put(:headers, Map.put(base_config.headers, "Location", redirect_url))
 
@@ -147,10 +124,8 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
     end
   end
 
-
-    # Validate that required fields are present for each response type
-  defp validate_response_fields(%{respond_with: "text", text_response: text_response})
-       when not is_nil(text_response) do
+  # Validate that required fields are present for each response type
+  defp validate_response_fields(%{respond_with: "text", text_response: text_response}) when not is_nil(text_response) do
     :ok
   end
 
@@ -158,8 +133,7 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
     {:error, "text_response is required when respond_with is 'text'"}
   end
 
-  defp validate_response_fields(%{respond_with: "json", json_response: json_response})
-       when not is_nil(json_response) do
+  defp validate_response_fields(%{respond_with: "json", json_response: json_response}) when not is_nil(json_response) do
     :ok
   end
 

@@ -92,6 +92,24 @@ defmodule Prana.Template.Engine do
             {:error, reason} -> throw({:error, "Error processing key '#{key}': #{reason}"})
           end
 
+        {key, value}, acc when is_map(value) ->
+          case process_map(value, context) do
+            {:ok, processed_value} -> Map.put(acc, key, processed_value)
+            {:error, reason} -> throw({:error, "Error processing key '#{key}': #{reason}"})
+          end
+
+        {key, value}, acc when is_list(value) ->
+          # Process lists by rendering each item
+          processed_list =
+            Enum.map(value, fn item ->
+              case render(item, context) do
+                {:ok, rendered_item} -> rendered_item
+                {:error, reason} -> throw({:error, "Error processing list item for key '#{key}': #{reason}"})
+              end
+            end)
+
+          Map.put(acc, key, processed_list)
+
         {k, v}, acc ->
           Map.put(acc, k, v)
       end)
