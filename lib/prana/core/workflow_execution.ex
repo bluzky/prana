@@ -73,7 +73,7 @@ defmodule Prana.WorkflowExecution do
     field(:metadata, :map, default: %{})
   end
 
-  # status :: "pending" | "running" | "suspended" | "completed" | "failed" | "cancelled" | "timeout"
+  # status :: "pending" | "running" | "suspended" | "completed" | "failed" | "timeout"
   @type execution_mode :: :sync | :async | :fire_and_forget
 
   @doc """

@@ -99,12 +99,25 @@ defmodule Prana.Template.Engine do
           end
 
         {key, value}, acc when is_list(value) ->
-          # Process lists by rendering each item
+          # Process lists by handling different item types
           processed_list =
             Enum.map(value, fn item ->
-              case render(item, context) do
-                {:ok, rendered_item} -> rendered_item
-                {:error, reason} -> throw({:error, "Error processing list item for key '#{key}': #{reason}"})
+              cond do
+                is_binary(item) ->
+                  case render(item, context) do
+                    {:ok, rendered_item} -> rendered_item
+                    {:error, reason} -> throw({:error, "Error processing list item for key '#{key}': #{reason}"})
+                  end
+                
+                is_map(item) ->
+                  case process_map(item, context) do
+                    {:ok, processed_item} -> processed_item
+                    {:error, reason} -> throw({:error, "Error processing list item for key '#{key}': #{reason}"})
+                  end
+                
+                true ->
+                  # For other types (numbers, booleans, etc.), return as-is
+                  item
               end
             end)
 

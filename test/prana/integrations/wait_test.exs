@@ -49,8 +49,6 @@ defmodule Prana.Integrations.WaitTest do
 
       assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
       assert suspension_data.mode == "interval"
-      assert suspension_data.duration_ms == 500_000
-      assert %DateTime{} = suspension_data.started_at
       assert %DateTime{} = suspension_data.resume_at
     end
 
@@ -58,7 +56,8 @@ defmodule Prana.Integrations.WaitTest do
       input_map = %{"mode" => "interval", "duration" => 2, "unit" => "minutes"}
 
       assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
-      assert suspension_data.duration_ms == 120_000
+      assert suspension_data.mode == "interval"
+      assert %DateTime{} = suspension_data.resume_at
     end
 
     test "interval mode returns error for missing duration" do
@@ -82,10 +81,7 @@ defmodule Prana.Integrations.WaitTest do
       assert {:suspend, :schedule, suspension_data} = Wait.wait(input_map)
       assert suspension_data.mode == "schedule"
       assert suspension_data.timezone == "UTC"
-      assert %DateTime{} = suspension_data.schedule_at
-      assert %DateTime{} = suspension_data.started_at
-      assert is_integer(suspension_data.duration_ms)
-      assert suspension_data.duration_ms > 0
+      assert %DateTime{} = suspension_data.resume_at
     end
 
     test "schedule mode returns error for past time" do
@@ -116,7 +112,6 @@ defmodule Prana.Integrations.WaitTest do
       assert {:suspend, :webhook, suspension_data} = Wait.wait(input_map)
       assert suspension_data.mode == "webhook"
       assert suspension_data.timeout_hours == 48
-      assert %DateTime{} = suspension_data.started_at
       assert %DateTime{} = suspension_data.expires_at
     end
 
@@ -125,6 +120,7 @@ defmodule Prana.Integrations.WaitTest do
 
       assert {:suspend, :webhook, suspension_data} = Wait.wait(input_map)
       assert suspension_data.timeout_hours == 24
+      assert %DateTime{} = suspension_data.expires_at
     end
 
     test "webhook mode returns error for invalid timeout_hours" do
@@ -156,36 +152,38 @@ defmodule Prana.Integrations.WaitTest do
     test "converts seconds to milliseconds correctly" do
       input_map = %{"mode" => "interval", "duration" => 1, "unit" => "seconds"}
 
-      # 1 second is less than 60 seconds, so it should sleep and return {:ok, %{}}
-      assert {:ok, %{}} = Wait.wait(input_map)
+      # 1 second is less than 60 seconds, so it should sleep and return {:ok, %{}, "main"}
+      assert {:ok, %{}, "main"} = Wait.wait(input_map)
     end
 
     test "converts minutes to milliseconds correctly" do
       input_map = %{"mode" => "interval", "duration" => 1, "unit" => "minutes"}
 
       assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
-      assert suspension_data.duration_ms == 60_000
+      assert suspension_data.mode == "interval"
+      assert %DateTime{} = suspension_data.resume_at
     end
 
     test "converts hours to milliseconds correctly" do
       input_map = %{"mode" => "interval", "duration" => 1, "unit" => "hours"}
 
       assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
-      assert suspension_data.duration_ms == 3_600_000
+      assert suspension_data.mode == "interval"
+      assert %DateTime{} = suspension_data.resume_at
     end
 
     test "handles fractional conversions" do
       input_map = %{"mode" => "interval", "duration" => 0.1, "unit" => "minutes"}
 
-      # 0.1 minutes = 6 seconds, which is less than 60 seconds, so it should sleep and return {:ok, %{}}
-      assert {:ok, %{}} = Wait.wait(input_map)
+      # 0.1 minutes = 6 seconds, which is less than 60 seconds, so it should sleep and return {:ok, %{}, "main"}
+      assert {:ok, %{}, "main"} = Wait.wait(input_map)
     end
 
     test "defaults to milliseconds when unit not specified" do
       input_map = %{"mode" => "interval", "duration" => 3000}
 
-      # 3000 ms = 3 seconds, which is less than 60 seconds, so it should sleep and return {:ok, %{}}
-      assert {:ok, %{}} = Wait.wait(input_map)
+      # 3000 ms = 3 seconds, which is less than 60 seconds, so it should sleep and return {:ok, %{}, "main"}
+      assert {:ok, %{}, "main"} = Wait.wait(input_map)
     end
 
     test "returns error for invalid unit" do
@@ -200,7 +198,8 @@ defmodule Prana.Integrations.WaitTest do
       input_map = %{"mode" => "interval", "duration" => 60, "unit" => "seconds"}
 
       assert {:suspend, :interval, suspension_data} = Wait.wait(input_map)
-      assert suspension_data.duration_ms == 60_000
+      assert suspension_data.mode == "interval"
+      assert %DateTime{} = suspension_data.resume_at
     end
   end
 

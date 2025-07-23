@@ -3,84 +3,44 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
 
   alias Prana.Integrations.HTTP.WebhookAction
 
-  describe "WebhookAction prepare/1" do
-    test "returns default preparation data" do
-      node = %{}
-
-      assert {:ok, preparation_data} = WebhookAction.prepare(node)
-      assert preparation_data.webhook_path == "/webhook"
-      assert %DateTime{} = preparation_data.prepared_at
-    end
-
-    test "uses node configuration" do
-      node = %{
-        config: %{
-          "webhook_path" => "/custom-webhook"
+  describe "WebhookAction execute/2" do
+    test "returns request params from context input" do
+      context = %{
+        "$input" => %{
+          "main" => %{
+            "method" => "POST",
+            "path" => "/webhook",
+            "headers" => %{"content-type" => "application/json"},
+            "body" => %{"data" => "test"}
+          }
         }
       }
 
-      assert {:ok, preparation_data} = WebhookAction.prepare(node)
-      assert preparation_data.webhook_path == "/custom-webhook"
-    end
-  end
-
-  describe "WebhookAction execute/1" do
-    test "returns webhook configuration" do
-      input_map = %{
-        "path" => "/test-webhook"
+      assert {:ok, result, "main"} = WebhookAction.execute(%{}, context)
+      assert result == %{
+        "method" => "POST",
+        "path" => "/webhook",
+        "headers" => %{"content-type" => "application/json"},
+        "body" => %{"data" => "test"}
       }
-
-      assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
-      assert result.webhook_path == "/test-webhook"
-      assert result.allowed_methods == ["POST"]
-      assert result.auth_config == %{"type" => "none"}
-      assert result.response_type == "immediately"
-      assert %DateTime{} = result.configured_at
     end
 
-    test "builds webhook URL from environment variable" do
-      # Set environment variable for this test
-      original_base_url = System.get_env("PRANA_BASE_URL")
-      System.put_env("PRANA_BASE_URL", "https://example.com")
-
-      input_map = %{
-        "path" => "/my-webhook"
-      }
-
-      assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
-      assert result.webhook_url == "https://example.com/my-webhook"
-
-      # Restore original environment
-      if original_base_url do
-        System.put_env("PRANA_BASE_URL", original_base_url)
-      else
-        System.delete_env("PRANA_BASE_URL")
-      end
+    test "returns nil when no input in context" do
+      context = %{"$input" => %{}}
+      
+      assert {:ok, result, "main"} = WebhookAction.execute(%{}, context)
+      assert result == nil
     end
 
-    test "uses default webhook path" do
-      # Set environment variable for this test
-      original_base_url = System.get_env("PRANA_BASE_URL")
-      System.put_env("PRANA_BASE_URL", "https://example.com")
-
-      input_map = %{}
-
-      assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
-      assert result.webhook_path == "/webhook"
-      assert result.webhook_url == "https://example.com/webhook"
-
-      # Restore original environment
-      if original_base_url do
-        System.put_env("PRANA_BASE_URL", original_base_url)
-      else
-        System.delete_env("PRANA_BASE_URL")
-      end
+    test "returns nil when no context provided" do
+      assert {:ok, result, "main"} = WebhookAction.execute(%{}, %{})
+      assert result == nil
     end
   end
 
   describe "WebhookAction resume/3" do
     test "returns error for unsupported resume operation" do
-      assert {:error, "Webhook action does not support resume"} =
+      assert {:error, "Resume not supported"} =
                WebhookAction.resume(%{}, %{}, %{})
     end
   end
