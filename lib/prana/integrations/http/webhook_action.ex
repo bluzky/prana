@@ -53,18 +53,14 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
     field(:headers, :map, default: %{})
   end
 
-  defschema WebhookSchema do
-    field(:webhook_config, WebhookConfigSchema, default: %{})
-  end
-
   @impl true
-  def params_schema, do: WebhookSchema
+  def params_schema, do: WebhookConfigSchema
 
   @impl true
   def validate_params(input_map) do
-    case Skema.cast_and_validate(input_map, WebhookSchema) do
+    case Skema.cast_and_validate(input_map, WebhookConfigSchema) do
       {:ok, validated_data} ->
-        case validate_methods(validated_data.webhook_config.methods) do
+        case validate_methods(validated_data.methods) do
           :ok -> {:ok, validated_data}
           {:error, reason} -> {:error, [reason]}
         end
@@ -118,8 +114,6 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
 
   @impl true
   def execute(params, _context) do
-    webhook_config = Map.get(params, "webhook_config", %{})
-
     # Build webhook URL using base_url from environment variable only
     webhook_url =
       case System.get_env("PRANA_BASE_URL") do
@@ -127,16 +121,16 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
           nil
 
         base_url ->
-          webhook_path = Map.get(webhook_config, "path", "/webhook")
+          webhook_path = Map.get(params, "path", "/webhook")
           "#{base_url}#{webhook_path}"
       end
 
     # Extract configuration and return webhook setup
     result = %{
-      webhook_path: Map.get(webhook_config, "path", "/webhook"),
-      allowed_methods: Map.get(webhook_config, "methods", ["POST"]),
-      auth_config: Map.get(webhook_config, "auth", %{"type" => "none"}),
-      response_type: Map.get(webhook_config, "response_type", "immediately"),
+      webhook_path: Map.get(params, "path", "/webhook"),
+      allowed_methods: Map.get(params, "methods", ["POST"]),
+      auth_config: Map.get(params, "auth", %{"type" => "none"}),
+      response_type: Map.get(params, "response_type", "immediately"),
       webhook_url: webhook_url,
       configured_at: DateTime.utc_now()
     }

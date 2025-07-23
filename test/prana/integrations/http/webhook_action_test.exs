@@ -27,7 +27,7 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
   describe "WebhookAction execute/1" do
     test "returns webhook configuration" do
       input_map = %{
-        "webhook_config" => %{"path" => "/test-webhook"}
+        "path" => "/test-webhook"
       }
 
       assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
@@ -44,7 +44,7 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
       System.put_env("PRANA_BASE_URL", "https://example.com")
 
       input_map = %{
-        "webhook_config" => %{"path" => "/my-webhook"}
+        "path" => "/my-webhook"
       }
 
       assert {:ok, result, "success"} = WebhookAction.execute(input_map, %{})
@@ -94,9 +94,7 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
   describe "WebhookAction schema validation" do
     test "validates invalid HTTP methods" do
       input_map = %{
-        "webhook_config" => %{
-          "methods" => ["INVALID", "POST"]
-        }
+        "methods" => ["INVALID", "POST"]
       }
 
       assert {:error, errors} = WebhookAction.validate_params(input_map)
@@ -107,28 +105,26 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
       input_map = %{}
 
       assert {:ok, validated} = WebhookAction.validate_params(input_map)
-      assert validated.webhook_config.path == "/webhook"
-      assert validated.webhook_config.secret == nil
-      assert validated.webhook_config.headers == %{}
+      assert validated.path == "/webhook"
+      assert validated.secret == nil
+      assert validated.headers == %{}
     end
 
-    test "validates nested webhook config schema" do
+    test "validates webhook config schema" do
       input_map = %{
-        "webhook_config" => %{
-          "path" => "/custom-webhook",
-          "secret" => "mysecret",
-          "headers" => %{"X-Custom" => "value"}
-        }
+        "path" => "/custom-webhook",
+        "secret" => "mysecret",
+        "headers" => %{"X-Custom" => "value"}
       }
 
       assert {:ok, validated} = WebhookAction.validate_params(input_map)
-      assert validated.webhook_config.path == "/custom-webhook"
-      assert validated.webhook_config.secret == "mysecret"
-      assert validated.webhook_config.headers == %{"X-Custom" => "value"}
+      assert validated.path == "/custom-webhook"
+      assert validated.secret == "mysecret"
+      assert validated.headers == %{"X-Custom" => "value"}
     end
 
     test "returns params_schema" do
-      assert WebhookAction.params_schema() == Prana.Integrations.HTTP.WebhookAction.WebhookSchema
+      assert WebhookAction.params_schema() == Prana.Integrations.HTTP.WebhookAction.WebhookConfigSchema
     end
   end
 
