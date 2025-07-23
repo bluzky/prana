@@ -374,7 +374,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, _} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify all nodes are tracked in node_executions
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
@@ -399,7 +399,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, _} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify merge node has access to branch results
       all_executions = execution.node_executions |> Map.values() |> List.flatten()
@@ -429,7 +429,7 @@ defmodule Prana.WorkflowExecution.DiamondForkTest do
       }
 
       # Execute the workflow
-      {:ok, execution} = GraphExecutor.execute_workflow(execution_graph, context)
+      {:ok, execution, _} = GraphExecutor.execute_workflow(execution_graph, context)
 
       # Verify final node has access to all previous results
       all_executions = execution.node_executions |> Map.values() |> List.flatten()

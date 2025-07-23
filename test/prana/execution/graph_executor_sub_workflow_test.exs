@@ -222,7 +222,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         )
 
       # Should complete after immediate resume
-      assert {:ok, completed_execution} = resume_result
+      assert {:ok, completed_execution, _} = resume_result
       assert completed_execution.status == "completed"
 
       # All nodes should be completed
@@ -261,7 +261,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         )
 
       # Should complete successfully
-      assert {:ok, completed_execution} = result
+      assert {:ok, completed_execution, _} = result
 
       # Verify completion
       assert completed_execution.status == "completed"
@@ -299,7 +299,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         )
 
       # Should suspend again at second sub-workflow
-      assert {:suspend, second_suspended} = result
+      assert {:suspend, second_suspended, _} = result
 
       # Verify we're suspended at the second node
       assert second_suspended.suspended_node_id == "second_sub_workflow"
@@ -316,7 +316,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         )
 
       # Should complete after second resume
-      assert {:ok, final_execution} = final_result
+      assert {:ok, final_execution, _} = final_result
       assert final_execution.status == "completed"
     end
 
@@ -394,7 +394,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "trigger")
 
       # Execute until suspension
-      {:suspend, _suspended} =
+      {:suspend, _suspended, _} =
         GraphExecutor.execute_workflow(
           execution_graph,
           %{"user_id" => 789}
