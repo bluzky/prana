@@ -7,6 +7,7 @@ defmodule Prana.Integrations.HTTP do
   - Request configuration (headers, body, timeout, authentication)
   - Response handling with success/error/timeout port routing
   - Webhook triggers for incoming HTTP requests
+  - Webhook respond actions for custom HTTP responses
   - Comprehensive error handling for network and HTTP errors
 
   This integration uses Req HTTP client for modern, performant HTTP operations.
@@ -17,6 +18,7 @@ defmodule Prana.Integrations.HTTP do
   alias Prana.Integration
   alias Prana.Integrations.HTTP.RequestAction
   alias Prana.Integrations.HTTP.WebhookAction
+  alias Prana.Integrations.HTTP.WebhookRespondAction
 
   @doc """
   Returns the integration definition with all available actions
@@ -31,7 +33,8 @@ defmodule Prana.Integrations.HTTP do
       category: "network",
       actions: %{
         "request" => RequestAction.specification(),
-        "webhook" => WebhookAction.specification()
+        "webhook" => WebhookAction.specification(),
+        "webhook_respond" => WebhookRespondAction.specification()
       }
     }
   end
