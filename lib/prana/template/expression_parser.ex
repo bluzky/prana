@@ -130,7 +130,7 @@ defmodule Prana.Template.ExpressionParser do
     args_str
     |> parse_quoted_arguments()
     |> Enum.map(&String.trim/1)
-    |> Enum.map(&parse_literal/1)
+    |> Enum.map(&parse_filter_argument/1)
   end
 
   defp parse_quoted_arguments(args_str) do
@@ -233,6 +233,33 @@ defmodule Prana.Template.ExpressionParser do
       # Default to string
       true ->
         {:ok, expr}
+    end
+  end
+
+  defp parse_filter_argument(str) do
+    str = String.trim(str)
+
+    cond do
+      # Prana expression path: $input.field -> return AST structure  
+      String.starts_with?(str, "$") ->
+        %{type: :variable, path: str}
+
+      # Quoted strings are literals
+      (String.starts_with?(str, "\"") and String.ends_with?(str, "\"")) or
+      (String.starts_with?(str, "'") and String.ends_with?(str, "'")) ->
+        parse_literal(str)
+
+      # Numbers and booleans are literals
+      str in ["true", "false"] or Regex.match?(~r/^\d+(\.\d+)?$/, str) ->
+        parse_literal(str)
+
+      # Unquoted identifiers are variable references
+      Regex.match?(~r/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/, str) ->
+        %{type: :variable, path: str}
+
+      # Default to literal parsing for edge cases
+      true ->
+        parse_literal(str)
     end
   end
 
