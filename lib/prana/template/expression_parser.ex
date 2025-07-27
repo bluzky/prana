@@ -12,7 +12,7 @@ defmodule Prana.Template.ExpressionParser do
   Parse an expression string into a standardized 3-tuple AST.
 
   Returns Elixir-style AST nodes in the format `{type, [], children}` where:
-  - `type` is an atom representing the node type (`:variable`, `:literal`, `:binary_op`, `:pipe`, `:call`, `:grouped`)
+  - `type` is an atom representing the node type (`:variable`, `:literal`, `:binary_op`, `:pipe`, `:call`, `:grouped`, `:for_loop`, `:if_condition`)
   - The second element is always an empty list `[]` (metadata placeholder)
   - `children` is a list containing the node's data and child nodes
 
@@ -20,13 +20,13 @@ defmodule Prana.Template.ExpressionParser do
 
       iex> parse("$input.age + 10")
       {:ok, {:binary_op, [], [:+, {:variable, [], ["$input.age"]}, {:literal, [], [10]}]}}
-      
+
       iex> parse("$input.name | upper_case")
       {:ok, {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:upper_case, []]}]}}
-      
+
       iex> parse("42")
       {:ok, {:literal, [], [42]}}
-      
+
       iex> parse("$input.name | default(\"Unknown\")")
       {:ok, {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}]}}
   """
@@ -229,73 +229,81 @@ defmodule Prana.Template.ExpressionParser do
   defp parse_simple_expression(expr) do
     expr = String.trim(expr)
 
+    case determine_expression_type(expr) do
+      :variable -> {:ok, AST.variable(expr)}
+      :double_quoted_string -> parse_quoted_string(expr, "\"")
+      :single_quoted_string -> parse_quoted_string(expr, "'")
+      :boolean -> {:ok, AST.literal(parse_boolean(expr))}
+      :integer -> {:ok, AST.literal(String.to_integer(expr))}
+      :float -> {:ok, AST.literal(String.to_float(expr))}
+      :grouped -> parse_grouped_expression(expr)
+      :literal -> {:ok, AST.literal(expr)}
+    end
+  end
+
+  # Helper functions to reduce cyclomatic complexity
+  defp determine_expression_type(expr) do
     cond do
-      # Variable path: $input.field -> should access context["$input"]["field"]
-      String.starts_with?(expr, "$") ->
-        {:ok, AST.variable(expr)}
+      String.starts_with?(expr, "$") -> :variable
+      String.starts_with?(expr, "\"") and String.ends_with?(expr, "\"") -> :double_quoted_string
+      String.starts_with?(expr, "'") and String.ends_with?(expr, "'") -> :single_quoted_string
+      expr in ["true", "false"] -> :boolean
+      Regex.match?(~r/^\d+$/, expr) -> :integer
+      Regex.match?(~r/^\d+\.\d+$/, expr) -> :float
+      String.starts_with?(expr, "(") and String.ends_with?(expr, ")") -> :grouped
+      true -> :literal
+    end
+  end
 
-      # String literal
-      String.starts_with?(expr, "\"") and String.ends_with?(expr, "\"") ->
-        content = String.slice(expr, 1..-2//1)
-        {:ok, AST.literal(content)}
+  defp parse_quoted_string(expr, _quote) do
+    content = String.slice(expr, 1..-2//1)
+    {:ok, AST.literal(content)}
+  end
 
-      String.starts_with?(expr, "'") and String.ends_with?(expr, "'") ->
-        content = String.slice(expr, 1..-2//1)
-        {:ok, AST.literal(content)}
+  defp parse_boolean("true"), do: true
+  defp parse_boolean("false"), do: false
 
-      # Boolean literal
-      expr == "true" ->
-        {:ok, AST.literal(true)}
-
-      expr == "false" ->
-        {:ok, AST.literal(false)}
-
-      # Number literal
-      Regex.match?(~r/^\d+$/, expr) ->
-        {:ok, AST.literal(String.to_integer(expr))}
-
-      Regex.match?(~r/^\d+\.\d+$/, expr) ->
-        {:ok, AST.literal(String.to_float(expr))}
-
-      # Parentheses
-      String.starts_with?(expr, "(") and String.ends_with?(expr, ")") ->
-        inner = String.slice(expr, 1..-2//1)
-        case parse(inner) do
-          {:ok, inner_ast} -> {:ok, AST.grouped(inner_ast)}
-          error -> error
-        end
-
-      # Default to string literal
-      true ->
-        {:ok, AST.literal(expr)}
+  defp parse_grouped_expression(expr) do
+    inner = String.slice(expr, 1..-2//1)
+    case parse(inner) do
+      {:ok, inner_ast} -> {:ok, AST.grouped(inner_ast)}
+      error -> error
     end
   end
 
   defp parse_filter_argument(str) do
     str = String.trim(str)
 
-    cond do
-      # Prana expression path: $input.field -> return AST structure  
-      String.starts_with?(str, "$") ->
-        AST.variable(str)
-
-      # Quoted strings are literals
-      (String.starts_with?(str, "\"") and String.ends_with?(str, "\"")) or
-      (String.starts_with?(str, "'") and String.ends_with?(str, "'")) ->
-        AST.literal(parse_literal(str))
-
-      # Numbers and booleans are literals
-      str in ["true", "false"] or Regex.match?(~r/^\d+(\.\d+)?$/, str) ->
-        AST.literal(parse_literal(str))
-
-      # Unquoted identifiers are variable references
-      Regex.match?(~r/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/, str) ->
-        AST.variable(str)
-
-      # Default to literal parsing for edge cases
-      true ->
-        AST.literal(parse_literal(str))
+    case determine_filter_argument_type(str) do
+      :prana_variable -> AST.variable(str)
+      :quoted_literal -> AST.literal(parse_literal(str))
+      :primitive_literal -> AST.literal(parse_literal(str))
+      :identifier_variable -> AST.variable(str)
+      :fallback_literal -> AST.literal(parse_literal(str))
     end
+  end
+
+  defp determine_filter_argument_type(str) do
+    cond do
+      String.starts_with?(str, "$") -> :prana_variable
+      is_quoted_string?(str) -> :quoted_literal
+      is_primitive_literal?(str) -> :primitive_literal
+      is_identifier_variable?(str) -> :identifier_variable
+      true -> :fallback_literal
+    end
+  end
+
+  defp is_quoted_string?(str) do
+    (String.starts_with?(str, "\"") and String.ends_with?(str, "\"")) or
+    (String.starts_with?(str, "'") and String.ends_with?(str, "'"))
+  end
+
+  defp is_primitive_literal?(str) do
+    str in ["true", "false"] or Regex.match?(~r/^\d+(\.\d+)?$/, str)
+  end
+
+  defp is_identifier_variable?(str) do
+    Regex.match?(~r/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/, str)
   end
 
   defp parse_literal(str) do
@@ -310,5 +318,33 @@ defmodule Prana.Template.ExpressionParser do
       String.starts_with?(str, "'") and String.ends_with?(str, "'") -> String.slice(str, 1..-2//1)
       true -> str
     end
+  end
+
+  @doc """
+  Parse a control flow block into a standardized 3-tuple AST.
+
+  ## Examples
+
+      iex> parse_control_block(:for_loop, %{variable: "user", iterable: "$input.users"}, [body_blocks])
+      {:ok, {:for_loop, [], ["user", {:variable, [], ["$input.users"]}, [body_blocks]]}}
+
+      iex> parse_control_block(:if_condition, %{condition: "$input.age >= 18"}, %{then_body: [blocks], else_body: []})
+      {:ok, {:if_condition, [], [{:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]}, [blocks], []]}}
+  """
+  @spec parse_control_block(atom(), map(), any()) :: {:ok, tuple()} | {:error, String.t()}
+  def parse_control_block(:for_loop, %{variable: variable, iterable: iterable}, body_blocks) do
+    with {:ok, iterable_ast} <- parse(iterable) do
+      {:ok, AST.for_loop(variable, iterable_ast, body_blocks)}
+    end
+  end
+
+  def parse_control_block(:if_condition, %{condition: condition}, %{then_body: then_body, else_body: else_body}) do
+    with {:ok, condition_ast} <- parse(condition) do
+      {:ok, AST.if_condition(condition_ast, then_body, else_body)}
+    end
+  end
+
+  def parse_control_block(type, attributes, _body) do
+    {:error, "Unknown control flow type: #{type} with attributes: #{inspect(attributes)}"}
   end
 end

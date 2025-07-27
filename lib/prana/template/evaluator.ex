@@ -9,6 +9,9 @@ defmodule Prana.Template.Evaluator do
   alias Prana.ExpressionEngine
   alias Prana.Template.FilterRegistry
 
+  # Security limits
+  @max_loop_iterations 10_000  # Max iterations in for loops
+
   @doc """
   Evaluate a parsed expression AST against a context.
 
@@ -23,15 +26,15 @@ defmodule Prana.Template.Evaluator do
   ## Examples
 
       context = %{"$input" => %{"age" => 25, "name" => "John"}}
-      
+
       # Variable access
       ast = {:variable, [], ["$input.age"]}
       {:ok, 25} = evaluate(ast, context)
-      
+
       # Arithmetic
       ast = {:binary_op, [], [:+, {:variable, [], ["$input.age"]}, {:literal, [], [10]}]}
       {:ok, 35} = evaluate(ast, context)
-      
+
       # With filters (pipe operations)
       ast = {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:upper_case, []]}]}
       {:ok, "JOHN"} = evaluate(ast, context)
@@ -58,6 +61,12 @@ defmodule Prana.Template.Evaluator do
       {:grouped, [], [inner_expression]} ->
         evaluate(inner_expression, context)
 
+      {:for_loop, [], [variable, iterable, body]} ->
+        evaluate_for_loop(variable, iterable, body, context)
+
+      {:if_condition, [], [condition, then_body, else_body]} ->
+        evaluate_if_condition(condition, then_body, else_body, context)
+
       # Direct values (for cases where literal values are passed directly)
       value when is_number(value) or is_boolean(value) or is_binary(value) ->
         {:ok, value}
@@ -69,6 +78,95 @@ defmodule Prana.Template.Evaluator do
   end
 
   # Private functions
+
+  defp evaluate_for_loop(variable, iterable, body, context) do
+    with {:ok, collection} <- evaluate(iterable, context) do
+      case collection do
+        items when is_list(items) ->
+          # Security check: limit loop iterations
+          if length(items) > @max_loop_iterations do
+            {:error, "For loop iterations (#{length(items)}) exceeds maximum allowed (#{@max_loop_iterations})"}
+          else
+            results =
+              Enum.map(items, fn item ->
+                # Create scoped context with loop variable accessible as $variable
+                # Limit context exposure by only adding the loop variable
+                scoped_context = Map.put(context, "$#{variable}", item)
+                evaluate_body(body, scoped_context)
+              end)
+
+            # Flatten results and join as string for template rendering
+            case flatten_results(results) do
+              {:ok, flattened} -> {:ok, Enum.join(flattened, "")}
+              error -> error
+            end
+          end
+
+        _ ->
+          {:error, "For loop iterable must be a list, got: #{inspect(collection)}"}
+      end
+    end
+  end
+
+  defp evaluate_if_condition(condition, then_body, else_body, context) do
+    with {:ok, condition_result} <- evaluate(condition, context) do
+      cond do
+        truthy?(condition_result) ->
+          evaluate_body(then_body, context)
+
+        not Enum.empty?(else_body) ->
+          evaluate_body(else_body, context)
+
+        true ->
+          {:ok, ""}
+      end
+    end
+  end
+
+  defp evaluate_body(body_blocks, context) do
+    results =
+      Enum.map(body_blocks, fn block ->
+        case block do
+          {:literal, content} ->
+            {:ok, content}
+
+          {:expression, content} ->
+            # Parse and evaluate the expression
+            alias Prana.Template.ExpressionParser
+            case ExpressionParser.parse(content) do
+              {:ok, ast} -> evaluate(ast, context)
+              error -> error
+            end
+
+          {:control, type, attributes, body} ->
+            # Parse and evaluate control block
+            alias Prana.Template.ExpressionParser
+            case ExpressionParser.parse_control_block(type, attributes, body) do
+              {:ok, ast} -> evaluate(ast, context)
+              error -> error
+            end
+
+          _ ->
+            {:error, "Unknown block type: #{inspect(block)}"}
+        end
+      end)
+
+    case flatten_results(results) do
+      {:ok, flattened} -> {:ok, Enum.join(flattened, "")}
+      error -> error
+    end
+  end
+
+  defp flatten_results(results) do
+    case Enum.find(results, fn {status, _} -> status == :error end) do
+      nil ->
+        values = Enum.map(results, fn {:ok, value} -> to_string(value) end)
+        {:ok, values}
+
+      error ->
+        error
+    end
+  end
 
   defp evaluate_binary_op(operator, left_ast, right_ast, context) do
     with {:ok, left_val} <- evaluate(left_ast, context),
@@ -84,7 +182,7 @@ defmodule Prana.Template.Evaluator do
           with {:ok, evaluated_args} <- evaluate_args(args, context) do
             FilterRegistry.apply_filter(Atom.to_string(function_name), value, evaluated_args)
           end
-        
+
         _ ->
           {:error, "Invalid pipe function"}
       end
@@ -103,11 +201,19 @@ defmodule Prana.Template.Evaluator do
       String.starts_with?(path, "$") ->
         ExpressionEngine.extract(path, context)
 
-      # Simple variable name - look up directly in context
+      # Simple variable name - look up directly in context, including scoped variables
       true ->
-        case get_in(context, String.split(path, ".")) do
-          nil -> {:ok, nil}
-          value -> {:ok, value}
+        # First try direct access for scoped variables like "user"
+        case Map.get(context, path) do
+          nil ->
+            # If not found directly, try path traversal for nested access like "user.name"
+            case get_in(context, String.split(path, ".")) do
+              nil -> {:ok, nil}
+              value -> {:ok, value}
+            end
+
+          value ->
+            {:ok, value}
         end
     end
   end

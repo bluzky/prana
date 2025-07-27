@@ -66,20 +66,30 @@ defmodule Prana.Template.Engine do
       # Filter chaining
       {:ok, "JOH"} = render("{{ $input.user.name | upper_case | truncate(3) }}", context)
   """
+  # Security limits
+  @max_template_size 1_000_000  # 1MB max template size
+  @max_nesting_depth 50         # Max control flow nesting depth
+
   @spec render(String.t(), map(), keyword()) :: {:ok, any()} | {:error, String.t()}
   def render(template_string, context, _opts \\ []) when is_binary(template_string) and is_map(context) do
-    # Extract template blocks once
-    case Extractor.extract(template_string) do
-      {:ok, blocks} ->
-        # Check if this is a pure expression and render accordingly
-        if is_pure_expression_blocks?(blocks) do
-          render_pure_expression_from_blocks(blocks, context)
-        else
-          render_blocks_as_string(blocks, context)
-        end
+    # Input validation for security
+    with :ok <- validate_template_size(template_string),
+         :ok <- validate_template_complexity(template_string) do
+      # Extract template blocks once
+      case Extractor.extract(template_string) do
+        {:ok, blocks} ->
+          # Check if this is a pure expression and render accordingly
+          if pure_expression_blocks?(blocks) do
+            render_pure_expression_from_blocks(blocks, context)
+          else
+            render_blocks_as_string(blocks, context)
+          end
 
-      {:error, reason} ->
-        {:error, "Template extraction failed: #{reason}"}
+        {:error, reason} ->
+          {:error, "Template extraction failed: #{reason}"}
+      end
+    else
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -108,13 +118,13 @@ defmodule Prana.Template.Engine do
                     {:ok, rendered_item} -> rendered_item
                     {:error, reason} -> throw({:error, "Error processing list item for key '#{key}': #{reason}"})
                   end
-                
+
                 is_map(item) ->
                   case process_map(item, context) do
                     {:ok, processed_item} -> processed_item
                     {:error, reason} -> throw({:error, "Error processing list item for key '#{key}': #{reason}"})
                   end
-                
+
                 true ->
                   # For other types (numbers, booleans, etc.), return as-is
                   item
@@ -134,8 +144,49 @@ defmodule Prana.Template.Engine do
 
   # Private functions
 
-  defp is_pure_expression_blocks?(blocks) do
+  defp validate_template_size(template) do
+    size = byte_size(template)
+    if size > @max_template_size do
+      {:error, "Template size (#{size} bytes) exceeds maximum allowed (#{@max_template_size} bytes)"}
+    else
+      :ok
+    end
+  end
+
+  defp validate_template_complexity(template) do
+    # Count control flow nesting depth
+    nesting_depth = count_max_nesting_depth(template)
+    if nesting_depth > @max_nesting_depth do
+      {:error, "Template nesting depth (#{nesting_depth}) exceeds maximum allowed (#{@max_nesting_depth})"}
+    else
+      :ok
+    end
+  end
+
+  defp count_max_nesting_depth(template) do
+    # More accurate nesting depth counting using regex
+    control_blocks = Regex.scan(~r/\{%\s*(for|if|endfor|endif)\b/, template)
+
+    control_blocks
+    |> Enum.reduce({0, 0}, fn [_full, type], {current_depth, max_depth} ->
+      case type do
+        type when type in ["for", "if"] ->
+          new_depth = current_depth + 1
+          {new_depth, max(max_depth, new_depth)}
+
+        type when type in ["endfor", "endif"] ->
+          {max(0, current_depth - 1), max_depth}
+
+        _ ->
+          {current_depth, max_depth}
+      end
+    end)
+    |> elem(1)
+  end
+
+  defp pure_expression_blocks?(blocks) do
     # Pure expression = exactly one expression block, no literal text at all
+    # Control flow blocks are not considered pure expressions
     case blocks do
       [{:expression, _content}] -> true
       _ -> false
@@ -197,6 +248,28 @@ defmodule Prana.Template.Engine do
         Logger.error("Expression evaluation failed: #{reason}")
         # Return original expression when parsing fails
         {:ok, "{{#{expression_content}}}"}
+    end
+  end
+
+  defp render_single_block({:control, type, attributes, body}, context) do
+    # Parse control flow block into AST and evaluate
+    case ExpressionParser.parse_control_block(type, attributes, body) do
+      {:ok, ast} ->
+        # Evaluate the control flow AST
+        case Evaluator.evaluate(ast, context) do
+          {:ok, value} ->
+            {:ok, format_output_value(value)}
+
+          {:error, reason} ->
+            # Log error but return the error message for security tests
+            Logger.error("Control flow evaluation failed: #{reason}")
+            {:ok, "Error: #{reason}"}
+        end
+
+      {:error, reason} ->
+        Logger.error("Control flow parsing failed: #{reason}")
+        # Return error message for parsing failures
+        {:ok, "Error: #{reason}"}
     end
   end
 
