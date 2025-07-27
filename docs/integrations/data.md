@@ -63,22 +63,63 @@ The Data integration provides essential data manipulation capabilities for combi
 
 ### Set Data
 - **Action Name**: `set_data`
-- **Description**: Set data for testing purposes
+- **Description**: Create or transform data using templates in manual or json mode
 - **Input Ports**: `["main"]`
 - **Output Ports**: `["main", "error"]`
 
 **Input Parameters**:
-- Any parameters passed will be returned as output
+- `mode`: Operating mode (`"manual"` | `"json"`) - defaults to `"manual"`
+- `mapping_map`: Map used in manual mode (optional)
+- `json_template`: JSON template string used in json mode (optional)
+
+**Operating Modes**:
+
+1. **manual** (default): Simple key-value mapping with template-rendered values
+2. **json**: Complex nested data structures from JSON template strings
 
 **Returns**:
-- `{:ok, params}` - returns the input parameters unchanged
+- `{:ok, data}` on successful data creation
+- `{:ok, nil}` when required parameter is missing
+- `{:error, reason}` if processing fails
 
-**Example**:
+**Examples**:
+
+*Manual Mode (Default)*:
 ```elixir
+# Node params with templates (rendered by NodeExecutor):
 %{
-  "name" => "John",
-  "age" => 30,
-  "city" => "NYC"
+  "mode" => "manual",
+  "mapping_map" => %{
+    "user_id" => 123,                    # Rendered from "{{ $input.id }}"
+    "full_name" => "John Doe",           # Rendered from "{{ $input.first_name }} {{ $input.last_name }}"
+    "status" => "processed"
+  }
 }
-# Result: %{"name" => "John", "age" => 30, "city" => "NYC"}
+# Result: %{"user_id" => 123, "full_name" => "John Doe", "status" => "processed"}
 ```
+
+*JSON Mode*:
+```elixir
+# Node params with JSON template (rendered by NodeExecutor):
+%{
+  "mode" => "json",
+  "json_template" => ~s|{"user":{"id":456,"name":"JANE DOE"},"orders":[{"order_id":"ord_1","amount":99.99}]}|
+}
+# Result: %{"user" => %{"id" => 456, "name" => "JANE DOE"}, "orders" => [%{"order_id" => "ord_1", "amount" => 99.99}]}
+```
+
+*Missing Parameters*:
+```elixir
+%{"mode" => "manual"}  # mapping_map missing
+# Result: {:ok, nil}
+
+%{"mode" => "json"}    # json_template missing  
+# Result: {:ok, nil}
+```
+
+**Template Integration**:
+The NodeExecutor automatically renders all templates in the node's `params` before calling the action. This means:
+- Template expressions like `"{{ $input.field }}"` are resolved before the action executes
+- The action receives already-processed data and focuses on data transformation logic
+- In manual mode, `mapping_map` values are already rendered
+- In json mode, `json_template` is already rendered and ready for JSON parsing
