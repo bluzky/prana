@@ -177,24 +177,57 @@ defmodule Prana.Template.Evaluator do
     # First evaluate the base expression
     with {:ok, value} <- evaluate(expr_ast, context) do
       # Apply filters in sequence
-      apply_filters(value, filters)
+      apply_filters(value, filters, context)
     end
   end
 
-  defp apply_filters(value, []), do: {:ok, value}
+  defp apply_filters(value, [], _context), do: {:ok, value}
 
-  defp apply_filters(value, [filter | remaining_filters]) do
-    case apply_single_filter(value, filter) do
+  defp apply_filters(value, [filter | remaining_filters], context) do
+    case apply_single_filter(value, filter, context) do
       {:ok, filtered_value} ->
-        apply_filters(filtered_value, remaining_filters)
+        apply_filters(filtered_value, remaining_filters, context)
 
       {:error, reason} ->
         {:error, reason}
     end
   end
 
-  defp apply_single_filter(value, %{name: filter_name, args: args}) do
-    FilterRegistry.apply_filter(filter_name, value, args)
+  defp apply_single_filter(value, %{name: filter_name, args: args}, context) do
+    with {:ok, evaluated_args} <- evaluate_filter_args(args, context) do
+      FilterRegistry.apply_filter(filter_name, value, evaluated_args)
+    end
+  end
+
+  defp evaluate_filter_args(args, context) do
+    # Evaluate each argument - if it's an AST structure, evaluate it; otherwise pass through
+    evaluated_args =
+      Enum.map(args, fn arg ->
+        {:ok, evaluated_arg} = evaluate_filter_arg(arg, context)
+        evaluated_arg
+      end)
+
+    {:ok, evaluated_args}
+  end
+
+  defp evaluate_filter_arg(%{type: :variable, path: path}, context) do
+    cond do
+      # Prana expression path (starts with $) - use ExpressionEngine
+      String.starts_with?(path, "$") ->
+        ExpressionEngine.extract(path, context)
+
+      # Simple variable name - look up directly in context
+      true ->
+        case get_in(context, String.split(path, ".")) do
+          nil -> {:ok, nil}
+          value -> {:ok, value}
+        end
+    end
+  end
+
+  defp evaluate_filter_arg(literal_value, _context) do
+    # This is a literal value - pass it through unchanged
+    {:ok, literal_value}
   end
 
   # Helper functions
