@@ -25,31 +25,40 @@ defmodule Prana.Template.Evaluator do
       context = %{"$input" => %{"age" => 25, "name" => "John"}}
       
       # Variable access
-      ast = %{type: :variable, path: "$input.age"}
+      ast = {:variable, [], ["$input.age"]}
       {:ok, 25} = evaluate(ast, context)
       
       # Arithmetic
-      ast = %{type: :binary_op, operator: :+, left: %{type: :variable, path: "$input.age"}, right: 10}
+      ast = {:binary_op, [], [:+, {:variable, [], ["$input.age"]}, {:literal, [], [10]}]}
       {:ok, 35} = evaluate(ast, context)
       
-      # With filters
-      ast = %{type: :filtered, expression: %{type: :variable, path: "$input.name"}, filters: [%{name: "upper_case", args: []}]}
+      # With filters (pipe operations)
+      ast = {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:upper_case, []]}]}
       {:ok, "JOHN"} = evaluate(ast, context)
   """
   @spec evaluate(any(), map()) :: {:ok, any()} | {:error, String.t()}
   def evaluate(ast, context) when is_map(context) do
     case ast do
-      %{type: :variable, path: path} ->
-        # Delegate to existing ExpressionEngine
-        ExpressionEngine.extract(path, context)
+      # 3-tuple AST nodes
+      {:variable, [], [path]} ->
+        evaluate_variable_path(path, context)
 
-      %{type: :binary_op, operator: op, left: left, right: right} ->
-        evaluate_binary_op(op, left, right, context)
+      {:literal, [], [value]} ->
+        {:ok, value}
 
-      %{type: :filtered, expression: expr, filters: filters} ->
-        evaluate_filtered_expression(expr, filters, context)
+      {:binary_op, [], [operator, left, right]} ->
+        evaluate_binary_op(operator, left, right, context)
 
-      # Literals (direct values from parser)
+      {:pipe, [], [expression, function]} ->
+        evaluate_pipe_expression(expression, function, context)
+
+      {:call, [], [function_name, args]} ->
+        evaluate_function_call(function_name, args, context)
+
+      {:grouped, [], [inner_expression]} ->
+        evaluate(inner_expression, context)
+
+      # Direct values (for cases where literal values are passed directly)
       value when is_number(value) or is_boolean(value) or is_binary(value) ->
         {:ok, value}
 
@@ -68,27 +77,52 @@ defmodule Prana.Template.Evaluator do
     end
   end
 
-  # Handle both string and atom operators for compatibility
-  defp apply_operator(op, left, right) when is_binary(op) do
-    atom_op =
-      case op do
-        "+" -> :+
-        "-" -> :-
-        "*" -> :*
-        "/" -> :/
-        ">" -> :>
-        "<" -> :<
-        ">=" -> :>=
-        "<=" -> :<=
-        "==" -> :==
-        "!=" -> :!=
-        "&&" -> :&&
-        "||" -> :||
-        _ -> String.to_atom(op)
+  defp evaluate_pipe_expression(expression, function, context) do
+    with {:ok, value} <- evaluate(expression, context) do
+      case function do
+        {:call, [], [function_name, args]} ->
+          with {:ok, evaluated_args} <- evaluate_args(args, context) do
+            FilterRegistry.apply_filter(Atom.to_string(function_name), value, evaluated_args)
+          end
+        
+        _ ->
+          {:error, "Invalid pipe function"}
       end
-
-    apply_operator(atom_op, left, right)
+    end
   end
+
+  defp evaluate_function_call(function_name, args, context) do
+    with {:ok, evaluated_args} <- evaluate_args(args, context) do
+      FilterRegistry.apply_filter(Atom.to_string(function_name), nil, evaluated_args)
+    end
+  end
+
+  defp evaluate_variable_path(path, context) do
+    cond do
+      # Prana expression path (starts with $) - use ExpressionEngine
+      String.starts_with?(path, "$") ->
+        ExpressionEngine.extract(path, context)
+
+      # Simple variable name - look up directly in context
+      true ->
+        case get_in(context, String.split(path, ".")) do
+          nil -> {:ok, nil}
+          value -> {:ok, value}
+        end
+    end
+  end
+
+  defp evaluate_args(args, context) do
+    results = Enum.map(args, fn arg -> evaluate(arg, context) end)
+    case Enum.find(results, fn {status, _} -> status == :error end) do
+      nil ->
+        values = Enum.map(results, fn {:ok, value} -> value end)
+        {:ok, values}
+      error ->
+        error
+    end
+  end
+
 
   defp apply_operator(:+, left, right) when is_number(left) and is_number(right) do
     {:ok, left + right}
@@ -135,7 +169,7 @@ defmodule Prana.Template.Evaluator do
     {:ok, left != right}
   end
 
-  # Logical operators
+  # Logical operators (truthiness-based, suitable for template expressions)
   defp apply_operator(:&&, left, right) do
     {:ok, truthy?(left) && truthy?(right)}
   end
@@ -173,62 +207,8 @@ defmodule Prana.Template.Evaluator do
     {:error, "Unsupported operation: #{inspect(left)} #{operator} #{inspect(right)}"}
   end
 
-  defp evaluate_filtered_expression(expr_ast, filters, context) do
-    # First evaluate the base expression
-    with {:ok, value} <- evaluate(expr_ast, context) do
-      # Apply filters in sequence
-      apply_filters(value, filters, context)
-    end
-  end
 
-  defp apply_filters(value, [], _context), do: {:ok, value}
 
-  defp apply_filters(value, [filter | remaining_filters], context) do
-    case apply_single_filter(value, filter, context) do
-      {:ok, filtered_value} ->
-        apply_filters(filtered_value, remaining_filters, context)
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp apply_single_filter(value, %{name: filter_name, args: args}, context) do
-    with {:ok, evaluated_args} <- evaluate_filter_args(args, context) do
-      FilterRegistry.apply_filter(filter_name, value, evaluated_args)
-    end
-  end
-
-  defp evaluate_filter_args(args, context) do
-    # Evaluate each argument - if it's an AST structure, evaluate it; otherwise pass through
-    evaluated_args =
-      Enum.map(args, fn arg ->
-        {:ok, evaluated_arg} = evaluate_filter_arg(arg, context)
-        evaluated_arg
-      end)
-
-    {:ok, evaluated_args}
-  end
-
-  defp evaluate_filter_arg(%{type: :variable, path: path}, context) do
-    cond do
-      # Prana expression path (starts with $) - use ExpressionEngine
-      String.starts_with?(path, "$") ->
-        ExpressionEngine.extract(path, context)
-
-      # Simple variable name - look up directly in context
-      true ->
-        case get_in(context, String.split(path, ".")) do
-          nil -> {:ok, nil}
-          value -> {:ok, value}
-        end
-    end
-  end
-
-  defp evaluate_filter_arg(literal_value, _context) do
-    # This is a literal value - pass it through unchanged
-    {:ok, literal_value}
-  end
 
   # Helper functions
 

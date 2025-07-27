@@ -9,16 +9,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.name"},
-        filters: [
-          %{
-            name: "default", 
-            args: [%{type: :variable, path: "$input.fallback"}]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:default, [{:variable, [], ["$input.fallback"]}]]}
+      ]} = ast
     end
 
     test "parses unquoted identifier variable arguments" do
@@ -26,16 +20,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.name"},
-        filters: [
-          %{
-            name: "default", 
-            args: [%{type: :variable, path: "fallback_name"}]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:default, [{:variable, [], ["fallback_name"]}]]}
+      ]} = ast
     end
 
     test "parses dotted variable paths" do
@@ -43,16 +31,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.price"},
-        filters: [
-          %{
-            name: "format_currency", 
-            args: [%{type: :variable, path: "config.currency"}]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.price"]},
+        {:call, [], [:format_currency, [{:variable, [], ["config.currency"]}]]}
+      ]} = ast
     end
 
     test "parses mixed literal and variable arguments" do
@@ -60,19 +42,13 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.value"},
-        filters: [
-          %{
-            name: "clamp", 
-            args: [
-              %{type: :variable, path: "$variables.min"},
-              100
-            ]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.value"]},
+        {:call, [], [:clamp, [
+          {:variable, [], ["$variables.min"]},
+          {:literal, [], [100]}
+        ]]}
+      ]} = ast
     end
 
     test "parses multiple variable arguments" do
@@ -80,19 +56,13 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.items"},
-        filters: [
-          %{
-            name: "slice", 
-            args: [
-              %{type: :variable, path: "$pagination.offset"},
-              %{type: :variable, path: "$pagination.limit"}
-            ]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.items"]},
+        {:call, [], [:slice, [
+          {:variable, [], ["$pagination.offset"]},
+          {:variable, [], ["$pagination.limit"]}
+        ]]}
+      ]} = ast
     end
 
     test "parses nested variable paths" do
@@ -100,16 +70,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.name"},
-        filters: [
-          %{
-            name: "default", 
-            args: [%{type: :variable, path: "$nodes.api.default_name"}]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:default, [{:variable, [], ["$nodes.api.default_name"]}]]}
+      ]} = ast
     end
 
     test "handles chained filters with variables" do
@@ -117,20 +81,13 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.price"},
-        filters: [
-          %{
-            name: "multiply", 
-            args: [%{type: :variable, path: "$rates.conversion"}]
-          },
-          %{
-            name: "format_currency", 
-            args: [%{type: :variable, path: "$locale.currency"}]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:pipe, [], [
+          {:variable, [], ["$input.price"]},
+          {:call, [], [:multiply, [{:variable, [], ["$rates.conversion"]}]]}
+        ]},
+        {:call, [], [:format_currency, [{:variable, [], ["$locale.currency"]}]]}
+      ]} = ast
     end
   end
 
@@ -140,12 +97,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{name: "default", args: ["Unknown"]}
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}
+      ]} = ast
     end
 
     test "unquoted identifiers are parsed as variables" do
@@ -153,12 +108,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{name: "default", args: [%{type: :variable, path: "fallback_value"}]}
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:default, [{:variable, [], ["fallback_value"]}]]}
+      ]} = ast
     end
 
     test "mixed quoted literals and unquoted variables" do
@@ -166,18 +119,13 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{
-            name: "format", 
-            args: [
-              "Hello %s",  # literal string
-              %{type: :variable, path: "user_name"}  # variable
-            ]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.message"]},
+        {:call, [], [:format, [
+          {:literal, [], ["Hello %s"]},
+          {:variable, [], ["user_name"]}
+        ]]}
+      ]} = ast
     end
   end
 
@@ -187,12 +135,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{name: "default", args: ["Unknown"]}
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}
+      ]} = ast
     end
 
     test "still parses literal number arguments" do
@@ -200,12 +146,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{name: "add", args: [5]}
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.age"]},
+        {:call, [], [:add, [{:literal, [], [5]}]]}
+      ]} = ast
     end
 
     test "still parses literal boolean arguments" do
@@ -213,12 +157,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{name: "default", args: [true]}
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.value"]},
+        {:call, [], [:default, [{:literal, [], [true]}]]}
+      ]} = ast
     end
 
     test "handles filters without arguments" do
@@ -226,12 +168,10 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{name: "upper_case", args: []}
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:upper_case, []]}
+      ]} = ast
     end
   end
 
@@ -241,19 +181,14 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{
-            name: "format", 
-            args: [
-              "Hello %s",
-              %{type: :variable, path: "$input.name"},
-              %{type: :variable, path: "$config.suffix"}
-            ]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.message"]},
+        {:call, [], [:format, [
+          {:literal, [], ["Hello %s"]},
+          {:variable, [], ["$input.name"]},
+          {:variable, [], ["$config.suffix"]}
+        ]]}
+      ]} = ast
     end
 
     test "handles single quotes with variables" do
@@ -261,18 +196,13 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{
-            name: "transform", 
-            args: [
-              "prefix",
-              %{type: :variable, path: "$input.suffix"}
-            ]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.value"]},
+        {:call, [], [:transform, [
+          {:literal, [], ["prefix"]},
+          {:variable, [], ["$input.suffix"]}
+        ]]}
+      ]} = ast
     end
 
     test "handles complex nested variable paths" do
@@ -280,18 +210,13 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{
-            name: "get_property", 
-            args: [
-              %{type: :variable, path: "$config.fields.primary"},
-              %{type: :variable, path: "$nodes.lookup.fallback_field"}
-            ]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.user"]},
+        {:call, [], [:get_property, [
+          {:variable, [], ["$config.fields.primary"]},
+          {:variable, [], ["$nodes.lookup.fallback_field"]}
+        ]]}
+      ]} = ast
     end
   end
 
@@ -302,12 +227,10 @@ defmodule Prana.Template.ExpressionParserTest do
       {:ok, ast} = ExpressionParser.parse(expression)
       
       # Should still parse but with minimal path
-      assert %{
-        type: :filtered,
-        filters: [
-          %{name: "default", args: [%{type: :variable, path: "$"}]}
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:default, [{:variable, [], ["$"]}]]}
+      ]} = ast
     end
 
     test "handles variables mixed with complex literals" do
@@ -315,20 +238,15 @@ defmodule Prana.Template.ExpressionParserTest do
       
       {:ok, ast} = ExpressionParser.parse(expression)
       
-      assert %{
-        type: :filtered,
-        filters: [
-          %{
-            name: "transform", 
-            args: [
-              123.45,
-              %{type: :variable, path: "$input.multiplier"},
-              true,
-              "test"
-            ]
-          }
-        ]
-      } = ast
+      assert {:pipe, [], [
+        {:variable, [], ["$input.data"]},
+        {:call, [], [:transform, [
+          {:literal, [], [123.45]},
+          {:variable, [], ["$input.multiplier"]},
+          {:literal, [], [true]},
+          {:literal, [], ["test"]}
+        ]]}
+      ]} = ast
     end
   end
 end

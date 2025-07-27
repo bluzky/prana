@@ -6,18 +6,31 @@ defmodule Prana.Template.ExpressionParser do
   Can be enhanced with NimbleParsec later for more complex expressions.
   """
 
+  alias Prana.Template.AST
+
   @doc """
-  Parse an expression string into an AST.
+  Parse an expression string into a standardized 3-tuple AST.
+
+  Returns Elixir-style AST nodes in the format `{type, [], children}` where:
+  - `type` is an atom representing the node type (`:variable`, `:literal`, `:binary_op`, `:pipe`, `:call`, `:grouped`)
+  - The second element is always an empty list `[]` (metadata placeholder)
+  - `children` is a list containing the node's data and child nodes
 
   ## Examples
 
       iex> parse("$input.age + 10")
-      {:ok, %{type: :binary_op, operator: "+", left: %{type: :variable, path: "$input.age"}, right: 10}}
+      {:ok, {:binary_op, [], [:+, {:variable, [], ["$input.age"]}, {:literal, [], [10]}]}}
       
       iex> parse("$input.name | upper_case")
-      {:ok, %{type: :filtered, expression: %{type: :variable, path: "$input.name"}, filters: [%{name: "upper_case", args: []}]}}
+      {:ok, {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:upper_case, []]}]}}
+      
+      iex> parse("42")
+      {:ok, {:literal, [], [42]}}
+      
+      iex> parse("$input.name | default(\"Unknown\")")
+      {:ok, {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}]}}
   """
-  @spec parse(String.t()) :: {:ok, map()} | {:error, String.t()}
+  @spec parse(String.t()) :: {:ok, tuple()} | {:error, String.t()}
   def parse(expression_string) when is_binary(expression_string) do
     expression_string = String.trim(expression_string)
 
@@ -51,7 +64,12 @@ defmodule Prana.Template.ExpressionParser do
       [base_expr, filters_part] ->
         with {:ok, base_ast} <- parse_simple_expression(String.trim(base_expr)),
              {:ok, filters} <- parse_filters(String.trim(filters_part)) do
-          {:ok, %{type: :filtered, expression: base_ast, filters: filters}}
+          # Convert filters to chained pipe operations
+          result_ast = Enum.reduce(filters, base_ast, fn filter, acc ->
+            filter_ast = AST.call(String.to_atom(filter.name), filter.args)
+            AST.pipe(acc, filter_ast)
+          end)
+          {:ok, result_ast}
         end
 
       _ ->
@@ -173,7 +191,8 @@ defmodule Prana.Template.ExpressionParser do
       {operator, left_part, right_part} ->
         with {:ok, left_ast} <- parse(String.trim(left_part)),
              {:ok, right_ast} <- parse(String.trim(right_part)) do
-          {:ok, %{type: :binary_op, operator: operator, left: left_ast, right: right_ast}}
+          operator_atom = operator_to_atom(operator)
+          {:ok, AST.binary_op(operator_atom, left_ast, right_ast)}
         end
 
       nil ->
@@ -194,45 +213,61 @@ defmodule Prana.Template.ExpressionParser do
     end)
   end
 
+  defp operator_to_atom("+"), do: :+
+  defp operator_to_atom("-"), do: :-
+  defp operator_to_atom("*"), do: :*
+  defp operator_to_atom("/"), do: :/
+  defp operator_to_atom("=="), do: :==
+  defp operator_to_atom("!="), do: :!=
+  defp operator_to_atom(">="), do: :>=
+  defp operator_to_atom("<="), do: :<=
+  defp operator_to_atom(">"), do: :>
+  defp operator_to_atom("<"), do: :<
+  defp operator_to_atom("&&"), do: :&&
+  defp operator_to_atom("||"), do: :||
+
   defp parse_simple_expression(expr) do
     expr = String.trim(expr)
 
     cond do
       # Variable path: $input.field -> should access context["$input"]["field"]
       String.starts_with?(expr, "$") ->
-        {:ok, %{type: :variable, path: expr}}
+        {:ok, AST.variable(expr)}
 
       # String literal
       String.starts_with?(expr, "\"") and String.ends_with?(expr, "\"") ->
         content = String.slice(expr, 1..-2//1)
-        {:ok, content}
+        {:ok, AST.literal(content)}
 
       String.starts_with?(expr, "'") and String.ends_with?(expr, "'") ->
         content = String.slice(expr, 1..-2//1)
-        {:ok, content}
+        {:ok, AST.literal(content)}
 
       # Boolean literal
       expr == "true" ->
-        {:ok, true}
+        {:ok, AST.literal(true)}
 
       expr == "false" ->
-        {:ok, false}
+        {:ok, AST.literal(false)}
 
       # Number literal
       Regex.match?(~r/^\d+$/, expr) ->
-        {:ok, String.to_integer(expr)}
+        {:ok, AST.literal(String.to_integer(expr))}
 
       Regex.match?(~r/^\d+\.\d+$/, expr) ->
-        {:ok, String.to_float(expr)}
+        {:ok, AST.literal(String.to_float(expr))}
 
       # Parentheses
       String.starts_with?(expr, "(") and String.ends_with?(expr, ")") ->
         inner = String.slice(expr, 1..-2//1)
-        parse(inner)
+        case parse(inner) do
+          {:ok, inner_ast} -> {:ok, AST.grouped(inner_ast)}
+          error -> error
+        end
 
-      # Default to string
+      # Default to string literal
       true ->
-        {:ok, expr}
+        {:ok, AST.literal(expr)}
     end
   end
 
@@ -242,24 +277,24 @@ defmodule Prana.Template.ExpressionParser do
     cond do
       # Prana expression path: $input.field -> return AST structure  
       String.starts_with?(str, "$") ->
-        %{type: :variable, path: str}
+        AST.variable(str)
 
       # Quoted strings are literals
       (String.starts_with?(str, "\"") and String.ends_with?(str, "\"")) or
       (String.starts_with?(str, "'") and String.ends_with?(str, "'")) ->
-        parse_literal(str)
+        AST.literal(parse_literal(str))
 
       # Numbers and booleans are literals
       str in ["true", "false"] or Regex.match?(~r/^\d+(\.\d+)?$/, str) ->
-        parse_literal(str)
+        AST.literal(parse_literal(str))
 
       # Unquoted identifiers are variable references
       Regex.match?(~r/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/, str) ->
-        %{type: :variable, path: str}
+        AST.variable(str)
 
       # Default to literal parsing for edge cases
       true ->
-        parse_literal(str)
+        AST.literal(parse_literal(str))
     end
   end
 
