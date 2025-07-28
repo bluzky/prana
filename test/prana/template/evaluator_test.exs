@@ -3,271 +3,212 @@ defmodule Prana.Template.EvaluatorTest do
 
   alias Prana.Template.Evaluator
 
-  describe "evaluate with variable filter arguments" do
+  describe "evaluate with 3-tuple AST" do
     setup do
       context = %{
         "$input" => %{
           "name" => "John",
           "age" => 25,
-          "fallback" => "Default Name",
-          "multiplier" => 2,
-          "items" => ["a", "b", "c", "d", "e"]
-        },
-        "$variables" => %{
-          "min" => 10,
-          "max" => 100,
-          "currency" => "USD",
-          "offset" => 1,
-          "limit" => 3
+          "missing" => nil
         },
         "$nodes" => %{
           "api" => %{
-            "default_name" => "API Default",
-            "response" => %{
-              "bonus" => 5
-            }
+            "default_name" => "API Default"
           }
         },
-        # Simple variable names at context root
-        "fallback_name" => "Root Fallback",
-        "config" => %{
-          "currency" => "EUR",
-          "theme" => "dark"
+        "fallback_name" => "Simple Fallback"
+      }
+
+      {:ok, context: context}
+    end
+
+    test "evaluates literal values", %{context: context} do
+      assert {:ok, 42} = Evaluator.evaluate({:literal, [], [42]}, context)
+      assert {:ok, "hello"} = Evaluator.evaluate({:literal, [], ["hello"]}, context)
+      assert {:ok, true} = Evaluator.evaluate({:literal, [], [true]}, context)
+    end
+
+    test "evaluates variable paths", %{context: context} do
+      # Dollar paths
+      assert {:ok, "John"} = Evaluator.evaluate({:variable, [], ["$input.name"]}, context)
+      assert {:ok, 25} = Evaluator.evaluate({:variable, [], ["$input.age"]}, context)
+      assert {:ok, nil} = Evaluator.evaluate({:variable, [], ["$input.missing"]}, context)
+
+      # Simple paths
+      assert {:ok, "Simple Fallback"} = Evaluator.evaluate({:variable, [], ["fallback_name"]}, context)
+    end
+
+    test "evaluates binary operations", %{context: context} do
+      # Arithmetic
+      ast = {:binary_op, [], [:+, {:variable, [], ["$input.age"]}, {:literal, [], [10]}]}
+      assert {:ok, 35} = Evaluator.evaluate(ast, context)
+
+      # Comparison
+      ast = {:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]}
+      assert {:ok, true} = Evaluator.evaluate(ast, context)
+
+      # Logical
+      ast = {:binary_op, [], [:&&, {:literal, [], [true]}, {:literal, [], [false]}]}
+      assert {:ok, false} = Evaluator.evaluate(ast, context)
+    end
+
+    test "evaluates pipe operations", %{context: context} do
+      # Simple filter
+      ast = {:pipe, [], [
+        {:variable, [], ["$input.name"]},
+        {:call, [], [:upper_case, []]}
+      ]}
+      assert {:ok, "JOHN"} = Evaluator.evaluate(ast, context)
+
+      # Filter with arguments
+      ast = {:pipe, [], [
+        {:variable, [], ["$input.missing"]},
+        {:call, [], [:default, [{:variable, [], ["fallback_name"]}]]}
+      ]}
+      assert {:ok, "Simple Fallback"} = Evaluator.evaluate(ast, context)
+    end
+
+    test "evaluates function calls", %{context: context} do
+      # Function with arguments
+      ast = {:call, [], [:default, [{:literal, [], ["test"]}]]}
+      assert {:ok, "test"} = Evaluator.evaluate(ast, context)
+    end
+
+    test "evaluates grouped expressions", %{context: context} do
+      inner = {:binary_op, [], [:+, {:literal, [], [2]}, {:literal, [], [3]}]}
+      ast = {:grouped, [], [inner]}
+      assert {:ok, 5} = Evaluator.evaluate(ast, context)
+    end
+
+    test "evaluates direct values for backward compatibility", %{context: context} do
+      assert {:ok, 42} = Evaluator.evaluate(42, context)
+      assert {:ok, "hello"} = Evaluator.evaluate("hello", context)
+      assert {:ok, true} = Evaluator.evaluate(true, context)
+    end
+  end
+
+  describe "error handling" do
+    test "handles invalid operations" do
+      context = %{}
+      ast = {:binary_op, [], [:+, {:literal, [], ["hello"]}, {:literal, [], ["world"]}]}
+      assert {:ok, "helloworld"} = Evaluator.evaluate(ast, context)
+    end
+
+    test "handles missing variables gracefully" do
+      context = %{}
+      ast = {:variable, [], ["$missing.path"]}
+      assert {:ok, nil} = Evaluator.evaluate(ast, context)
+    end
+  end
+
+  describe "control flow evaluation" do
+    setup do
+      context = %{
+        "$input" => %{
+          "users" => [
+            %{"name" => "Alice", "age" => 25, "active" => true},
+            %{"name" => "Bob", "age" => 17, "active" => false}
+          ],
+          "age" => 25,
+          "status" => "premium"
         }
       }
 
       {:ok, context: context}
     end
 
-    test "evaluates variable arguments in default filter", %{context: context} do
-      # Test with non-nil value - should return original
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.name"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "$input.fallback"}]}]
-      }
+    test "evaluates for loop with simple iteration", %{context: context} do
+      # {:for_loop, [], [variable, iterable, body]}
+      iterable_ast = {:variable, [], ["$input.users"]}
+      body_blocks = [
+        {:literal, "User: "},
+        {:expression, " $user.name "},
+        {:literal, " "}
+      ]
 
-      assert {:ok, "John"} = Evaluator.evaluate(ast, context)
+      ast = {:for_loop, [], ["user", iterable_ast, body_blocks]}
 
-      # Test with nil value - should return fallback variable value
-      ast_nil = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "$input.fallback"}]}]
-      }
-
-      assert {:ok, "Default Name"} = Evaluator.evaluate(ast_nil, context)
+      assert {:ok, result} = Evaluator.evaluate(ast, context)
+      assert result == "User: Alice User: Bob "
     end
 
-    test "evaluates nested variable paths in filter arguments", %{context: context} do
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "$nodes.api.default_name"}]}]
-      }
+    test "evaluates for loop with empty collection", %{context: _context} do
+      context = %{"$input" => %{"empty_list" => []}}
 
-      assert {:ok, "API Default"} = Evaluator.evaluate(ast, context)
+      iterable_ast = {:variable, [], ["$input.empty_list"]}
+      body_blocks = [{:literal, "Item"}]
+
+      ast = {:for_loop, [], ["item", iterable_ast, body_blocks]}
+
+      assert {:ok, result} = Evaluator.evaluate(ast, context)
+      assert result == ""
     end
 
-    test "evaluates simple variable names in filter arguments", %{context: context} do
-      # Test simple variable at context root
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "fallback_name"}]}]
-      }
+    test "evaluates if condition with true condition", %{context: context} do
+      # {:if_condition, [], [condition, then_body, else_body]}
+      condition_ast = {:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]}
+      then_body = [{:literal, "Welcome adult!"}]
+      else_body = [{:literal, "Must be 18+"}]
 
-      assert {:ok, "Root Fallback"} = Evaluator.evaluate(ast, context)
+      ast = {:if_condition, [], [condition_ast, then_body, else_body]}
 
-      # Test dotted variable path
-      ast_dotted = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "config.currency"}]}]
-      }
-
-      assert {:ok, "EUR"} = Evaluator.evaluate(ast_dotted, context)
+      assert {:ok, result} = Evaluator.evaluate(ast, context)
+      assert result == "Welcome adult!"
     end
 
-    test "evaluates multiple variable arguments", %{context: context} do
-      # Test a hypothetical clamp filter with min and max variables
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.age"},
-        filters: [%{
-          name: "clamp",
-          args: [
-            %{type: :variable, path: "$variables.min"},
-            %{type: :variable, path: "$variables.max"}
-          ]
-        }]
-      }
+    test "evaluates if condition with false condition", %{context: _context} do
+      context = %{"$input" => %{"age" => 16}}
 
-      # Since clamp filter doesn't exist, this will error, but we can verify args are evaluated
-      # by checking the error message includes the resolved values
-      case Evaluator.evaluate(ast, context) do
-        {:error, message} ->
-          assert String.contains?(message, "Unknown filter: clamp")
-        _ ->
-          flunk("Expected error for unknown filter")
-      end
+      condition_ast = {:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]}
+      then_body = [{:literal, "Welcome adult!"}]
+      else_body = [{:literal, "Must be 18+"}]
+
+      ast = {:if_condition, [], [condition_ast, then_body, else_body]}
+
+      assert {:ok, result} = Evaluator.evaluate(ast, context)
+      assert result == "Must be 18+"
     end
 
-    test "handles mixed literal and variable arguments", %{context: context} do
-      # Create an AST that would represent: $input.age | add($nodes.api.response.bonus)
-      # Since add filter might not exist, we'll test with default which accepts any second arg
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [%{
-          name: "default",
-          args: [%{type: :variable, path: "$nodes.api.response.bonus"}]
-        }]
-      }
+    test "evaluates if condition with no else body", %{context: _context} do
+      context = %{"$input" => %{"age" => 16}}
 
-      assert {:ok, 5} = Evaluator.evaluate(ast, context)
+      condition_ast = {:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]}
+      then_body = [{:literal, "Welcome adult!"}]
+      else_body = []
+
+      ast = {:if_condition, [], [condition_ast, then_body, else_body]}
+
+      assert {:ok, result} = Evaluator.evaluate(ast, context)
+      assert result == ""
     end
 
-    test "maintains backward compatibility with literal arguments", %{context: context} do
-      # Test literal string argument
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [%{name: "default", args: ["Literal Default"]}]
-      }
+    test "handles for loop with non-list iterable", %{context: _context} do
+      context = %{"$input" => %{"not_list" => "string"}}
 
-      assert {:ok, "Literal Default"} = Evaluator.evaluate(ast, context)
+      iterable_ast = {:variable, [], ["$input.not_list"]}
+      body_blocks = [{:literal, "Item"}]
 
-      # Test literal number argument
-      ast_num = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [%{name: "default", args: [42]}]
-      }
+      ast = {:for_loop, [], ["item", iterable_ast, body_blocks]}
 
-      assert {:ok, 42} = Evaluator.evaluate(ast_num, context)
+      assert {:error, reason} = Evaluator.evaluate(ast, context)
+      assert reason =~ "For loop iterable must be a list"
     end
 
-    test "handles chained filters with variable arguments", %{context: context} do
-      # Chain: name -> default(fallback) -> upper_case
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing"},
-        filters: [
-          %{name: "default", args: [%{type: :variable, path: "$input.fallback"}]},
-          %{name: "upper_case", args: []}
-        ]
-      }
+    test "evaluates nested control flow in loop body", %{context: context} do
+      # Loop through users, show different message based on age
+      iterable_ast = {:variable, [], ["$input.users"]}
 
-      assert {:ok, "DEFAULT NAME"} = Evaluator.evaluate(ast, context)
-    end
+      # Body contains if condition using $user syntax
+      then_body = [{:literal, "Adult: "}, {:expression, " $user.name "}]
+      else_body = [{:literal, "Minor: "}, {:expression, " $user.name "}]
 
-    test "handles filters without arguments", %{context: context} do
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.name"},
-        filters: [%{name: "upper_case", args: []}]
-      }
+      if_block = {:control, :if_condition, %{condition: "$user.age >= 18"}, %{then_body: then_body, else_body: else_body}}
+      body_blocks = [if_block, {:literal, " "}]
 
-      assert {:ok, "JOHN"} = Evaluator.evaluate(ast, context)
-    end
-  end
+      ast = {:for_loop, [], ["user", iterable_ast, body_blocks]}
 
-  describe "error handling for variable filter arguments" do
-    test "handles missing variable paths gracefully", %{} do
-      context = %{"$input" => %{"name" => "John"}}
-
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.name"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "$missing.path"}]}]
-      }
-
-      # Missing variable path should resolve to nil, so default filter should use that as fallback
-      # Since the main expression ($input.name) exists and is "John", default filter should return "John"
-      assert {:ok, "John"} = Evaluator.evaluate(ast, context)
-
-      # Test when main expression is missing - should use the nil fallback from missing path
-      ast_main_missing = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.missing_field"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "$missing.path"}]}]
-      }
-
-      assert {:ok, nil} = Evaluator.evaluate(ast_main_missing, context)
-    end
-
-    test "returns error when filter doesn't exist", %{} do
-      context = %{"$input" => %{"value" => 10}}
-
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.value"},
-        filters: [%{name: "nonexistent_filter", args: [%{type: :variable, path: "$input.value"}]}]
-      }
-
-      assert {:error, "Unknown filter: nonexistent_filter"} = Evaluator.evaluate(ast, context)
-    end
-
-    test "handles nested variable paths gracefully", %{} do
-      context = %{"$input" => %{"data" => nil}}
-
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.data"},
-        filters: [%{name: "default", args: [%{type: :variable, path: "$input.data.nested.missing"}]}]
-      }
-
-      # Both the main expression and the filter argument resolve to nil
-      # The default filter will return nil (since input is nil)
-      assert {:ok, nil} = Evaluator.evaluate(ast, context)
-    end
-  end
-
-  describe "complex evaluation scenarios" do
-    test "evaluates deeply nested variable references", %{} do
-      context = %{
-        "$config" => %{
-          "settings" => %{
-            "defaults" => %{
-              "user" => %{
-                "name" => "System Default"
-              }
-            }
-          }
-        },
-        "$input" => %{"user" => nil}
-      }
-
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.user"},
-        filters: [%{
-          name: "default",
-          args: [%{type: :variable, path: "$config.settings.defaults.user.name"}]
-        }]
-      }
-
-      assert {:ok, "System Default"} = Evaluator.evaluate(ast, context)
-    end
-
-    test "handles multiple filters with different argument types", %{} do
-      context = %{
-        "$input" => %{"text" => nil, "fallback" => "hello world"},
-        "$config" => %{"case" => "upper"}
-      }
-
-      # missing -> default(variable) -> upper_case (no args)
-      ast = %{
-        type: :filtered,
-        expression: %{type: :variable, path: "$input.text"},
-        filters: [
-          %{name: "default", args: [%{type: :variable, path: "$input.fallback"}]},
-          %{name: "upper_case", args: []}
-        ]
-      }
-
-      assert {:ok, "HELLO WORLD"} = Evaluator.evaluate(ast, context)
+      assert {:ok, result} = Evaluator.evaluate(ast, context)
+      assert result == "Adult: Alice Minor: Bob "
     end
   end
 end
