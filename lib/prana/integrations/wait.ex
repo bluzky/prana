@@ -93,7 +93,7 @@ defmodule Prana.Integrations.Wait do
       else
         interval_data = %{
           mode: "interval",
-          resume_at: DateTime.add(now, duration_ms, :millisecond),
+          resume_at: DateTime.add(now, duration_ms, :millisecond)
         }
 
         {:suspend, :interval, interval_data}
@@ -114,7 +114,6 @@ defmodule Prana.Integrations.Wait do
     with :ok <- validate_schedule_at(schedule_at),
          {:ok, schedule_datetime} <- parse_schedule_datetime(schedule_at, timezone),
          :ok <- validate_schedule_future(schedule_datetime) do
-
       schedule_data = %{
         mode: "schedule",
         resume_at: schedule_datetime,
@@ -138,6 +137,7 @@ defmodule Prana.Integrations.Wait do
       :ok ->
         now = DateTime.utc_now()
         expires_at = DateTime.add(now, timeout_hours * 3600, :second)
+
         webhook_data = %{
           mode: "webhook",
           expires_at: expires_at,
@@ -277,7 +277,6 @@ defmodule Prana.Integrations.Wait.WaitAction do
       :ok ->
         execution_id = "# TODO"
         webhook_url = "#{base_url}/resume/#{execution_id}"
-
 
         preparation_data = %{
           webhook_url: webhook_url,

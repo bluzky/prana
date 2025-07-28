@@ -112,26 +112,26 @@ defmodule Prana.Template.EngineTest do
     test "renders templates with variable filter arguments", %{context: context} do
       # Variable fallback when field exists
       assert {:ok, "Hello John!"} =
-        Engine.render("Hello {{ $input.user.name | default($input.fallback_name) }}!", context)
+               Engine.render("Hello {{ $input.user.name | default($input.fallback_name) }}!", context)
 
       # Variable fallback when field is missing
       assert {:ok, "Hello Default User!"} =
-        Engine.render("Hello {{ $input.missing_field | default($input.fallback_name) }}!", context)
+               Engine.render("Hello {{ $input.missing_field | default($input.fallback_name) }}!", context)
     end
 
     test "renders templates with nested variable paths in filters", %{context: context} do
       assert {:ok, "Name: API Default"} =
-        Engine.render("Name: {{ $input.missing_field | default($nodes.api.default_name) }}", context)
+               Engine.render("Name: {{ $input.missing_field | default($nodes.api.default_name) }}", context)
     end
 
     test "renders templates with unquoted variable arguments", %{context: context} do
       # Simple variable name
       assert {:ok, "Name: Simple Fallback"} =
-        Engine.render("Name: {{ $input.missing_field | default(fallback_name) }}", context)
+               Engine.render("Name: {{ $input.missing_field | default(fallback_name) }}", context)
 
       # Dotted variable path
       assert {:ok, "Currency: EUR"} =
-        Engine.render("Currency: {{ $input.missing_field | default(config.currency) }}", context)
+               Engine.render("Currency: {{ $input.missing_field | default(config.currency) }}", context)
     end
 
     test "handles mixed literal and variable arguments", %{context: context} do
@@ -147,10 +147,10 @@ defmodule Prana.Template.EngineTest do
     test "maintains backward compatibility with literal arguments", %{context: context} do
       # Should work exactly as before
       assert {:ok, "Hello Unknown!"} =
-        Engine.render("Hello {{ $input.missing_field | default(\"Unknown\") }}!", context)
+               Engine.render("Hello {{ $input.missing_field | default(\"Unknown\") }}!", context)
 
       assert {:ok, "Age: 18"} =
-        Engine.render("Age: {{ $input.missing_age | default(18) }}", context)
+               Engine.render("Age: {{ $input.missing_age | default(18) }}", context)
     end
 
     test "handles chained filters with variable arguments", %{context: context} do
@@ -161,21 +161,21 @@ defmodule Prana.Template.EngineTest do
     test "pure expressions return correct types with variable filter arguments", %{context: context} do
       # Should return the actual fallback value type, not string
       assert {:ok, 18} =
-        Engine.render("{{ $input.missing_age | default($variables.default_age) }}", context)
+               Engine.render("{{ $input.missing_age | default($variables.default_age) }}", context)
 
       assert {:ok, "Default User"} =
-        Engine.render("{{ $input.missing_field | default($input.fallback_name) }}", context)
+               Engine.render("{{ $input.missing_field | default($input.fallback_name) }}", context)
     end
 
     test "handles missing variable paths in filter arguments gracefully", %{context: context} do
       # Missing variable path should resolve to nil
       # Since $input.user.name exists, it should return "John" (not the nil fallback)
       assert {:ok, "John"} =
-        Engine.render("{{ $input.user.name | default($missing.path) }}", context)
+               Engine.render("{{ $input.user.name | default($missing.path) }}", context)
 
       # When main field is missing, should use the nil fallback from missing path
       assert {:ok, nil} =
-        Engine.render("{{ $input.missing_field | default($missing.path) }}", context)
+               Engine.render("{{ $input.missing_field | default($missing.path) }}", context)
     end
 
     test "complex real-world scenarios", %{context: context} do
@@ -185,18 +185,20 @@ defmodule Prana.Template.EngineTest do
       Age: {{ $input.user.age | default($variables.default_age) }}
       """
 
-      assert {:ok, """
-      Name: John
-      Age: 25
-      """} = Engine.render(template, context)
+      assert {:ok,
+              """
+              Name: John
+              Age: 25
+              """} = Engine.render(template, context)
 
       # Same template but with missing user data
       context_empty = Map.put(context, "$input", %{})
 
-      assert {:ok, """
-      Name: API Default
-      Age: 18
-      """} = Engine.render(template, context_empty)
+      assert {:ok,
+              """
+              Name: API Default
+              Age: 18
+              """} = Engine.render(template, context_empty)
     end
 
     test "deeply nested variable paths in filter arguments", %{context: _context} do

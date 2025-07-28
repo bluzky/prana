@@ -25,7 +25,8 @@ defmodule Prana.Template.SecurityTest do
   describe "nesting depth limits" do
     test "rejects deeply nested control structures" do
       # Create nested if statements beyond limit
-      nested_template = build_nested_if_template(60)  # Over the 50 limit
+      # Over the 50 limit
+      nested_template = build_nested_if_template(60)
       context = %{"$input" => %{"value" => true}}
 
       assert {:error, reason} = Engine.render(nested_template, context)
@@ -42,6 +43,7 @@ defmodule Prana.Template.SecurityTest do
     end
 
     defp build_nested_if_template(depth) when depth <= 0, do: "Content"
+
     defp build_nested_if_template(depth) do
       inner = build_nested_if_template(depth - 1)
       "{% if $input.value %}#{inner}{% endif %}"
@@ -114,7 +116,8 @@ defmodule Prana.Template.SecurityTest do
         end_time = System.monotonic_time(:millisecond)
 
         # Should complete within reasonable time (less than 1 second)
-        assert end_time - start_time < 1000, "Regex processing took too long for pattern: #{String.slice(pattern, 0, 50)}..."
+        assert end_time - start_time < 1000,
+               "Regex processing took too long for pattern: #{String.slice(pattern, 0, 50)}..."
       end
     end
   end

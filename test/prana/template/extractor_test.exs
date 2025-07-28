@@ -1,5 +1,6 @@
 defmodule Prana.Template.ExtractorTest do
   use ExUnit.Case, async: true
+
   alias Prana.Template.Extractor
 
   describe "extract/1 with expressions" do
@@ -7,23 +8,25 @@ defmodule Prana.Template.ExtractorTest do
       template = "Hello {{ $input.name }}!"
 
       assert {:ok, blocks} = Extractor.extract(template)
+
       assert blocks == [
-        {:literal, "Hello "},
-        {:expression, " $input.name "},
-        {:literal, "!"}
-      ]
+               {:literal, "Hello "},
+               {:expression, " $input.name "},
+               {:literal, "!"}
+             ]
     end
 
     test "extracts multiple expressions" do
       template = "{{ $input.greeting }} {{ $input.name }}!"
 
       assert {:ok, blocks} = Extractor.extract(template)
+
       assert blocks == [
-        {:expression, " $input.greeting "},
-        {:literal, " "},
-        {:expression, " $input.name "},
-        {:literal, "!"}
-      ]
+               {:expression, " $input.greeting "},
+               {:literal, " "},
+               {:expression, " $input.name "},
+               {:literal, "!"}
+             ]
     end
 
     test "handles template with no expressions" do
@@ -57,11 +60,12 @@ defmodule Prana.Template.ExtractorTest do
       assert {:ok, blocks} = Extractor.extract(template)
       assert [control_block] = blocks
       assert {:control, :for_loop, %{variable: "user", iterable: "$input.users"}, body} = control_block
+
       assert body == [
-        {:literal, "Hello "},
-        {:expression, " user.name "},
-        {:literal, "!"}
-      ]
+               {:literal, "Hello "},
+               {:expression, " user.name "},
+               {:literal, "!"}
+             ]
     end
 
     test "extracts simple if condition" do
@@ -69,7 +73,10 @@ defmodule Prana.Template.ExtractorTest do
 
       assert {:ok, blocks} = Extractor.extract(template)
       assert [control_block] = blocks
-      assert {:control, :if_condition, %{condition: "$input.age >= 18"}, %{then_body: body, else_body: []}} = control_block
+
+      assert {:control, :if_condition, %{condition: "$input.age >= 18"}, %{then_body: body, else_body: []}} =
+               control_block
+
       assert body == [{:literal, "Welcome adult!"}]
     end
 
@@ -77,11 +84,12 @@ defmodule Prana.Template.ExtractorTest do
       template = "Before {% for user in $input.users %}{{ user.name }}{% endfor %} After"
 
       assert {:ok, blocks} = Extractor.extract(template)
+
       assert [
-        {:literal, "Before "},
-        {:control, :for_loop, %{variable: "user", iterable: "$input.users"}, [{:expression, " user.name "}]},
-        {:literal, " After"}
-      ] = blocks
+               {:literal, "Before "},
+               {:control, :for_loop, %{variable: "user", iterable: "$input.users"}, [{:expression, " user.name "}]},
+               {:literal, " After"}
+             ] = blocks
     end
   end
 

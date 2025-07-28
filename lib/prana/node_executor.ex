@@ -395,13 +395,14 @@ defmodule Prana.NodeExecutor do
         "version" => execution.workflow_version
       },
       "$execution" => %{
+        "current_node_key" => node_execution.node_key,
         "run_index" => node_execution.run_index,
         "execution_index" => node_execution.execution_index,
         "id" => execution.id,
         "mode" => execution.execution_mode,
         "preparation" => execution.preparation_data,
         "state" => execution.__runtime["shared_state"] || %{},
-        "now" => DateTime.utc_now(),
+        "now" => DateTime.utc_now()
       }
     }
   end

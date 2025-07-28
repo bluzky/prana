@@ -67,8 +67,10 @@ defmodule Prana.Template.Engine do
       {:ok, "JOH"} = render("{{ $input.user.name | upper_case | truncate(3) }}", context)
   """
   # Security limits
-  @max_template_size 1_000_000  # 1MB max template size
-  @max_nesting_depth 50         # Max control flow nesting depth
+  # 1MB max template size
+  @max_template_size 1_000_000
+  # Max control flow nesting depth
+  @max_nesting_depth 50
 
   @spec render(String.t(), map(), keyword()) :: {:ok, any()} | {:error, String.t()}
   def render(template_string, context, _opts \\ []) when is_binary(template_string) and is_map(context) do
@@ -88,8 +90,6 @@ defmodule Prana.Template.Engine do
         {:error, reason} ->
           {:error, "Template extraction failed: #{reason}"}
       end
-    else
-      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -146,6 +146,7 @@ defmodule Prana.Template.Engine do
 
   defp validate_template_size(template) do
     size = byte_size(template)
+
     if size > @max_template_size do
       {:error, "Template size (#{size} bytes) exceeds maximum allowed (#{@max_template_size} bytes)"}
     else
@@ -156,6 +157,7 @@ defmodule Prana.Template.Engine do
   defp validate_template_complexity(template) do
     # Count control flow nesting depth
     nesting_depth = count_max_nesting_depth(template)
+
     if nesting_depth > @max_nesting_depth do
       {:error, "Template nesting depth (#{nesting_depth}) exceeds maximum allowed (#{@max_nesting_depth})"}
     else
