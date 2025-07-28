@@ -395,6 +395,7 @@ defmodule Prana.NodeExecutor do
         "version" => execution.workflow_version
       },
       "$execution" => %{
+        "current_node_key" => node_execution.node_key,
         "run_index" => node_execution.run_index,
         "execution_index" => node_execution.execution_index,
         "id" => execution.id,

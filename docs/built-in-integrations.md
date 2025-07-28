@@ -48,6 +48,13 @@ Comprehensive time-based workflow control capabilities, supporting interval dela
 
 HTTP request capabilities and webhook trigger functionality for external API interactions and incoming HTTP request handling.
 
+### [Code Integration](integrations/code.md)
+**Purpose**: Secure execution of user-provided Elixir code  
+**Category**: Development  
+**Module**: `Prana.Integrations.Code`
+
+Secure sandbox environment for executing user-provided Elixir code with comprehensive security validation and dual-mode execution (interpreted/compiled).
+
 ## Creating Custom Integrations
 
 For information on creating custom integrations, see the [Writing Integrations Guide](guides/writing_integrations.md).
