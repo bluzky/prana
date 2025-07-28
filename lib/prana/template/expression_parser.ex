@@ -190,8 +190,8 @@ defmodule Prana.Template.ExpressionParser do
     case find_main_operator(expr, operators) do
       {operator, left_part, right_part} ->
         with {:ok, left_ast} <- parse(String.trim(left_part)),
-             {:ok, right_ast} <- parse(String.trim(right_part)) do
-          operator_atom = operator_to_atom(operator)
+             {:ok, right_ast} <- parse(String.trim(right_part)),
+             {:ok, operator_atom} <- operator_to_atom(operator) do
           {:ok, AST.binary_op(operator_atom, left_ast, right_ast)}
         end
 
@@ -213,18 +213,21 @@ defmodule Prana.Template.ExpressionParser do
     end)
   end
 
-  defp operator_to_atom("+"), do: :+
-  defp operator_to_atom("-"), do: :-
-  defp operator_to_atom("*"), do: :*
-  defp operator_to_atom("/"), do: :/
-  defp operator_to_atom("=="), do: :==
-  defp operator_to_atom("!="), do: :!=
-  defp operator_to_atom(">="), do: :>=
-  defp operator_to_atom("<="), do: :<=
-  defp operator_to_atom(">"), do: :>
-  defp operator_to_atom("<"), do: :<
-  defp operator_to_atom("&&"), do: :&&
-  defp operator_to_atom("||"), do: :||
+  defp operator_to_atom("+"), do: {:ok, :+}
+  defp operator_to_atom("-"), do: {:ok, :-}
+  defp operator_to_atom("*"), do: {:ok, :*}
+  defp operator_to_atom("/"), do: {:ok, :/}
+  defp operator_to_atom("=="), do: {:ok, :==}
+  defp operator_to_atom("!="), do: {:ok, :!=}
+  defp operator_to_atom(">="), do: {:ok, :>=}
+  defp operator_to_atom("<="), do: {:ok, :<=}
+  defp operator_to_atom(">"), do: {:ok, :>}
+  defp operator_to_atom("<"), do: {:ok, :<}
+  defp operator_to_atom("&&"), do: {:ok, :&&}
+  defp operator_to_atom("||"), do: {:ok, :||} 
+  defp operator_to_atom(unknown_operator) do
+    {:error, "Unknown operator: #{inspect(unknown_operator)}"}
+  end
 
   defp parse_simple_expression(expr) do
     expr = String.trim(expr)
