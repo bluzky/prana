@@ -371,7 +371,7 @@ defmodule Prana.Integrations.Code.Sandbox do
     %{
       input: context["$input"] || %{},
       nodes: context["$nodes"] || %{},
-      variables: context["$variables"] || %{},
+      vars: context["$vars"] || %{},
       env: context["$env"] || %{}
     }
   end

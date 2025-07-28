@@ -11,7 +11,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -28,7 +28,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -45,7 +45,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{"name" => "John"},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -62,7 +62,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -79,7 +79,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -91,13 +91,13 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       assert String.contains?(error_msg, "not allowed")
     end
 
-    test "uses context variables from workflow" do
+    test "uses context vars from workflow" do
       params = %{"code" => ~s{def run(input, context), do: input["name"] <> " in " <> context.env["environment"]}}
 
       context = %{
         "$input" => %{"name" => "Alice"},
         "$nodes" => %{"api" => %{"response" => %{"status" => "ok"}}},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{"environment" => "production"},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -114,7 +114,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -132,7 +132,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{"name" => "Test"},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{
@@ -181,7 +181,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       context = %{
         "$input" => %{"name" => "Alice"},
         "$nodes" => %{},
-        "$variables" => %{},
+        "$vars" => %{},
         "$env" => %{"mode" => "test"},
         "$workflow" => %{"id" => "test_workflow"},
         "$execution" => %{"current_node_key" => "test_mode_consistency"}

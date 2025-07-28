@@ -5,6 +5,61 @@ defmodule Prana.Integrations.Code.SecurityPolicy do
   Defines whitelisted operators, functions, and validation rules based on Sequin's
   MiniElixir security model. This policy ensures safe execution of user code
   by explicitly allowing only trusted operations.
+
+  ## Security Principles
+
+  This policy follows a strict whitelist-only approach where:
+  
+  1. **Only explicitly allowed operations are permitted**
+  2. **All potentially dangerous functions are blocked by default**
+  3. **Resource exhaustion attacks are mitigated**
+  4. **No dynamic atom creation is allowed**
+
+  ## Security Protections
+
+  ### Blocked Operations
+  - File system access (File.*, Path.*)
+  - Network operations (HTTP, GenServer, etc.)
+  - Process spawning and message passing
+  - Module definitions and code compilation
+  - Import/require/use statements
+  - Assignment operations for immutability
+  - Dynamic atom creation (String.to_atom/1)
+  - Complex regex operations that can cause ReDoS attacks
+
+  ### Resource Protections
+  - 1000ms execution timeout
+  - AST validation before execution
+  - Limited function call depth
+  - Memory usage monitoring via timeout
+
+  ## Security Considerations
+
+  ### Atom Exhaustion Prevention
+  String.to_atom/1 has been explicitly removed to prevent atom table exhaustion
+  attacks. Atoms are never garbage collected in Elixir, and malicious code could
+  create millions of atoms leading to memory exhaustion and system crash.
+
+  ### ReDoS Prevention  
+  Complex regex functions (run/2, scan/2, replace/3, replace/4) have been removed
+  to prevent Regular Expression Denial of Service attacks through catastrophic
+  backtracking patterns. Only Regex.match?/2 is allowed as it's safer.
+
+  ### Safe String Operations
+  String operations are limited to read-only transformations. No functions that
+  could lead to memory exhaustion through string manipulation are included.
+
+  ## Allowed Operations Summary
+
+  - **Arithmetic**: +, -, *, /, rem, div
+  - **String Operations**: length, trim, case conversion, contains?, slice, split
+  - **Collection Operations**: Enum.map, filter, reduce (with timeout protection)
+  - **Map Operations**: get, put, delete, keys, values, merge
+  - **Date/Time Operations**: DateTime, Date, Time functions
+  - **Type Checking**: is_atom, is_binary, etc.
+  - **Safe Regex**: match? only (boolean result)
+
+  See individual function groups for complete lists.
   """
 
   @doc """
@@ -112,8 +167,8 @@ defmodule Prana.Integrations.Code.SecurityPolicy do
       {:String, :replace, 3},
       {:String, :replace, 4},
       {:String, :to_integer, 1},
-      {:String, :to_float, 1},
-      {:String, :to_atom, 1}
+      {:String, :to_float, 1}
+      # SECURITY: String.to_atom/1 REMOVED - prevents atom exhaustion attacks
     ]
   end
 
@@ -232,11 +287,11 @@ defmodule Prana.Integrations.Code.SecurityPolicy do
 
   defp regex_functions do
     [
-      {:Regex, :match?, 2},
-      {:Regex, :run, 2},
-      {:Regex, :scan, 2},
-      {:Regex, :replace, 3},
-      {:Regex, :replace, 4}
+      {:Regex, :match?, 2}
+      # SECURITY: Removed Regex.run/2, Regex.scan/2, Regex.replace/3, Regex.replace/4
+      # These functions can cause ReDoS (Regular Expression Denial of Service) attacks
+      # through catastrophic backtracking patterns. Only Regex.match?/2 is kept as it
+      # returns boolean quickly and is less susceptible to ReDoS.
     ]
   end
 end

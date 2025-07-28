@@ -25,8 +25,8 @@ defmodule Prana.Integrations.Code.Sandbox do
 
       # Development/validation
       Sandbox.run_interpreted("def run(input, _ctx), do: input.name", context)
-      
-      # Production execution  
+
+      # Production execution
       Sandbox.run_compiled("def run(input, _ctx), do: input.name", "node_123", context)
   """
 
@@ -70,7 +70,7 @@ defmodule Prana.Integrations.Code.Sandbox do
               # Create binding list that matches run_compiled function signature:
               # def run(input, context) - so we need 'input' and 'context' variables
               binding_list = [
-                input: bindings.input,
+                input: context["$input"] || %{},
                 context: bindings
               ]
 
@@ -133,7 +133,7 @@ defmodule Prana.Integrations.Code.Sandbox do
 
               # Call the compiled module's run function with input and context parameters
               bindings = create_bindings(context)
-              result = apply(module_name, :run, [bindings.input, bindings])
+              result = apply(module_name, :run, [context["$input"] || %{}, bindings])
 
               {:ok, result}
 
@@ -194,10 +194,9 @@ defmodule Prana.Integrations.Code.Sandbox do
 
   # Create bindings for Prana context (adapted from Sequin's pattern).
   # Sequin uses: action, record, changes, metadata
-  # We use: input, nodes, variables, env
+  # We use: input, nodes, vars, env
   defp create_bindings(context) do
     %{
-      input: context["$input"] || %{},
       nodes: context["$nodes"] || %{},
       vars: context["$vars"] || %{},
       env: context["$env"] || %{},
