@@ -54,17 +54,23 @@ defmodule Prana.Template.EvaluatorTest do
 
     test "evaluates pipe operations", %{context: context} do
       # Simple filter
-      ast = {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:upper_case, []]}
-      ]}
+      ast =
+        {:pipe, [],
+         [
+           {:variable, [], ["$input.name"]},
+           {:call, [], [:upper_case, []]}
+         ]}
+
       assert {:ok, "JOHN"} = Evaluator.evaluate(ast, context)
 
       # Filter with arguments
-      ast = {:pipe, [], [
-        {:variable, [], ["$input.missing"]},
-        {:call, [], [:default, [{:variable, [], ["fallback_name"]}]]}
-      ]}
+      ast =
+        {:pipe, [],
+         [
+           {:variable, [], ["$input.missing"]},
+           {:call, [], [:default, [{:variable, [], ["fallback_name"]}]]}
+         ]}
+
       assert {:ok, "Simple Fallback"} = Evaluator.evaluate(ast, context)
     end
 
@@ -120,6 +126,7 @@ defmodule Prana.Template.EvaluatorTest do
     test "evaluates for loop with simple iteration", %{context: context} do
       # {:for_loop, [], [variable, iterable, body]}
       iterable_ast = {:variable, [], ["$input.users"]}
+
       body_blocks = [
         {:literal, "User: "},
         {:expression, " $user.name "},

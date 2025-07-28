@@ -9,10 +9,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:default, [{:variable, [], ["$input.fallback"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:default, [{:variable, [], ["$input.fallback"]}]]}
+              ]} = ast
     end
 
     test "parses unquoted identifier variable arguments" do
@@ -20,10 +21,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:default, [{:variable, [], ["fallback_name"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:default, [{:variable, [], ["fallback_name"]}]]}
+              ]} = ast
     end
 
     test "parses dotted variable paths" do
@@ -31,10 +33,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.price"]},
-        {:call, [], [:format_currency, [{:variable, [], ["config.currency"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.price"]},
+                {:call, [], [:format_currency, [{:variable, [], ["config.currency"]}]]}
+              ]} = ast
     end
 
     test "parses mixed literal and variable arguments" do
@@ -42,13 +45,18 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.value"]},
-        {:call, [], [:clamp, [
-          {:variable, [], ["$variables.min"]},
-          {:literal, [], [100]}
-        ]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.value"]},
+                {:call, [],
+                 [
+                   :clamp,
+                   [
+                     {:variable, [], ["$variables.min"]},
+                     {:literal, [], [100]}
+                   ]
+                 ]}
+              ]} = ast
     end
 
     test "parses multiple variable arguments" do
@@ -56,13 +64,18 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.items"]},
-        {:call, [], [:slice, [
-          {:variable, [], ["$pagination.offset"]},
-          {:variable, [], ["$pagination.limit"]}
-        ]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.items"]},
+                {:call, [],
+                 [
+                   :slice,
+                   [
+                     {:variable, [], ["$pagination.offset"]},
+                     {:variable, [], ["$pagination.limit"]}
+                   ]
+                 ]}
+              ]} = ast
     end
 
     test "parses nested variable paths" do
@@ -70,10 +83,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:default, [{:variable, [], ["$nodes.api.default_name"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:default, [{:variable, [], ["$nodes.api.default_name"]}]]}
+              ]} = ast
     end
 
     test "handles chained filters with variables" do
@@ -81,13 +95,15 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:pipe, [], [
-          {:variable, [], ["$input.price"]},
-          {:call, [], [:multiply, [{:variable, [], ["$rates.conversion"]}]]}
-        ]},
-        {:call, [], [:format_currency, [{:variable, [], ["$locale.currency"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:pipe, [],
+                 [
+                   {:variable, [], ["$input.price"]},
+                   {:call, [], [:multiply, [{:variable, [], ["$rates.conversion"]}]]}
+                 ]},
+                {:call, [], [:format_currency, [{:variable, [], ["$locale.currency"]}]]}
+              ]} = ast
     end
   end
 
@@ -97,10 +113,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}
+              ]} = ast
     end
 
     test "unquoted identifiers are parsed as variables" do
@@ -108,10 +125,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:default, [{:variable, [], ["fallback_value"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:default, [{:variable, [], ["fallback_value"]}]]}
+              ]} = ast
     end
 
     test "mixed quoted literals and unquoted variables" do
@@ -119,13 +137,18 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.message"]},
-        {:call, [], [:format, [
-          {:literal, [], ["Hello %s"]},
-          {:variable, [], ["user_name"]}
-        ]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.message"]},
+                {:call, [],
+                 [
+                   :format,
+                   [
+                     {:literal, [], ["Hello %s"]},
+                     {:variable, [], ["user_name"]}
+                   ]
+                 ]}
+              ]} = ast
     end
   end
 
@@ -135,10 +158,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}
+              ]} = ast
     end
 
     test "still parses literal number arguments" do
@@ -146,10 +170,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.age"]},
-        {:call, [], [:add, [{:literal, [], [5]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.age"]},
+                {:call, [], [:add, [{:literal, [], [5]}]]}
+              ]} = ast
     end
 
     test "still parses literal boolean arguments" do
@@ -157,10 +182,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.value"]},
-        {:call, [], [:default, [{:literal, [], [true]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.value"]},
+                {:call, [], [:default, [{:literal, [], [true]}]]}
+              ]} = ast
     end
 
     test "handles filters without arguments" do
@@ -168,10 +194,11 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:upper_case, []]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:upper_case, []]}
+              ]} = ast
     end
   end
 
@@ -181,14 +208,19 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.message"]},
-        {:call, [], [:format, [
-          {:literal, [], ["Hello %s"]},
-          {:variable, [], ["$input.name"]},
-          {:variable, [], ["$config.suffix"]}
-        ]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.message"]},
+                {:call, [],
+                 [
+                   :format,
+                   [
+                     {:literal, [], ["Hello %s"]},
+                     {:variable, [], ["$input.name"]},
+                     {:variable, [], ["$config.suffix"]}
+                   ]
+                 ]}
+              ]} = ast
     end
 
     test "handles single quotes with variables" do
@@ -196,13 +228,18 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.value"]},
-        {:call, [], [:transform, [
-          {:literal, [], ["prefix"]},
-          {:variable, [], ["$input.suffix"]}
-        ]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.value"]},
+                {:call, [],
+                 [
+                   :transform,
+                   [
+                     {:literal, [], ["prefix"]},
+                     {:variable, [], ["$input.suffix"]}
+                   ]
+                 ]}
+              ]} = ast
     end
 
     test "handles complex nested variable paths" do
@@ -210,13 +247,18 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.user"]},
-        {:call, [], [:get_property, [
-          {:variable, [], ["$config.fields.primary"]},
-          {:variable, [], ["$nodes.lookup.fallback_field"]}
-        ]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.user"]},
+                {:call, [],
+                 [
+                   :get_property,
+                   [
+                     {:variable, [], ["$config.fields.primary"]},
+                     {:variable, [], ["$nodes.lookup.fallback_field"]}
+                   ]
+                 ]}
+              ]} = ast
     end
   end
 
@@ -227,10 +269,11 @@ defmodule Prana.Template.ExpressionParserTest do
       {:ok, ast} = ExpressionParser.parse(expression)
 
       # Should still parse but with minimal path
-      assert {:pipe, [], [
-        {:variable, [], ["$input.name"]},
-        {:call, [], [:default, [{:variable, [], ["$"]}]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.name"]},
+                {:call, [], [:default, [{:variable, [], ["$"]}]]}
+              ]} = ast
     end
 
     test "handles variables mixed with complex literals" do
@@ -238,15 +281,20 @@ defmodule Prana.Template.ExpressionParserTest do
 
       {:ok, ast} = ExpressionParser.parse(expression)
 
-      assert {:pipe, [], [
-        {:variable, [], ["$input.data"]},
-        {:call, [], [:transform, [
-          {:literal, [], [123.45]},
-          {:variable, [], ["$input.multiplier"]},
-          {:literal, [], [true]},
-          {:literal, [], ["test"]}
-        ]]}
-      ]} = ast
+      assert {:pipe, [],
+              [
+                {:variable, [], ["$input.data"]},
+                {:call, [],
+                 [
+                   :transform,
+                   [
+                     {:literal, [], [123.45]},
+                     {:variable, [], ["$input.multiplier"]},
+                     {:literal, [], [true]},
+                     {:literal, [], ["test"]}
+                   ]
+                 ]}
+              ]} = ast
     end
   end
 
@@ -256,17 +304,19 @@ defmodule Prana.Template.ExpressionParserTest do
       iterable = "$input.users"
       body_blocks = [{:expression, " user.name "}]
 
-      {:ok, ast} = ExpressionParser.parse_control_block(
-        :for_loop,
-        %{variable: variable, iterable: iterable},
-        body_blocks
-      )
+      {:ok, ast} =
+        ExpressionParser.parse_control_block(
+          :for_loop,
+          %{variable: variable, iterable: iterable},
+          body_blocks
+        )
 
-      assert {:for_loop, [], [
-        "user",
-        {:variable, [], ["$input.users"]},
-        [{:expression, " user.name "}]
-      ]} = ast
+      assert {:for_loop, [],
+              [
+                "user",
+                {:variable, [], ["$input.users"]},
+                [{:expression, " user.name "}]
+              ]} = ast
     end
 
     test "parses if condition control block" do
@@ -274,17 +324,19 @@ defmodule Prana.Template.ExpressionParserTest do
       then_body = [{:literal, "Welcome adult!"}]
       else_body = []
 
-      {:ok, ast} = ExpressionParser.parse_control_block(
-        :if_condition,
-        %{condition: condition},
-        %{then_body: then_body, else_body: else_body}
-      )
+      {:ok, ast} =
+        ExpressionParser.parse_control_block(
+          :if_condition,
+          %{condition: condition},
+          %{then_body: then_body, else_body: else_body}
+        )
 
-      assert {:if_condition, [], [
-        {:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]},
-        [{:literal, "Welcome adult!"}],
-        []
-      ]} = ast
+      assert {:if_condition, [],
+              [
+                {:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]},
+                [{:literal, "Welcome adult!"}],
+                []
+              ]} = ast
     end
 
     test "parses complex condition in if block" do
@@ -292,45 +344,52 @@ defmodule Prana.Template.ExpressionParserTest do
       then_body = [{:literal, "Premium user"}]
       else_body = [{:literal, "Regular user"}]
 
-      {:ok, ast} = ExpressionParser.parse_control_block(
-        :if_condition,
-        %{condition: condition},
-        %{then_body: then_body, else_body: else_body}
-      )
+      {:ok, ast} =
+        ExpressionParser.parse_control_block(
+          :if_condition,
+          %{condition: condition},
+          %{then_body: then_body, else_body: else_body}
+        )
 
-      assert {:if_condition, [], [
-        {:binary_op, [], [:&&,
-          {:binary_op, [], [:==, {:variable, [], ["$input.status"]}, {:literal, [], ["premium"]}]},
-          {:variable, [], ["$input.active"]}
-        ]},
-        [{:literal, "Premium user"}],
-        [{:literal, "Regular user"}]
-      ]} = ast
+      assert {:if_condition, [],
+              [
+                {:binary_op, [],
+                 [
+                   :&&,
+                   {:binary_op, [], [:==, {:variable, [], ["$input.status"]}, {:literal, [], ["premium"]}]},
+                   {:variable, [], ["$input.active"]}
+                 ]},
+                [{:literal, "Premium user"}],
+                [{:literal, "Regular user"}]
+              ]} = ast
     end
 
     test "returns error for unknown control block type" do
-      {:error, reason} = ExpressionParser.parse_control_block(
-        :unknown_type,
-        %{some: "attributes"},
-        []
-      )
+      {:error, reason} =
+        ExpressionParser.parse_control_block(
+          :unknown_type,
+          %{some: "attributes"},
+          []
+        )
 
       assert reason =~ "Unknown control flow type: unknown_type"
     end
 
     test "handles invalid iterable expression gracefully" do
       # Parser treats unknown syntax as literals, which is the current behavior
-      {:ok, ast} = ExpressionParser.parse_control_block(
-        :for_loop,
-        %{variable: "user", iterable: "invalid expression {{"},
-        []
-      )
+      {:ok, ast} =
+        ExpressionParser.parse_control_block(
+          :for_loop,
+          %{variable: "user", iterable: "invalid expression {{"},
+          []
+        )
 
-      assert {:for_loop, [], [
-        "user",
-        {:literal, [], ["invalid expression {{"]},
-        []
-      ]} = ast
+      assert {:for_loop, [],
+              [
+                "user",
+                {:literal, [], ["invalid expression {{"]},
+                []
+              ]} = ast
     end
   end
 end

@@ -10,7 +10,8 @@ defmodule Prana.Template.Evaluator do
   alias Prana.Template.FilterRegistry
 
   # Security limits
-  @max_loop_iterations 10_000  # Max iterations in for loops
+  # Max iterations in for loops
+  @max_loop_iterations 10_000
 
   @doc """
   Evaluate a parsed expression AST against a context.
@@ -133,6 +134,7 @@ defmodule Prana.Template.Evaluator do
           {:expression, content} ->
             # Parse and evaluate the expression
             alias Prana.Template.ExpressionParser
+
             case ExpressionParser.parse(content) do
               {:ok, ast} -> evaluate(ast, context)
               error -> error
@@ -141,6 +143,7 @@ defmodule Prana.Template.Evaluator do
           {:control, type, attributes, body} ->
             # Parse and evaluate control block
             alias Prana.Template.ExpressionParser
+
             case ExpressionParser.parse_control_block(type, attributes, body) do
               {:ok, ast} -> evaluate(ast, context)
               error -> error
@@ -196,39 +199,38 @@ defmodule Prana.Template.Evaluator do
   end
 
   defp evaluate_variable_path(path, context) do
-    cond do
-      # Prana expression path (starts with $) - use ExpressionEngine
-      String.starts_with?(path, "$") ->
-        ExpressionEngine.extract(path, context)
-
+    # Prana expression path (starts with $) - use ExpressionEngine
+    if String.starts_with?(path, "$") do
+      ExpressionEngine.extract(path, context)
+    else
       # Simple variable name - look up directly in context, including scoped variables
-      true ->
-        # First try direct access for scoped variables like "user"
-        case Map.get(context, path) do
-          nil ->
-            # If not found directly, try path traversal for nested access like "user.name"
-            case get_in(context, String.split(path, ".")) do
-              nil -> {:ok, nil}
-              value -> {:ok, value}
-            end
+      # First try direct access for scoped variables like "user"
+      case Map.get(context, path) do
+        nil ->
+          # If not found directly, try path traversal for nested access like "user.name"
+          case get_in(context, String.split(path, ".")) do
+            nil -> {:ok, nil}
+            value -> {:ok, value}
+          end
 
-          value ->
-            {:ok, value}
-        end
+        value ->
+          {:ok, value}
+      end
     end
   end
 
   defp evaluate_args(args, context) do
     results = Enum.map(args, fn arg -> evaluate(arg, context) end)
+
     case Enum.find(results, fn {status, _} -> status == :error end) do
       nil ->
         values = Enum.map(results, fn {:ok, value} -> value end)
         {:ok, values}
+
       error ->
         error
     end
   end
-
 
   defp apply_operator(:+, left, right) when is_number(left) and is_number(right) do
     {:ok, left + right}
@@ -312,9 +314,6 @@ defmodule Prana.Template.Evaluator do
   defp apply_operator(operator, left, right) do
     {:error, "Unsupported operation: #{inspect(left)} #{operator} #{inspect(right)}"}
   end
-
-
-
 
   # Helper functions
 

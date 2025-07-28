@@ -65,10 +65,12 @@ defmodule Prana.Template.ExpressionParser do
         with {:ok, base_ast} <- parse_simple_expression(String.trim(base_expr)),
              {:ok, filters} <- parse_filters(String.trim(filters_part)) do
           # Convert filters to chained pipe operations
-          result_ast = Enum.reduce(filters, base_ast, fn filter, acc ->
-            filter_ast = AST.call(String.to_atom(filter.name), filter.args)
-            AST.pipe(acc, filter_ast)
-          end)
+          result_ast =
+            Enum.reduce(filters, base_ast, fn filter, acc ->
+              filter_ast = AST.call(String.to_atom(filter.name), filter.args)
+              AST.pipe(acc, filter_ast)
+            end)
+
           {:ok, result_ast}
         end
 
@@ -224,7 +226,8 @@ defmodule Prana.Template.ExpressionParser do
   defp operator_to_atom(">"), do: {:ok, :>}
   defp operator_to_atom("<"), do: {:ok, :<}
   defp operator_to_atom("&&"), do: {:ok, :&&}
-  defp operator_to_atom("||"), do: {:ok, :||} 
+  defp operator_to_atom("||"), do: {:ok, :||}
+
   defp operator_to_atom(unknown_operator) do
     {:error, "Unknown operator: #{inspect(unknown_operator)}"}
   end
@@ -268,6 +271,7 @@ defmodule Prana.Template.ExpressionParser do
 
   defp parse_grouped_expression(expr) do
     inner = String.slice(expr, 1..-2//1)
+
     case parse(inner) do
       {:ok, inner_ast} -> {:ok, AST.grouped(inner_ast)}
       error -> error
@@ -298,7 +302,7 @@ defmodule Prana.Template.ExpressionParser do
 
   defp is_quoted_string?(str) do
     (String.starts_with?(str, "\"") and String.ends_with?(str, "\"")) or
-    (String.starts_with?(str, "'") and String.ends_with?(str, "'"))
+      (String.starts_with?(str, "'") and String.ends_with?(str, "'"))
   end
 
   defp is_primitive_literal?(str) do

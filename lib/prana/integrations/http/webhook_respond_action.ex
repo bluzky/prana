@@ -139,8 +139,7 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
     {:error, "json_data is required when respond_with is 'json'"}
   end
 
-  defp validate_response_fields(%{respond_with: "redirect", redirect_url: redirect_url})
-       when not is_nil(redirect_url) do
+  defp validate_response_fields(%{respond_with: "redirect", redirect_url: redirect_url}) when not is_nil(redirect_url) do
     :ok
   end
 

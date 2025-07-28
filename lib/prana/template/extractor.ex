@@ -78,9 +78,8 @@ defmodule Prana.Template.Extractor do
   # Private functions
 
   defp validate_template_syntax(template) do
-    with :ok <- validate_expression_syntax(template),
-         :ok <- validate_control_flow_syntax(template) do
-      :ok
+    with :ok <- validate_expression_syntax(template) do
+      validate_control_flow_syntax(template)
     end
   end
 
@@ -161,8 +160,8 @@ defmodule Prana.Template.Extractor do
         control_block = parse_control_block(type, String.trim(attributes), body)
 
         # Recursively process before and remaining parts
-        before_blocks = if before != "", do: extract_expressions(before), else: []
-        remaining_blocks = if remaining != "", do: do_extract(remaining), else: []
+        before_blocks = if before == "", do: [], else: extract_expressions(before)
+        remaining_blocks = if remaining == "", do: [], else: do_extract(remaining)
 
         {before_blocks ++ [control_block] ++ remaining_blocks, ""}
 

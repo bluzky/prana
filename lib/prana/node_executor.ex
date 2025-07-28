@@ -402,7 +402,7 @@ defmodule Prana.NodeExecutor do
         "mode" => execution.execution_mode,
         "preparation" => execution.preparation_data,
         "state" => execution.__runtime["shared_state"] || %{},
-        "now" => DateTime.utc_now(),
+        "now" => DateTime.utc_now()
       }
     }
   end

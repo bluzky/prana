@@ -17,17 +17,18 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
       }
 
       assert {:ok, result, "main"} = WebhookAction.execute(%{}, context)
+
       assert result == %{
-        "method" => "POST",
-        "path" => "/webhook",
-        "headers" => %{"content-type" => "application/json"},
-        "body" => %{"data" => "test"}
-      }
+               "method" => "POST",
+               "path" => "/webhook",
+               "headers" => %{"content-type" => "application/json"},
+               "body" => %{"data" => "test"}
+             }
     end
 
     test "returns nil when no input in context" do
       context = %{"$input" => %{}}
-      
+
       assert {:ok, result, "main"} = WebhookAction.execute(%{}, context)
       assert result == nil
     end
@@ -87,5 +88,4 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
       assert WebhookAction.params_schema() == Prana.Integrations.HTTP.WebhookAction.WebhookConfigSchema
     end
   end
-
 end
