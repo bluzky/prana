@@ -463,14 +463,14 @@ const WorkflowLayout = ({
 
   const reactFlowInstance = React.useRef(null);
   
-  // Apply fitView after ReactFlow is initialized
-  React.useEffect(() => {
-    if (reactFlowInstance.current && layoutedData.nodes.length > 0) {
+  // Apply fitView immediately when ReactFlow instance is available
+  const onReactFlowInit = React.useCallback((instance) => {
+    reactFlowInstance.current = instance;
+    if (layoutedData.nodes.length > 0) {
+      // Apply fitView immediately on init
       setTimeout(() => {
-        if (reactFlowInstance.current) {
-          reactFlowInstance.current.fitView({ padding: 0.1, maxZoom: 1.2 });
-        }
-      }, 50);
+        instance.fitView({ padding: 0.1, maxZoom: 1.2 });
+      }, 10);
     }
   }, [layoutedData.nodes.length]);
   
@@ -537,7 +537,8 @@ const WorkflowLayout = ({
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               nodeTypes={nodeTypes}
-              onInit={(instance) => { reactFlowInstance.current = instance; }}
+              onInit={onReactFlowInit}
+              defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               className="bg-background"
             >
               <Background />
