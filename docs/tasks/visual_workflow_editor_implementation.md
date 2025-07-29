@@ -40,36 +40,41 @@ Implement a React Flow-based visual workflow editor for Prana that allows users 
 
 ## Technical Architecture
 
-### Standalone Node.js Project
-- **Project Location**: `editor/` directory (separate from Prana core)
-- **Development**: Independent development and deployment
-- **Data Source**: Static JSON files for integration definitions
-- **Output**: Prana-compatible workflow JSON
+### Phoenix LiveView + React Component Integration
+- **Primary Interface**: Phoenix LiveView for server-side reactivity
+- **Visual Editor**: React component embedded via LiveView hooks
+- **Real-time Sync**: Phoenix channels for multi-user collaboration
+- **Data Flow**: JSON messages between LiveView and React component
 
-### Frontend Stack
-- **React** with TypeScript for type safety
+### Component Stack
+- **React** with TypeScript for the visual editor component
 - **React Flow** for graph visualization and interaction
 - **Monaco Editor** for JSON parameter editing
-- **Vite** for fast development and building
+- **Phoenix LiveView** for server-side state management and validation
 
 ### Data Integration
-- **Static JSON files** for integration definitions (`editor/src/data/integrations.json`)
-- **Local storage** for workflow persistence during development
-- **JSON export/import** for Prana workflow compatibility
-- **Optional API integration** for production deployment
+- **LiveView State**: Server-side workflow state management
+- **Integration Registry**: Direct access to Prana's IntegrationRegistry
+- **Real-time Validation**: Server-side validation via LiveView
+- **Persistence**: Native Elixir workflow serialization
 
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure
-**Goal**: Basic graph editing with static nodes
+**Goal**: Basic LiveView + React integration
 
-#### 1.1 Project Setup
-- [ ] Create `editor/` directory with Node.js project (`npm create vite@latest editor --template react-ts`)
-- [ ] Install and configure React Flow
-- [ ] Set up Monaco Editor for JSON editing
-- [ ] Create integration definitions JSON file (`editor/src/data/integrations.json`)
-- [ ] Populate JSON with current Prana integrations (Manual, Logic, Data, Workflow)
-- [ ] Configure build and development environment
+#### 1.1 LiveView Hook Setup
+- [ ] Create LiveView hook for React component communication (`workflow_editor_hook.js`)
+- [ ] Design JSON message protocol between LiveView and React
+- [ ] Set up React component mounting and unmounting lifecycle
+- [ ] Configure esbuild for React/TypeScript compilation
+- [ ] Install React Flow and Monaco Editor dependencies
+
+#### 1.2 LiveView Module
+- [ ] Create `WorkflowEditorLive` LiveView module
+- [ ] Implement workflow state management in LiveView
+- [ ] Add integration registry data loading from Prana
+- [ ] Set up real-time validation via server-side events
 
 #### 1.2 Basic Node System
 - [ ] Create base node component with port rendering
