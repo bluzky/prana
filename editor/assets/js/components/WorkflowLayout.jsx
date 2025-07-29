@@ -9,6 +9,46 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogC
 import { Label } from './ui/label.jsx';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs.jsx';
 import WorkflowSidebar from './WorkflowSidebar.jsx';
+import dagre from 'dagre';
+
+// Auto-layout function using dagre
+const getLayoutedElements = (nodes, edges, direction = 'TB') => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  const nodeWidth = 250;
+  const nodeHeight = 80;
+
+  const isHorizontal = direction === 'LR';
+  dagreGraph.setGraph({ rankdir: direction });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const newNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    const newNode = {
+      ...node,
+      targetPosition: isHorizontal ? 'left' : 'top',
+      sourcePosition: isHorizontal ? 'right' : 'bottom',
+      position: {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      },
+    };
+
+    return newNode;
+  });
+
+  return { nodes: newNodes, edges };
+};
 
 // NodeEditDialog component
 const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
@@ -272,7 +312,8 @@ const WorkflowLayout = ({
   onSelectIntegration,
   integrations,
   allActions,
-  workflowData
+  workflowData,
+  onAddNode
 }) => {
   const [dialogNode, setDialogNode] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -401,7 +442,37 @@ const WorkflowLayout = ({
     );
   };
   
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  // Apply auto-layout before initializing React Flow state to prevent flash
+  const layoutedData = React.useMemo(() => {
+    if (initialNodes.length > 0) {
+      console.log('Pre-applying auto-layout to prevent flash...');
+      try {
+        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
+        console.log('Pre-layout completed:', { layoutedNodes, layoutedEdges });
+        return { nodes: layoutedNodes, edges: layoutedEdges };
+      } catch (error) {
+        console.error('Pre-layout error:', error);
+        return { nodes: initialNodes, edges: initialEdges };
+      }
+    }
+    return { nodes: initialNodes, edges: initialEdges };
+  }, [initialNodes, initialEdges]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedData.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedData.edges);
+
+  const reactFlowInstance = React.useRef(null);
+  
+  // Apply fitView after ReactFlow is initialized
+  React.useEffect(() => {
+    if (reactFlowInstance.current && layoutedData.nodes.length > 0) {
+      setTimeout(() => {
+        if (reactFlowInstance.current) {
+          reactFlowInstance.current.fitView({ padding: 0.1, maxZoom: 1.2 });
+        }
+      }, 50);
+    }
+  }, [layoutedData.nodes.length]);
   
   const nodesWithHandlers = React.useMemo(() => 
     nodes.map(node => ({
@@ -414,8 +485,6 @@ const WorkflowLayout = ({
       }
     })), [nodes]
   );
-  
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const onConnect = React.useCallback((params) => {
     const newEdge = {
@@ -454,6 +523,7 @@ const WorkflowLayout = ({
           onSelectIntegration={onSelectIntegration}
           integrations={integrations}
           allActions={allActions}
+          onAddNode={onAddNode}
         />
         
         <SidebarInset className="flex flex-col relative">
@@ -467,7 +537,7 @@ const WorkflowLayout = ({
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               nodeTypes={nodeTypes}
-              fitView
+              onInit={(instance) => { reactFlowInstance.current = instance; }}
               className="bg-background"
             >
               <Background />

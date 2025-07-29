@@ -20,7 +20,8 @@ const WorkflowSidebar = ({
   selectedIntegration, 
   onSelectIntegration, 
   integrations, 
-  allActions 
+  allActions,
+  onAddNode 
 }) => {
   const filterItems = (items, query) => {
     if (!query || query === "") return items;
@@ -52,12 +53,16 @@ const WorkflowSidebar = ({
             <ChevronLeft className="w-3 h-3 mr-1" />
             Back to integrations
           </Button>
+          <span className="text-xs font-medium">{integration.display_name}</span>
         </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {integration.actions.map((action, index) => (
               <SidebarMenuItem key={index}>
-                <SidebarMenuButton>
+                <SidebarMenuButton
+                  onClick={() => onAddNode && onAddNode(action, integration.name)}
+                  className="cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
                   <span>{action}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -81,25 +86,34 @@ const WorkflowSidebar = ({
     
     return (
       <div>
-        {Object.entries(groupedResults).map(([integrationName, actions]) => (
-          <SidebarGroup key={integrationName}>
-            <SidebarGroupLabel className="flex items-center justify-between">
-              <span>{integrationName}</span>
-              <span className="text-xs text-sidebar-foreground/50">({actions.length})</span>
-            </SidebarGroupLabel>
+        {Object.entries(groupedResults).map(([integrationName, actions]) => {
+          // Find the integration to get display_name
+          const integration = integrations.find(i => i.name === integrationName);
+          const displayName = integration ? integration.display_name : integrationName;
+          
+          return (
+            <SidebarGroup key={integrationName}>
+              <SidebarGroupLabel className="flex items-center justify-between">
+                <span>{displayName}</span>
+                <span className="text-xs text-sidebar-foreground/50">({actions.length})</span>
+              </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {actions.map((action, index) => (
                   <SidebarMenuItem key={index}>
-                    <SidebarMenuButton>
+                    <SidebarMenuButton
+                      onClick={() => onAddNode && onAddNode(action, integrationName)}
+                      className="cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    >
                       <span>{action}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+            </SidebarGroup>
+          );
+        })}
         {Object.keys(groupedResults).length === 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>No Results</SidebarGroupLabel>
@@ -127,7 +141,7 @@ const WorkflowSidebar = ({
                   isActive={integration.selected}
                   className="flex items-center justify-between"
                 >
-                  <span>{integration.name}</span>
+                  <span>{integration.display_name}</span>
                   {integration.selected && (
                     <ChevronRight className="w-4 h-4" />
                   )}

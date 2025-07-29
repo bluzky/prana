@@ -18,7 +18,7 @@ defmodule EditorWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
-    live "/workflow", WorkflowLive, :index
+    live "/workflow", WorkflowLive
   end
 
   # Other scopes may use custom stacks.

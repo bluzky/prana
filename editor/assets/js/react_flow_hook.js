@@ -8,6 +8,55 @@ import { Label } from './components/ui/label.jsx';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs.jsx';
 import { Settings, Trash2 } from 'lucide-react';
 import WorkflowLayout from './components/WorkflowLayout.jsx';
+import dagre from 'dagre';
+
+// Auto-layout function using dagre
+const getLayoutedElements = (nodes, edges, direction = 'TB') => {
+  console.log('getLayoutedElements called with:', { nodes, edges, direction });
+  
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  const nodeWidth = 250;
+  const nodeHeight = 80;
+
+  const isHorizontal = direction === 'LR';
+  dagreGraph.setGraph({ rankdir: direction });
+
+  console.log('Adding nodes to dagre graph...');
+  nodes.forEach((node) => {
+    console.log('Adding node:', node.id);
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  console.log('Adding edges to dagre graph...');
+  edges.forEach((edge) => {
+    console.log('Adding edge:', edge.source, '->', edge.target);
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  console.log('Running dagre layout...');
+  dagre.layout(dagreGraph);
+
+  const newNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    console.log('Node position from dagre:', node.id, nodeWithPosition);
+    const newNode = {
+      ...node,
+      targetPosition: isHorizontal ? 'left' : 'top',
+      sourcePosition: isHorizontal ? 'right' : 'bottom',
+      position: {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      },
+    };
+
+    return newNode;
+  });
+
+  console.log('Final layouted nodes:', newNodes);
+  return { nodes: newNodes, edges };
+};
 
 // Node Edit Dialog Component
 const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
@@ -224,7 +273,7 @@ const CustomNode = ({ data, selected }) => {
         data.onDoubleClick && data.onDoubleClick();
       }}
     >
-      <Handle type="target" position={Position.Top} className="w-3 h-3" />
+      <Handle type="target" position={Position.Top} id="main" className="w-3 h-3" />
       
       <div className="p-3">
         <div className="flex items-center space-x-3">
@@ -264,7 +313,7 @@ const CustomNode = ({ data, selected }) => {
         </div>
       </div>
       
-      <Handle type="source" position={Position.Bottom} className="w-3 h-3" />
+      <Handle type="source" position={Position.Bottom} id="main" className="w-3 h-3" />
     </div>
   );
 };
@@ -342,6 +391,32 @@ const ReactFlowComponent = ({ initialNodes, initialEdges, onWorkflowChange, onNo
     console.log('Node clicked:', node);
     onNodeSelect(node);
   }, [onNodeSelect]);
+
+  // Apply auto-layout on initial load
+  const hasAppliedLayout = React.useRef(false);
+  
+  React.useEffect(() => {
+    console.log('Auto-layout effect triggered:', { 
+      hasAppliedLayout: hasAppliedLayout.current, 
+      nodesLength: initialNodes.length,
+      edgesLength: initialEdges.length,
+      nodes: initialNodes,
+      edges: initialEdges
+    });
+    
+    if (!hasAppliedLayout.current && initialNodes.length > 0) {
+      console.log('Applying auto-layout...');
+      try {
+        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
+        console.log('Layout completed:', { layoutedNodes, layoutedEdges });
+        setNodes(layoutedNodes);
+        setEdges(layoutedEdges);
+        hasAppliedLayout.current = true;
+      } catch (error) {
+        console.error('Auto-layout error:', error);
+      }
+    }
+  }, [initialNodes, initialEdges]);
 
   // Track if this is the initial render
   const isInitialRender = React.useRef(true);
@@ -455,6 +530,12 @@ const ReactFlowHook = {
       }
     };
 
+    const onAddNode = (action, integration) => {
+      if (this.el && this.el.isConnected) {
+        this.pushEvent("add_node", { action, integration });
+      }
+    };
+
     // Render the full WorkflowLayout with sidebar and header
     root.render(
       React.createElement(WorkflowLayout, {
@@ -471,7 +552,8 @@ const ReactFlowHook = {
         onSelectIntegration,
         integrations,
         allActions,
-        workflowData
+        workflowData,
+        onAddNode
       })
     );
 
@@ -543,6 +625,12 @@ const ReactFlowHook = {
         }
       };
 
+      const onAddNode = (action, integration) => {
+        if (this.el && this.el.isConnected) {
+          this.pushEvent("add_node", { action, integration });
+        }
+      };
+
       // Render the full WorkflowLayout with sidebar and header
       this.root.render(
         React.createElement(WorkflowLayout, {
@@ -559,7 +647,8 @@ const ReactFlowHook = {
           onSelectIntegration,
           integrations,
           allActions,
-          workflowData
+          workflowData,
+          onAddNode
         })
       );
     }
