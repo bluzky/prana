@@ -228,6 +228,14 @@ defmodule EditorWeb.WorkflowLive do
           "params" => %{
             "message" => "API call failed"
           }
+        },
+        %{
+          "key" => "merge_results",
+          "name" => "Merge Results",
+          "type" => "data.merge",
+          "params" => %{
+            "strategy" => "append"
+          }
         }
       ],
       "connections" => %{
@@ -266,6 +274,26 @@ defmodule EditorWeb.WorkflowLive do
               "from" => "check_status",
               "to_port" => "main",
               "from_port" => "false"
+            }
+          ]
+        },
+        "success_action" => %{
+          "main" => [
+            %{
+              "to" => "merge_results",
+              "from" => "success_action",
+              "to_port" => "input_a",
+              "from_port" => "main"
+            }
+          ]
+        },
+        "error_action" => %{
+          "main" => [
+            %{
+              "to" => "merge_results",
+              "from" => "error_action",
+              "to_port" => "input_b",
+              "from_port" => "main"
             }
           ]
         }
@@ -343,6 +371,9 @@ defmodule EditorWeb.WorkflowLive do
   # Convert Prana workflow format to React Flow format for UI
   defp convert_prana_to_react_flow(prana_workflow) do
     nodes = Enum.map(prana_workflow["nodes"] || [], fn node ->
+      # Get port information from integration action
+      {input_ports, output_ports} = get_node_ports(node["type"])
+      
       %{
         "id" => node["key"],
         "type" => "custom",
@@ -352,7 +383,9 @@ defmodule EditorWeb.WorkflowLive do
           "label" => node["name"],
           "action_name" => node["name"],
           "node_key" => node["key"],
-          "integration_type" => node["type"]
+          "integration_type" => node["type"],
+          "input_ports" => input_ports,
+          "output_ports" => output_ports
         },
         "node_key" => node["key"],
         "params" => node["params"] || %{}
@@ -388,15 +421,15 @@ defmodule EditorWeb.WorkflowLive do
   defp convert_connections_to_edges(connections) do
     connections
     |> Enum.flat_map(fn {from_node, ports} ->
-      Enum.flat_map(ports, fn {port, connections_list} ->
+      Enum.flat_map(ports, fn {from_port, connections_list} ->
         Enum.map(connections_list, fn conn ->
           %{
-            "id" => "e#{from_node}-#{conn["to"]}",
+            "id" => "e#{from_node}-#{from_port}-#{conn["to"]}-#{conn["to_port"]}",
             "source" => from_node,
-            "target" => conn["to"]
+            "target" => conn["to"],
+            "sourceHandle" => from_port,
+            "targetHandle" => conn["to_port"]
           }
-          # Omit sourceHandle and targetHandle entirely for default connections
-          # React Flow will use the default handles when these are not specified
         end)
       end)
     end)
@@ -422,6 +455,32 @@ defmodule EditorWeb.WorkflowLive do
       
       {source, port_map}
     end)
+  end
+
+  # Get input and output ports for a node type
+  defp get_node_ports(node_type) do
+    case String.split(node_type, ".") do
+      [integration_name, action_name] ->
+        # Get raw integration data from registry instead of formatted data
+        case Prana.IntegrationRegistry.get_integration(integration_name) do
+          {:ok, integration} ->
+            case Map.get(integration.actions, action_name) do
+              nil -> 
+                {["main"], ["main"]}
+              
+              action ->
+                input_ports = action.input_ports || ["main"]
+                output_ports = action.output_ports || ["main"]
+                {input_ports, output_ports}
+            end
+          
+          _ -> 
+            {["main"], ["main"]}
+        end
+      
+      _ -> 
+        {["main"], ["main"]}
+    end
   end
 
 end

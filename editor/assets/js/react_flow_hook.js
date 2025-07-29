@@ -265,15 +265,61 @@ const CustomNode = ({ data, selected }) => {
     }
   };
 
+  // Get port colors based on port names
+  const getPortColor = (portName) => {
+    switch (portName) {
+      case 'main': return 'bg-blue-500';
+      case 'true': return 'bg-green-500';
+      case 'false': return 'bg-red-500';
+      case 'error': return 'bg-red-600';
+      case 'timeout': return 'bg-yellow-500';
+      case 'success': return 'bg-green-600';
+      case 'input_a':
+      case 'input_b': return 'bg-purple-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const inputPorts = data.input_ports || ['main'];
+  const outputPorts = data.output_ports || ['main'];
+
   return (
     <div 
-      className={`bg-white border-2 rounded-lg shadow-sm min-w-[200px] ${selected ? 'border-gray-900' : 'border-gray-200'}`}
+      className={`bg-white border-2 rounded-lg shadow-sm min-w-[250px] relative ${selected ? 'border-gray-900' : 'border-gray-200'}`}
       onDoubleClick={(e) => {
         e.stopPropagation();
         data.onDoubleClick && data.onDoubleClick();
       }}
     >
-      <Handle type="target" position={Position.Top} id="main" className="w-3 h-3" />
+      {/* Input Ports */}
+      {inputPorts.map((port, index) => {
+        const totalPorts = inputPorts.length;
+        const leftPosition = totalPorts === 1 ? 50 : (100 / (totalPorts + 1)) * (index + 1);
+        
+        return (
+          <React.Fragment key={`input-${port}`}>
+            <Handle 
+              type="target" 
+              position={Position.Top}
+              id={port}
+              className={`w-3 h-3 ${getPortColor(port)} border-2 border-white`}
+              style={{ left: `${leftPosition}%` }}
+            />
+            {totalPorts > 1 && (
+              <div 
+                className="absolute text-xs text-gray-600 font-medium bg-white px-1 rounded"
+                style={{ 
+                  left: `${leftPosition}%`, 
+                  top: '-20px',
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                {port}
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
       
       <div className="p-3">
         <div className="flex items-center space-x-3">
@@ -313,7 +359,35 @@ const CustomNode = ({ data, selected }) => {
         </div>
       </div>
       
-      <Handle type="source" position={Position.Bottom} id="main" className="w-3 h-3" />
+      {/* Output Ports */}
+      {outputPorts.map((port, index) => {
+        const totalPorts = outputPorts.length;
+        const leftPosition = totalPorts === 1 ? 50 : (100 / (totalPorts + 1)) * (index + 1);
+        
+        return (
+          <React.Fragment key={`output-${port}`}>
+            <Handle 
+              type="source" 
+              position={Position.Bottom}
+              id={port}
+              className={`w-3 h-3 ${getPortColor(port)} border-2 border-white`}
+              style={{ left: `${leftPosition}%` }}
+            />
+            {totalPorts > 1 && (
+              <div 
+                className="absolute text-xs text-gray-600 font-medium bg-white px-1 rounded"
+                style={{ 
+                  left: `${leftPosition}%`, 
+                  bottom: '-20px',
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                {port}
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 };
