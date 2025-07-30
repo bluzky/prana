@@ -30,8 +30,12 @@ const WorkflowSidebar = ({
       if (typeof item === 'string') {
         return item.toLowerCase().includes(queryLower);
       }
-      if (item.name) {
-        return item.name.toLowerCase().includes(queryLower);
+      // Handle action objects
+      if (item && typeof item === 'object') {
+        const displayName = item.display_name || item.name || '';
+        const description = item.description || '';
+        return displayName.toLowerCase().includes(queryLower) || 
+               description.toLowerCase().includes(queryLower);
       }
       return false;
     });
@@ -60,10 +64,10 @@ const WorkflowSidebar = ({
             {integration.actions.map((action, index) => (
               <SidebarMenuItem key={index}>
                 <SidebarMenuButton
-                  onClick={() => onAddNode && onAddNode(action, integration.name)}
+                  onClick={() => onAddNode && onAddNode(action.key || action, integration.name)}
                   className="cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 >
-                  <span>{action}</span>
+                  <span>{action.display_name || action.name || action}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
@@ -102,10 +106,10 @@ const WorkflowSidebar = ({
                 {actions.map((action, index) => (
                   <SidebarMenuItem key={index}>
                     <SidebarMenuButton
-                      onClick={() => onAddNode && onAddNode(action, integrationName)}
+                      onClick={() => onAddNode && onAddNode(action.key || action, integrationName)}
                       className="cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     >
-                      <span>{action}</span>
+                      <span>{action.display_name || action.name || action}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

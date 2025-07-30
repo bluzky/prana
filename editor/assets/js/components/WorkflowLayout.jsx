@@ -513,6 +513,11 @@ const WorkflowLayout = ({
         window.workflowMonacoEditor.dispose();
         window.workflowMonacoEditor = null;
       }
+      // Clear any pending update timeout
+      if (window.workflowUpdateTimeout) {
+        clearTimeout(window.workflowUpdateTimeout);
+        window.workflowUpdateTimeout = null;
+      }
     };
   }, []);
 
@@ -561,11 +566,26 @@ const WorkflowLayout = ({
           }
         });
 
-        // Handle content changes (disabled to prevent update loops)
+        // Handle content changes with debouncing to prevent update loops
         window.workflowMonacoEditor.onDidChangeModelContent(() => {
-          // Temporarily disabled to prevent network spam and update loops
-          // Could enable for explicit save actions
-          return;
+          // Clear previous timeout
+          if (window.workflowUpdateTimeout) {
+            clearTimeout(window.workflowUpdateTimeout);
+          }
+          
+          // Debounce updates to prevent rapid firing
+          window.workflowUpdateTimeout = setTimeout(() => {
+            try {
+              const value = window.workflowMonacoEditor.getValue();
+              const parsedWorkflow = JSON.parse(value);
+              
+              // Update workflow data through context
+              updateWorkflowData(parsedWorkflow);
+            } catch (error) {
+              // Invalid JSON - don't update but don't show errors either
+              console.log('Invalid JSON in editor:', error.message);
+            }
+          }, 500); // 500ms debounce
         });
 
         // Format JSON on Ctrl+Shift+F
