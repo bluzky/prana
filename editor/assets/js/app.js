@@ -44,5 +44,8 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Enable debug mode to see connection issues
+liveSocket.enableDebug()
+
 // Functions now handled by React components
 

@@ -15,7 +15,7 @@ config :editor, EditorWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "zP5FqbFjZeO53KJwnf/3OOA87q/lFwXPum6RQYpYChajdzzBkbAAxDK6mubrh6Sv",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:editor, ~w(--sourcemap=inline --watch)]},
+    esbuild: {Esbuild, :install_and_run, [:editor, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:editor, ~w(--watch)]}
   ]
 

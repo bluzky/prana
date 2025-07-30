@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ReactFlow, Controls, Background, addEdge, useNodesState, useEdgesState, Handle, Position } from '@xyflow/react';
-import { PanelLeft, Download, Settings, Trash2 } from 'lucide-react';
+import { PanelLeft, Download, Settings, Trash2, Play, MapPin, GitBranch, GitFork, Globe, Zap, FileText, ArrowLeftRight } from 'lucide-react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from './ui/sidebar.jsx';
 import { Button } from './ui/button.jsx';
 import { Input } from './ui/input.jsx';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogC
 import { Label } from './ui/label.jsx';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs.jsx';
 import WorkflowSidebar from './WorkflowSidebar.jsx';
+import { useWorkflow } from '../contexts/WorkflowContext.js';
 import dagre from 'dagre';
 
 // Auto-layout function using dagre
@@ -60,12 +61,16 @@ const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
 
   useEffect(() => {
     if (node && isOpen) {
-      setNodeKey(node.node_key || '');
-      const params = node.params ? JSON.stringify(node.params, null, 2) : '{}';
-      setJsonParams(params);
-      
+      // Access data from React Flow node structure
+      const nodeKey = node.data?.node_key || node.node_key || '';
+      const params = node.data?.params || node.params || {};
+
+      setNodeKey(nodeKey);
+      const paramString = JSON.stringify(params, null, 2);
+      setJsonParams(paramString);
+
       // Initialize Monaco editor when dialog opens
-      setTimeout(() => initializeNodeEditor(params), 100);
+      setTimeout(() => initializeNodeEditor(paramString), 100);
     }
   }, [node, isOpen]);
 
@@ -81,10 +86,10 @@ const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
     if (!editorRef.current || monacoEditorRef.current) return;
 
     if (typeof require !== 'undefined') {
-      require.config({ 
-        paths: { 
-          'vs': 'https://unpkg.com/monaco-editor@0.44.0/min/vs' 
-        } 
+      require.config({
+        paths: {
+          'vs': 'https://unpkg.com/monaco-editor@0.44.0/min/vs'
+        }
       });
 
       require(['vs/editor/editor.main'], () => {
@@ -138,11 +143,10 @@ const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
       const params = JSON.parse(jsonParams);
       onSave({
         ...node,
-        node_key: nodeKey,
-        params: params,
         data: {
           ...node.data,
-          node_key: nodeKey
+          node_key: nodeKey,
+          params: params
         }
       });
       onClose();
@@ -175,7 +179,7 @@ const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
             <TabsTrigger value="params">Params</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="params" className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="node-key">Node Key</Label>
@@ -187,17 +191,17 @@ const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
                 placeholder="Enter node key"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Parameters (JSON)</Label>
-              <div 
+              <div
                 ref={editorRef}
                 className="border rounded-md"
                 style={{ height: '300px', width: '100%' }}
               />
             </div>
           </TabsContent>
-          
+
           <TabsContent value="settings" className="space-y-4">
             <div className="text-sm text-muted-foreground">
               Settings panel coming soon...
@@ -220,39 +224,72 @@ const NodeEditDialog = ({ node, isOpen, onClose, onSave }) => {
 
 // We'll define nodeTypes here since we need the CustomNode
 const CustomNode = ({ data, selected }) => {
-  
-  const getNodeIcon = (type) => {
+
+  const getNodeIcon = (integration_type, action_display_name) => {
     const iconClass = "w-8 h-8 rounded flex items-center justify-center text-white";
-    const iconSvg = <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-    </svg>;
-    
-    switch (type) {
-      case 'start':
-        return <div className={`${iconClass} bg-purple-500`}>{iconSvg}</div>;
-      case 'action':
-        return <div className={`${iconClass} bg-pink-500`}>{iconSvg}</div>;
-      case 'review':
-        return <div className={`${iconClass} bg-orange-500`}>{iconSvg}</div>;
-      case 'end':
-        return <div className={`${iconClass} bg-blue-500`}>{iconSvg}</div>;
-      default:
-        return <div className={`${iconClass} bg-gray-500`}>{iconSvg}</div>;
+
+    // Special actions with custom icons and colors
+    const specialActions = {
+      // Trigger actions
+      'manual.trigger': {
+        color: 'bg-green-500',
+        icon: <Zap className="w-4 h-4" />
+      },
+
+      // Logic actions
+      'logic.if_condition': {
+        color: 'bg-amber-500',
+        icon: <ArrowLeftRight className="w-4 h-4" />
+      },
+      'logic.switch': {
+        color: 'bg-orange-500',
+        icon: <GitBranch className="w-4 h-4" />
+      },
+
+      // Data actions
+      'data.merge': {
+        color: 'bg-blue-500',
+        icon: <GitFork className="w-4 h-4" />
+      },
+
+      // HTTP actions
+      'http.request': {
+        color: 'bg-purple-500',
+        icon: <Globe className="w-4 h-4" />
+      },
+
+      // Workflow actions
+      'workflow.execute_workflow': {
+        color: 'bg-indigo-500',
+        icon: <Play className="w-4 h-4" />
+      }
+    };
+
+    // Check if this is a special action
+    const specialAction = specialActions[integration_type];
+    if (specialAction) {
+      return <div className={`${iconClass} ${specialAction.color}`}>{specialAction.icon}</div>;
     }
+    
+    // Check if action display name contains "trigger" (case insensitive)
+    if (action_display_name && action_display_name.toLowerCase().includes('trigger')) {
+      return <div className={`${iconClass} bg-green-500`}><Zap className="w-4 h-4" /></div>;
+    }
+
+    // Default icon for other actions
+    return <div className={`${iconClass} bg-gray-500`}><FileText className="w-4 h-4" /></div>;
   };
 
   // Get port colors based on port names
   const getPortColor = (portName) => {
     switch (portName) {
-      case 'main': return 'bg-blue-500';
-      case 'true': return 'bg-green-500';
-      case 'false': return 'bg-red-500';
-      case 'error': return 'bg-red-600';
-      case 'timeout': return 'bg-yellow-500';
-      case 'success': return 'bg-green-600';
-      case 'input_a':
-      case 'input_b': return 'bg-purple-500';
-      default: return 'bg-gray-500';
+      case 'main': return '#3b82f6'; // blue-500
+      case 'true': return '#10b981'; // green-500
+      case 'false': return '#ef4444'; // red-500
+      case 'error': return '#ef4444'; // red-500
+      case 'timeout': return '#eab308'; // yellow-500
+      case 'success': return '#059669'; // green-600
+      default: return '#6b7280'; // gray-500
     }
   };
 
@@ -260,7 +297,7 @@ const CustomNode = ({ data, selected }) => {
   const outputPorts = data.output_ports || ['main'];
 
   return (
-    <div 
+    <div
       className={`bg-white border-2 rounded-lg shadow-sm min-w-[250px] relative ${selected ? 'border-gray-900' : 'border-gray-200'}`}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -271,28 +308,30 @@ const CustomNode = ({ data, selected }) => {
       {inputPorts.map((port, index) => {
         const totalPorts = inputPorts.length;
         const leftPosition = totalPorts === 1 ? 50 : (100 / (totalPorts + 1)) * (index + 1);
-        
+
         return (
           <React.Fragment key={`input-${port}`}>
-            <Handle 
-              type="target" 
+            <Handle
+              type="target"
               position={Position.Top}
               id={port}
-              className={`${getPortColor(port)} border-2 border-white transition-all duration-150 hover:scale-125`}
-              style={{ 
-                left: `${leftPosition}%`, 
+              className="border-2 border-white transition-all duration-150 hover:scale-125"
+              style={{
+                left: `${leftPosition}%`,
                 transform: 'translateX(-50%)',
+                top: '-8px',
                 width: '12px',
-                height: '12px'
+                height: '12px',
+                backgroundColor: getPortColor(port)
               }}
               isConnectable={true}
             />
             {totalPorts > 1 && (
-              <div 
+              <div
                 className="absolute text-xs text-gray-600 font-medium bg-white px-1 rounded"
-                style={{ 
-                  left: `${leftPosition}%`, 
-                  top: '-20px',
+                style={{
+                  left: `${leftPosition}%`,
+                  top: '-28px',
                   transform: 'translateX(-50%)'
                 }}
               >
@@ -302,13 +341,13 @@ const CustomNode = ({ data, selected }) => {
           </React.Fragment>
         );
       })}
-      
+
       <div className="p-3">
         <div className="flex items-center space-x-3">
-          {getNodeIcon(data.type)}
+          {getNodeIcon(data.integration_type, data.action_display_name)}
           <div className="flex-1">
             <div className="font-medium text-gray-900 text-sm">
-              {data.label || data.action_name || 'Untitled'}
+              {data.action_display_name || data.label || data.action_name || 'Untitled'}
             </div>
             <div className="text-xs text-gray-500">
               {data.subtitle || data.node_key || 'No key'}
@@ -340,33 +379,35 @@ const CustomNode = ({ data, selected }) => {
           </div>
         </div>
       </div>
-      
+
       {/* Output Ports */}
       {outputPorts.map((port, index) => {
         const totalPorts = outputPorts.length;
         const leftPosition = totalPorts === 1 ? 50 : (100 / (totalPorts + 1)) * (index + 1);
-        
+
         return (
           <React.Fragment key={`output-${port}`}>
-            <Handle 
-              type="source" 
+            <Handle
+              type="source"
               position={Position.Bottom}
               id={port}
-              className={`${getPortColor(port)} border-2 border-white transition-all duration-150 hover:scale-125`}
-              style={{ 
-                left: `${leftPosition}%`, 
+              className="border-2 border-white transition-all duration-150 hover:scale-125"
+              style={{
+                left: `${leftPosition}%`,
                 transform: 'translateX(-50%)',
+                bottom: '-8px',
                 width: '12px',
-                height: '12px'
+                height: '12px',
+                backgroundColor: getPortColor(port)
               }}
               isConnectable={true}
             />
             {totalPorts > 1 && (
-              <div 
+              <div
                 className="absolute text-xs text-gray-600 font-medium bg-white px-1 rounded"
-                style={{ 
-                  left: `${leftPosition}%`, 
-                  bottom: '-20px',
+                style={{
+                  left: `${leftPosition}%`,
+                  bottom: '-28px',
                   transform: 'translateX(-50%)'
                 }}
               >
@@ -384,37 +425,47 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
-const WorkflowLayout = ({ 
-  initialNodes, 
-  initialEdges, 
-  workflowTitle,
-  onWorkflowChange, 
-  onTitleChange,
-  onExportJson,
-  integrations,
-  allActions,
-  workflowData,
-  onAddNode
+const WorkflowLayout = ({
+  initialWorkflowData,
+  initialIntegrations,
+  initialAllActions
 }) => {
+  // Get shared state and actions from context
+  const {
+    workflowData,
+    reactFlowData,
+    title,
+    integrations,
+    allActions,
+    initialize,
+    updateTitle,
+    updateFlow,
+    updateWorkflowData,
+    addNode,
+    updateNode,
+    deleteNode,
+    exportJson
+  } = useWorkflow();
+
+  // Initialize context with data from props
+  useEffect(() => {
+    initialize(initialWorkflowData, initialIntegrations, initialAllActions);
+  }, [initialize, initialWorkflowData, initialIntegrations, initialAllActions]);
+
+  // Local UI state (not workflow data)
   const [dialogNode, setDialogNode] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showWorkflowJson, setShowWorkflowJson] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [currentTitle, setCurrentTitle] = useState(workflowTitle);
+  const [isUpdatingJsonEditor, setIsUpdatingJsonEditor] = useState(false);
 
-  // Update local title when prop changes
-  useEffect(() => {
-    setCurrentTitle(workflowTitle);
-  }, [workflowTitle]);
-
-  // Handle title changes locally only
+  // Handle title changes through context
   const handleTitleChange = (newTitle) => {
-    setCurrentTitle(newTitle);
-    onTitleChange(newTitle);
+    updateTitle(newTitle);
   };
-  
+
   // Initialize Monaco editor when JSON panel is shown
   useEffect(() => {
     if (showWorkflowJson) {
@@ -439,6 +490,22 @@ const WorkflowLayout = ({
     }
   }, [showWorkflowJson]);
 
+  // Update Monaco editor when workflow data changes from other sources
+  useEffect(() => {
+    if (window.workflowMonacoEditor && showWorkflowJson) {
+      const currentValue = window.workflowMonacoEditor.getValue();
+      const newValue = JSON.stringify(workflowData, null, 2);
+
+      // Only update if the content is different to avoid infinite loops
+      if (currentValue !== newValue) {
+        setIsUpdatingJsonEditor(true);
+        window.workflowMonacoEditor.setValue(newValue);
+        // Reset flag after a short delay to allow the change event to be ignored
+        setTimeout(() => setIsUpdatingJsonEditor(false), 100);
+      }
+    }
+  }, [workflowData, showWorkflowJson]);
+
   // Cleanup Monaco editor on unmount
   useEffect(() => {
     return () => {
@@ -452,12 +519,12 @@ const WorkflowLayout = ({
   const initializeWorkflowEditor = (container) => {
     // Show the clean workflow data directly
     const initialValue = JSON.stringify(workflowData, null, 2);
-    
+
     if (typeof require !== 'undefined') {
-      require.config({ 
-        paths: { 
-          'vs': 'https://unpkg.com/monaco-editor@0.44.0/min/vs' 
-        } 
+      require.config({
+        paths: {
+          'vs': 'https://unpkg.com/monaco-editor@0.44.0/min/vs'
+        }
       });
 
       require(['vs/editor/editor.main'], () => {
@@ -494,11 +561,11 @@ const WorkflowLayout = ({
           }
         });
 
-        // Handle content changes
+        // Handle content changes (disabled to prevent update loops)
         window.workflowMonacoEditor.onDidChangeModelContent(() => {
-          const value = window.workflowMonacoEditor.getValue();
-          console.log("JSON editor content changed:", value);
-          // We could add a callback here to update the workflow data
+          // Temporarily disabled to prevent network spam and update loops
+          // Could enable for explicit save actions
+          return;
         });
 
         // Format JSON on Ctrl+Shift+F
@@ -508,77 +575,71 @@ const WorkflowLayout = ({
       });
     }
   };
-  
+
   const openDialog = (node) => {
     setDialogNode(node);
     setIsDialogOpen(true);
   };
-  
+
   const closeDialog = () => {
     setIsDialogOpen(false);
     setDialogNode(null);
   };
-  
-  const saveNode = (updatedNode) => {
-    setNodes(currentNodes => 
-      currentNodes.map(node => 
-        node.id === updatedNode.id ? updatedNode : node
-      )
-    );
+
+  const saveNodeFromDialog = (updatedNode) => {
+    updateNode(updatedNode.id, updatedNode);
   };
 
-  const deleteNode = (nodeToDelete) => {
-    setNodes(currentNodes => 
-      currentNodes.filter(node => node.id !== nodeToDelete.id)
-    );
-    
-    setEdges(currentEdges => 
-      currentEdges.filter(edge => 
-        edge.source !== nodeToDelete.id && edge.target !== nodeToDelete.id
-      )
-    );
+  const deleteNodeFromButton = (nodeToDelete) => {
+    deleteNode(nodeToDelete.id);
   };
-  
+
   // Apply auto-layout before initializing React Flow state to prevent flash
   const layoutedData = React.useMemo(() => {
-    if (initialNodes.length > 0) {
-      console.log('Pre-applying auto-layout to prevent flash...');
+    if (reactFlowData.nodes && reactFlowData.nodes.length > 0) {
       try {
-        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
-        console.log('Pre-layout completed:', { layoutedNodes, layoutedEdges });
+        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(reactFlowData.nodes, reactFlowData.edges);
         return { nodes: layoutedNodes, edges: layoutedEdges };
       } catch (error) {
         console.error('Pre-layout error:', error);
-        return { nodes: initialNodes, edges: initialEdges };
+        return reactFlowData;
       }
     }
-    return { nodes: initialNodes, edges: initialEdges };
-  }, [initialNodes, initialEdges]);
+    return reactFlowData;
+  }, [reactFlowData.nodes, reactFlowData.edges]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedData.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedData.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Sync context reactFlowData changes to React Flow local state
+  useEffect(() => {
+    if (reactFlowData.nodes) {
+      setNodes(reactFlowData.nodes);
+    }
+    if (reactFlowData.edges) {
+      setEdges(reactFlowData.edges);
+    }
+  }, [reactFlowData.nodes, reactFlowData.edges, setNodes, setEdges]);
 
   const reactFlowInstance = React.useRef(null);
-  
-  // Apply fitView immediately when ReactFlow instance is available
+
+  // Apply fitView only when ReactFlow instance is initialized
   const onReactFlowInit = React.useCallback((instance) => {
     reactFlowInstance.current = instance;
-    if (layoutedData.nodes.length > 0) {
-      // Apply fitView immediately on init
-      setTimeout(() => {
-        instance.fitView({ padding: 0.1, maxZoom: 1.2 });
-      }, 10);
-    }
-  }, [layoutedData.nodes.length]);
-  
-  const nodesWithHandlers = React.useMemo(() => 
+    // Fit view once on initialization
+    setTimeout(() => {
+      instance.fitView({ padding: 0.1, maxZoom: 1.2 });
+    }, 100);
+  }, []);
+
+  const nodesWithHandlers = React.useMemo(() =>
     nodes.map(node => ({
       ...node,
       data: {
         ...node.data,
         onGearClick: () => openDialog(node),
         onDoubleClick: () => openDialog(node),
-        onDeleteClick: () => deleteNode(node)
+        onDeleteClick: () => deleteNodeFromButton(node)
       }
     })), [nodes]
   );
@@ -608,25 +669,26 @@ const WorkflowLayout = ({
     }
 
     const timeoutId = setTimeout(() => {
-      onWorkflowChange({ nodes, edges });
+      // Update context with React Flow changes
+      updateFlow(nodes, edges);
     }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [nodes, edges, onWorkflowChange]);
+  }, [nodes, edges, updateFlow]);
 
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full">
-        <WorkflowSidebar 
+        <WorkflowSidebar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           selectedIntegration={selectedIntegration}
           onSelectIntegration={setSelectedIntegration}
           integrations={integrations}
           allActions={allActions}
-          onAddNode={onAddNode}
+          onAddNode={addNode}
         />
-        
+
         <SidebarInset className="flex flex-col relative">
           {/* Main Content - React Flow (behind header, above status bar and JSON editor) */}
           <div className={`absolute top-0 left-0 right-0 ${showWorkflowJson ? 'bottom-80' : 'bottom-8'}`}>
@@ -644,6 +706,9 @@ const WorkflowLayout = ({
               connectionMode="loose"
               snapToGrid={true}
               snapGrid={[15, 15]}
+              defaultEdgeOptions={{
+                style: { strokeWidth: 2 }
+              }}
             >
               <Background />
               <Controls />
@@ -656,14 +721,14 @@ const WorkflowLayout = ({
             <div className="flex items-center flex-1">
               <Input
                 type="text"
-                value={currentTitle}
+                value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 className="border-none bg-transparent text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0"
                 style={{ minWidth: '200px' }}
               />
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={onExportJson} size="sm">
+              <Button onClick={exportJson} size="sm">
                 <Download className="w-4 h-4 mr-2" />
                 Export JSON
               </Button>
@@ -701,12 +766,12 @@ const WorkflowLayout = ({
             </div>
           )}
         </SidebarInset>
-        
+
         <NodeEditDialog
           node={dialogNode}
           isOpen={isDialogOpen}
           onClose={closeDialog}
-          onSave={saveNode}
+          onSave={saveNodeFromDialog}
         />
       </div>
     </SidebarProvider>

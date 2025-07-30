@@ -6,13 +6,27 @@ defmodule EditorWeb.WorkflowLive do
   @impl true
   def mount(_params, _session, socket) do
     workflow_data = initial_workflow_data()
+    
+    # Safely load integrations with error handling
+    integrations = try do
+      IntegrationLoader.load_integrations()
+    catch
+      _kind, _error -> []
+    end
+    
+    all_actions = try do
+      IntegrationLoader.load_all_actions()
+    catch
+      _kind, _error -> []
+    end
+    
     {:ok,
      socket
      |> assign(:workflow_data, workflow_data)
      |> assign(:workflow_title, workflow_data["name"])
      |> assign(:page_title, "Workflow Editor")
-     |> assign(:integrations, IntegrationLoader.load_integrations())
-     |> assign(:all_actions, IntegrationLoader.load_all_actions())}
+     |> assign(:integrations, integrations || [])
+     |> assign(:all_actions, all_actions || [])}
   end
 
   @impl true
@@ -34,19 +48,31 @@ defmodule EditorWeb.WorkflowLive do
 
   @impl true
   def render(assigns) do
+    # Safely encode JSON data
+    workflow_json = safe_json_encode(assigns.workflow_data, "{}")
+    integrations_json = safe_json_encode(assigns.integrations, "[]")
+    all_actions_json = safe_json_encode(assigns.all_actions, "[]")
+    
     ~H"""
     <div 
       id="react-workflow-container"
       phx-hook="ReactFlow"
       phx-update="ignore"
-      data-workflow={Jason.encode!(@workflow_data)}
-      data-integrations={Jason.encode!(@integrations)}
-      data-all-actions={Jason.encode!(@all_actions)}
+      data-workflow={workflow_json}
+      data-integrations={integrations_json}
+      data-all-actions={all_actions_json}
       class="h-screen w-screen"
     >
     </div>
-    
     """
+  end
+  
+  defp safe_json_encode(data, fallback) do
+    try do
+      Jason.encode!(data)
+    rescue
+      _ -> fallback
+    end
   end
 
   defp initial_workflow_data do

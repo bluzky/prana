@@ -113,8 +113,17 @@ defmodule Editor.IntegrationLoader do
 
   defp format_actions(actions) do
     actions
-    |> Enum.map(fn {_key, action} -> action.display_name || action.name end)
-    |> Enum.sort()
+    |> Enum.map(fn {key, action} -> 
+      %{
+        key: key,
+        name: action.name,
+        display_name: action.display_name || action.name,
+        description: Map.get(action, :description, ""),
+        input_ports: action.input_ports || ["main"],
+        output_ports: action.output_ports || ["main", "error"]
+      }
+    end)
+    |> Enum.sort_by(& &1.display_name)
   end
 
   defp format_action(action, integration_name) do
