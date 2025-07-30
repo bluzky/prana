@@ -278,8 +278,14 @@ const CustomNode = ({ data, selected }) => {
               type="target" 
               position={Position.Top}
               id={port}
-              className={`w-3 h-3 ${getPortColor(port)} border-2 border-white`}
-              style={{ left: `${leftPosition}%` }}
+              className={`${getPortColor(port)} border-2 border-white transition-all duration-150 hover:scale-125`}
+              style={{ 
+                left: `${leftPosition}%`, 
+                transform: 'translateX(-50%)',
+                width: '12px',
+                height: '12px'
+              }}
+              isConnectable={true}
             />
             {totalPorts > 1 && (
               <div 
@@ -346,8 +352,14 @@ const CustomNode = ({ data, selected }) => {
               type="source" 
               position={Position.Bottom}
               id={port}
-              className={`w-3 h-3 ${getPortColor(port)} border-2 border-white`}
-              style={{ left: `${leftPosition}%` }}
+              className={`${getPortColor(port)} border-2 border-white transition-all duration-150 hover:scale-125`}
+              style={{ 
+                left: `${leftPosition}%`, 
+                transform: 'translateX(-50%)',
+                width: '12px',
+                height: '12px'
+              }}
+              isConnectable={true}
             />
             {totalPorts > 1 && (
               <div 
@@ -377,13 +389,8 @@ const WorkflowLayout = ({
   initialEdges, 
   workflowTitle,
   onWorkflowChange, 
-  onNodeSelect,
   onTitleChange,
   onExportJson,
-  searchQuery,
-  onSearchChange,
-  selectedIntegration,
-  onSelectIntegration,
   integrations,
   allActions,
   workflowData,
@@ -392,6 +399,21 @@ const WorkflowLayout = ({
   const [dialogNode, setDialogNode] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showWorkflowJson, setShowWorkflowJson] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIntegration, setSelectedIntegration] = useState(null);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [currentTitle, setCurrentTitle] = useState(workflowTitle);
+
+  // Update local title when prop changes
+  useEffect(() => {
+    setCurrentTitle(workflowTitle);
+  }, [workflowTitle]);
+
+  // Handle title changes locally only
+  const handleTitleChange = (newTitle) => {
+    setCurrentTitle(newTitle);
+    onTitleChange(newTitle);
+  };
   
   // Initialize Monaco editor when JSON panel is shown
   useEffect(() => {
@@ -428,6 +450,7 @@ const WorkflowLayout = ({
   }, []);
 
   const initializeWorkflowEditor = (container) => {
+    // Show the clean workflow data directly
     const initialValue = JSON.stringify(workflowData, null, 2);
     
     if (typeof require !== 'undefined') {
@@ -561,16 +584,20 @@ const WorkflowLayout = ({
   );
 
   const onConnect = React.useCallback((params) => {
+    console.log('Connection params:', params);
     const newEdge = {
       ...params,
-      id: `e${params.source}-${params.target}`,
+      id: `e${params.source}-${params.sourceHandle || 'main'}-${params.target}-${params.targetHandle || 'main'}`,
+      sourceHandle: params.sourceHandle || 'main',
+      targetHandle: params.targetHandle || 'main'
     };
+    console.log('Creating new edge:', newEdge);
     setEdges((eds) => addEdge(newEdge, eds));
   }, [setEdges]);
 
   const onNodeClick = React.useCallback((event, node) => {
-    onNodeSelect(node);
-  }, [onNodeSelect]);
+    setSelectedNode(node);
+  }, []);
 
   const isInitialRender = React.useRef(true);
 
@@ -592,9 +619,9 @@ const WorkflowLayout = ({
       <div className="flex h-screen w-full">
         <WorkflowSidebar 
           searchQuery={searchQuery}
-          onSearchChange={onSearchChange}
+          onSearchChange={setSearchQuery}
           selectedIntegration={selectedIntegration}
-          onSelectIntegration={onSelectIntegration}
+          onSelectIntegration={setSelectedIntegration}
           integrations={integrations}
           allActions={allActions}
           onAddNode={onAddNode}
@@ -614,6 +641,9 @@ const WorkflowLayout = ({
               onInit={onReactFlowInit}
               defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               className="bg-background"
+              connectionMode="loose"
+              snapToGrid={true}
+              snapGrid={[15, 15]}
             >
               <Background />
               <Controls />
@@ -626,8 +656,8 @@ const WorkflowLayout = ({
             <div className="flex items-center flex-1">
               <Input
                 type="text"
-                value={workflowTitle}
-                onChange={(e) => onTitleChange(e.target.value)}
+                value={currentTitle}
+                onChange={(e) => handleTitleChange(e.target.value)}
                 className="border-none bg-transparent text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0"
                 style={{ minWidth: '200px' }}
               />
@@ -666,7 +696,6 @@ const WorkflowLayout = ({
             <div className="relative z-10 border-t bg-background h-80">
               <div
                 id="react-workflow-json-editor"
-                data-value={JSON.stringify(workflowData, null, 2)}
                 className="h-full w-full"
               />
             </div>
