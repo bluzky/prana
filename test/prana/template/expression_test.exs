@@ -1,7 +1,7 @@
-defmodule Prana.ExpressionEngineTest do
+defmodule Prana.Template.ExpressionTest do
   use ExUnit.Case, async: false
 
-  alias Prana.ExpressionEngine
+  alias Prana.Template.Expression
 
   describe "simple field access" do
     setup do
@@ -36,22 +36,22 @@ defmodule Prana.ExpressionEngineTest do
       }
 
       # Missing paths should return nil
-      {:ok, result} = ExpressionEngine.extract("$input.missing_field", context)
+      {:ok, result} = Expression.extract("$input.missing_field", context)
       assert result == nil
 
-      {:ok, result} = ExpressionEngine.extract("$missing_root.field", context)
+      {:ok, result} = Expression.extract("$missing_root.field", context)
       assert result == nil
 
       # Non-expressions should return as-is
-      {:ok, result} = ExpressionEngine.extract("not_an_expression", context)
+      {:ok, result} = Expression.extract("not_an_expression", context)
       assert result == "not_an_expression"
 
       # Empty $ should return as-is (not a valid expression)
-      {:ok, result} = ExpressionEngine.extract("$", context)
+      {:ok, result} = Expression.extract("$", context)
       assert result == "$"
 
       # Valid expressions should work
-      {:ok, result} = ExpressionEngine.extract("$input.valid_field", context)
+      {:ok, result} = Expression.extract("$input.valid_field", context)
       assert result == "value"
     end
 
@@ -70,7 +70,7 @@ defmodule Prana.ExpressionEngineTest do
         "static" => "hello"
       }
 
-      {:ok, processed} = ExpressionEngine.process_map(input_map, context)
+      {:ok, processed} = Expression.process_map(input_map, context)
 
       assert processed == %{
                "valid1" => "value",
@@ -83,57 +83,57 @@ defmodule Prana.ExpressionEngineTest do
     end
 
     test "extracts simple fields", %{context: context} do
-      {:ok, email} = ExpressionEngine.extract("$input.email", context)
+      {:ok, email} = Expression.extract("$input.email", context)
       assert email == "john@test.com"
 
-      {:ok, age} = ExpressionEngine.extract("$input.age", context)
+      {:ok, age} = Expression.extract("$input.age", context)
       assert age == 25
 
-      {:ok, active} = ExpressionEngine.extract("$input.is_active", context)
+      {:ok, active} = Expression.extract("$input.is_active", context)
       assert active == true
     end
 
     test "extracts nested fields", %{context: context} do
-      {:ok, name} = ExpressionEngine.extract("$input.profile.name", context)
+      {:ok, name} = Expression.extract("$input.profile.name", context)
       assert name == "John Doe"
 
-      {:ok, theme} = ExpressionEngine.extract("$input.profile.settings.theme", context)
+      {:ok, theme} = Expression.extract("$input.profile.settings.theme", context)
       assert theme == "dark"
 
-      {:ok, user_id} = ExpressionEngine.extract("$nodes.api_call.response.user_id", context)
+      {:ok, user_id} = Expression.extract("$nodes.api_call.response.user_id", context)
       assert user_id == 123
     end
 
     test "extracts from different context roots", %{context: context} do
-      {:ok, api_url} = ExpressionEngine.extract("$variables.api_url", context)
+      {:ok, api_url} = Expression.extract("$variables.api_url", context)
       assert api_url == "https://api.example.com"
 
-      {:ok, status_code} = ExpressionEngine.extract("$nodes.api_call.status_code", context)
+      {:ok, status_code} = Expression.extract("$nodes.api_call.status_code", context)
       assert status_code == 200
     end
 
     test "returns non-expressions as-is", %{context: context} do
-      {:ok, value} = ExpressionEngine.extract("hello", context)
+      {:ok, value} = Expression.extract("hello", context)
       assert value == "hello"
 
-      {:ok, value} = ExpressionEngine.extract(123, context)
+      {:ok, value} = Expression.extract(123, context)
       assert value == 123
 
-      {:ok, value} = ExpressionEngine.extract(true, context)
+      {:ok, value} = Expression.extract(true, context)
       assert value == true
 
-      {:ok, value} = ExpressionEngine.extract(%{"key" => "value"}, context)
+      {:ok, value} = Expression.extract(%{"key" => "value"}, context)
       assert value == %{"key" => "value"}
     end
 
     test "handles missing paths - returns nil", %{context: context} do
-      {:ok, result} = ExpressionEngine.extract("$input.nonexistent", context)
+      {:ok, result} = Expression.extract("$input.nonexistent", context)
       assert result == nil
 
-      {:ok, result} = ExpressionEngine.extract("$nodes.missing.field", context)
+      {:ok, result} = Expression.extract("$nodes.missing.field", context)
       assert result == nil
 
-      {:ok, result} = ExpressionEngine.extract("$variables.nonexistent.deep.path", context)
+      {:ok, result} = Expression.extract("$variables.nonexistent.deep.path", context)
       assert result == nil
     end
   end
@@ -163,147 +163,34 @@ defmodule Prana.ExpressionEngineTest do
     end
 
     test "extracts array elements by index", %{context: context} do
-      {:ok, user} = ExpressionEngine.extract("$input.users[0]", context)
+      {:ok, user} = Expression.extract("$input.users[0]", context)
       assert user["name"] == "John"
 
-      {:ok, name} = ExpressionEngine.extract("$input.users[1].name", context)
+      {:ok, name} = Expression.extract("$input.users[1].name", context)
       assert name == "Jane"
 
-      {:ok, tag} = ExpressionEngine.extract("$input.tags[0]", context)
+      {:ok, tag} = Expression.extract("$input.tags[0]", context)
       assert tag == "urgent"
     end
 
     test "extracts from nested arrays", %{context: context} do
-      {:ok, title} = ExpressionEngine.extract("$nodes.search_results.items[0].title", context)
+      {:ok, title} = Expression.extract("$nodes.search_results.items[0].title", context)
       assert title == "First Result"
 
-      {:ok, score} = ExpressionEngine.extract("$nodes.search_results.items[1].score", context)
+      {:ok, score} = Expression.extract("$nodes.search_results.items[1].score", context)
       assert score == 0.87
     end
 
     test "handles array bounds - returns nil", %{context: context} do
-      {:ok, result} = ExpressionEngine.extract("$input.users[10]", context)
+      {:ok, result} = Expression.extract("$input.users[10]", context)
       assert result == nil
 
-      {:ok, result} = ExpressionEngine.extract("$input.tags[5]", context)
+      {:ok, result} = Expression.extract("$input.tags[5]", context)
       assert result == nil
     end
   end
 
-  describe "filtering with corrected syntax" do
-    setup do
-      context = %{
-        "$input" => %{
-          "users" => [
-            %{"id" => 1, "name" => "John", "email" => "john@test.com", "is_active" => true, "role" => "admin"},
-            %{"id" => 2, "name" => "Jane", "email" => "jane@test.com", "is_active" => true, "role" => "user"},
-            %{"id" => 3, "name" => "Bob", "email" => "bob@test.com", "is_active" => false, "role" => "user"},
-            %{"id" => 4, "name" => "Alice", "email" => "alice@test.com", "is_active" => true, "role" => "admin"}
-          ],
-          "orders" => [
-            %{"id" => 101, "status" => "completed", "amount" => 100, "user_id" => 1},
-            %{"id" => 102, "status" => "pending", "amount" => 200, "user_id" => 2},
-            %{"id" => 103, "status" => "completed", "amount" => 150, "user_id" => 1},
-            %{"id" => 104, "status" => "completed", "amount" => 75, "user_id" => 4}
-          ]
-        }
-      }
 
-      {:ok, context: context}
-    end
-
-    test "filters with single condition - returns arrays", %{context: context} do
-      {:ok, admin_emails} = ExpressionEngine.extract("$input.users.{role: \"admin\"}.email", context)
-      assert admin_emails == ["john@test.com", "alice@test.com"]
-
-      {:ok, active_names} = ExpressionEngine.extract("$input.users.{is_active: true}.name", context)
-      assert active_names == ["John", "Jane", "Alice"]
-
-      {:ok, completed_amounts} = ExpressionEngine.extract("$input.orders.{status: \"completed\"}.amount", context)
-      assert completed_amounts == [100, 150, 75]
-    end
-
-    test "filters with multiple conditions", %{context: context} do
-      {:ok, active_admins} = ExpressionEngine.extract("$input.users.{is_active: true, role: \"admin\"}", context)
-      assert length(active_admins) == 2
-      assert Enum.all?(active_admins, &(&1["is_active"] == true and &1["role"] == "admin"))
-
-      {:ok, user1_completed_orders} =
-        ExpressionEngine.extract("$input.orders.{status: \"completed\", user_id: 1}", context)
-
-      assert length(user1_completed_orders) == 2
-      assert Enum.all?(user1_completed_orders, &(&1["user_id"] == 1 and &1["status"] == "completed"))
-    end
-
-    test "handles no matches - returns empty arrays", %{context: context} do
-      {:ok, no_matches} = ExpressionEngine.extract("$input.users.{role: \"nonexistent\"}.name", context)
-      assert no_matches == []
-
-      {:ok, no_orders} = ExpressionEngine.extract("$input.orders.{status: \"cancelled\"}.id", context)
-      assert no_orders == []
-    end
-
-    test "single match still returns array", %{context: context} do
-      {:ok, inactive_users} = ExpressionEngine.extract("$input.users.{is_active: false}.name", context)
-      # Array with one item
-      assert inactive_users == ["Bob"]
-    end
-
-    test "filters with different value types", %{context: context} do
-      # Boolean filter
-      {:ok, active_users} = ExpressionEngine.extract("$input.users.{is_active: true}", context)
-      assert length(active_users) == 3
-
-      # Number filter
-      {:ok, user_1_orders} = ExpressionEngine.extract("$input.orders.{user_id: 1}", context)
-      assert length(user_1_orders) == 2
-
-      # String filter with single quotes
-      {:ok, admin_users} = ExpressionEngine.extract("$input.users.{role: 'admin'}", context)
-      assert length(admin_users) == 2
-    end
-  end
-
-  describe "wildcard extraction - always returns arrays" do
-    setup do
-      context = %{
-        "$input" => %{
-          "users" => [
-            %{"name" => "John", "email" => "john@test.com", "skills" => ["elixir", "javascript"]},
-            %{"name" => "Jane", "email" => "jane@test.com", "skills" => ["python", "sql"]},
-            %{"name" => "Bob", "email" => "bob@test.com", "skills" => ["java", "spring"]}
-          ]
-        }
-      }
-
-      {:ok, context: context}
-    end
-
-    test "extracts all values with wildcard", %{context: context} do
-      {:ok, names} = ExpressionEngine.extract("$input.users.*.name", context)
-      assert names == ["John", "Jane", "Bob"]
-
-      {:ok, emails} = ExpressionEngine.extract("$input.users.*.email", context)
-      assert emails == ["john@test.com", "jane@test.com", "bob@test.com"]
-    end
-
-    test "extracts all objects with wildcard", %{context: context} do
-      {:ok, users} = ExpressionEngine.extract("$input.users.*", context)
-      assert length(users) == 3
-      assert Enum.all?(users, &is_map/1)
-    end
-
-    test "extracts nested arrays with wildcard", %{context: context} do
-      {:ok, all_skills} = ExpressionEngine.extract("$input.users.*.skills.*", context)
-      assert all_skills == ["elixir", "javascript", "python", "sql", "java", "spring"]
-    end
-
-    test "wildcard with empty arrays", %{context: _context} do
-      empty_context = %{"$input" => %{"users" => []}}
-      {:ok, names} = ExpressionEngine.extract("$input.users.*.name", empty_context)
-      assert names == []
-    end
-  end
 
   describe "map processing" do
     setup do
@@ -335,23 +222,23 @@ defmodule Prana.ExpressionEngineTest do
         "email" => "$input.email",
         "api_url" => "$variables.api_url",
         "avatar" => "$nodes.get_user.profile.avatar_url",
-        # Array result
-        "all_names" => "$input.users.*.name",
-        # Array result
-        "admin_names" => "$input.users.{role: \"admin\"}.name",
+        # Single result from first user
+        "first_name" => "$input.users[0].name",
+        # Single result from second user
+        "second_name" => "$input.users[1].name",
         "static_value" => "hello",
         "number_value" => 42
       }
 
-      {:ok, processed} = ExpressionEngine.process_map(input_map, context)
+      {:ok, processed} = Expression.process_map(input_map, context)
 
       assert processed == %{
                "user_id" => 123,
                "email" => "john@test.com",
                "api_url" => "https://api.example.com",
                "avatar" => "https://example.com/avatar.jpg",
-               "all_names" => ["John", "Jane"],
-               "admin_names" => ["John"],
+               "first_name" => "John",
+               "second_name" => "Jane",
                "static_value" => "hello",
                "number_value" => 42
              }
@@ -368,11 +255,11 @@ defmodule Prana.ExpressionEngineTest do
         "config" => %{
           "api_url" => "$variables.api_url",
           # Array in nested structure
-          "user_names" => "$input.users.*.name"
+          "first_user_name" => "$input.users[0].name"
         }
       }
 
-      {:ok, processed} = ExpressionEngine.process_map(input_map, context)
+      {:ok, processed} = Expression.process_map(input_map, context)
 
       assert processed == %{
                "user_data" => %{
@@ -383,16 +270,16 @@ defmodule Prana.ExpressionEngineTest do
                },
                "config" => %{
                  "api_url" => "https://api.example.com",
-                 "user_names" => ["John", "Jane"]
+                 "first_user_name" => "John"
                }
              }
     end
 
     test "handles non-map input", %{context: context} do
-      {:ok, result} = ExpressionEngine.process_map("not a map", context)
+      {:ok, result} = Expression.process_map("not a map", context)
       assert result == "not a map"
 
-      {:ok, result} = ExpressionEngine.process_map(123, context)
+      {:ok, result} = Expression.process_map(123, context)
       assert result == 123
     end
 
@@ -402,7 +289,7 @@ defmodule Prana.ExpressionEngineTest do
         "missing" => "$input.nonexistent.field"
       }
 
-      {:ok, processed} = ExpressionEngine.process_map(input_map, context)
+      {:ok, processed} = Expression.process_map(input_map, context)
 
       assert processed == %{
                "valid" => "john@test.com",
@@ -437,43 +324,43 @@ defmodule Prana.ExpressionEngineTest do
     end
 
     test "string key access with double quotes", %{context: context} do
-      {:ok, result} = ExpressionEngine.extract("$input[\"email\"]", context)
+      {:ok, result} = Expression.extract("$input[\"email\"]", context)
       assert result == "test@example.com"
     end
 
     test "string key access with single quotes", %{context: context} do
-      {:ok, result} = ExpressionEngine.extract("$input['email']", context)
+      {:ok, result} = Expression.extract("$input['email']", context)
       assert result == "test@example.com"
     end
 
     test "atom key access", %{context: context} do
-      {:ok, result} = ExpressionEngine.extract("$input[:atom_email]", context)
+      {:ok, result} = Expression.extract("$input[:atom_email]", context)
       assert result == "atom@example.com"
     end
 
     test "string number key vs integer key distinction", %{context: context} do
       # String "0" key
-      {:ok, result1} = ExpressionEngine.extract("$input.user[\"0\"]", context)
+      {:ok, result1} = Expression.extract("$input.user[\"0\"]", context)
       assert result1 == "string_zero_value"
 
       # Integer 0 key  
-      {:ok, result2} = ExpressionEngine.extract("$input.user[0]", context)
+      {:ok, result2} = Expression.extract("$input.user[0]", context)
       assert result2 == "integer_zero_value"
     end
 
     test "integer key access in object", %{context: context} do
-      {:ok, result} = ExpressionEngine.extract("$input.object[0]", context) 
+      {:ok, result} = Expression.extract("$input.object[0]", context) 
       assert result == "integer_key_value"
     end
 
     test "mixed key types in same object", %{context: context} do
-      {:ok, atom_result} = ExpressionEngine.extract("$input.mixed_keys[:name]", context)
+      {:ok, atom_result} = Expression.extract("$input.mixed_keys[:name]", context)
       assert atom_result == "John"
 
-      {:ok, string_result} = ExpressionEngine.extract("$input.mixed_keys[\"age\"]", context)
+      {:ok, string_result} = Expression.extract("$input.mixed_keys[\"age\"]", context)
       assert string_result == 25
 
-      {:ok, dot_result} = ExpressionEngine.extract("$input.mixed_keys.role", context)
+      {:ok, dot_result} = Expression.extract("$input.mixed_keys.role", context)
       assert dot_result == "admin"
     end
 
@@ -484,13 +371,13 @@ defmodule Prana.ExpressionEngineTest do
         }
       }
 
-      {:ok, result} = ExpressionEngine.extract("$input[:atom_key]", simple_context)
+      {:ok, result} = Expression.extract("$input[:atom_key]", simple_context)
       assert result == "atom_value"
     end
 
     test "nested bracket access with debug", %{context: _context} do
       # Let's test step by step to understand what's happening
-      {:ok, result1} = ExpressionEngine.extract("$input.mixed_keys[:name]", %{
+      {:ok, result1} = Expression.extract("$input.mixed_keys[:name]", %{
         "$input" => %{
           "mixed_keys" => %{
             :name => "John"
@@ -531,21 +418,20 @@ defmodule Prana.ExpressionEngineTest do
         "base_url" => "$variables.api_base_url",
         "tenant_id" => "$input.tenant_id",
         "template" => "$variables.notification_template",
-        "all_emails" => "$nodes.get_users.response.users.*.email",
-        "admin_emails" => "$nodes.get_users.response.users.{role: \"admin\"}.email",
-        "active_admin_ids" => "$nodes.get_users.response.users.{role: \"admin\", is_active: true}.id"
+        "first_email" => "$nodes.get_users.response.users[0].email",
+        "second_email" => "$nodes.get_users.response.users[1].email",
+        "first_user_id" => "$nodes.get_users.response.users[0].id"
       }
 
-      {:ok, prepared} = ExpressionEngine.process_map(notification_input, context)
+      {:ok, prepared} = Expression.process_map(notification_input, context)
 
       assert prepared == %{
                "base_url" => "https://api.example.com",
                "tenant_id" => "tenant_123",
                "template" => "Welcome {{name}}!",
-               "all_emails" => ["john@test.com", "jane@test.com", "bob@test.com"],
-               "admin_emails" => ["john@test.com", "bob@test.com"],
-               # Only John is active admin
-               "active_admin_ids" => [1]
+               "first_email" => "john@test.com",
+               "second_email" => "jane@test.com", 
+               "first_user_id" => 1
              }
     end
 
@@ -559,22 +445,22 @@ defmodule Prana.ExpressionEngineTest do
       }
 
       # Empty expressions should return as-is
-      {:ok, "$"} = ExpressionEngine.extract("$", context)
+      {:ok, "$"} = Expression.extract("$", context)
 
       # Deep nesting should work
-      {:ok, value} = ExpressionEngine.extract("$input.nested.deep.value", context)
+      {:ok, value} = Expression.extract("$input.nested.deep.value", context)
       assert value == "found"
 
-      # Wildcards on empty arrays should return empty arrays
-      {:ok, empty} = ExpressionEngine.extract("$input.empty_list.*", context)
-      assert empty == []
+      # Accessing empty arrays should return nil for index access
+      {:ok, empty} = Expression.extract("$input.empty_list[0]", context)
+      assert empty == nil
 
       # Accessing nil should return nil (graceful handling)
-      {:ok, result} = ExpressionEngine.extract("$input.null_value.field", context)
+      {:ok, result} = Expression.extract("$input.null_value.field", context)
       assert result == nil
 
       # Accessing missing root should return nil
-      {:ok, result} = ExpressionEngine.extract("$nonexistent.field", context)
+      {:ok, result} = Expression.extract("$nonexistent.field", context)
       assert result == nil
     end
   end

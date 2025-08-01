@@ -1,7 +1,8 @@
 # Expression System Migration Plan
 
 **Date**: July 2025
-**Status**: COMPLETED ✅ ARCHIVED
+**Status**: COMPLETED ✅ ARCHIVED  
+**Updated**: August 2025 - Expression engine simplified to fetch-only with mixed key support
 **Purpose**: Migrate from `$node.{node_id}` to `$nodes.{node_id}.output` for extensible node attributes
 
 ## Overview
@@ -16,14 +17,19 @@
 - **Primary Implementation**: `lib/prana/expression_engine.ex`
 - **Test Coverage**: `test/prana/expression_engine_test.exs`
 
-### Current Expression Patterns
+### Current Expression Patterns (UPDATED AUGUST 2025)
 ```elixir
-# Structured node access (NEW FORMAT)
+# Structured node access (CURRENT FORMAT)
 "$nodes.api_call.output.user_id"              # Single value from output
 "$nodes.api_call.output.response.user_id"     # Nested access from output
-"$nodes.api_call.output.users.*.name"         # Wildcard access from output
-"$nodes.api_call.output.users.{status: \"active\"}.email"  # Filtered access from output
+"$nodes.api_call.output.users[0].name"        # Array index access from output
 "$nodes.api_call.context.loop_index"          # Context access
+
+# Mixed key access (NEW IN AUGUST 2025)
+"$input[:atom_key]"                           # Atom key access
+"$input[\"string_key\"]"                     # String key access
+"$input.user[:name]"                          # Dot notation + atom key
+"$nodes.api_call.output[\"data\"][0]"         # Mixed bracket notation
 ```
 
 ### Usage Locations to Audit
@@ -286,14 +292,17 @@ end
 5. **✅ Clean Migration**: Updated to structured patterns without backward compatibility burden
 6. **✅ Action Context Support**: Actions can return context via `{:ok, data, context}` patterns
 
-## ✅ ARCHIVED - MIGRATION COMPLETE
+## ✅ ARCHIVED - MIGRATION COMPLETE (UPDATED AUGUST 2025)
 
 This migration is now complete and archived. The expression system successfully supports:
 
 1. **✅ Structured Node Access**: `$nodes.{node_id}.output` and `$nodes.{node_id}.context` patterns
-2. **✅ Loop Context Support**: Foundation ready for iteration tracking and advanced features
-3. **✅ Backward Compatibility**: Existing flat patterns continue to work unchanged
-4. **✅ Future-Proof Architecture**: Ready for loop integrations and complex workflow coordination
+2. **✅ Mixed Key Access**: String, atom, and integer keys via bracket notation (ADDED AUGUST 2025)
+3. **✅ Simplified Architecture**: Fetch-only operations, no wildcards or filters (SIMPLIFIED AUGUST 2025)
+4. **✅ Backward Compatibility**: Existing patterns continue to work unchanged
+5. **✅ Future-Proof Architecture**: Ready for loop integrations and complex workflow coordination
+
+**Latest update (August 2025)**: Expression engine simplified to fetch-only operations with comprehensive mixed key support for better consistency and performance.
 
 **Next development**: Loop integrations can now leverage the structured context patterns for advanced workflow capabilities.
 

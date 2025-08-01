@@ -2,11 +2,11 @@ defmodule Prana.Template.Evaluator do
   @moduledoc """
   Expression evaluator for template expressions.
 
-  Evaluates parsed expression ASTs by integrating with Prana.ExpressionEngine
+  Evaluates parsed expression ASTs by integrating with Prana.Template.Expression
   for variable path resolution and implementing arithmetic/boolean operations.
   """
 
-  alias Prana.ExpressionEngine
+  alias Prana.Template.Expression
   alias Prana.Template.FilterRegistry
 
   # Security limits
@@ -199,9 +199,9 @@ defmodule Prana.Template.Evaluator do
   end
 
   defp evaluate_variable_path(path, context) do
-    # Prana expression path (starts with $) - use ExpressionEngine
+    # Prana expression path (starts with $) - use Expression
     if String.starts_with?(path, "$") do
-      ExpressionEngine.extract(path, context)
+      Expression.extract(path, context)
     else
       # Simple variable name - look up directly in context, including scoped variables
       # First try direct access for scoped variables like "user"

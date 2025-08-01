@@ -36,21 +36,32 @@ Prana.Template.render(template_string, context_map, opts \\ [])
 #### 4.1 Basic Variable Interpolation
 ```elixir
 "Hello {{ $input.user.name }}"
+"User email: {{ $input[:email] }}"  # Atom key access
+"First item: {{ $input.items[0] }}"   # Array index access
+"String key: {{ $input[\"data\"] }}" # String key access
 ```
 
-#### 4.2 Arithmetic Expressions
+#### 4.2 Mixed Key Access (NEW)
+```elixir
+"{{ $input.user[:name] }}"          # Dot notation + atom key
+"{{ $input.user[\"email\"] }}"     # Dot notation + string key
+"{{ $input.data[0].title }}"        # Array index + field access
+"{{ $input[\"config\"][:timeout] }}" # Mixed string and atom keys
+```
+
+#### 4.3 Arithmetic Expressions
 ```elixir
 "{{ $input.age + 10 }}"
 "{{ ($input.price - 5) * 2 }}"
 ```
 
-#### 4.3 Boolean Expressions
+#### 4.4 Boolean Expressions
 ```elixir
 "{{ $input.age > 30 }}"
 "{{ $input.age > 18 && $input.verified == true }}"
 ```
 
-#### 4.4 Filter Syntax
+#### 4.5 Filter Syntax
 ```elixir
 "{{ $input.name | upper_case }}"
 "{{ $input.price | format_currency('USD') }}"
@@ -118,9 +129,10 @@ to_string()           # Convert to string
 2. **Expression Parsing**: Use NimbleParsec to parse expression content
 
 #### 7.2 Variable Integration
-- Use existing `Prana.evaluate("$input.user.name")` for variable path extraction
-- Resolve variable paths against provided context map
+- Use existing `Prana.ExpressionEngine.extract("$input.user.name", context)` for variable path extraction
+- Support mixed key types: string keys, atom keys, integer keys
 - Handle nested map access gracefully (return `nil` for missing keys)
+- Support bracket notation: `$input["key"]`, `$input[:atom]`, `$input[0]`
 
 #### 7.3 Operator Precedence (highest to lowest)
 1. Parentheses `()`
@@ -203,8 +215,9 @@ Prana.Template.render("{{ $input.user.name | upper_case | truncate(3) }}", conte
 1. **Start with template extraction** - Get basic `{{ }}` parsing working first
 2. **Build expression parser incrementally** - Start with variables, add operators gradually
 3. **Implement filters last** - Core expression evaluation is the critical path
-4. **Leverage existing Prana** - Use `Prana.evaluate()` for variable path extraction
+4. **Leverage existing Prana** - Use `Prana.ExpressionEngine.extract/2` for variable path extraction with mixed key support
 5. **Error handling throughout** - Don't defer error handling to the end
+6. **Mixed key support** - Ensure parser handles string, atom, and integer keys in bracket notation
 
 ## Success Criteria
 - All example usage cases work correctly
