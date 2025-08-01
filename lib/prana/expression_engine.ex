@@ -15,9 +15,17 @@ defmodule Prana.ExpressionEngine do
   - `$nodes.api_call.response.user_id` - Nested field from node output
   - `$variables.api_url` - Variable value
 
+  ### Bracket Key Access  
+  - `$input["email"]` - String key access with double quotes
+  - `$input['email']` - String key access with single quotes
+  - `$input[:email]` - Atom key access
+  - `$input.user["0"]` - String number key (different from integer 0)
+  - `$input.object[0]` - Integer key or array index
+
   ### Array Access
   - `$input.users[0]` - First item in array
   - `$input.users[0].name` - Field from indexed item
+  - `$input.users[1][:email]` - Mixed bracket and atom access
 
   ### Wildcard Extraction (Always Returns Arrays)
   - `$input.users.*` - All users (array of objects)
@@ -315,26 +323,44 @@ defmodule Prana.ExpressionEngine do
   end
 
   defp parse_array_segment(segment) do
-    # Parse "users[0]" or "[0]"
+    # Parse "users[0]", "[0]", "users[\"key\"]", "users[:atom]"
     case String.split(segment, "[", parts: 2) do
       [base, index_part] ->
         index_string = String.trim_trailing(index_part, "]")
+        key = parse_bracket_key(index_string)
 
-        case Integer.parse(index_string) do
-          {index, ""} ->
-            if base == "" do
-              [index]
-            else
-              [base, index]
-            end
-
-          _ ->
-            # Invalid index, treat as regular segment
-            [segment]
+        if base == "" do
+          [key]
+        else
+          [base, key]
         end
 
       [segment] ->
         [segment]
+    end
+  end
+
+  defp parse_bracket_key(key_string) do
+    cond do
+      # Atom key: [:email] -> :email
+      String.starts_with?(key_string, ":") ->
+        key_string |> String.slice(1..-1//1) |> String.to_atom()
+
+      # Double-quoted string: ["email"] -> "email"
+      String.starts_with?(key_string, "\"") and String.ends_with?(key_string, "\"") ->
+        String.slice(key_string, 1..-2//1)
+
+      # Single-quoted string: ['email'] -> "email" 
+      String.starts_with?(key_string, "'") and String.ends_with?(key_string, "'") ->
+        String.slice(key_string, 1..-2//1)
+
+      # Integer: [0] -> 0
+      String.match?(key_string, ~r/^\d+$/) ->
+        String.to_integer(key_string)
+
+      # Unquoted string: [email] -> "email" (fallback)
+      true ->
+        key_string
     end
   end
 

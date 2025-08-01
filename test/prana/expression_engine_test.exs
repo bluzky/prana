@@ -411,6 +411,96 @@ defmodule Prana.ExpressionEngineTest do
     end
   end
 
+  describe "extended bracket syntax" do
+    setup do
+      context = %{
+        "$input" => %{
+          "email" => "test@example.com",
+          :atom_email => "atom@example.com",
+          "user" => %{
+            "0" => "string_zero_value",
+            0 => "integer_zero_value"
+          },
+          "object" => %{
+            0 => "integer_key_value",
+            "1" => "string_key_value"
+          },
+          "mixed_keys" => %{
+            :name => "John",
+            "age" => 25,
+            "role" => "admin"
+          }
+        }
+      }
+
+      {:ok, context: context}
+    end
+
+    test "string key access with double quotes", %{context: context} do
+      {:ok, result} = ExpressionEngine.extract("$input[\"email\"]", context)
+      assert result == "test@example.com"
+    end
+
+    test "string key access with single quotes", %{context: context} do
+      {:ok, result} = ExpressionEngine.extract("$input['email']", context)
+      assert result == "test@example.com"
+    end
+
+    test "atom key access", %{context: context} do
+      {:ok, result} = ExpressionEngine.extract("$input[:atom_email]", context)
+      assert result == "atom@example.com"
+    end
+
+    test "string number key vs integer key distinction", %{context: context} do
+      # String "0" key
+      {:ok, result1} = ExpressionEngine.extract("$input.user[\"0\"]", context)
+      assert result1 == "string_zero_value"
+
+      # Integer 0 key  
+      {:ok, result2} = ExpressionEngine.extract("$input.user[0]", context)
+      assert result2 == "integer_zero_value"
+    end
+
+    test "integer key access in object", %{context: context} do
+      {:ok, result} = ExpressionEngine.extract("$input.object[0]", context) 
+      assert result == "integer_key_value"
+    end
+
+    test "mixed key types in same object", %{context: context} do
+      {:ok, atom_result} = ExpressionEngine.extract("$input.mixed_keys[:name]", context)
+      assert atom_result == "John"
+
+      {:ok, string_result} = ExpressionEngine.extract("$input.mixed_keys[\"age\"]", context)
+      assert string_result == 25
+
+      {:ok, dot_result} = ExpressionEngine.extract("$input.mixed_keys.role", context)
+      assert dot_result == "admin"
+    end
+
+    test "simple atom key access works", %{context: _context} do
+      simple_context = %{
+        "$input" => %{
+          :atom_key => "atom_value"
+        }
+      }
+
+      {:ok, result} = ExpressionEngine.extract("$input[:atom_key]", simple_context)
+      assert result == "atom_value"
+    end
+
+    test "nested bracket access with debug", %{context: _context} do
+      # Let's test step by step to understand what's happening
+      {:ok, result1} = ExpressionEngine.extract("$input.mixed_keys[:name]", %{
+        "$input" => %{
+          "mixed_keys" => %{
+            :name => "John"
+          }
+        }
+      })
+      assert result1 == "John"
+    end
+  end
+
   describe "complex scenarios" do
     test "workflow node input preparation" do
       context = %{
