@@ -297,4 +297,270 @@ defmodule Prana.Template.EngineTest do
       assert result =~ "Error: For loop iterable must be a list"
     end
   end
+
+  describe "compile/2 functionality" do
+    test "compiles simple template successfully" do
+      template = "Hello {{ $input.name }}!"
+      
+      assert {:ok, compiled} = Engine.compile(template)
+      assert %Engine.CompiledTemplate{} = compiled
+      assert compiled.metadata.size == byte_size(template)
+      assert compiled.metadata.complexity > 0
+      assert %DateTime{} = compiled.metadata.compiled_at
+    end
+
+    test "compiles complex template with control flow" do
+      template = """
+      {% if $user.premium %}
+      Welcome {{ $user.name | upper_case }}!
+      {% endif %}
+      """
+      
+      assert {:ok, compiled} = Engine.compile(template)
+      assert compiled.metadata.complexity > 5  # Higher complexity due to control flow
+    end
+
+    test "compiles template with arithmetic expressions" do
+      template = "Result: {{ ($a + $b) * $c }}"
+      
+      assert {:ok, compiled} = Engine.compile(template)
+      assert compiled.metadata.complexity > 0
+    end
+
+    test "compiles single expression template" do
+      template = "{{ $value }}"
+      
+      assert {:ok, compiled} = Engine.compile(template)
+      assert compiled.metadata.size == 12
+    end
+
+    test "compiles empty template" do
+      template = ""
+      
+      assert {:ok, compiled} = Engine.compile(template)
+      assert compiled.metadata.size == 0
+      assert compiled.metadata.complexity == 0
+    end
+
+    test "compiles literal-only template" do
+      template = "This is just literal text with no expressions"
+      
+      assert {:ok, compiled} = Engine.compile(template)
+      assert compiled.metadata.complexity == 1  # Just one literal block
+    end
+
+    test "respects compilation options" do
+      template = "{{ $value }}"
+      options = [strict_mode: true, max_template_size: 1000]
+      
+      assert {:ok, compiled} = Engine.compile(template, options)
+      assert compiled.options.strict_mode == true
+      assert compiled.options.max_template_size == 1000
+    end
+
+    test "enforces template size limits during compilation" do
+      large_template = String.duplicate("{{ $x }}", 1000)
+      
+      assert {:error, "Template size exceeds maximum allowed" <> _} = 
+        Engine.compile(large_template, max_template_size: 100)
+    end
+
+    test "compiles invalid template syntax as literal text" do
+      template = "{{ unclosed expression"
+
+      assert {:ok, compiled} = Engine.compile(template)
+      assert compiled.metadata.complexity == 1  # Treated as literal text
+    end
+  end
+
+  describe "render with compiled templates" do
+    test "renders compiled simple template" do
+      template = "Hello {{ $input.name }}!"
+      context = %{"$input" => %{"name" => "Alice"}}
+      
+      {:ok, compiled} = Engine.compile(template)
+      
+      assert {:ok, "Hello Alice!"} = Engine.render(compiled, context)
+    end
+
+    test "renders compiled single expression template with original type" do
+      template = "{{ $input.value }}"
+      context = %{"$input" => %{"value" => 42}}
+      
+      {:ok, compiled} = Engine.compile(template)
+      
+      assert {:ok, 42} = Engine.render(compiled, context)
+    end
+
+    test "renders compiled template with arithmetic" do
+      template = "Result: {{ $input.a + $input.b }}"
+      context = %{"$input" => %{"a" => 10, "b" => 5}}
+      
+      {:ok, compiled} = Engine.compile(template)
+      
+      assert {:ok, "Result: 15"} = Engine.render(compiled, context)
+    end
+
+    test "renders compiled template with filters" do
+      template = "{{ $input.text | upper_case }}"
+      context = %{"$input" => %{"text" => "hello"}}
+      
+      {:ok, compiled} = Engine.compile(template)
+      
+      assert {:ok, "HELLO"} = Engine.render(compiled, context)
+    end
+
+    test "renders compiled template with if statement" do
+      template = "{% if $input.show %}Visible{% endif %}"
+      
+      {:ok, compiled} = Engine.compile(template)
+      
+      assert {:ok, "Visible"} = Engine.render(compiled, %{"$input" => %{"show" => true}})
+      assert {:ok, ""} = Engine.render(compiled, %{"$input" => %{"show" => false}})
+    end
+
+    test "renders same compiled template multiple times with different contexts" do
+      template = "Hello {{ $input.name }}!"
+      {:ok, compiled} = Engine.compile(template)
+      
+      assert {:ok, "Hello Alice!"} = Engine.render(compiled, %{"$input" => %{"name" => "Alice"}})
+      assert {:ok, "Hello Bob!"} = Engine.render(compiled, %{"$input" => %{"name" => "Bob"}})
+      assert {:ok, "Hello Charlie!"} = Engine.render(compiled, %{"$input" => %{"name" => "Charlie"}})
+    end
+
+    test "compiled template performance is consistent" do
+      template = "Welcome {{ $user.name | upper_case }}! You have {{ $items | length }} items."
+      context = %{"$user" => %{"name" => "alice"}, "$items" => [1, 2, 3, 4, 5]}
+      
+      {:ok, compiled} = Engine.compile(template)
+      expected = "Welcome ALICE! You have 5 items."
+      
+      # Render multiple times to ensure consistency
+      for _ <- 1..10 do
+        assert {:ok, ^expected} = Engine.render(compiled, context)
+      end
+    end
+
+    test "compiled template handles missing variables gracefully" do
+      template = "Hello {{ $input.missing }}!"
+      {:ok, compiled} = Engine.compile(template)
+      
+      assert {:ok, "Hello !"} = Engine.render(compiled, %{})
+    end
+
+    test "compiled template maintains error handling behavior" do
+      template = "{{ $input.value | round }}"
+      {:ok, compiled} = Engine.compile(template)
+      
+      # Invalid value should cause filter error
+      assert {:error, _reason} = Engine.render(compiled, %{"$input" => %{"value" => "not_a_number"}})
+    end
+  end
+
+  describe "render/2 API unification" do
+    test "render accepts both strings and compiled templates seamlessly" do
+      template = "Hello {{ $input.name }}!"
+      context = %{"$input" => %{"name" => "Alice"}}
+      
+      # String template
+      {:ok, result1} = Engine.render(template, context)
+      
+      # Compiled template  
+      {:ok, compiled} = Engine.compile(template)
+      {:ok, result2} = Engine.render(compiled, context)
+      
+      # Results should be identical
+      assert result1 == result2
+      assert result1 == "Hello Alice!"
+    end
+
+    test "render/3 with options works for both string and compiled templates" do
+      template = "{{ $invalid | unknown_filter }}"
+      
+      # String template with strict mode
+      assert {:error, _} = Engine.render(template, %{}, strict_mode: true)
+      
+      # Compiled template ignores options in render (uses compile-time options)
+      {:ok, compiled} = Engine.compile(template, strict_mode: false)
+      assert {:error, _} = Engine.render(compiled, %{}, strict_mode: true)  # Compile-time options take precedence
+    end
+
+  end
+
+  describe "process_map functionality" do
+    setup do
+      context = %{
+        "$input" => %{
+          "user" => %{"name" => "John", "age" => 25},
+          "fallback_name" => "Default User",
+          "missing_field" => nil
+        },
+        "$variables" => %{
+          "default_age" => 18,
+          "currency" => "USD"
+        }
+      }
+
+      {:ok, context: context}
+    end
+
+    test "process_map works with simple expressions", %{context: context} do
+      input_map = %{
+        "greeting" => "{{ $input.user.name }}",
+        "age" => "{{ $input.user.age }}",
+        "static" => "Hello World"
+      }
+
+      assert {:ok, result} = Engine.process_map(input_map, context)
+      assert result["greeting"] == "John"
+      assert result["age"] == 25
+      assert result["static"] == "Hello World"
+    end
+
+    test "process_map maintains original types for single expressions", %{context: context} do
+      input_map = %{
+        "name" => "{{ $input.user.name }}",  # String
+        "age" => "{{ $input.user.age }}",    # Integer
+        "missing" => "{{ $input.missing_field }}" # nil
+      }
+
+      assert {:ok, result} = Engine.process_map(input_map, context)
+      assert result["name"] == "John"
+      assert result["age"] == 25
+      assert result["missing"] == nil
+    end
+
+    test "process_map handles nested structures", %{context: context} do
+      input_map = %{
+        "user_info" => %{
+          "display_name" => "{{ $input.user.name }}",
+          "years_old" => "{{ $input.user.age }}"
+        },
+        "metadata" => [
+          "{{ $input.user.name }}",
+          "{{ $input.user.age }}"
+        ]
+      }
+
+      assert {:ok, result} = Engine.process_map(input_map, context)
+      assert result["user_info"]["display_name"] == "John"
+      assert result["user_info"]["years_old"] == 25
+      assert result["metadata"] == ["John", 25]
+    end
+
+    test "process_map works with mixed content templates" do
+      input_map = %{
+        "greeting" => "Hello {{ $input.name }}!",
+        "message" => "Welcome {{ $input.name | upper_case }}"
+      }
+      context = %{"$input" => %{"name" => "alice"}}
+      
+      expected = %{
+        "greeting" => "Hello alice!",
+        "message" => "Welcome ALICE"
+      }
+      
+      assert {:ok, ^expected} = Engine.process_map(input_map, context)
+    end
+  end
 end
