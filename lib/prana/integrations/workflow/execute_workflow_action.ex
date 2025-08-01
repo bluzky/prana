@@ -1,11 +1,12 @@
 defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   @moduledoc """
-  Execute Sub-workflow Action - trigger a sub-workflow with coordination
+  Execute Sub-workflow Action - trigger a sub-workflow with coordination and batch processing
 
   Expected params:
   - workflow_id: The ID of the sub-workflow to execute
   - input_data: Data to pass to the sub-workflow (optional, defaults to full input from parent workflow)
   - execution_mode: Execution mode - "sync" | "async" | "fire_and_forget" (optional, defaults to "sync")
+  - batch_mode: Batch processing mode - "batch" | "single" (optional, defaults to "single")
   - timeout_ms: Maximum time to wait for sub-workflow completion in milliseconds (optional, defaults to 5 minutes)
   - failure_strategy: How to handle sub-workflow failures - "fail_parent" | "continue" (optional, defaults to "fail_parent")
 
@@ -15,6 +16,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   - Synchronous ("sync"): Parent workflow suspends until sub-workflow completes
   - Asynchronous ("async"): Parent workflow suspends, sub-workflow executes async, parent resumes when complete
   - Fire-and-Forget ("fire_and_forget"): Parent workflow triggers sub-workflow and continues immediately
+
+  Batch Processing Modes:
+  - Batch ("batch"): Run sub-workflow once with all items from input main port (input passed as-is)
+  - Single ("single"): Run sub-workflow for each item individually - non-arrays are wrapped in a list for consistent processing (default)
+
+  The integrating application is responsible for handling the actual batch execution logic.
 
   Returns:
   - {:suspend, :sub_workflow_sync, suspension_data} for synchronous execution
@@ -50,6 +57,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     # Extract configuration
     workflow_id = Map.get(params, "workflow_id")
     execution_mode = Map.get(params, "execution_mode", "sync")
+    batch_mode = Map.get(params, "batch_mode", "single")
     # 5 minutes default
     timeout_ms = Map.get(params, "timeout_ms", 300_000)
     failure_strategy = Map.get(params, "failure_strategy", "fail_parent")
@@ -57,15 +65,30 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     # Validate required parameters
     with :ok <- validate_workflow_id(workflow_id),
          :ok <- validate_execution_mode(execution_mode),
+         :ok <- validate_batch_mode(batch_mode),
          :ok <- validate_timeout(timeout_ms),
          :ok <- validate_failure_strategy(failure_strategy) do
-      # Prepare sub-workflow execution data with input from parent workflow
-
-      input_data = context["$input"]["main"] || %{}
+      # Get input data from parent workflow
+      raw_input_data = context["$input"]["main"] || %{}
+      
+      # Normalize input data based on batch mode
+      input_data = case batch_mode do
+        "batch" -> 
+          # Batch mode: pass input as-is
+          raw_input_data
+        "single" ->
+          # Single mode: wrap non-arrays in a list for consistent processing
+          if is_list(raw_input_data) do
+            raw_input_data
+          else
+            [raw_input_data]
+          end
+      end
 
       sub_workflow_data = %{
         workflow_id: workflow_id,
         execution_mode: execution_mode,
+        batch_mode: batch_mode,
         timeout_ms: timeout_ms,
         failure_strategy: failure_strategy,
         input_data: input_data,
@@ -148,6 +171,10 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   # Validate execution_mode parameter
   defp validate_execution_mode(mode) when mode in ["sync", "async", "fire_and_forget"], do: :ok
   defp validate_execution_mode(_), do: {:error, "execution_mode must be 'sync', 'async', or 'fire_and_forget'"}
+
+  # Validate batch_mode parameter
+  defp validate_batch_mode(mode) when mode in ["batch", "single"], do: :ok
+  defp validate_batch_mode(_), do: {:error, "batch_mode must be 'batch' or 'single'"}
 
   # Validate failure_strategy parameter
   defp validate_failure_strategy(strategy) when strategy in ["fail_parent", "continue"], do: :ok
