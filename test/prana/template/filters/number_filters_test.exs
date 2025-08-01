@@ -1,7 +1,7 @@
 defmodule Prana.Template.Filters.NumberFiltersTest do
   use ExUnit.Case, async: false
 
-  alias Prana.Template.Engine
+  alias Prana.Template.V2.Engine
 
   describe "number filters" do
     setup do

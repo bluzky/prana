@@ -1,7 +1,7 @@
 defmodule Prana.Template.Filters.StringFiltersTest do
   use ExUnit.Case, async: false
 
-  alias Prana.Template.Engine
+  alias Prana.Template.V2.Engine
 
   describe "string filters" do
     setup do

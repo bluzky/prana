@@ -91,7 +91,7 @@ defmodule Prana.NodeExecutor do
   defp prepare_params(%Node{params: nil}, _context), do: {:ok, %{}}
 
   defp prepare_params(%Node{params: params}, context) when is_map(params) do
-    case Prana.Template.Engine.process_map(params, context) do
+    case Prana.Template.V2.Engine.process_map(params, context) do
       {:ok, processed_map} ->
         {:ok, processed_map || %{}}
 

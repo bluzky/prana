@@ -1,7 +1,7 @@
 defmodule Prana.Template.EngineTest do
   use ExUnit.Case, async: false
 
-  alias Prana.Template.Engine
+  alias Prana.Template.V2.Engine
 
   describe "basic template rendering with correct context format" do
     setup do

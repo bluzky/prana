@@ -22,11 +22,13 @@ defmodule Prana.MixProject do
   defp deps do
     [
       {:nestex, "~> 0.2"},
+      {:nimble_parsec, "~> 1.4"},
       {:req, "~> 0.5"},
       {:skema, "~> 1.0"},
       {:uuid, "~> 1.1"},
       {:styler, "~> 1.5", only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:benchee, "~> 1.3", only: [:dev], runtime: false}
 
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}

@@ -1,7 +1,7 @@
 defmodule Prana.Template.Filters.FilterChainingTest do
   use ExUnit.Case, async: false
 
-  alias Prana.Template.Engine
+  alias Prana.Template.V2.Engine
 
   describe "filter chaining across types" do
     setup do
