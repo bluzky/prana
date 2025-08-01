@@ -73,19 +73,20 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     case validate_params(params) do
       {:ok, validated_params} ->
         # Get input data from parent workflow
-        raw_input_data = context["$input"]["main"] || %{}
+        raw_input_data = get_in(context, ["$input", "main"])
         
         # Normalize input data based on batch mode
         input_data = case validated_params.batch_mode do
           "batch" -> 
-            # Batch mode: pass input as-is
-            raw_input_data
+            # Batch mode: pass input as-is, default to empty map if nil
+            raw_input_data || %{}
           "single" ->
             # Single mode: wrap non-arrays in a list for consistent processing
-            if is_list(raw_input_data) do
-              raw_input_data
-            else
-              [raw_input_data]
+            # Treat nil/missing input as empty list instead of wrapping nil
+            case raw_input_data do
+              nil -> []
+              data when is_list(data) -> data
+              data -> [data]
             end
         end
 

@@ -3,6 +3,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
   alias Prana.Integrations.Workflow.ExecuteWorkflowAction
 
+  # Test helper
+  defp execute_with_input(params, input_data) do
+    context = %{"$input" => %{"main" => input_data}}
+    ExecuteWorkflowAction.execute(params, context)
+  end
+
   describe "execute/1" do
     test "returns suspension for synchronous execution with valid parameters" do
       input_map = %{
@@ -298,8 +304,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data.batch_mode == "single"
-      # Missing input should default to empty map and be wrapped for single mode
-      assert suspension_data.input_data == [%{}]
+      # Missing input should default to empty list for single mode
+      assert suspension_data.input_data == []
     end
 
     test "handles missing main port in input context" do
@@ -319,6 +325,36 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       assert suspension_data.batch_mode == "batch"
       # Missing main port should default to empty map
       assert suspension_data.input_data == %{}
+    end
+
+    test "async mode applies batch_mode normalization" do
+      input_map = %{
+        "workflow_id" => "test_workflow",
+        "execution_mode" => "async",
+        "batch_mode" => "single"
+      }
+
+      context = %{"$input" => %{"main" => %{"user_id" => 123}}}
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_async, suspension_data} = result
+      assert suspension_data.input_data == [%{"user_id" => 123}]
+    end
+
+    test "fire_and_forget mode applies batch_mode normalization" do
+      input_map = %{
+        "workflow_id" => "test_workflow",
+        "execution_mode" => "fire_and_forget",
+        "batch_mode" => "single"
+      }
+
+      context = %{"$input" => %{"main" => %{"notification_id" => "123"}}}
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
+      assert suspension_data.input_data == [%{"notification_id" => "123"}]
     end
   end
 end
