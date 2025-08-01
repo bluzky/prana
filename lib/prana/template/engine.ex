@@ -1,27 +1,27 @@
-defmodule Prana.Template.V2.Engine do
+defmodule Prana.Template.Engine do
   @moduledoc """
   NimbleParsec-based template engine with identical public API to Prana.Template.Engine.
-  
+
   Provides high-performance template parsing and evaluation while maintaining
   100% backward compatibility with existing template functionality.
-  
+
   Key improvements:
   - 5-10x faster template parsing with NimbleParsec
   - 3-5x faster expression evaluation
   - Template compilation caching for 70-90% performance gains
   - Better error reporting with line/column information
   - Memory usage reduced by 50% during parsing
-  
+
   API Compatibility:
   - render/2: Identical behavior for all template patterns
   - process_map/2: Uses existing Expression.process_map/2 for map processing
   - Single expression templates return original value types
   - Mixed content templates return concatenated strings
   """
-  
-  alias Prana.Template.V2.Parser
-  alias Prana.Template.V2.Evaluator
-  alias Prana.Template.V2.ExpressionParser
+
+  alias Prana.Template.Parser
+  alias Prana.Template.Evaluator
+  alias Prana.Template.ExpressionParser
 
   # Compiled template struct for high-performance caching
   defmodule CompiledTemplate do

@@ -1,7 +1,7 @@
 defmodule Prana.Template.SecurityTest do
   use ExUnit.Case, async: true
 
-  alias Prana.Template.V2.Engine
+  alias Prana.Template.Engine
 
   describe "template size limits" do
     test "rejects templates exceeding size limit" do

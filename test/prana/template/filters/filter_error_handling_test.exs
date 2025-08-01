@@ -1,7 +1,7 @@
 defmodule Prana.Template.Filters.FilterErrorHandlingTest do
   use ExUnit.Case, async: false
 
-  alias Prana.Template.V2.Engine
+  alias Prana.Template.Engine
 
   describe "filter error handling" do
     setup do

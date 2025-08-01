@@ -1,7 +1,7 @@
 defmodule Prana.Template.Filters.CollectionFiltersTest do
   use ExUnit.Case, async: false
 
-  alias Prana.Template.V2.Engine
+  alias Prana.Template.Engine
 
   describe "collection filters" do
     setup do

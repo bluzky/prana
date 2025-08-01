@@ -1,4 +1,4 @@
-defmodule Prana.Template.V2.ExpressionParser do
+defmodule Prana.Template.ExpressionParser do
   @moduledoc """
   NimbleParsec-based expression parser with full operator precedence support.
 
@@ -80,7 +80,7 @@ defmodule Prana.Template.V2.ExpressionParser do
     |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
     |> reduce({List, :to_string, []})
     |> unwrap_and_tag(:variable)
-  
+
   # Local variables (like loop variables: user.name)
   local_variable =
     [?a..?z, ?A..?Z]
@@ -88,10 +88,10 @@ defmodule Prana.Template.V2.ExpressionParser do
     |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
     |> reduce({List, :to_string, []})
     |> unwrap_and_tag(:local_variable)
-  
+
   # Combined variable matching (context first, then local)
   variable_name = choice([context_variable, local_variable])
-  
+
   # Unquoted identifier (for function arguments - treated as variable reference)
   unquoted_identifier =
     [?a..?z, ?A..?Z]
@@ -109,17 +109,21 @@ defmodule Prana.Template.V2.ExpressionParser do
 
   # Simple parenthesized expression with basic binary operations
   parenthesized_expression =
-    ignore(ascii_char([?(]))
+    [?(]
+    |> ascii_char()
+    |> ignore()
     |> concat(whitespace)
     |> choice([variable_name, float, integer, double_quoted_string, single_quoted_string, boolean])
     |> repeat(
       whitespace
-      |> concat(choice([
-        string("+") |> replace(:add),
-        string("-") |> replace(:sub),
-        string("*") |> replace(:mul),
-        string("/") |> replace(:div)
-      ]))
+      |> concat(
+        choice([
+          "+" |> string() |> replace(:add),
+          "-" |> string() |> replace(:sub),
+          "*" |> string() |> replace(:mul),
+          "/" |> string() |> replace(:div)
+        ])
+      )
       |> concat(whitespace)
       |> choice([variable_name, float, integer, double_quoted_string, single_quoted_string, boolean])
     )
@@ -127,7 +131,7 @@ defmodule Prana.Template.V2.ExpressionParser do
     |> ignore(ascii_char([?)]))
     |> reduce({__MODULE__, :build_binary_ops, []})
     |> unwrap_and_tag(:grouped)
-  
+
   # Simple expression for basic functionality
   simple_value =
     choice([
@@ -139,7 +143,7 @@ defmodule Prana.Template.V2.ExpressionParser do
       single_quoted_string,
       boolean
     ])
-    
+
   # Function argument can include unquoted identifiers (treated as variables)
   function_argument =
     choice([
@@ -199,19 +203,13 @@ defmodule Prana.Template.V2.ExpressionParser do
     |> ignore(ascii_char([?(]))
     |> concat(whitespace)
     |> optional(
-      function_argument
-      |> repeat(
-        whitespace
-        |> ignore(ascii_char([?,]))
-        |> concat(whitespace)
-        |> concat(function_argument)
-      )
+      repeat(function_argument, whitespace |> ignore(ascii_char([?,])) |> concat(whitespace) |> concat(function_argument))
     )
     |> concat(whitespace)
     |> ignore(ascii_char([?)]))
     |> reduce({__MODULE__, :build_function_call, []})
 
-  # Pipe operation (simple version) 
+  # Pipe operation (simple version)
   pipe_expression =
     simple_expression
     |> repeat(
@@ -229,7 +227,6 @@ defmodule Prana.Template.V2.ExpressionParser do
       function_call,
       simple_expression
     ])
-
 
   defparsec(
     :parse_expression,
@@ -294,11 +291,11 @@ defmodule Prana.Template.V2.ExpressionParser do
         # Simple function name without arguments
         func_name when is_binary(func_name) ->
           {:call, func_name, [acc]}
-        
+
         # Function call with arguments
         {:call, func_name, args} ->
           {:call, func_name, [acc | args]}
-        
+
         # Handle other patterns
         other ->
           {:call, inspect(other), [acc]}
