@@ -79,7 +79,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:error, error_data, "error"} = result
       assert error_data.code == "action_error"
-      assert error_data.message == "workflow_id is required"
+      assert error_data.message == "errors: %{workflow_id: [\"is required\"]}"
     end
 
     test "returns error for empty workflow_id" do
@@ -89,7 +89,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:error, error_data, "error"} = result
       assert error_data.code == "action_error"
-      assert error_data.message == "workflow_id cannot be empty"
+      assert error_data.message == "errors: %{workflow_id: [\"length must be greater than or equal to 1\"]}"
     end
 
     test "returns error for non-string workflow_id" do
@@ -99,7 +99,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:error, error_data, "error"} = result
       assert error_data.code == "action_error"
-      assert error_data.message == "workflow_id must be a string"
+      assert error_data.message == "errors: %{workflow_id: [\"is required\"]}"
     end
 
     test "returns error for invalid execution_mode" do
@@ -112,7 +112,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:error, error_data, "error"} = result
       assert error_data.code == "action_error"
-      assert error_data.message == "execution_mode must be 'sync', 'async', or 'fire_and_forget'"
+      assert error_data.message == "errors: %{execution_mode: [\"not be in the inclusion list\"]}"
     end
 
     test "returns error for invalid timeout_ms" do
@@ -125,7 +125,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:error, error_data, "error"} = result
       assert error_data.code == "action_error"
-      assert error_data.message == "timeout_ms must be a positive integer"
+      assert error_data.message == "errors: %{timeout_ms: [\"must be greater than or equal to 1\"]}"
     end
 
     test "returns error for invalid failure_strategy" do
@@ -138,7 +138,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:error, error_data, "error"} = result
       assert error_data.code == "action_error"
-      assert error_data.message == "failure_strategy must be 'fail_parent' or 'continue'"
+      assert error_data.message == "errors: %{failure_strategy: [\"not be in the inclusion list\"]}"
     end
 
     test "accepts 'continue' failure_strategy" do
@@ -191,6 +191,134 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       assert suspension_data.timeout_ms == 120_000
       assert suspension_data.failure_strategy == "continue"
       assert is_struct(suspension_data.triggered_at, DateTime)
+    end
+
+    test "batch mode defaults to 'single' and wraps non-array input in list" do
+      input_map = %{
+        "workflow_id" => "test_workflow"
+      }
+
+      context = %{
+        "$input" => %{
+          "main" => %{"user_id" => 123, "name" => "John"}
+        }
+      }
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.batch_mode == "single"
+      # Non-array input should be wrapped in list for single mode
+      assert suspension_data.input_data == [%{"user_id" => 123, "name" => "John"}]
+    end
+
+    test "batch mode 'single' keeps array input as-is" do
+      input_map = %{
+        "workflow_id" => "test_workflow",
+        "batch_mode" => "single"
+      }
+
+      context = %{
+        "$input" => %{
+          "main" => [%{"user_id" => 123}, %{"user_id" => 456}]
+        }
+      }
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.batch_mode == "single"
+      # Array input should remain as array for single mode
+      assert suspension_data.input_data == [%{"user_id" => 123}, %{"user_id" => 456}]
+    end
+
+    test "batch mode 'batch' passes input data as-is without wrapping" do
+      input_map = %{
+        "workflow_id" => "test_workflow", 
+        "batch_mode" => "batch"
+      }
+
+      context = %{
+        "$input" => %{
+          "main" => %{"user_id" => 123, "name" => "John"}
+        }
+      }
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.batch_mode == "batch"
+      # Batch mode passes input as-is (no wrapping in list)
+      assert suspension_data.input_data == %{"user_id" => 123, "name" => "John"}
+    end
+
+    test "batch mode 'batch' with array input passes array as-is" do
+      input_map = %{
+        "workflow_id" => "test_workflow",
+        "batch_mode" => "batch"
+      }
+
+      context = %{
+        "$input" => %{
+          "main" => [%{"user_id" => 123}, %{"user_id" => 456}]
+        }
+      }
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.batch_mode == "batch"
+      # Batch mode passes array input as-is
+      assert suspension_data.input_data == [%{"user_id" => 123}, %{"user_id" => 456}]
+    end
+
+    test "returns error for invalid batch_mode" do
+      input_map = %{
+        "workflow_id" => "test_workflow",
+        "batch_mode" => "invalid_mode"
+      }
+
+      result = ExecuteWorkflowAction.execute(input_map, %{})
+
+      assert {:error, error_data, "error"} = result
+      assert error_data.code == "action_error"
+      assert error_data.message == "errors: %{batch_mode: [\"not be in the inclusion list\"]}"
+    end
+
+    test "handles missing input context gracefully" do
+      input_map = %{
+        "workflow_id" => "test_workflow",
+        "batch_mode" => "single"
+      }
+
+      # Context with no input
+      context = %{}
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.batch_mode == "single"
+      # Missing input should default to empty map and be wrapped for single mode
+      assert suspension_data.input_data == [%{}]
+    end
+
+    test "handles missing main port in input context" do
+      input_map = %{
+        "workflow_id" => "test_workflow", 
+        "batch_mode" => "batch"
+      }
+
+      # Context with input but no main port
+      context = %{
+        "$input" => %{}
+      }
+
+      result = ExecuteWorkflowAction.execute(input_map, context)
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data.batch_mode == "batch"
+      # Missing main port should default to empty map
+      assert suspension_data.input_data == %{}
     end
   end
 end
