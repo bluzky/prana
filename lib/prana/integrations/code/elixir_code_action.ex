@@ -21,8 +21,8 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
       description: "Execute Elixir code in a sandboxed environment with security validation",
       type: :action,
       module: __MODULE__,
-      input_ports: ["input"],
-      output_ports: ["success", "error"]
+      input_ports: ["main"],
+      output_ports: ["main", "error"]
     }
   end
 
