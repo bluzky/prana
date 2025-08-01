@@ -136,7 +136,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
       # Verify error details - the structure is nested under "error" with atom keys
       assert error_data.code == "action_error"
       assert error_data.details["error"].code == "action_error"
-      assert error_data.details["error"].message == "workflow_id cannot be empty"
+      assert error_data.details["error"].message == "errors: %{workflow_id: [\"length must be greater than or equal to 1\"]}"
       assert error_data.details["port"] == "error"
 
       # Verify failed node execution

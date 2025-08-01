@@ -422,6 +422,238 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       assert event_data.execution.status == "suspended"
       assert event_data.suspended_node.key == "sub_workflow_node"
     end
+    test "includes batch_mode in suspension data" do
+      # Create workflow with batch mode set to "batch"
+      workflow = %Workflow{
+        id: "batch_workflow",
+        name: "Batch Processing Workflow",
+        nodes: [
+          %Node{
+            key: "trigger",
+            type: "manual.trigger"
+          },
+          %Node{
+            key: "batch_sub_workflow",
+            type: "workflow.execute_workflow",
+            params: %{
+              "workflow_id" => "batch_child_workflow",
+              "execution_mode" => "sync",
+              "batch_mode" => "batch",
+              "timeout_ms" => 300_000
+            }
+          }
+        ],
+        connections: [
+          %Connection{
+            from: "trigger",
+            to: "batch_sub_workflow", 
+            from_port: "main",
+            to_port: "main"
+          }
+        ]
+      }
+
+      # Compile and execute workflow
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
+      result = GraphExecutor.execute_workflow(execution_graph, %{})
+
+      # Should suspend at batch sub-workflow node
+      assert {:suspend, suspended_execution, _} = result
+
+      # Find suspended node execution and verify batch_mode
+      all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+      batch_execution = Enum.find(all_executions, &(&1.node_key == "batch_sub_workflow"))
+
+      assert batch_execution.status == "suspended"
+      assert batch_execution.suspension_data.batch_mode == "batch"
+      assert batch_execution.suspension_data.workflow_id == "batch_child_workflow"
+    end
+
+    test "includes single batch_mode as default in suspension data" do
+      # Create workflow without explicit batch_mode (should default to "single")
+      workflow = %Workflow{
+        id: "single_workflow", 
+        name: "Single Processing Workflow",
+        nodes: [
+          %Node{
+            key: "trigger",
+            type: "manual.trigger"
+          },
+          %Node{
+            key: "single_sub_workflow",
+            type: "workflow.execute_workflow",
+            params: %{
+              "workflow_id" => "single_child_workflow",
+              "execution_mode" => "sync"
+            }
+          }
+        ],
+        connections: [
+          %Connection{
+            from: "trigger",
+            to: "single_sub_workflow",
+            from_port: "main", 
+            to_port: "main"
+          }
+        ]
+      }
+
+      # Compile and execute workflow
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
+      result = GraphExecutor.execute_workflow(execution_graph, %{})
+
+      # Should suspend at single sub-workflow node  
+      assert {:suspend, suspended_execution, _} = result
+
+      # Find suspended node execution and verify default batch_mode
+      all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+      single_execution = Enum.find(all_executions, &(&1.node_key == "single_sub_workflow"))
+
+      assert single_execution.status == "suspended"
+      assert single_execution.suspension_data.batch_mode == "single"
+      assert single_execution.suspension_data.workflow_id == "single_child_workflow"
+    end
+
+    test "wraps non-array input in list for single mode" do
+      # Create workflow with single mode processing a map input
+      workflow = %Workflow{
+        id: "single_map_workflow",
+        name: "Single Mode Map Processing",
+        nodes: [
+          %Node{
+            key: "trigger",
+            type: "manual.trigger"
+          },
+          %Node{
+            key: "single_map_sub_workflow",
+            type: "workflow.execute_workflow",
+            params: %{
+              "workflow_id" => "map_processor_workflow",
+              "execution_mode" => "sync",
+              "batch_mode" => "single"
+            }
+          }
+        ],
+        connections: [
+          %Connection{
+            from: "trigger",
+            to: "single_map_sub_workflow",
+            from_port: "main",
+            to_port: "main"
+          }
+        ]
+      }
+
+      # Execute with map input (non-array)
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
+      input_data = %{"user" => "john", "age" => 30}
+      result = GraphExecutor.execute_workflow(execution_graph, input_data)
+
+      # Should suspend and wrap map in array for single processing
+      assert {:suspend, suspended_execution, _} = result
+
+      all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+      single_execution = Enum.find(all_executions, &(&1.node_key == "single_map_sub_workflow"))
+
+      assert single_execution.status == "suspended"
+      assert single_execution.suspension_data.batch_mode == "single"
+      # Input should be wrapped in array for single mode processing
+      assert single_execution.suspension_data.input_data == [%{"user" => "john", "age" => 30}]
+    end
+
+    test "preserves array input for single mode" do
+      # Create workflow with single mode processing an array input
+      workflow = %Workflow{
+        id: "single_array_workflow", 
+        name: "Single Mode Array Processing",
+        nodes: [
+          %Node{
+            key: "trigger",
+            type: "manual.trigger"
+          },
+          %Node{
+            key: "single_array_sub_workflow",
+            type: "workflow.execute_workflow",
+            params: %{
+              "workflow_id" => "array_processor_workflow",
+              "execution_mode" => "sync",
+              "batch_mode" => "single"
+            }
+          }
+        ],
+        connections: [
+          %Connection{
+            from: "trigger",
+            to: "single_array_sub_workflow",
+            from_port: "main",
+            to_port: "main"
+          }
+        ]
+      }
+
+      # Execute with array input
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
+      input_data = [%{"user" => "john"}, %{"user" => "jane"}]
+      result = GraphExecutor.execute_workflow(execution_graph, input_data)
+
+      # Should suspend and preserve array for single processing
+      assert {:suspend, suspended_execution, _} = result
+
+      all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+      single_execution = Enum.find(all_executions, &(&1.node_key == "single_array_sub_workflow"))
+
+      assert single_execution.status == "suspended"
+      assert single_execution.suspension_data.batch_mode == "single"
+      # Array input should be preserved as-is for single mode processing
+      assert single_execution.suspension_data.input_data == [%{"user" => "john"}, %{"user" => "jane"}]
+    end
+
+    test "preserves input as-is for batch mode" do
+      # Create workflow with batch mode
+      workflow = %Workflow{
+        id: "batch_preserve_workflow",
+        name: "Batch Mode Input Preservation",
+        nodes: [
+          %Node{
+            key: "trigger",
+            type: "manual.trigger"
+          },
+          %Node{
+            key: "batch_preserve_sub_workflow",
+            type: "workflow.execute_workflow",
+            params: %{
+              "workflow_id" => "batch_processor_workflow",
+              "execution_mode" => "sync",
+              "batch_mode" => "batch"
+            }
+          }
+        ],
+        connections: [
+          %Connection{
+            from: "trigger",
+            to: "batch_preserve_sub_workflow",
+            from_port: "main",
+            to_port: "main"
+          }
+        ]
+      }
+
+      # Execute with map input
+      {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
+      input_data = %{"users" => [%{"name" => "john"}, %{"name" => "jane"}]}
+      result = GraphExecutor.execute_workflow(execution_graph, input_data)
+
+      # Should suspend and preserve input as-is for batch processing
+      assert {:suspend, suspended_execution, _} = result
+
+      all_executions = suspended_execution.node_executions |> Map.values() |> List.flatten()
+      batch_execution = Enum.find(all_executions, &(&1.node_key == "batch_preserve_sub_workflow"))
+
+      assert batch_execution.status == "suspended"
+      assert batch_execution.suspension_data.batch_mode == "batch"
+      # Input should be preserved as-is for batch mode
+      assert batch_execution.suspension_data.input_data == %{"users" => [%{"name" => "john"}, %{"name" => "jane"}]}
+    end
   end
 
   # Helper functions
