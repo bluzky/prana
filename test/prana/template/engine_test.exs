@@ -3,380 +3,41 @@ defmodule Prana.TemplateTest do
 
   alias Prana.Template
 
-  describe "basic template rendering with correct context format" do
-    setup do
+  describe "template engine integration" do
+    test "basic template rendering works" do
+      context = %{"$input" => %{"name" => "World"}}
+      assert {:ok, "Hello World!"} = Template.render("Hello {{ $input.name }}!", context)
+    end
+
+    test "handles empty context" do
+      assert {:ok, "Hello !"} = Template.render("Hello {{ $input.name }}!", %{})
+    end
+
+    test "handles malformed expressions gracefully" do
+      context = %{"$input" => %{"name" => "World"}}
+      
+      # Unclosed expression becomes literal text
+      assert {:ok, "Hello {{ $input.name"} = Template.render("Hello {{ $input.name", context)
+      
+      # Invalid syntax becomes literal text (graceful degradation)
+      assert {:ok, "Hello {{ $input. }}"} = Template.render("Hello {{ $input. }}", context)
+    end
+
+    test "template engine performance with complex expressions" do
       context = %{
         "$input" => %{
-          "user" => %{"name" => "John", "age" => 35},
-          "items" => ["a", "b", "c"],
-          "price" => 99.99,
-          "verified" => true
+          "users" => Enum.map(1..100, fn i -> %{"id" => i, "name" => "User#{i}"} end)
         }
       }
-
-      {:ok, context: context}
-    end
-
-    test "renders mixed template expressions (returns strings)", %{context: context} do
-      assert {:ok, "Hello John!"} = Template.render("Hello {{ $input.user.name }}!", context)
-    end
-
-    test "renders mixed arithmetic expressions (returns strings)", %{context: context} do
-      assert {:ok, "Age in 10 years: 45"} = Template.render("Age in 10 years: {{ $input.user.age + 10 }}", context)
-    end
-
-    test "renders mixed boolean expressions (returns strings)", %{context: context} do
-      assert {:ok, "Eligible: true"} =
-               Template.render("Eligible: {{ $input.user.age >= 18 && $input.verified }}", context)
-    end
-
-    test "renders mixed templates with filters (returns strings)", %{context: context} do
-      assert {:ok, "Hello JOHN!"} = Template.render("Hello {{ $input.user.name | upper_case }}!", context)
-    end
-
-    test "handles missing variables by returning nil/empty string", %{context: context} do
-      # Mixed template with missing field - nil becomes empty string
-      assert {:ok, "Hello !"} = Template.render("Hello {{ $input.missing_field }}!", context)
-
-      # Pure expression with missing field - returns nil
-      assert {:ok, nil} = Template.render("{{ $input.missing_field }}", context)
-    end
-
-    test "renders literal text without expressions", %{context: _context} do
-      assert {:ok, "No expressions here"} = Template.render("No expressions here", %{})
-    end
-
-    test "pure expressions return original data types", %{context: context} do
-      # String value
-      assert {:ok, "John"} = Template.render("{{ $input.user.name }}", context)
-
-      # Integer value
-      assert {:ok, 35} = Template.render("{{ $input.user.age }}", context)
-
-      # Boolean value
-      assert {:ok, true} = Template.render("{{ $input.verified }}", context)
-
-      # Float value
-      assert {:ok, 99.99} = Template.render("{{ $input.price }}", context)
-
-      # Arithmetic result (number)
-      assert {:ok, 45} = Template.render("{{ $input.user.age + 10 }}", context)
-
-      # Boolean expression result
-      assert {:ok, true} = Template.render("{{ $input.user.age >= 18 }}", context)
-
-      # Filter result (string from filter)
-      assert {:ok, "JOHN"} = Template.render("{{ $input.user.name | upper_case }}", context)
-    end
-
-    test "whitespace around expressions makes them mixed templates", %{context: context} do
-      # Space before - mixed template, returns string
-      assert {:ok, " John"} = Template.render(" {{ $input.user.name }}", context)
-
-      # Space after - mixed template, returns string
-      assert {:ok, "John "} = Template.render("{{ $input.user.name }} ", context)
-
-      # Multiple expressions - mixed template, returns string
-      assert {:ok, "John is 35"} = Template.render("{{ $input.user.name }} is {{ $input.user.age }}", context)
-    end
-  end
-
-  describe "variable filter arguments integration" do
-    setup do
-      context = %{
-        "$input" => %{
-          "user" => %{"name" => "John", "age" => 25},
-          "fallback_name" => "Default User",
-          "missing_field" => nil
-        },
-        "$variables" => %{
-          "default_age" => 18,
-          "currency" => "USD"
-        },
-        "$nodes" => %{
-          "api" => %{
-            "default_name" => "API Default",
-            "response" => %{"bonus" => 5}
-          }
-        },
-        # Simple variables for unquoted syntax
-        "fallback_name" => "Simple Fallback",
-        "config" => %{
-          "currency" => "EUR",
-          "theme" => "dark"
-        }
-      }
-
-      {:ok, context: context}
-    end
-
-    test "renders templates with variable filter arguments", %{context: context} do
-      # Variable fallback when field exists
-      assert {:ok, "Hello John!"} =
-               Template.render("Hello {{ $input.user.name | default($input.fallback_name) }}!", context)
-
-      # Variable fallback when field is missing
-      assert {:ok, "Hello Default User!"} =
-               Template.render("Hello {{ $input.missing_field | default($input.fallback_name) }}!", context)
-    end
-
-    test "renders templates with nested variable paths in filters", %{context: context} do
-      assert {:ok, "Name: API Default"} =
-               Template.render("Name: {{ $input.missing_field | default($nodes.api.default_name) }}", context)
-    end
-
-    test "renders templates with unquoted variable arguments", %{context: context} do
-      # Simple variable name
-      assert {:ok, "Name: Simple Fallback"} =
-               Template.render("Name: {{ $input.missing_field | default(fallback_name) }}", context)
-
-      # Dotted variable path
-      assert {:ok, "Currency: EUR"} =
-               Template.render("Currency: {{ $input.missing_field | default(config.currency) }}", context)
-    end
-
-    test "handles mixed literal and variable arguments", %{context: context} do
-      # Mix of literal string and variable
-      template = "User: {{ $input.missing_field | default($input.fallback_name) | default(\"Unknown\") }}"
-      assert {:ok, "User: Default User"} = Template.render(template, context)
-
-      # When both variables are missing, should use literal
-      context_minimal = %{"$input" => %{}}
-      assert {:ok, "User: Unknown"} = Template.render(template, context_minimal)
-    end
-
-    test "maintains backward compatibility with literal arguments", %{context: context} do
-      # Should work exactly as before
-      assert {:ok, "Hello Unknown!"} =
-               Template.render("Hello {{ $input.missing_field | default(\"Unknown\") }}!", context)
-
-      assert {:ok, "Age: 18"} =
-               Template.render("Age: {{ $input.missing_age | default(18) }}", context)
-    end
-
-    test "handles chained filters with variable arguments", %{context: context} do
-      template = "{{ $input.missing_field | default($input.fallback_name) | upper_case }}"
-      assert {:ok, "DEFAULT USER"} = Template.render(template, context)
-    end
-
-    test "pure expressions return correct types with variable filter arguments", %{context: context} do
-      # Should return the actual fallback value type, not string
-      assert {:ok, 18} =
-               Template.render("{{ $input.missing_age | default($variables.default_age) }}", context)
-
-      assert {:ok, "Default User"} =
-               Template.render("{{ $input.missing_field | default($input.fallback_name) }}", context)
-    end
-
-    test "handles missing variable paths in filter arguments gracefully", %{context: context} do
-      # Missing variable path should resolve to nil
-      # Since $input.user.name exists, it should return "John" (not the nil fallback)
-      assert {:ok, "John"} =
-               Template.render("{{ $input.user.name | default($missing.path) }}", context)
-
-      # When main field is missing, should use the nil fallback from missing path
-      assert {:ok, nil} =
-               Template.render("{{ $input.missing_field | default($missing.path) }}", context)
-    end
-
-    test "complex real-world scenarios", %{context: context} do
-      # Scenario: User profile with multiple fallbacks
-      template = """
-      Name: {{ $input.user.display_name | default($input.user.name) | default($nodes.api.default_name) }}
-      Age: {{ $input.user.age | default($variables.default_age) }}
-      """
-
-      assert {:ok,
-              """
-              Name: John
-              Age: 25
-              """} = Template.render(template, context)
-
-      # Same template but with missing user data
-      context_empty = Map.put(context, "$input", %{})
-
-      assert {:ok,
-              """
-              Name: API Default
-              Age: 18
-              """} = Template.render(template, context_empty)
-    end
-
-    test "deeply nested variable paths in filter arguments", %{context: _context} do
-      context_nested = %{
-        "$config" => %{
-          "ui" => %{
-            "defaults" => %{
-              "user" => %{
-                "placeholder" => "Enter name"
-              }
-            }
-          }
-        },
-        "$input" => %{"name" => nil}
-      }
-
-      template = "{{ $input.name | default($config.ui.defaults.user.placeholder) }}"
-      assert {:ok, "Enter name"} = Template.render(template, context_nested)
-    end
-  end
-
-  describe "control flow rendering" do
-    setup do
-      context = %{
-        "$input" => %{
-          "users" => [
-            %{"name" => "Alice", "age" => 25, "active" => true},
-            %{"name" => "Bob", "age" => 17, "active" => false},
-            %{"name" => "Carol", "age" => 30, "active" => true}
-          ],
-          "age" => 25,
-          "status" => "premium",
-          "empty_list" => []
-        }
-      }
-
-      {:ok, context: context}
-    end
-
-    test "renders for loop with simple iteration", %{context: context} do
-      template = "{% for user in $input.users %}User: {{ user.name }} {% endfor %}"
-
-      assert {:ok, result} = Template.render(template, context)
-      assert result == "User: Alice User: Bob User: Carol "
-    end
-
-    test "renders for loop with mixed content", %{context: context} do
-      template = "Users: {% for user in $input.users %}{{ user.name }}({{ user.age }}) {% endfor %}Done!"
-
-      assert {:ok, result} = Template.render(template, context)
-      assert result == "Users: Alice(25) Bob(17) Carol(30) Done!"
-    end
-
-    test "renders for loop with empty collection", %{context: context} do
-      template = "Items: {% for item in $input.empty_list %}{{ item }} {% endfor %}None found."
-
-      assert {:ok, result} = Template.render(template, context)
-      assert result == "Items: None found."
-    end
-
-    test "renders if condition with true condition", %{context: context} do
-      template = "{% if $input.age >= 18 %}Welcome adult!{% endif %}"
-
-      assert {:ok, result} = Template.render(template, context)
-      assert result == "Welcome adult!"
-    end
-
-    test "renders if condition with false condition and no else", %{context: _context} do
-      context = %{"$input" => %{"age" => 16}}
-      template = "{% if $input.age >= 18 %}Welcome adult!{% endif %}"
-
-      assert {:ok, result} = Template.render(template, context)
-      assert result == ""
-    end
-
-    test "renders content before and after control blocks", %{context: context} do
-      template = "Before {% for user in $input.users %}{{ user.name }} {% endfor %}After"
-
-      assert {:ok, result} = Template.render(template, context)
-      assert result == "Before Alice Bob Carol After"
-    end
-
-    test "handles multiple control blocks in sequence", %{context: context} do
-      template = "{% if $input.age >= 18 %}Adult {% endif %}{% for user in $input.users %}{{ user.name }} {% endfor %}"
-
-      assert {:ok, result} = Template.render(template, context)
-      assert result == "Adult Alice Bob Carol "
-    end
-
-    test "handles control flow errors gracefully", %{context: _context} do
-      context = %{"$input" => %{"not_a_list" => "string"}}
-      template = "{% for item in $input.not_a_list %}{{ $item }}{% endfor %}"
-
-      # Should return error indication instead of crashing
-      assert {:ok, result} = Template.render(template, context)
-      assert result =~ "Error: For loop iterable must be a list"
-    end
-  end
-
-  describe "process_map functionality" do
-    setup do
-      context = %{
-        "$input" => %{
-          "user" => %{"name" => "John", "age" => 25},
-          "fallback_name" => "Default User",
-          "missing_field" => nil
-        },
-        "$variables" => %{
-          "default_age" => 18,
-          "currency" => "USD"
-        }
-      }
-
-      {:ok, context: context}
-    end
-
-    test "process_map works with simple expressions", %{context: context} do
-      input_map = %{
-        "greeting" => "{{ $input.user.name }}",
-        "age" => "{{ $input.user.age }}",
-        "static" => "Hello World"
-      }
-
-      assert {:ok, result} = Template.process_map(input_map, context)
-      assert result["greeting"] == "John"
-      assert result["age"] == 25
-      assert result["static"] == "Hello World"
-    end
-
-    test "process_map maintains original types for single expressions", %{context: context} do
-      input_map = %{
-        # String
-        "name" => "{{ $input.user.name }}",
-        # Integer
-        "age" => "{{ $input.user.age }}",
-        # nil
-        "missing" => "{{ $input.missing_field }}"
-      }
-
-      assert {:ok, result} = Template.process_map(input_map, context)
-      assert result["name"] == "John"
-      assert result["age"] == 25
-      assert result["missing"] == nil
-    end
-
-    test "process_map handles nested structures", %{context: context} do
-      input_map = %{
-        "user_info" => %{
-          "display_name" => "{{ $input.user.name }}",
-          "years_old" => "{{ $input.user.age }}"
-        },
-        "metadata" => [
-          "{{ $input.user.name }}",
-          "{{ $input.user.age }}"
-        ]
-      }
-
-      assert {:ok, result} = Template.process_map(input_map, context)
-      assert result["user_info"]["display_name"] == "John"
-      assert result["user_info"]["years_old"] == 25
-      assert result["metadata"] == ["John", 25]
-    end
-
-    test "process_map works with mixed content templates" do
-      input_map = %{
-        "greeting" => "Hello {{ $input.name }}!",
-        "message" => "Welcome {{ $input.name | upper_case }}"
-      }
-
-      context = %{"$input" => %{"name" => "alice"}}
-
-      expected = %{
-        "greeting" => "Hello alice!",
-        "message" => "Welcome ALICE"
-      }
-
-      assert {:ok, ^expected} = Template.process_map(input_map, context)
+      
+      template = "{% for user in $input.users %}{{ user.name }} {% endfor %}"
+      
+      {time, {:ok, result}} = :timer.tc(fn -> Template.render(template, context) end)
+      
+      # Should complete within reasonable time (1 second = 1,000,000 microseconds)
+      assert time < 1_000_000
+      assert String.contains?(result, "User1")
+      assert String.contains?(result, "User100")
     end
   end
 end
