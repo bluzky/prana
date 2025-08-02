@@ -9,7 +9,7 @@ defmodule Prana.Integrations.Code.SecurityPolicy do
   ## Security Principles
 
   This policy follows a strict whitelist-only approach where:
-  
+
   1. **Only explicitly allowed operations are permitted**
   2. **All potentially dangerous functions are blocked by default**
   3. **Resource exhaustion attacks are mitigated**

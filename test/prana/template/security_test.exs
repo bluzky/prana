@@ -1,7 +1,7 @@
 defmodule Prana.Template.SecurityTest do
   use ExUnit.Case, async: true
 
-  alias Prana.Template.Engine
+  alias Prana.Template
 
   describe "template size limits" do
     test "rejects templates exceeding size limit" do
@@ -9,7 +9,7 @@ defmodule Prana.Template.SecurityTest do
       large_template = String.duplicate("{{ $input.data }}", 100_000)
       context = %{"$input" => %{"data" => "test"}}
 
-      assert {:error, reason} = Engine.render(large_template, context)
+      assert {:error, reason} = Template.render(large_template, context)
       assert reason =~ "Template size"
       assert reason =~ "exceeds maximum allowed"
     end
@@ -18,7 +18,7 @@ defmodule Prana.Template.SecurityTest do
       normal_template = "Hello {{ $input.name }}!"
       context = %{"$input" => %{"name" => "World"}}
 
-      assert {:ok, "Hello World!"} = Engine.render(normal_template, context)
+      assert {:ok, "Hello World!"} = Template.render(normal_template, context)
     end
   end
 
@@ -29,7 +29,7 @@ defmodule Prana.Template.SecurityTest do
       nested_template = build_nested_if_template(60)
       context = %{"$input" => %{"value" => true}}
 
-      assert {:error, reason} = Engine.render(nested_template, context)
+      assert {:error, reason} = Template.render(nested_template, context)
       assert reason =~ "nesting depth"
       assert reason =~ "exceeds maximum allowed"
     end
@@ -39,7 +39,7 @@ defmodule Prana.Template.SecurityTest do
       nested_template = build_nested_if_template(3)
       context = %{"$input" => %{"value" => true}}
 
-      assert {:ok, _result} = Engine.render(nested_template, context)
+      assert {:ok, _result} = Template.render(nested_template, context)
     end
 
     defp build_nested_if_template(depth) when depth <= 0, do: "Content"
@@ -57,18 +57,17 @@ defmodule Prana.Template.SecurityTest do
       context = %{"$input" => %{"items" => large_list}}
       template = "{% for item in $input.items %}{{ $item }} {% endfor %}"
 
-      assert {:ok, result} = Engine.render(template, context)
-      # Should contain error indication rather than processing all items
-      assert result =~ "Error: For loop iterations"
-      assert result =~ "exceeds maximum allowed"
+      # Should return error immediately without processing any items
+      assert {:error, message} = Template.render(template, context)
+      assert message =~ "Expression evaluation failed: Loop iterations (10001) exceed maximum allowed limit of 10000"
     end
 
     test "accepts loops within iteration limit" do
       normal_list = [1, 2, 3, 4, 5]
       context = %{"$input" => %{"items" => normal_list}}
-      template = "{% for item in $input.items %}{{ $item }} {% endfor %}"
+      template = "{% for item in $input.items %}{{ item }} {% endfor %}"
 
-      assert {:ok, "1 2 3 4 5 "} = Engine.render(template, context)
+      assert {:ok, "1 2 3 4 5 "} = Template.render(template, context)
     end
   end
 
@@ -81,9 +80,9 @@ defmodule Prana.Template.SecurityTest do
       }
 
       # Template tries to access secrets through loop variable
-      template = "{% for user in $input.users %}{{ $user.name }} {% endfor %}"
+      template = "{% for user in $input.users %}{{ user.name }} {% endfor %}"
 
-      assert {:ok, "Alice "} = Engine.render(template, context)
+      assert {:ok, "Alice "} = Template.render(template, context)
 
       # Verify secrets aren't accessible through loop context
       # This would be implementation-specific based on how scoping is done
@@ -93,7 +92,7 @@ defmodule Prana.Template.SecurityTest do
       context = %{"$input" => %{"name" => "test"}}
       template = "{{ $input.name }}"
 
-      assert {:ok, "test"} = Engine.render(template, context)
+      assert {:ok, "test"} = Template.render(template, context)
       # Should not expose internal Elixir structures or functions
     end
   end
@@ -112,7 +111,7 @@ defmodule Prana.Template.SecurityTest do
       for pattern <- malicious_patterns do
         # Should complete quickly without hanging
         start_time = System.monotonic_time(:millisecond)
-        _result = Engine.render(pattern, context)
+        _result = Template.render(pattern, context)
         end_time = System.monotonic_time(:millisecond)
 
         # Should complete within reasonable time (less than 1 second)

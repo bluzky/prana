@@ -1,344 +1,363 @@
 defmodule Prana.Template.Evaluator do
   @moduledoc """
-  Expression evaluator for template expressions.
+  AST evaluator for NimbleParsec-generated template and expression trees.
 
-  Evaluates parsed expression ASTs by integrating with Prana.ExpressionEngine
-  for variable path resolution and implementing arithmetic/boolean operations.
+  Handles:
+  - Template block evaluation (literals, expressions, control flow)
+  - Expression evaluation with full operator precedence
+  - Variable resolution using existing Expression module
+  - Filter application via FilterRegistry
+  - Control flow (if/else, for loops) with proper scoping
+  - Security limits and error handling
   """
 
-  alias Prana.ExpressionEngine
+  alias Prana.Template.Expression
+  alias Prana.Template.ExpressionParser
   alias Prana.Template.FilterRegistry
+  alias Prana.Template.SecurityValidator
 
-  # Security limits
-  # Max iterations in for loops
-  @max_loop_iterations 10_000
+  @spec evaluate_template(list(), map()) :: {:ok, String.t() | any()} | {:error, String.t()}
+  def evaluate_template(ast_blocks, context) when is_list(ast_blocks) do
+    case detect_single_expression(ast_blocks) do
+      {:single_expression, expression_ast} ->
+        # Single expression template - return original value type
+        evaluate_expression(expression_ast, context)
 
-  @doc """
-  Evaluate a parsed expression AST against a context.
-
-  ## Parameters
-  - `ast` - Parsed expression AST from ExpressionParser
-  - `context` - Context map for variable resolution
-
-  ## Returns
-  - `{:ok, value}` - Successfully evaluated value
-  - `{:error, reason}` - Evaluation error
-
-  ## Examples
-
-      context = %{"$input" => %{"age" => 25, "name" => "John"}}
-
-      # Variable access
-      ast = {:variable, [], ["$input.age"]}
-      {:ok, 25} = evaluate(ast, context)
-
-      # Arithmetic
-      ast = {:binary_op, [], [:+, {:variable, [], ["$input.age"]}, {:literal, [], [10]}]}
-      {:ok, 35} = evaluate(ast, context)
-
-      # With filters (pipe operations)
-      ast = {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:upper_case, []]}]}
-      {:ok, "JOHN"} = evaluate(ast, context)
-  """
-  @spec evaluate(any(), map()) :: {:ok, any()} | {:error, String.t()}
-  def evaluate(ast, context) when is_map(context) do
-    case ast do
-      # 3-tuple AST nodes
-      {:variable, [], [path]} ->
-        evaluate_variable_path(path, context)
-
-      {:literal, [], [value]} ->
-        {:ok, value}
-
-      {:binary_op, [], [operator, left, right]} ->
-        evaluate_binary_op(operator, left, right, context)
-
-      {:pipe, [], [expression, function]} ->
-        evaluate_pipe_expression(expression, function, context)
-
-      {:call, [], [function_name, args]} ->
-        evaluate_function_call(function_name, args, context)
-
-      {:grouped, [], [inner_expression]} ->
-        evaluate(inner_expression, context)
-
-      {:for_loop, [], [variable, iterable, body]} ->
-        evaluate_for_loop(variable, iterable, body, context)
-
-      {:if_condition, [], [condition, then_body, else_body]} ->
-        evaluate_if_condition(condition, then_body, else_body, context)
-
-      # Direct values (for cases where literal values are passed directly)
-      value when is_number(value) or is_boolean(value) or is_binary(value) ->
-        {:ok, value}
-
-      # Handle other literal types
-      value ->
-        {:ok, value}
+      :mixed_content ->
+        # Mixed content template - return concatenated string
+        evaluate_template_blocks(ast_blocks, context, "")
     end
   end
 
-  # Private functions
-
-  defp evaluate_for_loop(variable, iterable, body, context) do
-    with {:ok, collection} <- evaluate(iterable, context) do
-      case collection do
-        items when is_list(items) ->
-          # Security check: limit loop iterations
-          if length(items) > @max_loop_iterations do
-            {:error, "For loop iterations (#{length(items)}) exceeds maximum allowed (#{@max_loop_iterations})"}
-          else
-            results =
-              Enum.map(items, fn item ->
-                # Create scoped context with loop variable accessible as $variable
-                # Limit context exposure by only adding the loop variable
-                scoped_context = Map.put(context, "$#{variable}", item)
-                evaluate_body(body, scoped_context)
-              end)
-
-            # Flatten results and join as string for template rendering
-            case flatten_results(results) do
-              {:ok, flattened} -> {:ok, Enum.join(flattened, "")}
-              error -> error
-            end
-          end
-
-        _ ->
-          {:error, "For loop iterable must be a list, got: #{inspect(collection)}"}
-      end
-    end
+  @spec evaluate_expression(any(), map()) :: {:ok, any()} | {:error, String.t()}
+  def evaluate_expression(ast, context) do
+    result = do_evaluate_expression(ast, context, 0)
+    {:ok, result}
+  rescue
+    error -> {:error, "Expression evaluation failed: #{inspect(error)}"}
+  catch
+    {:error, message} -> {:error, message}
+    {:max_recursion, depth} -> {:error, "Maximum recursion depth exceeded at depth #{depth}"}
   end
 
-  defp evaluate_if_condition(condition, then_body, else_body, context) do
-    with {:ok, condition_result} <- evaluate(condition, context) do
-      cond do
-        truthy?(condition_result) ->
-          evaluate_body(then_body, context)
-
-        not Enum.empty?(else_body) ->
-          evaluate_body(else_body, context)
-
-        true ->
-          {:ok, ""}
-      end
-    end
+  @spec evaluate_control_block(atom(), any(), list(), map()) :: {:ok, String.t()} | {:error, String.t()}
+  def evaluate_control_block(type, condition, body, context) do
+    result = do_evaluate_control_block(type, condition, body, context, 0)
+    {:ok, result}
+  rescue
+    error -> {:error, "Control block evaluation failed: #{inspect(error)}"}
+  catch
+    {:error, message} -> {:error, message}
   end
 
-  defp evaluate_body(body_blocks, context) do
-    results =
-      Enum.map(body_blocks, fn block ->
-        case block do
-          {:literal, content} ->
-            {:ok, content}
+  # Private implementation functions
 
-          {:expression, content} ->
-            # Parse and evaluate the expression
-            alias Prana.Template.ExpressionParser
-
-            case ExpressionParser.parse(content) do
-              {:ok, ast} -> evaluate(ast, context)
-              error -> error
-            end
-
-          {:control, type, attributes, body} ->
-            # Parse and evaluate control block
-            alias Prana.Template.ExpressionParser
-
-            case ExpressionParser.parse_control_block(type, attributes, body) do
-              {:ok, ast} -> evaluate(ast, context)
-              error -> error
-            end
-
-          _ ->
-            {:error, "Unknown block type: #{inspect(block)}"}
+  defp detect_single_expression(ast_blocks) do
+    case ast_blocks do
+      [{:expression, expression_content}] ->
+        # Parse the expression content to get the AST
+        case ExpressionParser.parse(String.trim(expression_content)) do
+          {:ok, ast} -> {:single_expression, ast}
+          {:error, _reason} -> :mixed_content
         end
-      end)
-
-    case flatten_results(results) do
-      {:ok, flattened} -> {:ok, Enum.join(flattened, "")}
-      error -> error
-    end
-  end
-
-  defp flatten_results(results) do
-    case Enum.find(results, fn {status, _} -> status == :error end) do
-      nil ->
-        values = Enum.map(results, fn {:ok, value} -> to_string(value) end)
-        {:ok, values}
-
-      error ->
-        error
-    end
-  end
-
-  defp evaluate_binary_op(operator, left_ast, right_ast, context) do
-    with {:ok, left_val} <- evaluate(left_ast, context),
-         {:ok, right_val} <- evaluate(right_ast, context) do
-      apply_operator(operator, left_val, right_val)
-    end
-  end
-
-  defp evaluate_pipe_expression(expression, function, context) do
-    with {:ok, value} <- evaluate(expression, context) do
-      case function do
-        {:call, [], [function_name, args]} ->
-          with {:ok, evaluated_args} <- evaluate_args(args, context) do
-            FilterRegistry.apply_filter(Atom.to_string(function_name), value, evaluated_args)
-          end
-
-        _ ->
-          {:error, "Invalid pipe function"}
-      end
-    end
-  end
-
-  defp evaluate_function_call(function_name, args, context) do
-    with {:ok, evaluated_args} <- evaluate_args(args, context) do
-      FilterRegistry.apply_filter(Atom.to_string(function_name), nil, evaluated_args)
-    end
-  end
-
-  defp evaluate_variable_path(path, context) do
-    # Prana expression path (starts with $) - use ExpressionEngine
-    if String.starts_with?(path, "$") do
-      ExpressionEngine.extract(path, context)
-    else
-      # Simple variable name - look up directly in context, including scoped variables
-      # First try direct access for scoped variables like "user"
-      case Map.get(context, path) do
-        nil ->
-          # If not found directly, try path traversal for nested access like "user.name"
-          case get_in(context, String.split(path, ".")) do
-            nil -> {:ok, nil}
-            value -> {:ok, value}
-          end
-
-        value ->
-          {:ok, value}
-      end
-    end
-  end
-
-  defp evaluate_args(args, context) do
-    results = Enum.map(args, fn arg -> evaluate(arg, context) end)
-
-    case Enum.find(results, fn {status, _} -> status == :error end) do
-      nil ->
-        values = Enum.map(results, fn {:ok, value} -> value end)
-        {:ok, values}
-
-      error ->
-        error
-    end
-  end
-
-  defp apply_operator(:+, left, right) when is_number(left) and is_number(right) do
-    {:ok, left + right}
-  end
-
-  defp apply_operator(:-, left, right) when is_number(left) and is_number(right) do
-    {:ok, left - right}
-  end
-
-  defp apply_operator(:*, left, right) when is_number(left) and is_number(right) do
-    {:ok, left * right}
-  end
-
-  defp apply_operator(:/, left, right) when is_number(left) and is_number(right) do
-    if right == 0 do
-      {:error, "Division by zero"}
-    else
-      {:ok, left / right}
-    end
-  end
-
-  # Comparison operators
-  defp apply_operator(:>, left, right) when is_number(left) and is_number(right) do
-    {:ok, left > right}
-  end
-
-  defp apply_operator(:<, left, right) when is_number(left) and is_number(right) do
-    {:ok, left < right}
-  end
-
-  defp apply_operator(:>=, left, right) when is_number(left) and is_number(right) do
-    {:ok, left >= right}
-  end
-
-  defp apply_operator(:<=, left, right) when is_number(left) and is_number(right) do
-    {:ok, left <= right}
-  end
-
-  defp apply_operator(:==, left, right) do
-    {:ok, left == right}
-  end
-
-  defp apply_operator(:!=, left, right) do
-    {:ok, left != right}
-  end
-
-  # Logical operators (truthiness-based, suitable for template expressions)
-  defp apply_operator(:&&, left, right) do
-    {:ok, truthy?(left) && truthy?(right)}
-  end
-
-  defp apply_operator(:||, left, right) do
-    {:ok, truthy?(left) || truthy?(right)}
-  end
-
-  # String concatenation with +
-  defp apply_operator(:+, left, right) when is_binary(left) and is_binary(right) do
-    {:ok, left <> right}
-  end
-
-  # Type coercion for mixed operations
-  defp apply_operator(:+, left, right) when is_binary(left) do
-    {:ok, left <> to_string(right)}
-  end
-
-  defp apply_operator(:+, left, right) when is_binary(right) do
-    {:ok, to_string(left) <> right}
-  end
-
-  # Comparison with type coercion
-  defp apply_operator(op, left, right) when op in [:>, :<, :>=, :<=] do
-    case {coerce_to_number(left), coerce_to_number(right)} do
-      {{:ok, left_num}, {:ok, right_num}} ->
-        apply_operator(op, left_num, right_num)
 
       _ ->
-        {:error, "Cannot compare #{inspect(left)} and #{inspect(right)}"}
+        :mixed_content
     end
   end
 
-  defp apply_operator(operator, left, right) do
-    {:error, "Unsupported operation: #{inspect(left)} #{operator} #{inspect(right)}"}
+  defp evaluate_template_blocks([], _context, acc), do: {:ok, acc}
+
+  defp evaluate_template_blocks([block | rest], context, acc) do
+    case evaluate_template_block(block, context) do
+      {:ok, result} ->
+        string_result = if is_binary(result), do: result, else: if(result == nil, do: "", else: to_string(result))
+        evaluate_template_blocks(rest, context, acc <> string_result)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # Nesting-aware version for control structures
+  defp evaluate_template_blocks_with_nesting([], _context, acc, _nesting_depth), do: {:ok, acc}
+
+  defp evaluate_template_blocks_with_nesting([block | rest], context, acc, nesting_depth) do
+    case evaluate_template_block_with_nesting(block, context, nesting_depth) do
+      {:ok, result} ->
+        string_result = if is_binary(result), do: result, else: if(result == nil, do: "", else: to_string(result))
+        evaluate_template_blocks_with_nesting(rest, context, acc <> string_result, nesting_depth)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp evaluate_template_block({:literal, text}, _context), do: {:ok, text}
+
+  defp evaluate_template_block({:expression, expression_content}, context) do
+    # Parse and evaluate the expression content
+    case ExpressionParser.parse(String.trim(expression_content)) do
+      {:ok, ast} ->
+        evaluate_expression(ast, context)
+
+      {:error, reason} ->
+        {:error, "Expression parsing failed: #{reason}"}
+    end
+  end
+
+  defp evaluate_template_block({:control, type, condition, body}, context) do
+    evaluate_control_block(type, condition, body, context)
+  end
+
+  # Nesting-aware version for control structures
+  defp evaluate_template_block_with_nesting({:literal, text}, _context, _nesting_depth), do: {:ok, text}
+
+  defp evaluate_template_block_with_nesting({:expression, expression_content}, context, _nesting_depth) do
+    # Parse and evaluate the expression content
+    case ExpressionParser.parse(String.trim(expression_content)) do
+      {:ok, ast} ->
+        evaluate_expression(ast, context)
+
+      {:error, reason} ->
+        {:error, "Expression parsing failed: #{reason}"}
+    end
+  end
+
+  # This will call do_evaluate_control_block with nesting_depth
+  defp evaluate_template_block_with_nesting({:control, type, condition, body}, context, nesting_depth) do
+    result = do_evaluate_control_block(type, condition, body, context, nesting_depth)
+    {:ok, result}
+  rescue
+    error -> {:error, "Control block evaluation failed: #{inspect(error)}"}
+  catch
+    {:error, message} -> {:error, message}
+  end
+
+  defp do_evaluate_expression(ast, context, depth) do
+    case SecurityValidator.validate_recursion_depth(depth) do
+      :ok -> do_evaluate_expression_impl(ast, context, depth)
+      {:error, message} -> throw({:error, message})
+    end
+  end
+
+  # Actual expression evaluation implementation (renamed from original)
+  defp do_evaluate_expression_impl(ast, context, depth) do
+    case ast do
+      {:variable, var_name} ->
+        # Simple variable access (no chain)
+        Map.get(context, var_name)
+
+      {:access_chain, base_var, accessors} ->
+        # Variable with access chain (e.g., input.users[0].name)
+        evaluate_access_chain(base_var, accessors, context)
+
+      {:literal, value} ->
+        value
+
+      {:binary_op, op, left, right} ->
+        left_val = do_evaluate_expression(left, context, depth + 1)
+        right_val = do_evaluate_expression(right, context, depth + 1)
+        apply_binary_operation(op, left_val, right_val)
+
+      {:grouped, inner_ast} ->
+        do_evaluate_expression(inner_ast, context, depth + 1)
+
+      {:call, function_name, args} when is_list(args) ->
+        evaluated_args = Enum.map(args, &do_evaluate_expression(&1, context, depth + 1))
+        apply_function(function_name, evaluated_args)
+
+      {:call, function_name, arg} ->
+        evaluated_arg = do_evaluate_expression(arg, context, depth + 1)
+        apply_function(function_name, [evaluated_arg])
+
+      unknown_ast ->
+        throw({:error, "Unknown AST node: #{inspect(unknown_ast)}"})
+    end
+  end
+
+  # Binary operation implementation
+  defp apply_binary_operation(:add, left, right) when is_number(left) and is_number(right), do: left + right
+  defp apply_binary_operation(:sub, left, right) when is_number(left) and is_number(right), do: left - right
+  defp apply_binary_operation(:mul, left, right) when is_number(left) and is_number(right), do: left * right
+
+  defp apply_binary_operation(:div, _left, 0) do
+    throw({:error, "Division by zero is not allowed"})
+  end
+
+  defp apply_binary_operation(:div, left, right) when is_number(left) and is_number(right), do: left / right
+
+  defp apply_binary_operation(:gt, left, right), do: compare_values(left, right) == :gt
+  defp apply_binary_operation(:lt, left, right), do: compare_values(left, right) == :lt
+  defp apply_binary_operation(:gte, left, right), do: compare_values(left, right) in [:gt, :eq]
+  defp apply_binary_operation(:lte, left, right), do: compare_values(left, right) in [:lt, :eq]
+  defp apply_binary_operation(:eq, left, right), do: left == right
+  defp apply_binary_operation(:neq, left, right), do: left != right
+
+  defp apply_binary_operation(:and, left, right), do: is_truthy(left) && is_truthy(right)
+  defp apply_binary_operation(:or, left, right), do: is_truthy(left) || is_truthy(right)
+
+  # Fallback for unsupported operations
+  defp apply_binary_operation(op, left, right) do
+    throw({:error, "Unsupported binary operation: #{op} with values #{inspect(left)} and #{inspect(right)}"})
+  end
+
+  # Function application (filters)
+  defp apply_function(function_name, [value | filter_args]) do
+    case FilterRegistry.apply_filter(function_name, value, filter_args) do
+      {:ok, result} -> result
+      {:error, reason} -> throw({:error, "Filter application failed: #{reason}"})
+    end
+  end
+
+  defp apply_function(function_name, []) do
+    case FilterRegistry.apply_filter(function_name, nil, []) do
+      {:ok, result} -> result
+      {:error, reason} -> throw({:error, "Filter application failed: #{reason}"})
+    end
+  end
+
+  # Control flow evaluation
+  defp do_evaluate_control_block(:if, condition, body, context, nesting_depth) do
+    # Check nesting depth limit
+    case SecurityValidator.validate_nesting_depth(nesting_depth) do
+      :ok -> :continue
+      {:error, message} -> throw({:error, message})
+    end
+
+    case ExpressionParser.parse(condition) do
+      {:ok, condition_ast} ->
+        condition_result = do_evaluate_expression(condition_ast, context, 0)
+
+        if is_truthy(condition_result) do
+          case evaluate_template_blocks_with_nesting(body, context, "", nesting_depth + 1) do
+            {:ok, result} -> result
+            {:error, reason} -> throw({:error, reason})
+          end
+        else
+          ""
+        end
+
+      {:error, reason} ->
+        throw({:error, "Condition parsing failed: #{reason}"})
+    end
+  end
+
+  defp do_evaluate_control_block(:for, loop_spec, body, context, nesting_depth) do
+    # Check nesting depth limit
+    case SecurityValidator.validate_nesting_depth(nesting_depth) do
+      :ok -> :continue
+      {:error, message} -> throw({:error, message})
+    end
+
+    # Parse "item in collection" syntax
+    case parse_for_loop_spec(loop_spec) do
+      {:ok, {item_var, collection_path}} ->
+        case Expression.extract(collection_path, context) do
+          {:ok, collection} when is_list(collection) ->
+            evaluate_for_loop_with_limits(item_var, collection, body, context, nesting_depth + 1)
+
+          {:ok, _non_list} ->
+            "Error: For loop iterable must be a list"
+        end
+
+      {:error, reason} ->
+        throw({:error, reason})
+    end
+  end
+
+  defp parse_for_loop_spec(spec) do
+    case String.split(spec, " in ", parts: 2) do
+      [item_var, collection_path] ->
+        item_var = String.trim(item_var)
+        collection_path = String.trim(collection_path)
+        {:ok, {item_var, collection_path}}
+
+      _ ->
+        {:error, "Invalid for loop syntax: #{spec}"}
+    end
+  end
+
+  # Version with nesting depth tracking and graceful iteration limit handling
+  defp evaluate_for_loop_with_limits(item_var, collection, body, context, nesting_depth) do
+    # Get max from SecurityValidator
+    max_iterations = 10_000
+
+    collection
+    |> Enum.with_index()
+    |> Enum.reduce_while("", fn {item, index}, acc ->
+      # Check loop limit on each iteration
+      if index >= max_iterations do
+        throw({:error, "Loop iterations (#{index + 1}) exceed maximum allowed limit of #{max_iterations}"})
+      end
+
+      # Create loop context with item variable and loop_index
+      loop_context =
+        context
+        |> Map.put("#{item_var}", item)
+        |> Map.put("loop_index", index)
+
+      case evaluate_template_blocks_with_nesting(body, loop_context, "", nesting_depth) do
+        {:ok, result} -> {:cont, acc <> result}
+        {:error, reason} -> throw({:error, reason})
+      end
+    end)
   end
 
   # Helper functions
-
-  defp truthy?(nil), do: false
-  defp truthy?(false), do: false
-  defp truthy?(0), do: false
-  defp truthy?(""), do: false
-  defp truthy?([]), do: false
-  defp truthy?(%{} = map) when map_size(map) == 0, do: false
-  defp truthy?(_), do: true
-
-  defp coerce_to_number(value) when is_number(value), do: {:ok, value}
-
-  defp coerce_to_number(value) when is_binary(value) do
-    case Float.parse(value) do
-      {num, ""} ->
-        {:ok, num}
-
-      _ ->
-        case Integer.parse(value) do
-          {num, ""} -> {:ok, num}
-          _ -> {:error, "Cannot convert to number"}
-        end
+  defp compare_values(left, right) do
+    cond do
+      left > right -> :gt
+      left < right -> :lt
+      left == right -> :eq
+      # Fallback for incomparable types
+      true -> :eq
     end
   end
 
-  defp coerce_to_number(_), do: {:error, "Cannot convert to number"}
+  defp is_truthy(nil), do: false
+  defp is_truthy(false), do: false
+  defp is_truthy(""), do: false
+  defp is_truthy([]), do: false
+  defp is_truthy(%{} = map) when map_size(map) == 0, do: false
+  defp is_truthy(_), do: true
+
+  # Access chain evaluation for new parser structure
+  defp evaluate_access_chain(base_var_name, accessors, context) do
+    # Get base value using the variable name as-is (including $ if present)
+    base_value = Map.get(context, base_var_name)
+
+    # Apply each accessor in sequence
+    Enum.reduce(accessors, base_value, fn accessor, current_value ->
+      apply_accessor(accessor, current_value)
+    end)
+  end
+
+  defp apply_accessor({:dot_access, field}, value) when is_map(value) do
+    # Dot access only handles string keys
+    Map.get(value, field)
+  end
+
+  defp apply_accessor({:dot_access, _field}, _value) do
+    # Dot access on non-map returns nil
+    nil
+  end
+
+  defp apply_accessor({:bracket_access, {:literal, index}}, value) when is_list(value) and is_integer(index) do
+    Enum.at(value, index)
+  end
+
+  defp apply_accessor({:bracket_access, {:literal, key}}, value) when is_map(value) do
+    Map.get(value, key)
+  end
+
+  defp apply_accessor({:bracket_access, _key}, _value) do
+    # Bracket access on incompatible types returns nil
+    nil
+  end
+
+  defp apply_accessor(_accessor, _value) do
+    # Graceful fallback for any other cases
+    nil
+  end
 end

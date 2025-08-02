@@ -468,20 +468,23 @@ Use expressions to access and transform data throughout the workflow.
 "$variables.config.timeout" # Nested variable access
 ```
 
-### Array and Object Operations
+### Array and Mixed Key Access
 
 ```elixir
 # Array access
 "$input.users[0].name"     # First user's name
 "$input.scores[2]"         # Third score
 
-# Wildcard extraction (returns arrays)
-"$input.users.*.name"      # All user names as array
-"$input.orders.*.items.*"  # All items from all orders
+# Mixed key access (NEW)
+"$input[:atom_key]"        # Atom key access
+"$input[\"string_key\"]"   # String key access
+"$input.user[:name]"       # Dot notation + atom key
+"$input.data[0].title"     # Array index + field access
+"$input[\"config\"][:timeout]" # Mixed string and atom keys
 
-# Filtering (returns matching items)
-"$input.users.{role: \"admin\"}.email"  # Emails of admin users
-"$input.orders.{status: \"completed\", total: 100}" # Orders matching criteria
+# String vs integer keys
+"$input.object[\"0\"]"     # String key "0"
+"$input.object[0]"         # Integer key 0
 ```
 
 ### Expression Examples in Workflows
@@ -505,8 +508,9 @@ Use expressions to access and transform data throughout the workflow.
     # Using variables
     "api_endpoint" => "$variables.service_config.user_api",
 
-    # Complex expressions
-    "admin_emails" => "$input.users.{role: \"admin\"}.email",
+    # Array and mixed key access
+    "first_user_name" => "$input.users[0].name",
+    "atom_field" => "$input[:atom_key]",
     "first_order_total" => "$input.orders[0].total"
   }
 }

@@ -1,357 +1,438 @@
 defmodule Prana.Template.ExpressionParser do
   @moduledoc """
-  Simple expression parser for template expressions.
+  NimbleParsec-based expression parser with full operator precedence support.
 
-  For now, this is a simplified version that focuses on the basic patterns.
-  Can be enhanced with NimbleParsec later for more complex expressions.
+  Supports complex nested expressions with proper operator precedence.
+  For now, we'll implement a simple version that can be extended.
   """
 
-  alias Prana.Template.AST
+  import NimbleParsec
 
-  @doc """
-  Parse an expression string into a standardized 3-tuple AST.
+  # Basic tokens
+  whitespace = ignore(repeat(ascii_char([?\s, ?\t, ?\n, ?\r])))
 
-  Returns Elixir-style AST nodes in the format `{type, [], children}` where:
-  - `type` is an atom representing the node type (`:variable`, `:literal`, `:binary_op`, `:pipe`, `:call`, `:grouped`, `:for_loop`, `:if_condition`)
-  - The second element is always an empty list `[]` (metadata placeholder)
-  - `children` is a list containing the node's data and child nodes
+  # Literals
+  integer =
+    [?-]
+    |> ascii_char()
+    |> optional()
+    |> ascii_string([?0..?9], min: 1)
+    |> reduce({__MODULE__, :parse_integer, []})
+    |> unwrap_and_tag(:literal)
 
-  ## Examples
+  float =
+    [?-]
+    |> ascii_char()
+    |> optional()
+    |> ascii_string([?0..?9], min: 1)
+    |> ascii_char([?.])
+    |> ascii_string([?0..?9], min: 1)
+    |> reduce({__MODULE__, :parse_float, []})
+    |> unwrap_and_tag(:literal)
 
-      iex> parse("$input.age + 10")
-      {:ok, {:binary_op, [], [:+, {:variable, [], ["$input.age"]}, {:literal, [], [10]}]}}
+  # String literals (both double and single quoted)
+  double_string_char =
+    choice([
+      "\\\"" |> string() |> replace(?"),
+      "\\\\" |> string() |> replace(?\\),
+      utf8_char(not: ?")
+    ])
 
-      iex> parse("$input.name | upper_case")
-      {:ok, {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:upper_case, []]}]}}
+  single_string_char =
+    choice([
+      "\\'" |> string() |> replace(?'),
+      "\\\\" |> string() |> replace(?\\),
+      utf8_char(not: ?')
+    ])
 
-      iex> parse("42")
-      {:ok, {:literal, [], [42]}}
+  double_quoted_string =
+    [?"]
+    |> ascii_char()
+    |> ignore()
+    |> repeat(double_string_char)
+    |> ignore(ascii_char([?"]))
+    |> reduce({List, :to_string, []})
+    |> unwrap_and_tag(:literal)
 
-      iex> parse("$input.name | default(\"Unknown\")")
-      {:ok, {:pipe, [], [{:variable, [], ["$input.name"]}, {:call, [], [:default, [{:literal, [], ["Unknown"]}]]}]}}
-  """
-  @spec parse(String.t()) :: {:ok, tuple()} | {:error, String.t()}
+  single_quoted_string =
+    [?']
+    |> ascii_char()
+    |> ignore()
+    |> repeat(single_string_char)
+    |> ignore(ascii_char([?']))
+    |> reduce({List, :to_string, []})
+    |> unwrap_and_tag(:literal)
+
+  # Boolean literals
+  boolean =
+    [
+      "true" |> string() |> replace(true),
+      "false" |> string() |> replace(false)
+    ]
+    |> choice()
+    |> unwrap_and_tag(:literal)
+
+  # Basic identifier (no dots or brackets)
+  identifier =
+    [?a..?z, ?A..?Z]
+    |> ascii_char()
+    |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_]))
+    |> reduce({List, :to_string, []})
+
+  # Base variable (with optional $ prefix)
+  base_variable =
+    [?$]
+    |> ascii_char()
+    |> optional()
+    |> concat(identifier)
+    |> reduce({List, :to_string, []})
+    |> unwrap_and_tag(:variable)
+
+  # Dot access: .field
+  dot_access =
+    [?.]
+    |> ascii_char()
+    |> ignore()
+    |> concat(identifier)
+    |> unwrap_and_tag(:dot_access)
+
+  # Atom literal for bracket access
+  atom_literal =
+    [?:]
+    |> ascii_char()
+    |> ignore()
+    |> concat(identifier)
+    |> reduce({__MODULE__, :create_atom, []})
+    |> unwrap_and_tag(:literal)
+
+  # Bracket access: [key] where key can be integer, string, or atom
+  bracket_access =
+    [?[]
+    |> ascii_char()
+    |> ignore()
+    |> concat(whitespace)
+    |> choice([
+      integer,
+      double_quoted_string,
+      single_quoted_string,
+      atom_literal
+    ])
+    |> concat(whitespace)
+    |> ignore(ascii_char([?]]))
+    |> unwrap_and_tag(:bracket_access)
+
+  # Access chain: variable followed by zero or more dot/bracket accessors
+  access_chain =
+    base_variable
+    |> repeat(choice([dot_access, bracket_access]))
+    |> reduce({__MODULE__, :build_access_chain, []})
+
+  # Unified variable identifier that supports access chains
+  variable_identifier = access_chain
+
+  # For backward compatibility, keep the old variable_name reference
+  variable_name = variable_identifier
+
+  # Function names
+  function_name =
+    [?a..?z, ?A..?Z]
+    |> ascii_char()
+    |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_]))
+    |> reduce({List, :to_string, []})
+
+  # Forward declaration will be defined after pipe_expression
+
+  # Parenthesized expression with full recursive support
+  parenthesized_expression =
+    [?(]
+    |> ascii_char()
+    |> ignore()
+    |> concat(whitespace)
+    |> parsec(:pipe_expr_parser)
+    |> concat(whitespace)
+    |> ignore(ascii_char([?)]))
+    |> unwrap_and_tag(:grouped)
+
+  # Simple expression for basic functionality
+  simple_value =
+    choice([
+      parenthesized_expression,
+      variable_name,
+      float,
+      integer,
+      double_quoted_string,
+      single_quoted_string,
+      boolean
+    ])
+
+  # Function argument can include variable identifiers
+  function_argument =
+    choice([
+      parenthesized_expression,
+      variable_identifier,
+      float,
+      integer,
+      double_quoted_string,
+      single_quoted_string,
+      boolean
+    ])
+
+  # Simple binary operations
+  binary_op =
+    choice([
+      ">=" |> string() |> replace(:gte),
+      "<=" |> string() |> replace(:lte),
+      "==" |> string() |> replace(:eq),
+      "!=" |> string() |> replace(:neq),
+      "&&" |> string() |> replace(:and),
+      "||" |> string() |> replace(:or),
+      ">" |> string() |> replace(:gt),
+      "<" |> string() |> replace(:lt),
+      "+" |> string() |> replace(:add),
+      "-" |> string() |> replace(:sub),
+      "*" |> string() |> replace(:mul),
+      "/" |> string() |> replace(:div)
+    ])
+
+  # Simple expression with binary operations
+  simple_expression =
+    simple_value
+    |> repeat(
+      whitespace
+      |> concat(binary_op)
+      |> concat(whitespace)
+      |> concat(simple_value)
+    )
+    |> reduce({__MODULE__, :build_binary_ops, []})
+
+  # Function call
+  function_call =
+    function_name
+    |> ignore(ascii_char([?(]))
+    |> concat(whitespace)
+    |> optional(
+      repeat(simple_expression, [?,] |> ascii_char() |> ignore() |> concat(whitespace) |> concat(simple_expression))
+    )
+    |> concat(whitespace)
+    |> ignore(ascii_char([?)]))
+    |> tag(:call)
+
+  # Function call with arguments
+  function_with_args =
+    function_name
+    |> ignore(ascii_char([?(]))
+    |> concat(whitespace)
+    |> optional(
+      repeat(function_argument, whitespace |> ignore(ascii_char([?,])) |> concat(whitespace) |> concat(function_argument))
+    )
+    |> concat(whitespace)
+    |> ignore(ascii_char([?)]))
+    |> reduce({__MODULE__, :build_function_call, []})
+
+  # Pipe operation (simple version)
+  pipe_expression =
+    simple_expression
+    |> repeat(
+      whitespace
+      |> ignore(ascii_char([?|]))
+      |> concat(whitespace)
+      |> choice([function_with_args, function_name])
+    )
+    |> reduce({__MODULE__, :build_pipe_chain, []})
+
+  # Main expression parser
+  expression =
+    choice([
+      pipe_expression,
+      function_call,
+      simple_expression
+    ])
+
+  # Define recursive parser for parentheses
+  defparsec(:pipe_expr_parser, pipe_expression)
+
+  defparsec(
+    :parse_expression,
+    whitespace
+    |> concat(expression)
+    |> concat(whitespace)
+  )
+
+  @spec parse(String.t()) :: {:ok, any()} | {:error, String.t()}
   def parse(expression_string) when is_binary(expression_string) do
-    expression_string = String.trim(expression_string)
+    case parse_expression(expression_string) do
+      {:ok, [ast], "", _, _, _} ->
+        {:ok, ast}
 
-    # Simple parsing approach - can be enhanced later
-    cond do
-      # Check for filters first (contains |)
-      String.contains?(expression_string, "|") ->
-        parse_filtered_expression(expression_string)
+      {:ok, _ast, remainder, _, _, _} ->
+        {:error, "Unexpected input after expression: #{inspect(remainder)}"}
 
-      # Check for binary operations
-      has_binary_operator?(expression_string) ->
-        parse_binary_expression(expression_string)
-
-      # Simple variable or literal
-      true ->
-        parse_simple_expression(expression_string)
+      {:error, reason, _remainder, _context, line, column} ->
+        {:error, "Expression parsing failed at line #{inspect(line)}, column #{inspect(column)}: #{inspect(reason)}"}
     end
   end
 
-  # Private functions
+  # Helper functions for parse-time transformations
+  def parse_integer([sign | digits_list]) when is_list(digits_list) do
+    digits = List.to_string(digits_list)
 
-  defp has_binary_operator?(expr) do
-    # Simple check for common operators
-    Enum.any?(["&&", "||", "==", "!=", ">=", "<=", ">", "<", "+", "-", "*", "/"], fn op ->
-      String.contains?(expr, op)
+    case sign do
+      ?- -> -String.to_integer(digits)
+      _ -> ([sign] ++ digits_list) |> List.to_string() |> String.to_integer()
+    end
+  end
+
+  def parse_integer(digits_list) when is_list(digits_list) do
+    digits_list |> List.to_string() |> String.to_integer()
+  end
+
+  def parse_float([sign | rest]) when sign in [?-, ?+] do
+    rest |> List.to_string() |> String.to_float() |> then(fn f -> if sign == ?-, do: -f, else: f end)
+  end
+
+  def parse_float(float_chars) when is_list(float_chars) do
+    float_chars |> List.to_string() |> String.to_float()
+  end
+
+  def build_binary_ops([left | rest]) do
+    rest
+    |> Enum.chunk_every(2)
+    |> build_with_precedence([left], [])
+  end
+
+  # Build AST with proper operator precedence using a simplified approach
+  defp build_with_precedence([], [result], []), do: result
+
+  defp build_with_precedence([], operands, operators) do
+    # Process remaining operators
+    apply_remaining_operators(operands, operators)
+  end
+
+  defp build_with_precedence([[op, operand] | rest], operands, operators) do
+    # Check if we should process operators on the stack first
+    if should_process_stack?(op, operators) do
+      # Process one operator from stack and continue
+      {new_operands, new_operators} = process_one_operator(operands, operators)
+      build_with_precedence([[op, operand] | rest], new_operands, new_operators)
+    else
+      # Push current operator and operand to stacks
+      build_with_precedence(rest, [operand | operands], [op | operators])
+    end
+  end
+
+  defp should_process_stack?(current_op, [stack_op | _]) do
+    precedence(stack_op) >= precedence(current_op)
+  end
+
+  defp should_process_stack?(_, []), do: false
+
+  defp precedence(:or), do: 1
+  defp precedence(:and), do: 2
+  defp precedence(:eq), do: 3
+  defp precedence(:neq), do: 3
+  defp precedence(:gt), do: 3
+  defp precedence(:lt), do: 3
+  defp precedence(:gte), do: 3
+  defp precedence(:lte), do: 3
+  defp precedence(:add), do: 4
+  defp precedence(:sub), do: 4
+  defp precedence(:mul), do: 5
+  defp precedence(:div), do: 5
+
+  defp process_one_operator([right, left | operands], [op | operators]) do
+    result = {:binary_op, op, left, right}
+    {[result | operands], operators}
+  end
+
+  defp apply_remaining_operators([result], []), do: result
+
+  defp apply_remaining_operators([right, left | operands], [op | operators]) do
+    result = {:binary_op, op, left, right}
+    apply_remaining_operators([result | operands], operators)
+  end
+
+  def build_function_call([func_name | args]) do
+    {:call, func_name, args || []}
+  end
+
+  def build_parenthesized_expression(parsed_elements) do
+    # Handle parenthesized expressions with optional pipes and binary operations
+    case parsed_elements do
+      [single_element] -> single_element
+      elements -> build_pipe_chain_and_binary_ops(elements)
+    end
+  end
+
+  defp build_pipe_chain_and_binary_ops(elements) do
+    # First handle pipe operations, then binary operations
+    {base, rest} = extract_base_and_operations(elements)
+
+    # Apply pipe operations first
+    piped_result = apply_pipe_operations(base, rest)
+
+    # Then apply binary operations if any
+    apply_binary_operations(piped_result, rest)
+  end
+
+  defp extract_base_and_operations([base | rest]), do: {base, rest}
+
+  defp apply_pipe_operations(base, operations) do
+    operations
+    |> Enum.filter(&is_pipe_operation?/1)
+    |> Enum.reduce(base, fn func_name, acc ->
+      {:call, func_name, [acc]}
     end)
   end
 
-  defp parse_filtered_expression(expr) do
-    case String.split(expr, "|", parts: 2) do
-      [base_expr, filters_part] ->
-        with {:ok, base_ast} <- parse_simple_expression(String.trim(base_expr)),
-             {:ok, filters} <- parse_filters(String.trim(filters_part)) do
-          # Convert filters to chained pipe operations
-          result_ast =
-            Enum.reduce(filters, base_ast, fn filter, acc ->
-              filter_ast = AST.call(String.to_atom(filter.name), filter.args)
-              AST.pipe(acc, filter_ast)
-            end)
+  defp apply_binary_operations(base, operations) do
+    binary_ops = Enum.filter(operations, &is_binary_operation?/1)
 
-          {:ok, result_ast}
-        end
-
-      _ ->
-        {:error, "Invalid filter expression"}
+    case binary_ops do
+      [] -> base
+      ops -> build_binary_ops([base | ops])
     end
   end
 
-  defp parse_filters(filters_str) do
-    # Split on | but respect parentheses and quotes
-    filter_parts = split_filters_smart(filters_str)
+  defp is_pipe_operation?(element) when is_binary(element), do: true
+  defp is_pipe_operation?(_), do: false
 
-    filters =
-      Enum.map(filter_parts, fn filter_str ->
-        filter_str = String.trim(filter_str)
+  defp is_binary_operation?(element) when element in [:add, :sub, :mul, :div], do: true
+  defp is_binary_operation?(_), do: false
 
-        case Regex.run(~r/^(\w+)(?:\(([^)]*)\))?$/, filter_str) do
-          [_, name] ->
-            %{name: name, args: []}
+  def build_pipe_chain([base | pipe_parts]) do
+    # Transform pipe chain into nested function calls
+    # a | f | g(x) becomes g(f(a), x)
+    Enum.reduce(pipe_parts, base, fn pipe_part, acc ->
+      case pipe_part do
+        # Simple function name without arguments
+        func_name when is_binary(func_name) ->
+          {:call, func_name, [acc]}
 
-          [_, name, args_str] ->
-            args = parse_filter_args(args_str)
-            %{name: name, args: args}
+        # Function call with arguments
+        {:call, func_name, args} ->
+          {:call, func_name, [acc | args]}
 
-          _ ->
-            %{name: filter_str, args: []}
-        end
-      end)
-
-    {:ok, filters}
-  end
-
-  defp split_filters_smart(filters_str) do
-    # Split filters by | but respect parentheses
-    split_filters(filters_str, [], "", 0, false, nil)
-  end
-
-  defp split_filters("", filters, current_filter, _paren_count, _in_quotes, _quote_char) do
-    # End of string - add final filter if non-empty
-    final_filters = if String.trim(current_filter) == "", do: filters, else: [current_filter | filters]
-    Enum.reverse(final_filters)
-  end
-
-  defp split_filters(<<char, rest::binary>>, filters, current_filter, paren_count, in_quotes, quote_char) do
-    cond do
-      # Starting a quoted string
-      not in_quotes and char in [?", ?'] ->
-        split_filters(rest, filters, current_filter <> <<char>>, paren_count, true, char)
-
-      # Ending a quoted string
-      in_quotes and char == quote_char ->
-        split_filters(rest, filters, current_filter <> <<char>>, paren_count, false, nil)
-
-      # Open parenthesis outside quotes
-      not in_quotes and char == ?( ->
-        split_filters(rest, filters, current_filter <> <<char>>, paren_count + 1, false, nil)
-
-      # Close parenthesis outside quotes
-      not in_quotes and char == ?) ->
-        split_filters(rest, filters, current_filter <> <<char>>, paren_count - 1, false, nil)
-
-      # Pipe outside quotes and parentheses - split filter
-      not in_quotes and paren_count == 0 and char == ?| ->
-        new_filters = if String.trim(current_filter) == "", do: filters, else: [current_filter | filters]
-        split_filters(rest, new_filters, "", 0, false, nil)
-
-      # Any other character - add to current filter
-      true ->
-        split_filters(rest, filters, current_filter <> <<char>>, paren_count, in_quotes, quote_char)
-    end
-  end
-
-  defp parse_filter_args(""), do: []
-
-  defp parse_filter_args(args_str) do
-    # Smart argument parsing - handle quoted strings with commas
-    args_str
-    |> parse_quoted_arguments()
-    |> Enum.map(&String.trim/1)
-    |> Enum.map(&parse_filter_argument/1)
-  end
-
-  defp parse_quoted_arguments(args_str) do
-    # Parse arguments respecting quoted strings
-    parse_arguments(args_str, [], "", false, nil)
-  end
-
-  defp parse_arguments("", args, current_arg, _in_quotes, _quote_char) do
-    # End of string - add final argument if non-empty
-    final_args = if String.trim(current_arg) == "", do: args, else: [current_arg | args]
-    Enum.reverse(final_args)
-  end
-
-  defp parse_arguments(<<char, rest::binary>>, args, current_arg, in_quotes, quote_char) do
-    cond do
-      # Starting a quoted string
-      not in_quotes and char in [?", ?'] ->
-        parse_arguments(rest, args, current_arg <> <<char>>, true, char)
-
-      # Ending a quoted string
-      in_quotes and char == quote_char ->
-        parse_arguments(rest, args, current_arg <> <<char>>, false, nil)
-
-      # Comma outside quotes - split argument
-      not in_quotes and char == ?, ->
-        new_args = if String.trim(current_arg) == "", do: args, else: [current_arg | args]
-        parse_arguments(rest, new_args, "", false, nil)
-
-      # Any other character - add to current argument
-      true ->
-        parse_arguments(rest, args, current_arg <> <<char>>, in_quotes, quote_char)
-    end
-  end
-
-  defp parse_binary_expression(expr) do
-    # Find the main operator (rightmost for left-associativity)
-    operators = ["||", "&&", "==", "!=", ">=", "<=", ">", "<", "+", "-", "*", "/"]
-
-    case find_main_operator(expr, operators) do
-      {operator, left_part, right_part} ->
-        with {:ok, left_ast} <- parse(String.trim(left_part)),
-             {:ok, right_ast} <- parse(String.trim(right_part)),
-             {:ok, operator_atom} <- operator_to_atom(operator) do
-          {:ok, AST.binary_op(operator_atom, left_ast, right_ast)}
-        end
-
-      nil ->
-        parse_simple_expression(expr)
-    end
-  end
-
-  defp find_main_operator(expr, operators) do
-    # Find rightmost operator for left-associativity
-    Enum.reduce_while(operators, nil, fn op, acc ->
-      case String.split(expr, op, parts: 2) do
-        [left, right] when left != expr ->
-          {:halt, {op, left, right}}
-
-        _ ->
-          {:cont, acc}
+        # Handle unsupported pipe_part types with clear error
+        other ->
+          raise ArgumentError,
+                "Unsupported pipe operation: #{inspect(other)}. Expected function name (string) or function call tuple."
       end
     end)
   end
 
-  defp operator_to_atom("+"), do: {:ok, :+}
-  defp operator_to_atom("-"), do: {:ok, :-}
-  defp operator_to_atom("*"), do: {:ok, :*}
-  defp operator_to_atom("/"), do: {:ok, :/}
-  defp operator_to_atom("=="), do: {:ok, :==}
-  defp operator_to_atom("!="), do: {:ok, :!=}
-  defp operator_to_atom(">="), do: {:ok, :>=}
-  defp operator_to_atom("<="), do: {:ok, :<=}
-  defp operator_to_atom(">"), do: {:ok, :>}
-  defp operator_to_atom("<"), do: {:ok, :<}
-  defp operator_to_atom("&&"), do: {:ok, :&&}
-  defp operator_to_atom("||"), do: {:ok, :||}
+  def build_access_chain([{:variable, base_var} | accessors]) do
+    case accessors do
+      [] ->
+        # Simple variable with no accessors
+        {:variable, base_var}
 
-  defp operator_to_atom(unknown_operator) do
-    {:error, "Unknown operator: #{inspect(unknown_operator)}"}
-  end
-
-  defp parse_simple_expression(expr) do
-    expr = String.trim(expr)
-
-    case determine_expression_type(expr) do
-      :variable -> {:ok, AST.variable(expr)}
-      :double_quoted_string -> parse_quoted_string(expr, "\"")
-      :single_quoted_string -> parse_quoted_string(expr, "'")
-      :boolean -> {:ok, AST.literal(parse_boolean(expr))}
-      :integer -> {:ok, AST.literal(String.to_integer(expr))}
-      :float -> {:ok, AST.literal(String.to_float(expr))}
-      :grouped -> parse_grouped_expression(expr)
-      :literal -> {:ok, AST.literal(expr)}
+      _ ->
+        # Variable with access chain
+        {:access_chain, base_var, accessors}
     end
   end
 
-  # Helper functions to reduce cyclomatic complexity
-  defp determine_expression_type(expr) do
-    cond do
-      String.starts_with?(expr, "$") -> :variable
-      String.starts_with?(expr, "\"") and String.ends_with?(expr, "\"") -> :double_quoted_string
-      String.starts_with?(expr, "'") and String.ends_with?(expr, "'") -> :single_quoted_string
-      expr in ["true", "false"] -> :boolean
-      Regex.match?(~r/^\d+$/, expr) -> :integer
-      Regex.match?(~r/^\d+\.\d+$/, expr) -> :float
-      String.starts_with?(expr, "(") and String.ends_with?(expr, ")") -> :grouped
-      true -> :literal
-    end
-  end
-
-  defp parse_quoted_string(expr, _quote) do
-    content = String.slice(expr, 1..-2//1)
-    {:ok, AST.literal(content)}
-  end
-
-  defp parse_boolean("true"), do: true
-  defp parse_boolean("false"), do: false
-
-  defp parse_grouped_expression(expr) do
-    inner = String.slice(expr, 1..-2//1)
-
-    case parse(inner) do
-      {:ok, inner_ast} -> {:ok, AST.grouped(inner_ast)}
-      error -> error
-    end
-  end
-
-  defp parse_filter_argument(str) do
-    str = String.trim(str)
-
-    case determine_filter_argument_type(str) do
-      :prana_variable -> AST.variable(str)
-      :quoted_literal -> AST.literal(parse_literal(str))
-      :primitive_literal -> AST.literal(parse_literal(str))
-      :identifier_variable -> AST.variable(str)
-      :fallback_literal -> AST.literal(parse_literal(str))
-    end
-  end
-
-  defp determine_filter_argument_type(str) do
-    cond do
-      String.starts_with?(str, "$") -> :prana_variable
-      is_quoted_string?(str) -> :quoted_literal
-      is_primitive_literal?(str) -> :primitive_literal
-      is_identifier_variable?(str) -> :identifier_variable
-      true -> :fallback_literal
-    end
-  end
-
-  defp is_quoted_string?(str) do
-    (String.starts_with?(str, "\"") and String.ends_with?(str, "\"")) or
-      (String.starts_with?(str, "'") and String.ends_with?(str, "'"))
-  end
-
-  defp is_primitive_literal?(str) do
-    str in ["true", "false"] or Regex.match?(~r/^\d+(\.\d+)?$/, str)
-  end
-
-  defp is_identifier_variable?(str) do
-    Regex.match?(~r/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/, str)
-  end
-
-  defp parse_literal(str) do
-    str = String.trim(str)
-
-    cond do
-      str == "true" -> true
-      str == "false" -> false
-      Regex.match?(~r/^\d+$/, str) -> String.to_integer(str)
-      Regex.match?(~r/^\d+\.\d+$/, str) -> String.to_float(str)
-      String.starts_with?(str, "\"") and String.ends_with?(str, "\"") -> String.slice(str, 1..-2//1)
-      String.starts_with?(str, "'") and String.ends_with?(str, "'") -> String.slice(str, 1..-2//1)
-      true -> str
-    end
-  end
-
-  @doc """
-  Parse a control flow block into a standardized 3-tuple AST.
-
-  ## Examples
-
-      iex> parse_control_block(:for_loop, %{variable: "user", iterable: "$input.users"}, [body_blocks])
-      {:ok, {:for_loop, [], ["user", {:variable, [], ["$input.users"]}, [body_blocks]]}}
-
-      iex> parse_control_block(:if_condition, %{condition: "$input.age >= 18"}, %{then_body: [blocks], else_body: []})
-      {:ok, {:if_condition, [], [{:binary_op, [], [:>=, {:variable, [], ["$input.age"]}, {:literal, [], [18]}]}, [blocks], []]}}
-  """
-  @spec parse_control_block(atom(), map(), any()) :: {:ok, tuple()} | {:error, String.t()}
-  def parse_control_block(:for_loop, %{variable: variable, iterable: iterable}, body_blocks) do
-    with {:ok, iterable_ast} <- parse(iterable) do
-      {:ok, AST.for_loop(variable, iterable_ast, body_blocks)}
-    end
-  end
-
-  def parse_control_block(:if_condition, %{condition: condition}, %{then_body: then_body, else_body: else_body}) do
-    with {:ok, condition_ast} <- parse(condition) do
-      {:ok, AST.if_condition(condition_ast, then_body, else_body)}
-    end
-  end
-
-  def parse_control_block(type, attributes, _body) do
-    {:error, "Unknown control flow type: #{type} with attributes: #{inspect(attributes)}"}
+  def create_atom([atom_name]) when is_binary(atom_name) do
+    String.to_atom(atom_name)
   end
 end

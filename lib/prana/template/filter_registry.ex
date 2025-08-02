@@ -13,7 +13,8 @@ defmodule Prana.Template.FilterRegistry do
       config :prana, :template_filters, [
         Prana.Template.Filters.StringFilters,
         Prana.Template.Filters.NumberFilters,
-        Prana.Template.Filters.CollectionFilters
+        Prana.Template.Filters.CollectionFilters,
+        Prana.Template.Filters.MathFilters
       ]
 
   ## Filter Module Contract
@@ -33,7 +34,8 @@ defmodule Prana.Template.FilterRegistry do
   @filter_modules Application.compile_env(:prana, :template_filters, [
                     Prana.Template.Filters.StringFilters,
                     Prana.Template.Filters.NumberFilters,
-                    Prana.Template.Filters.CollectionFilters
+                    Prana.Template.Filters.CollectionFilters,
+                    Prana.Template.Filters.MathFilters
                   ])
 
   # Build filter map at compile time
