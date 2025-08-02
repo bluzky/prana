@@ -72,25 +72,59 @@ defmodule Prana.Template.ExpressionParser do
     |> choice()
     |> unwrap_and_tag(:literal)
 
-  # Unified variable identifier parser that handles all variable types
-  # Handles both context variables (with $) and local variables (without $)
-  variable_identifier =
-    choice([
-      # Context variable with $ prefix
-      [?$]
-      |> ascii_char()
-      |> ascii_char([?a..?z, ?A..?Z])
-      |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
-      |> reduce({List, :to_string, []})
-      |> unwrap_and_tag(:variable),
-      
-      # Local variable without $ prefix  
-      [?a..?z, ?A..?Z]
-      |> ascii_char()
-      |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
-      |> reduce({List, :to_string, []})
-      |> unwrap_and_tag(:variable)
+  # Basic identifier (no dots or brackets)
+  identifier =
+    [?a..?z, ?A..?Z]
+    |> ascii_char()
+    |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_]))
+    |> reduce({List, :to_string, []})
+
+  # Base variable (with optional $ prefix)
+  base_variable =
+    optional(ascii_char([?$]))
+    |> concat(identifier)
+    |> reduce({List, :to_string, []})
+    |> unwrap_and_tag(:variable)
+
+  # Dot access: .field
+  dot_access =
+    [?.]
+    |> ascii_char()
+    |> ignore()
+    |> concat(identifier)
+    |> unwrap_and_tag(:dot_access)
+
+  # Atom literal for bracket access
+  atom_literal =
+    ignore(ascii_char([?:]))
+    |> concat(identifier)
+    |> reduce({__MODULE__, :create_atom, []})
+    |> unwrap_and_tag(:literal)
+
+  # Bracket access: [key] where key can be integer, string, or atom
+  bracket_access =
+    [?[]
+    |> ascii_char()
+    |> ignore()
+    |> concat(whitespace)
+    |> choice([
+      integer,
+      double_quoted_string,
+      single_quoted_string,
+      atom_literal
     ])
+    |> concat(whitespace)
+    |> ignore(ascii_char([?]]))
+    |> unwrap_and_tag(:bracket_access)
+
+  # Access chain: variable followed by zero or more dot/bracket accessors
+  access_chain =
+    base_variable
+    |> repeat(choice([dot_access, bracket_access]))
+    |> reduce({__MODULE__, :build_access_chain, []})
+
+  # Unified variable identifier that supports access chains
+  variable_identifier = access_chain
 
   # For backward compatibility, keep the old variable_name reference
   variable_name = variable_identifier
@@ -376,8 +410,25 @@ defmodule Prana.Template.ExpressionParser do
 
         # Handle unsupported pipe_part types with clear error
         other ->
-          raise ArgumentError, "Unsupported pipe operation: #{inspect(other)}. Expected function name (string) or function call tuple."
+          raise ArgumentError,
+                "Unsupported pipe operation: #{inspect(other)}. Expected function name (string) or function call tuple."
       end
     end)
+  end
+
+  def build_access_chain([{:variable, base_var} | accessors]) do
+    case accessors do
+      [] ->
+        # Simple variable with no accessors
+        {:variable, base_var}
+
+      _ ->
+        # Variable with access chain
+        {:access_chain, base_var, accessors}
+    end
+  end
+
+  def create_atom([atom_name]) when is_binary(atom_name) do
+    String.to_atom(atom_name)
   end
 end

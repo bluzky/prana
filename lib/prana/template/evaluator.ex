@@ -144,10 +144,13 @@ defmodule Prana.Template.Evaluator do
   # Actual expression evaluation implementation (renamed from original)
   defp do_evaluate_expression_impl(ast, context, depth) do
     case ast do
-      {:variable, path} ->
-        case Expression.extract(path, context) do
-          {:ok, value} -> value
-        end
+      {:variable, var_name} ->
+        # Simple variable access (no chain)
+        Map.get(context, var_name)
+
+      {:access_chain, base_var, accessors} ->
+        # Variable with access chain (e.g., input.users[0].name)
+        evaluate_access_chain(base_var, accessors, context)
 
       {:literal, value} ->
         value
@@ -318,4 +321,43 @@ defmodule Prana.Template.Evaluator do
   defp is_truthy([]), do: false
   defp is_truthy(%{} = map) when map_size(map) == 0, do: false
   defp is_truthy(_), do: true
+
+  # Access chain evaluation for new parser structure
+  defp evaluate_access_chain(base_var_name, accessors, context) do
+    # Get base value using the variable name as-is (including $ if present)
+    base_value = Map.get(context, base_var_name)
+    
+    # Apply each accessor in sequence
+    Enum.reduce(accessors, base_value, fn accessor, current_value ->
+      apply_accessor(accessor, current_value)
+    end)
+  end
+
+  defp apply_accessor({:dot_access, field}, value) when is_map(value) do
+    # Dot access only handles string keys
+    Map.get(value, field)
+  end
+
+  defp apply_accessor({:dot_access, _field}, _value) do
+    # Dot access on non-map returns nil
+    nil
+  end
+
+  defp apply_accessor({:bracket_access, {:literal, index}}, value) when is_list(value) and is_integer(index) do
+    Enum.at(value, index)
+  end
+
+  defp apply_accessor({:bracket_access, {:literal, key}}, value) when is_map(value) do
+    Map.get(value, key)
+  end
+
+  defp apply_accessor({:bracket_access, _key}, _value) do
+    # Bracket access on incompatible types returns nil
+    nil
+  end
+
+  defp apply_accessor(_accessor, _value) do
+    # Graceful fallback for any other cases
+    nil
+  end
 end

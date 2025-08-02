@@ -473,4 +473,102 @@ defmodule Prana.Template.ExpressionTest do
       assert result == true
     end
   end
+
+  describe "bracket notation" do
+    setup do
+      context = %{
+        "$input" => %{
+          "users" => [
+            %{"name" => "Alice", "age" => 25},
+            %{"name" => "Bob", "age" => 30}
+          ],
+          "data" => %{
+            "string_key" => "string_value",
+            :atom_key => "atom_value",
+            "0" => "string_zero"
+          },
+          :nested => %{
+            :deep => "nested_value",
+            "mixed" => %{:atom => "mixed_access"}
+          }
+        }
+      }
+
+      {:ok, context: context}
+    end
+
+    test "array index access", %{context: context} do
+      # Array index [0]
+      assert {:ok, result} = Template.render("{{ $input.users[0] }}", context)
+      assert result == %{"name" => "Alice", "age" => 25}
+
+      # Array index [1] 
+      assert {:ok, result} = Template.render("{{ $input.users[1] }}", context)
+      assert result == %{"name" => "Bob", "age" => 30}
+
+      # Array index with field access
+      assert {:ok, "Alice"} = Template.render("{{ $input.users[0].name }}", context)
+      assert {:ok, 30} = Template.render("{{ $input.users[1].age }}", context)
+    end
+
+    test "map string key access", %{context: context} do
+      # String key with double quotes
+      assert {:ok, "string_value"} = Template.render(~s/{{ $input.data["string_key"] }}/, context)
+
+      # String key with single quotes  
+      assert {:ok, "string_value"} = Template.render("{{ $input.data['string_key'] }}", context)
+
+      # String number key (different from integer)
+      assert {:ok, "string_zero"} = Template.render(~s/{{ $input.data["0"] }}/, context)
+    end
+
+    test "map atom key access", %{context: context} do
+      # Atom key access
+      assert {:ok, "atom_value"} = Template.render("{{ $input.data[:atom_key] }}", context)
+
+      # Nested atom key access
+      assert {:ok, "nested_value"} = Template.render("{{ $input[:nested][:deep] }}", context)
+    end
+
+    test "mixed bracket and dot notation", %{context: context} do
+      # Dot then bracket
+      assert {:ok, "atom_value"} = Template.render("{{ $input.data[:atom_key] }}", context)
+
+      # Bracket then dot
+      assert {:ok, "Alice"} = Template.render("{{ $input.users[0].name }}", context)
+
+      # Complex nested access
+      assert {:ok, "mixed_access"} = Template.render("{{ $input[:nested].mixed[:atom] }}", context)
+    end
+
+    test "bracket notation in mixed content", %{context: context} do
+      # Mixed content should return string
+      assert {:ok, "User: Alice"} = Template.render("User: {{ $input.users[0].name }}", context)
+      assert {:ok, "Value: atom_value"} = Template.render("Value: {{ $input.data[:atom_key] }}", context)
+    end
+
+    test "bracket notation error handling", %{context: context} do
+      # Invalid array index (graceful handling)
+      assert {:ok, result} = Template.render("{{ $input.users[5] }}", context)
+      assert result == nil
+
+      # Missing keys (graceful handling) 
+      assert {:ok, result} = Template.render("{{ $input.data[:missing] }}", context)
+      assert result == nil
+
+      assert {:ok, result} = Template.render(~s/{{ $input.data["missing"] }}/, context)
+      assert result == nil
+    end
+
+    test "complex bracket expressions", %{context: context} do
+      # Chained bracket access
+      template = "{{ $input[:nested][:deep] }}"
+      assert {:ok, "nested_value"} = Template.render(template, context)
+
+      # Array with bracket key access
+      template = "{{ $input.users[0][:missing] }}"
+      # This should gracefully handle missing atom key in the first user object
+      assert {:ok, nil} = Template.render(template, context)
+    end
+  end
 end
