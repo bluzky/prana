@@ -15,7 +15,7 @@ defmodule Prana.Template.Expression do
   - `$nodes.api_call.response.user_id` - Nested field from node output
   - `$variables.api_url` - Variable value
 
-  ### Bracket Key Access  
+  ### Bracket Key Access
   - `$input["email"]` - String key access with double quotes
   - `$input['email']` - String key access with single quotes
   - `$input[:email]` - Atom key access
@@ -79,12 +79,8 @@ defmodule Prana.Template.Expression do
   """
   @spec extract(String.t(), map()) :: {:ok, any()} | {:error, String.t()}
   def extract(expression, context) when is_binary(expression) do
-    if is_expression?(expression) do
-      path = parse_path(expression)
-      evaluate_path(path, context)
-    else
-      {:ok, expression}
-    end
+    path = parse_path(expression)
+    evaluate_path(path, context)
   end
 
   # Non-string values as-is
@@ -114,14 +110,6 @@ defmodule Prana.Template.Expression do
   end
 
   def process_map(data, _context), do: {:ok, data}
-
-  # Private functions
-
-  defp is_expression?(value) when is_binary(value) do
-    String.starts_with?(value, "$") and String.length(value) > 1
-  end
-
-  defp is_expression?(_), do: false
 
   # Path parsing functions
 
@@ -178,7 +166,7 @@ defmodule Prana.Template.Expression do
       String.starts_with?(key_string, "\"") and String.ends_with?(key_string, "\"") ->
         String.slice(key_string, 1..-2//1)
 
-      # Single-quoted string: ['email'] -> "email" 
+      # Single-quoted string: ['email'] -> "email"
       String.starts_with?(key_string, "'") and String.ends_with?(key_string, "'") ->
         String.slice(key_string, 1..-2//1)
 

@@ -72,33 +72,28 @@ defmodule Prana.Template.ExpressionParser do
     |> choice()
     |> unwrap_and_tag(:literal)
 
-  # Variable identifiers (handling dotted paths like $input.name.field)
-  context_variable =
-    [?$]
-    |> ascii_char()
-    |> ascii_char([?a..?z, ?A..?Z])
-    |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
-    |> reduce({List, :to_string, []})
-    |> unwrap_and_tag(:variable)
+  # Unified variable identifier parser that handles all variable types
+  # Handles both context variables (with $) and local variables (without $)
+  variable_identifier =
+    choice([
+      # Context variable with $ prefix
+      [?$]
+      |> ascii_char()
+      |> ascii_char([?a..?z, ?A..?Z])
+      |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
+      |> reduce({List, :to_string, []})
+      |> unwrap_and_tag(:variable),
+      
+      # Local variable without $ prefix  
+      [?a..?z, ?A..?Z]
+      |> ascii_char()
+      |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
+      |> reduce({List, :to_string, []})
+      |> unwrap_and_tag(:variable)
+    ])
 
-  # Local variables (like loop variables: user.name)
-  local_variable =
-    [?a..?z, ?A..?Z]
-    |> ascii_char()
-    |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
-    |> reduce({List, :to_string, []})
-    |> unwrap_and_tag(:local_variable)
-
-  # Combined variable matching (context first, then local)
-  variable_name = choice([context_variable, local_variable])
-
-  # Unquoted identifier (for function arguments - treated as variable reference)
-  unquoted_identifier =
-    [?a..?z, ?A..?Z]
-    |> ascii_char()
-    |> repeat(ascii_char([?a..?z, ?A..?Z, ?0..?9, ?_, ?.]))
-    |> reduce({List, :to_string, []})
-    |> unwrap_and_tag(:unquoted_identifier)
+  # For backward compatibility, keep the old variable_name reference
+  variable_name = variable_identifier
 
   # Function names
   function_name =
@@ -132,12 +127,11 @@ defmodule Prana.Template.ExpressionParser do
       boolean
     ])
 
-  # Function argument can include unquoted identifiers (treated as variables)
+  # Function argument can include variable identifiers
   function_argument =
     choice([
       parenthesized_expression,
-      variable_name,
-      unquoted_identifier,
+      variable_identifier,
       float,
       integer,
       double_quoted_string,

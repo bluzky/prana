@@ -149,22 +149,6 @@ defmodule Prana.Template.Evaluator do
           {:ok, value} -> value
         end
 
-      {:local_variable, path} ->
-        if String.contains?(path, ".") do
-          path_segments = String.split(path, ".")
-          get_nested_value(context, path_segments)
-        else
-          Map.get(context, path)
-        end
-
-      {:unquoted_identifier, path} ->
-        if String.contains?(path, ".") do
-          path_segments = String.split(path, ".")
-          get_nested_value(context, path_segments)
-        else
-          Map.get(context, path)
-        end
-
       {:literal, value} ->
         value
 
@@ -189,22 +173,6 @@ defmodule Prana.Template.Evaluator do
     end
   end
 
-  # Helper function for nested value access
-  defp get_nested_value(context, []) do
-    context
-  end
-
-  defp get_nested_value(context, [key | rest]) when is_map(context) do
-    case Map.get(context, key) do
-      nil -> nil
-      value -> get_nested_value(value, rest)
-    end
-  end
-
-  defp get_nested_value(_context, _path) do
-    nil
-  end
-
   # Binary operation implementation
   defp apply_binary_operation(:add, left, right) when is_number(left) and is_number(right), do: left + right
   defp apply_binary_operation(:sub, left, right) when is_number(left) and is_number(right), do: left - right
@@ -213,6 +181,7 @@ defmodule Prana.Template.Evaluator do
   defp apply_binary_operation(:div, _left, 0) do
     throw({:error, "Division by zero is not allowed"})
   end
+
   defp apply_binary_operation(:div, left, right) when is_number(left) and is_number(right), do: left / right
 
   defp apply_binary_operation(:gt, left, right), do: compare_values(left, right) == :gt
