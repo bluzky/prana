@@ -1,7 +1,7 @@
 defmodule Prana.Template.Filters.FilterErrorHandlingTest do
   use ExUnit.Case, async: false
 
-  alias Prana.Template.Engine
+  alias Prana.Template
 
   describe "filter error handling" do
     setup do
@@ -18,11 +18,11 @@ defmodule Prana.Template.Filters.FilterErrorHandlingTest do
 
     test "invalid filter name returns error", %{context: context} do
       # Invalid filter name should return error
-      assert {:error, message} = Engine.render("{{ $input.name | invalid_filter }}", context)
+      assert {:error, message} = Template.render("{{ $input.name | invalid_filter }}", context)
       assert message =~ "Unknown filter: invalid_filter"
 
       # Mixed template with invalid filter should also return error
-      assert {:error, message} = Engine.render("Name: {{ $input.name | invalid_filter }}", context)
+      assert {:error, message} = Template.render("Name: {{ $input.name | invalid_filter }}", context)
       assert message =~ "Unknown filter: invalid_filter"
     end
 
@@ -31,34 +31,34 @@ defmodule Prana.Template.Filters.FilterErrorHandlingTest do
       # Note: Current implementation is quite permissive, but these tests document expected behavior
 
       # String filter on number (should convert to string first)
-      assert {:ok, "99.99"} = Engine.render("{{ $input.price | upper_case }}", context)
+      assert {:ok, "99.99"} = Template.render("{{ $input.price | upper_case }}", context)
     end
 
     test "chained filters with one invalid", %{context: context} do
       # First filter valid, second invalid - should return error
-      assert {:error, message} = Engine.render("{{ $input.name | upper_case | invalid_filter }}", context)
+      assert {:error, message} = Template.render("{{ $input.name | upper_case | invalid_filter }}", context)
       assert message =~ "Unknown filter: invalid_filter"
 
       # First filter invalid - should return error
-      assert {:error, message} = Engine.render("{{ $input.name | invalid_filter | upper_case }}", context)
+      assert {:error, message} = Template.render("{{ $input.name | invalid_filter | upper_case }}", context)
       assert message =~ "Unknown filter: invalid_filter"
     end
 
     test "missing field with filters", %{context: context} do
       # Missing field should return empty string when filtered
-      assert {:ok, ""} = Engine.render("{{ $input.missing_field | upper_case }}", context)
+      assert {:ok, ""} = Template.render("{{ $input.missing_field | upper_case }}", context)
 
       # Mixed template with missing field and filter
-      assert {:ok, "Value: "} = Engine.render("Value: {{ $input.missing_field | upper_case }}", context)
+      assert {:ok, "Value: "} = Template.render("Value: {{ $input.missing_field | upper_case }}", context)
     end
 
     test "filter parameter parsing errors", %{context: context} do
       # Malformed filter parameters should return original expression
-      assert {:ok, "{{ $input.name | truncate( }}"} = Engine.render("{{ $input.name | truncate( }}", context)
+      assert {:ok, "{{ $input.name | truncate( }}"} = Template.render("{{ $input.name | truncate( }}", context)
 
       # Unclosed quotes in filter parameters
       assert {:ok, "{{ $input.name | truncate(10, \"unclosed }}"} =
-               Engine.render("{{ $input.name | truncate(10, \"unclosed }}", context)
+               Template.render("{{ $input.name | truncate(10, \"unclosed }}", context)
     end
   end
 end

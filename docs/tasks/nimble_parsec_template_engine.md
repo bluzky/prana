@@ -18,7 +18,7 @@ Replace the current regex-based template engine with a high-performance NimblePa
 
 ```
 lib/prana/template/
-├── engine.ex              # Main public API (Prana.Template.Engine)
+├── template.ex              # Main public API (Prana.Template)
 ├── parser.ex              # Template structure parser
 ├── expression_parser.ex   # Expression syntax parser
 ├── evaluator.ex           # AST evaluation engine
@@ -37,7 +37,7 @@ lib/prana/template/
 
 ### Integration Point
 
-- **Single integration**: `Prana.NodeExecutor` calls `Prana.Template.Engine.process_map/2`
+- **Single integration**: `Prana.NodeExecutor` calls `Prana.Template.process_map/2`
 - **API Contract**: Must maintain exact same function signature and behavior
 - **Test Coverage**: 141 template tests + 24 expression tests must all pass
 
@@ -264,11 +264,11 @@ end
 
 ### 5. New Template Engine API
 
-**Requirement**: Create `Prana.Template.Engine` with identical public API
+**Requirement**: Create `Prana.Template` with identical public API
 
 **Public API Functions**:
 ```elixir
-defmodule Prana.Template.Engine do
+defmodule Prana.Template do
   @spec render(String.t(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def render(template_string, context)
 
@@ -315,7 +315,7 @@ end
 ```
 
 **Acceptance Criteria**:
-- Exact same function signatures as current `Prana.Template.Engine`
+- Exact same function signatures as current `Prana.Template`
 - Identical behavior for all input patterns
 - **Single expression templates return original value types** (not string-converted) for process_map
 - **Mixed content templates return strings** as expected for template rendering
@@ -390,8 +390,8 @@ end
 ```elixir
 # Template parsing performance
 Benchee.run(%{
-  "old_engine" => fn template -> Prana.Template.Engine.render(template, context) end,
-  "new_engine" => fn template -> Prana.Template.Engine.render(template, context) end
+  "old_engine" => fn template -> Prana.Template.render(template, context) end,
+  "new_engine" => fn template -> Prana.Template.render(template, context) end
 })
 
 # Expression parsing performance

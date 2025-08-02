@@ -9,8 +9,8 @@ defmodule Prana.Template.ErrorHandler do
   @doc """
   Handle and transform template parsing errors consistently.
   """
-  @spec handle_parse_error(any(), map()) :: {:error, String.t()}
-  def handle_parse_error(error_reason, opts \\ %{}) do
+  @spec handle_parse_error(any()) :: {:error, String.t()}
+  def handle_parse_error(error_reason) do
     case error_reason do
       {:error, message} when is_binary(message) ->
         {:error, message}
@@ -24,14 +24,13 @@ defmodule Prana.Template.ErrorHandler do
       error ->
         {:error, "Template parsing failed: #{inspect(error)}"}
     end
-    |> maybe_apply_graceful_mode(opts)
   end
 
   @doc """
   Handle and transform expression evaluation errors consistently.
   """
-  @spec handle_evaluation_error(any(), map()) :: {:error, String.t()}
-  def handle_evaluation_error(error_reason, opts \\ %{}) do
+  @spec handle_evaluation_error(any()) :: {:error, String.t()}
+  def handle_evaluation_error(error_reason) do
     case error_reason do
       {:error, message} when is_binary(message) ->
         {:error, message}
@@ -48,14 +47,13 @@ defmodule Prana.Template.ErrorHandler do
       error ->
         {:error, "Expression evaluation failed: #{inspect(error)}"}
     end
-    |> maybe_apply_graceful_mode(opts)
   end
 
   @doc """
   Handle and transform control flow evaluation errors consistently.
   """
-  @spec handle_control_error(any(), map()) :: {:error, String.t()}
-  def handle_control_error(error_reason, opts \\ %{}) do
+  @spec handle_control_error(any()) :: {:error, String.t()}
+  def handle_control_error(error_reason) do
     case error_reason do
       {:error, message} when is_binary(message) ->
         {:error, message}
@@ -69,7 +67,6 @@ defmodule Prana.Template.ErrorHandler do
       error ->
         {:error, "Control block evaluation failed: #{inspect(error)}"}
     end
-    |> maybe_apply_graceful_mode(opts)  
   end
 
   @doc """
@@ -96,15 +93,6 @@ defmodule Prana.Template.ErrorHandler do
   end
 
   # Private functions
-
-  defp maybe_apply_graceful_mode({:error, message} = error, opts) do
-    if is_graceful_mode?(opts) and not is_always_error?(message) do
-      # Return error for now - graceful handling happens at higher level with context
-      error
-    else
-      error
-    end
-  end
 
   defp is_graceful_mode?(opts) do
     not Map.get(opts, :strict_mode, false)

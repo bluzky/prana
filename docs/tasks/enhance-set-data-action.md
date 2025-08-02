@@ -96,11 +96,11 @@ This mode is for creating complex, nested JSON objects or arrays.
     - Implement a `case` statement to handle the `mode`.
     - **`"manual"` mode**:
         - Get `mapping_map` from `params`.
-        - If it's a map, iterate through its values and render each one using `Prana.Template.Engine.render/2`.
+        - If it's a map, iterate through its values and render each one using `Prana.Template.render/2`.
         - Return the new map with rendered values.
     - **`"json"` mode**:
         - Get `json_template` from `params`.
-        - If it's a string, render it using `Prana.Template.Engine.render/2`.
+        - If it's a string, render it using `Prana.Template.render/2`.
         - Parse the resulting string with `Jason.decode/1`.
         - Return the parsed map or list.
     - **Error Handling**: Implement robust error handling for missing parameters, template rendering failures, and JSON parsing errors. Return structured error tuples.
