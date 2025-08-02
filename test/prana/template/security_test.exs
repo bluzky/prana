@@ -57,16 +57,15 @@ defmodule Prana.Template.SecurityTest do
       context = %{"$input" => %{"items" => large_list}}
       template = "{% for item in $input.items %}{{ $item }} {% endfor %}"
 
-      assert {:ok, result} = Engine.render(template, context)
-      # Should contain error indication rather than processing all items
-      assert result =~ "Error: For loop iterations"
-      assert result =~ "exceeds maximum allowed"
+      # Should return error immediately without processing any items
+      assert {:error, message} = Engine.render(template, context)
+      assert message =~ "Expression evaluation failed: Loop iterations (10001) exceed maximum allowed limit of 10000"
     end
 
     test "accepts loops within iteration limit" do
       normal_list = [1, 2, 3, 4, 5]
       context = %{"$input" => %{"items" => normal_list}}
-      template = "{% for item in $input.items %}{{ $item }} {% endfor %}"
+      template = "{% for item in $input.items %}{{ item }} {% endfor %}"
 
       assert {:ok, "1 2 3 4 5 "} = Engine.render(template, context)
     end
@@ -81,7 +80,7 @@ defmodule Prana.Template.SecurityTest do
       }
 
       # Template tries to access secrets through loop variable
-      template = "{% for user in $input.users %}{{ $user.name }} {% endfor %}"
+      template = "{% for user in $input.users %}{{ user.name }} {% endfor %}"
 
       assert {:ok, "Alice "} = Engine.render(template, context)
 

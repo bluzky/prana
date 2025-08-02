@@ -66,5 +66,58 @@ defmodule Prana.Template.Filters.FilterChainingTest do
       assert {:ok, "Items: APPLE,BANANA,CHERRY,DATE"} =
                Engine.render("Items: {{ $input.items | join(\",\") | upper_case }}", context)
     end
+
+    test "complex filter chain with truncate and case conversion", %{context: context} do
+      # Complex chain: truncate then upper_case
+      template = "{{ $input.description | truncate(20) | upper_case }}"
+      
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "THIS IS A VERY LO..."
+      assert String.length(result) == 20
+    end
+
+    test "filter chain with variable arguments and defaults", %{context: context} do
+      # Chain: round with precision then format_currency with default USD
+      template = "{{ $input.price | round(1) | format_currency }}"
+      
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "$123.50"  # 123.456789 rounded to 1 decimal = 123.5, formatted as currency = $123.50
+    end
+
+    test "type preservation in pure chained expressions", %{context: context} do
+      # Pure expression with collection -> number should return number
+      template = "{{ $input.items | length }}"
+      
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 4
+      assert is_integer(result)
+    end
+
+    test "mixed content with chained filters returns string", %{context: context} do
+      # Mixed content should always return string regardless of filter chain
+      template = "Total items: {{ $input.items | length }} found"
+      
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Total items: 4 found"
+      assert is_binary(result)
+    end
+
+    test "long filter chains across multiple types", %{context: context} do
+      # Very long chain: collection -> string -> string -> string
+      template = "{{ $input.items | join(\", \") | upper_case | truncate(15) }}"
+      
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "APPLE, BANAN..."
+      assert String.length(result) == 15
+    end
+
+    test "filter chains with default arguments", %{context: context} do
+      # Test chains using filters with default arguments
+      template1 = "{{ $input.items | join | upper_case }}"
+      assert {:ok, "APPLE, BANANA, CHERRY, DATE"} = Engine.render(template1, context)
+      
+      template2 = "{{ $input.price | round | format_currency }}"
+      assert {:ok, "$123.00"} = Engine.render(template2, context)
+    end
   end
 end

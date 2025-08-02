@@ -86,5 +86,37 @@ defmodule Prana.Template.Filters.StringFiltersTest do
       # Chain: capitalize then truncate
       assert {:ok, "John doe"} = Engine.render("{{ $input.name | capitalize | truncate(10) }}", context)
     end
+
+    test "string filters with literal values", %{context: context} do
+      # Test with string literals instead of variables
+      assert {:ok, "hello world"} = Engine.render("{{ \"HELLO WORLD\" | lower_case }}", context)
+      assert {:ok, "HELLO WORLD"} = Engine.render("{{ \"hello world\" | upper_case }}", context)
+      assert {:ok, "Hello world"} = Engine.render("{{ \"hello world\" | capitalize }}", context)
+    end
+
+    test "type preservation in pure expressions", %{context: context} do
+      # Pure string expressions should return strings
+      assert {:ok, result} = Engine.render("{{ $input.name | upper_case }}", context)
+      assert result == "JOHN DOE"
+      assert is_binary(result)
+    end
+
+    test "mixed content returns string", %{context: context} do
+      # Mixed content should always return string
+      assert {:ok, result} = Engine.render("Name: {{ $input.name | upper_case }}", context)
+      assert result == "Name: JOHN DOE"
+      assert is_binary(result)
+    end
+
+    test "edge cases with empty and nil values", %{context: context} do
+      # Empty string handling (empty string is not nil, so default doesn't apply)
+      context_with_empty = Map.put(context, "$input", Map.put(context["$input"], "empty", ""))
+      assert {:ok, ""} = Engine.render("{{ $input.empty | upper_case }}", context_with_empty)
+      assert {:ok, ""} = Engine.render("{{ $input.empty | default(\"fallback\") }}", context_with_empty)
+      
+      # Nil value handling
+      context_with_nil = Map.put(context, "$input", Map.put(context["$input"], "nil_value", nil))
+      assert {:ok, "fallback"} = Engine.render("{{ $input.nil_value | default(\"fallback\") }}", context_with_nil)
+    end
   end
 end

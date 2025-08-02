@@ -16,13 +16,14 @@ defmodule Prana.Template.Filters.FilterErrorHandlingTest do
       {:ok, context: context}
     end
 
-    test "invalid filter name returns original expression", %{context: context} do
-      # Invalid filter name should return original expression
-      assert {:ok, "{{ $input.name | invalid_filter }}"} = Engine.render("{{ $input.name | invalid_filter }}", context)
+    test "invalid filter name returns error", %{context: context} do
+      # Invalid filter name should return error
+      assert {:error, message} = Engine.render("{{ $input.name | invalid_filter }}", context)
+      assert message =~ "Unknown filter: invalid_filter"
 
-      # Mixed template with invalid filter
-      assert {:ok, "Name: {{ $input.name | invalid_filter }}"} =
-               Engine.render("Name: {{ $input.name | invalid_filter }}", context)
+      # Mixed template with invalid filter should also return error
+      assert {:error, message} = Engine.render("Name: {{ $input.name | invalid_filter }}", context)
+      assert message =~ "Unknown filter: invalid_filter"
     end
 
     test "filter with wrong parameter types", %{context: context} do
@@ -34,13 +35,13 @@ defmodule Prana.Template.Filters.FilterErrorHandlingTest do
     end
 
     test "chained filters with one invalid", %{context: context} do
-      # First filter valid, second invalid - should return original expression
-      assert {:ok, "{{ $input.name | upper_case | invalid_filter }}"} =
-               Engine.render("{{ $input.name | upper_case | invalid_filter }}", context)
+      # First filter valid, second invalid - should return error
+      assert {:error, message} = Engine.render("{{ $input.name | upper_case | invalid_filter }}", context)
+      assert message =~ "Unknown filter: invalid_filter"
 
-      # First filter invalid - should return original expression
-      assert {:ok, "{{ $input.name | invalid_filter | upper_case }}"} =
-               Engine.render("{{ $input.name | invalid_filter | upper_case }}", context)
+      # First filter invalid - should return error
+      assert {:error, message} = Engine.render("{{ $input.name | invalid_filter | upper_case }}", context)
+      assert message =~ "Unknown filter: invalid_filter"
     end
 
     test "missing field with filters", %{context: context} do

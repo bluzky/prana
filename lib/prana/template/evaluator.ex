@@ -13,10 +13,7 @@ defmodule Prana.Template.Evaluator do
 
   alias Prana.Template.Expression
   alias Prana.Template.FilterRegistry
-
-  # Security limits
-  @max_loop_iterations 10_000
-  @max_recursion_depth 100
+  alias Prana.Template.SecurityValidator
 
   @spec evaluate_template(list(), map()) :: {:ok, String.t() | any()} | {:error, String.t()}
   def evaluate_template(ast_blocks, context) when is_list(ast_blocks) do
@@ -40,7 +37,7 @@ defmodule Prana.Template.Evaluator do
       error -> {:error, "Expression evaluation failed: #{inspect(error)}"}
     catch
       {:error, message} -> {:error, message}
-      {:max_recursion, depth} -> {:error, "Maximum recursion depth (#{@max_recursion_depth}) exceeded at depth #{depth}"}
+      {:max_recursion, depth} -> {:error, "Maximum recursion depth exceeded at depth #{depth}"}
     end
   end
 
@@ -76,7 +73,7 @@ defmodule Prana.Template.Evaluator do
   defp evaluate_template_blocks([block | rest], context, acc) do
     case evaluate_template_block(block, context) do
       {:ok, result} ->
-        string_result = if is_binary(result), do: result, else: to_string(result || "")
+        string_result = if is_binary(result), do: result, else: (if result == nil, do: "", else: to_string(result))
         evaluate_template_blocks(rest, context, acc <> string_result)
 
       {:error, reason} ->
@@ -90,7 +87,7 @@ defmodule Prana.Template.Evaluator do
   defp evaluate_template_blocks_with_nesting([block | rest], context, acc, nesting_depth) do
     case evaluate_template_block_with_nesting(block, context, nesting_depth) do
       {:ok, result} ->
-        string_result = if is_binary(result), do: result, else: to_string(result || "")
+        string_result = if is_binary(result), do: result, else: (if result == nil, do: "", else: to_string(result))
         evaluate_template_blocks_with_nesting(rest, context, acc <> string_result, nesting_depth)
 
       {:error, reason} ->
@@ -141,43 +138,61 @@ defmodule Prana.Template.Evaluator do
     end
   end
 
-  defp do_evaluate_expression(_ast, _context, depth) when depth > @max_recursion_depth do
-    throw({:max_recursion, depth})
-  end
-
-  # Variable evaluation
-  defp do_evaluate_expression({:variable, path}, context, _depth) do
-    case Expression.extract(path, context) do
-      {:ok, value} -> value
+  defp do_evaluate_expression(ast, context, depth) do
+    case SecurityValidator.validate_recursion_depth(depth) do
+      :ok -> do_evaluate_expression_impl(ast, context, depth)
+      {:error, message} -> throw({:error, message})
     end
   end
 
-  # Local variable evaluation (for loop variables and unquoted identifiers)
-  defp do_evaluate_expression({:local_variable, path}, context, _depth) do
-    # Handle dotted paths like "config.currency"
-    if String.contains?(path, ".") do
-      path_segments = String.split(path, ".")
-      get_nested_value(context, path_segments)
-    else
-      # Simple key access
-      Map.get(context, path)
+  # Actual expression evaluation implementation (renamed from original)
+  defp do_evaluate_expression_impl(ast, context, depth) do
+    case ast do
+      {:variable, path} ->
+        case Expression.extract(path, context) do
+          {:ok, value} -> value
+        end
+
+      {:local_variable, path} ->
+        if String.contains?(path, ".") do
+          path_segments = String.split(path, ".")
+          get_nested_value(context, path_segments)
+        else
+          Map.get(context, path)
+        end
+
+      {:unquoted_identifier, path} ->
+        if String.contains?(path, ".") do
+          path_segments = String.split(path, ".")
+          get_nested_value(context, path_segments)
+        else
+          Map.get(context, path)
+        end
+
+      {:literal, value} ->
+        value
+
+      {:binary_op, op, left, right} ->
+        left_val = do_evaluate_expression(left, context, depth + 1)
+        right_val = do_evaluate_expression(right, context, depth + 1)
+        apply_binary_operation(op, left_val, right_val)
+
+      {:grouped, inner_ast} ->
+        do_evaluate_expression(inner_ast, context, depth + 1)
+
+      {:call, function_name, args} when is_list(args) ->
+        evaluated_args = Enum.map(args, &do_evaluate_expression(&1, context, depth + 1))
+        apply_function(function_name, evaluated_args)
+
+      {:call, function_name, arg} ->
+        evaluated_arg = do_evaluate_expression(arg, context, depth + 1)
+        apply_function(function_name, [evaluated_arg])
+
+      unknown_ast ->
+        throw({:error, "Unknown AST node: #{inspect(unknown_ast)}"})
     end
   end
 
-  # Unquoted identifier evaluation (same as local variable)
-  defp do_evaluate_expression({:unquoted_identifier, path}, context, _depth) do
-    # Handle dotted paths like "config.currency"
-    if String.contains?(path, ".") do
-      path_segments = String.split(path, ".")
-      get_nested_value(context, path_segments)
-    else
-      # Simple key access
-      Map.get(context, path)
-    end
-  end
-
-  # Literal values
-  defp do_evaluate_expression({:literal, value}, _context, _depth), do: value
 
   # Helper function for nested value access
   defp get_nested_value(context, []) do
@@ -195,35 +210,6 @@ defmodule Prana.Template.Evaluator do
     nil
   end
 
-  # Binary operations
-  defp do_evaluate_expression({:binary_op, op, left, right}, context, depth) do
-    left_val = do_evaluate_expression(left, context, depth + 1)
-    right_val = do_evaluate_expression(right, context, depth + 1)
-
-    apply_binary_operation(op, left_val, right_val)
-  end
-
-  # Grouped expressions (parentheses)
-  defp do_evaluate_expression({:grouped, inner_ast}, context, depth) do
-    do_evaluate_expression(inner_ast, context, depth + 1)
-  end
-
-  # Function calls
-  defp do_evaluate_expression({:call, function_name, args}, context, depth) when is_list(args) do
-    evaluated_args = Enum.map(args, &do_evaluate_expression(&1, context, depth + 1))
-    apply_function(function_name, evaluated_args)
-  end
-
-  defp do_evaluate_expression({:call, function_name, arg}, context, depth) do
-    # Single argument case
-    evaluated_arg = do_evaluate_expression(arg, context, depth + 1)
-    apply_function(function_name, [evaluated_arg])
-  end
-
-  # Unknown AST node
-  defp do_evaluate_expression(unknown_ast, _context, _depth) do
-    throw({:error, "Unknown AST node: #{inspect(unknown_ast)}"})
-  end
 
   # Binary operation implementation
   defp apply_binary_operation(:add, left, right) when is_number(left) and is_number(right), do: left + right
@@ -264,9 +250,9 @@ defmodule Prana.Template.Evaluator do
   # Control flow evaluation
   defp do_evaluate_control_block(:if, condition, body, context, nesting_depth) do
     # Check nesting depth limit
-    max_nesting = 50  # From default options
-    if nesting_depth >= max_nesting do
-      throw({:error, "Control structure nesting depth exceeds maximum allowed limit of #{max_nesting}"})
+    case SecurityValidator.validate_nesting_depth(nesting_depth) do
+      :ok -> :continue
+      {:error, message} -> throw({:error, message})
     end
 
     case Prana.Template.ExpressionParser.parse(condition) do
@@ -289,9 +275,9 @@ defmodule Prana.Template.Evaluator do
 
   defp do_evaluate_control_block(:for, loop_spec, body, context, nesting_depth) do
     # Check nesting depth limit
-    max_nesting = 50  # From default options
-    if nesting_depth >= max_nesting do
-      throw({:error, "Control structure nesting depth exceeds maximum allowed limit of #{max_nesting}"})
+    case SecurityValidator.validate_nesting_depth(nesting_depth) do
+      :ok -> :continue
+      {:error, message} -> throw({:error, message})
     end
 
     # Parse "item in collection" syntax
@@ -322,43 +308,31 @@ defmodule Prana.Template.Evaluator do
     end
   end
 
-  defp evaluate_for_loop(item_var, collection, body, context) do
+
+  # Version with nesting depth tracking and graceful iteration limit handling
+  defp evaluate_for_loop_with_limits(item_var, collection, body, context, nesting_depth) do
+    max_iterations = 10_000  # Get max from SecurityValidator
+
     collection
     |> Enum.with_index()
-    |> Enum.reduce("", fn {item, index}, acc ->
-      if index >= @max_loop_iterations do
-        throw({:error, "Maximum loop iterations (#{@max_loop_iterations}) exceeded"})
+    |> Enum.reduce_while("", fn {item, index}, acc ->
+      # Check loop limit on each iteration
+      if index >= max_iterations do
+        throw({:error, "Loop iterations (#{index + 1}) exceed maximum allowed limit of #{max_iterations}"})
       end
 
-      # Create loop context with item variable
-      loop_context = Map.put(context, "$#{item_var}", item)
+      # Create loop context with item variable and loop_index
+      loop_context = context
+                    |> Map.put("#{item_var}", item)
+                    |> Map.put("loop_index", index)
 
-      case evaluate_template_blocks(body, loop_context, "") do
-        {:ok, result} -> acc <> result
+      case evaluate_template_blocks_with_nesting(body, loop_context, "", nesting_depth) do
+        {:ok, result} -> {:cont, acc <> result}
         {:error, reason} -> throw({:error, reason})
       end
     end)
   end
 
-  # Version with nesting depth tracking and graceful iteration limit handling
-  defp evaluate_for_loop_with_limits(item_var, collection, body, context, nesting_depth) do
-    if length(collection) > @max_loop_iterations do
-      # Return error message instead of throwing for graceful handling
-      "Error: For loop iterations exceeds maximum allowed limit of #{@max_loop_iterations}"
-    else
-      collection
-      |> Enum.with_index()
-      |> Enum.reduce("", fn {item, index}, acc ->
-        # Create loop context with item variable (with $ prefix for structured access)
-        loop_context = Map.put(context, "$#{item_var}", item)
-
-        case evaluate_template_blocks_with_nesting(body, loop_context, "", nesting_depth) do
-          {:ok, result} -> acc <> result
-          {:error, reason} -> throw({:error, reason})
-        end
-      end)
-    end
-  end
 
   # Helper functions
   defp compare_values(left, right) do

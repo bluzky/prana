@@ -61,11 +61,21 @@ defmodule Prana.Template.Filters.NumberFilters do
       {:ok, "€42.00"} = format_currency(42, ["EUR"])
   """
   @spec format_currency(number(), list()) :: {:ok, String.t()} | {:error, String.t()}
+  def format_currency(value, []) when is_number(value) do
+    # Default to USD when no currency code is provided
+    format_currency(value, ["USD"])
+  end
+
   def format_currency(value, [currency_code]) when is_number(value) and is_binary(currency_code) do
     # Simple currency formatting - in production you might use a proper i18n library
     symbol = get_currency_symbol(currency_code)
     formatted_amount = format_decimal(value, 2)
     {:ok, "#{symbol}#{formatted_amount}"}
+  end
+
+  def format_currency(value, []) when is_binary(value) do
+    # Default to USD when no currency code is provided
+    format_currency(value, ["USD"])
   end
 
   def format_currency(value, [currency_code]) when is_binary(value) do
@@ -82,7 +92,7 @@ defmodule Prana.Template.Filters.NumberFilters do
   end
 
   def format_currency(_value, _args) do
-    {:error, "format_currency filter requires a number and currency code"}
+    {:error, "format_currency filter requires a number and optional currency code"}
   end
 
   # Private helper functions

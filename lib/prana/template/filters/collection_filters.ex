@@ -117,9 +117,18 @@ defmodule Prana.Template.Filters.CollectionFilters do
       {:ok, "abc"} = join(["a", "b", "c"], [""])
   """
   @spec join(list(), list()) :: {:ok, String.t()} | {:error, String.t()}
+  def join(value, []) when is_list(value) do
+    # Default to ", " separator when no argument is provided
+    join(value, [", "])
+  end
+
   def join(value, [separator]) when is_list(value) and is_binary(separator) do
     string_values = Enum.map(value, &to_string/1)
     {:ok, Enum.join(string_values, separator)}
+  end
+
+  def join(_value, []) do
+    {:error, "join filter only works on lists"}
   end
 
   def join(_value, [_separator]) do
@@ -127,6 +136,6 @@ defmodule Prana.Template.Filters.CollectionFilters do
   end
 
   def join(_value, _args) do
-    {:error, "join filter requires exactly one separator argument"}
+    {:error, "join filter requires optional separator argument"}
   end
 end

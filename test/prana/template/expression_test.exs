@@ -1,467 +1,446 @@
 defmodule Prana.Template.ExpressionTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
+  alias Prana.Template.Engine
 
-  alias Prana.Template.Expression
-
-  describe "simple field access" do
+  describe "simple expression rendering" do
     setup do
       context = %{
         "$input" => %{
-          "email" => "john@test.com",
+          "name" => "Alice",
           "age" => 25,
-          "is_active" => true,
-          "profile" => %{
-            "name" => "John Doe",
-            "settings" => %{"theme" => "dark"}
-          }
-        },
-        "$nodes" => %{
-          "api_call" => %{
-            "response" => %{"user_id" => 123, "status" => "success"},
-            "status_code" => 200
+          "active" => true,
+          "inactive" => false,
+          "score" => 95.5,
+          "nested" => %{
+            "field" => "nested_value",
+            "deep" => %{"value" => "very_deep"}
           }
         },
         "$variables" => %{
-          "api_url" => "https://api.example.com",
-          "retry_count" => 3
+          "app_name" => "MyApp",
+          "version" => "1.0.0"
         }
       }
 
       {:ok, context: context}
     end
 
-    test "distinguishes between missing paths (nil) and syntax errors (error)" do
-      context = %{
-        "$input" => %{"valid_field" => "value"}
-      }
+    test "renders simple string variable", %{context: context} do
+      template = "Hello {{ $input.name }}!"
 
-      # Missing paths should return nil
-      {:ok, result} = Expression.extract("$input.missing_field", context)
-      assert result == nil
-
-      {:ok, result} = Expression.extract("$missing_root.field", context)
-      assert result == nil
-
-      # Non-expressions should return as-is
-      {:ok, result} = Expression.extract("not_an_expression", context)
-      assert result == "not_an_expression"
-
-      # Empty $ should return as-is (not a valid expression)
-      {:ok, result} = Expression.extract("$", context)
-      assert result == "$"
-
-      # Valid expressions should work
-      {:ok, result} = Expression.extract("$input.valid_field", context)
-      assert result == "value"
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Hello Alice!"
     end
 
-    test "map processing with mixed missing and valid paths" do
-      context = %{
-        "$input" => %{"existing" => "value"},
-        "$nodes" => %{"step1" => %{"result" => "success"}}
-      }
+    test "renders simple number variable", %{context: context} do
+      template = "Age: {{ $input.age }}"
 
-      input_map = %{
-        "valid1" => "$input.existing",
-        "valid2" => "$nodes.step1.result",
-        "missing1" => "$input.nonexistent",
-        "missing2" => "$nodes.missing_step.result",
-        "missing3" => "$variables.missing_var",
-        "static" => "hello"
-      }
-
-      {:ok, processed} = Expression.process_map(input_map, context)
-
-      assert processed == %{
-               "valid1" => "value",
-               "valid2" => "success",
-               "missing1" => nil,
-               "missing2" => nil,
-               "missing3" => nil,
-               "static" => "hello"
-             }
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Age: 25"
     end
 
-    test "extracts simple fields", %{context: context} do
-      {:ok, email} = Expression.extract("$input.email", context)
-      assert email == "john@test.com"
+    test "renders boolean variables", %{context: context} do
+      template1 = "Active: {{ $input.active }}"
+      assert {:ok, "Active: true"} = Engine.render(template1, context)
 
-      {:ok, age} = Expression.extract("$input.age", context)
-      assert age == 25
-
-      {:ok, active} = Expression.extract("$input.is_active", context)
-      assert active == true
+      template2 = "Inactive: {{ $input.inactive }}"
+      assert {:ok, "Inactive: false"} = Engine.render(template2, context)
     end
 
-    test "extracts nested fields", %{context: context} do
-      {:ok, name} = Expression.extract("$input.profile.name", context)
-      assert name == "John Doe"
+    test "renders float variables", %{context: context} do
+      template = "Score: {{ $input.score }}"
 
-      {:ok, theme} = Expression.extract("$input.profile.settings.theme", context)
-      assert theme == "dark"
-
-      {:ok, user_id} = Expression.extract("$nodes.api_call.response.user_id", context)
-      assert user_id == 123
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Score: 95.5"
     end
 
-    test "extracts from different context roots", %{context: context} do
-      {:ok, api_url} = Expression.extract("$variables.api_url", context)
-      assert api_url == "https://api.example.com"
+    test "renders nested field access", %{context: context} do
+      template = "Nested: {{ $input.nested.field }}"
 
-      {:ok, status_code} = Expression.extract("$nodes.api_call.status_code", context)
-      assert status_code == 200
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Nested: nested_value"
     end
 
-    test "returns non-expressions as-is", %{context: context} do
-      {:ok, value} = Expression.extract("hello", context)
-      assert value == "hello"
+    test "renders deeply nested field access", %{context: context} do
+      template = "Deep: {{ $input.nested.deep.value }}"
 
-      {:ok, value} = Expression.extract(123, context)
-      assert value == 123
-
-      {:ok, value} = Expression.extract(true, context)
-      assert value == true
-
-      {:ok, value} = Expression.extract(%{"key" => "value"}, context)
-      assert value == %{"key" => "value"}
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Deep: very_deep"
     end
 
-    test "handles missing paths - returns nil", %{context: context} do
-      {:ok, result} = Expression.extract("$input.nonexistent", context)
-      assert result == nil
+    test "renders variables section", %{context: context} do
+      template = "App: {{ $variables.app_name }} v{{ $variables.version }}"
 
-      {:ok, result} = Expression.extract("$nodes.missing.field", context)
-      assert result == nil
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "App: MyApp v1.0.0"
+    end
 
-      {:ok, result} = Expression.extract("$variables.nonexistent.deep.path", context)
-      assert result == nil
+    test "pure expression returns original data type", %{context: context} do
+      # Single expression should return the original type, not string
+      template = "{{ $input.age }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 25  # Number, not "25"
+    end
+
+    test "pure boolean expression returns boolean", %{context: context} do
+      template = "{{ $input.active }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # Boolean, not "true"
+    end
+
+    test "pure nested expression returns original type", %{context: context} do
+      template = "{{ $input.nested.field }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "nested_value"  # String as expected
+    end
+
+    test "mixed content returns string", %{context: context} do
+      template = "Name: {{ $input.name }}, Age: {{ $input.age }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Name: Alice, Age: 25"
+      assert is_binary(result)
+    end
+
+    test "handles missing variables gracefully", %{context: context} do
+      template = "Missing: {{ $input.missing_field }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Missing: "  # Empty string for missing values
+    end
+
+    test "handles missing nested fields gracefully", %{context: context} do
+      template = "Missing nested: {{ $input.nested.missing }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Missing nested: "
+    end
+
+    test "renders literal text without expressions", %{context: _context} do
+      template = "This is just plain text with no expressions"
+
+      assert {:ok, result} = Engine.render(template, %{})
+      assert result == "This is just plain text with no expressions"
+    end
+
+    test "handles empty template", %{context: _context} do
+      template = ""
+
+      assert {:ok, result} = Engine.render(template, %{})
+      assert result == ""
+    end
+
+    test "handles whitespace in expressions", %{context: context} do
+      template = "Hello {{   $input.name   }}!"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Hello Alice!"
+    end
+
+    test "handles multiple expressions in one template", %{context: context} do
+      template = "{{ $input.name }} is {{ $input.age }} years old and is {{ $input.active }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Alice is 25 years old and is true"
     end
   end
 
-  describe "array access" do
+  describe "arithmetic expressions" do
     setup do
       context = %{
         "$input" => %{
-          "users" => [
-            %{"name" => "John", "email" => "john@test.com", "is_active" => true, "role" => "admin"},
-            %{"name" => "Jane", "email" => "jane@test.com", "is_active" => true, "role" => "user"},
-            %{"name" => "Bob", "email" => "bob@test.com", "is_active" => false, "role" => "user"}
-          ],
-          "tags" => ["urgent", "customer", "support"]
-        },
-        "$nodes" => %{
-          "search_results" => %{
-            "items" => [
-              %{"title" => "First Result", "score" => 0.95},
-              %{"title" => "Second Result", "score" => 0.87}
-            ]
-          }
+          "a" => 10,
+          "b" => 5,
+          "c" => 2.5
         }
       }
 
       {:ok, context: context}
     end
 
-    test "extracts array elements by index", %{context: context} do
-      {:ok, user} = Expression.extract("$input.users[0]", context)
-      assert user["name"] == "John"
+    test "renders addition", %{context: context} do
+      template = "Result: {{ $input.a + $input.b }}"
 
-      {:ok, name} = Expression.extract("$input.users[1].name", context)
-      assert name == "Jane"
-
-      {:ok, tag} = Expression.extract("$input.tags[0]", context)
-      assert tag == "urgent"
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Result: 15"
     end
 
-    test "extracts from nested arrays", %{context: context} do
-      {:ok, title} = Expression.extract("$nodes.search_results.items[0].title", context)
-      assert title == "First Result"
+    test "renders subtraction", %{context: context} do
+      template = "Result: {{ $input.a - $input.b }}"
 
-      {:ok, score} = Expression.extract("$nodes.search_results.items[1].score", context)
-      assert score == 0.87
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Result: 5"
     end
 
-    test "handles array bounds - returns nil", %{context: context} do
-      {:ok, result} = Expression.extract("$input.users[10]", context)
-      assert result == nil
+    test "renders multiplication", %{context: context} do
+      template = "Result: {{ $input.a * $input.b }}"
 
-      {:ok, result} = Expression.extract("$input.tags[5]", context)
-      assert result == nil
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Result: 50"
+    end
+
+    test "renders division", %{context: context} do
+      template = "Result: {{ $input.a / $input.b }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Result: 2.0"
+    end
+
+    test "renders complex arithmetic", %{context: context} do
+      template = "Result: {{ ($input.a + $input.b) * $input.c }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Result: 37.5"
+    end
+
+    test "pure arithmetic expression returns number", %{context: context} do
+      template = "{{ $input.a + $input.b }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 15  # Number, not "15"
     end
   end
 
-
-
-  describe "map processing" do
+  describe "nested parentheses with arithmetic operators" do
     setup do
       context = %{
         "$input" => %{
-          "user_id" => 123,
-          "email" => "john@test.com",
-          "users" => [
-            %{"name" => "John", "role" => "admin"},
-            %{"name" => "Jane", "role" => "user"}
-          ]
-        },
-        "$variables" => %{
-          "api_url" => "https://api.example.com"
-        },
-        "$nodes" => %{
-          "get_user" => %{
-            "profile" => %{"avatar_url" => "https://example.com/avatar.jpg"}
-          }
+          "a" => 10,
+          "b" => 5,
+          "c" => 2,
+          "d" => 3,
+          "items" => ["x", "y", "z"],
+          "users" => [%{"name" => "Alice"}, %{"name" => "Bob"}]
         }
       }
 
       {:ok, context: context}
     end
 
-    test "processes map with expressions", %{context: context} do
-      input_map = %{
-        "user_id" => "$input.user_id",
-        "email" => "$input.email",
-        "api_url" => "$variables.api_url",
-        "avatar" => "$nodes.get_user.profile.avatar_url",
-        # Single result from first user
-        "first_name" => "$input.users[0].name",
-        # Single result from second user
-        "second_name" => "$input.users[1].name",
-        "static_value" => "hello",
-        "number_value" => 42
-      }
+    test "simple nested parentheses", %{context: context} do
+      template = "{{ ($input.a + $input.b) * $input.c }}"
 
-      {:ok, processed} = Expression.process_map(input_map, context)
-
-      assert processed == %{
-               "user_id" => 123,
-               "email" => "john@test.com",
-               "api_url" => "https://api.example.com",
-               "avatar" => "https://example.com/avatar.jpg",
-               "first_name" => "John",
-               "second_name" => "Jane",
-               "static_value" => "hello",
-               "number_value" => 42
-             }
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 30  # (10 + 5) * 2 = 30
     end
 
-    test "processes nested maps", %{context: context} do
-      input_map = %{
-        "user_data" => %{
-          "id" => "$input.user_id",
-          "contact" => %{
-            "email" => "$input.email"
-          }
-        },
-        "config" => %{
-          "api_url" => "$variables.api_url",
-          # Array in nested structure
-          "first_user_name" => "$input.users[0].name"
-        }
-      }
+    test "multiple levels of nesting", %{context: context} do
+      template = "{{ (($input.a + $input.b) * $input.c) + $input.d }}"
 
-      {:ok, processed} = Expression.process_map(input_map, context)
-
-      assert processed == %{
-               "user_data" => %{
-                 "id" => 123,
-                 "contact" => %{
-                   "email" => "john@test.com"
-                 }
-               },
-               "config" => %{
-                 "api_url" => "https://api.example.com",
-                 "first_user_name" => "John"
-               }
-             }
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 33  # ((10 + 5) * 2) + 3 = 33
     end
 
-    test "handles non-map input", %{context: context} do
-      {:ok, result} = Expression.process_map("not a map", context)
-      assert result == "not a map"
+    test "nested parentheses with subtraction", %{context: context} do
+      template = "{{ ($input.a - ($input.b + $input.c)) * $input.d }}"
 
-      {:ok, result} = Expression.process_map(123, context)
-      assert result == 123
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 9  # (10 - (5 + 2)) * 3 = 9
     end
 
-    test "handles missing paths in map processing - returns nil", %{context: context} do
-      input_map = %{
-        "valid" => "$input.email",
-        "missing" => "$input.nonexistent.field"
-      }
+    test "nested parentheses with division", %{context: context} do
+      template = "{{ ($input.a + $input.b) / ($input.c + $input.d) }}"
 
-      {:ok, processed} = Expression.process_map(input_map, context)
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 3.0  # (10 + 5) / (2 + 3) = 3.0
+    end
 
-      assert processed == %{
-               "valid" => "john@test.com",
-               "missing" => nil
-             }
+    test "complex nested expression with mixed operators", %{context: context} do
+      template = "{{ (($input.a * $input.b) + ($input.c - $input.d)) / $input.c }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 24.5  # ((10 * 5) + (2 - 3)) / 2 = 49 / 2 = 24.5
+    end
+
+    test "nested parentheses with function calls", %{context: context} do
+      template = "{{ ($input.items | length()) + ($input.users | length()) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 5  # 3 + 2 = 5
+    end
+
+    test "function call result in arithmetic expression", %{context: context} do
+      template = "{{ ($input.items | length()) * ($input.a + $input.b) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 45  # 3 * (10 + 5) = 45
+    end
+
+    test "nested function calls with arithmetic", %{context: context} do
+      template = "{{ (($input.items | length()) + $input.c) * $input.d }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 15  # ((3) + 2) * 3 = 15
+    end
+
+    test "deeply nested with multiple operations", %{context: context} do
+      template = "{{ ((($input.a + $input.b) * $input.c) - $input.d) / ($input.items | length()) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 9.0  # (((10 + 5) * 2) - 3) / 3 = 27 / 3 = 9.0
+    end
+
+    test "nested parentheses in mixed content returns string", %{context: context} do
+      template = "Result: {{ ($input.a + $input.b) * $input.c }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Result: 30"
+      assert is_binary(result)
+    end
+
+    test "pure nested expression preserves number type", %{context: context} do
+      template = "{{ (($input.a + $input.b) * $input.c) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 30
+      assert is_integer(result)
+    end
+
+    test "handles precedence correctly without parentheses", %{context: context} do
+      template = "{{ $input.a + $input.b * $input.c }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 20  # 10 + (5 * 2) = 20, multiplication has higher precedence
+    end
+
+    test "parentheses override natural precedence", %{context: context} do
+      template = "{{ ($input.a + $input.b) * $input.c }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == 30  # (10 + 5) * 2 = 30
     end
   end
 
-  describe "extended bracket syntax" do
+  describe "nested parentheses with boolean operators" do
     setup do
       context = %{
         "$input" => %{
-          "email" => "test@example.com",
-          :atom_email => "atom@example.com",
-          "user" => %{
-            "0" => "string_zero_value",
-            0 => "integer_zero_value"
-          },
-          "object" => %{
-            0 => "integer_key_value",
-            "1" => "string_key_value"
-          },
-          "mixed_keys" => %{
-            :name => "John",
-            "age" => 25,
-            "role" => "admin"
-          }
+          "age" => 25,
+          "score" => 85,
+          "active" => true,
+          "premium" => false,
+          "count" => 10,
+          "limit" => 5,
+          "name" => "Alice",
+          "role" => "admin"
         }
       }
 
       {:ok, context: context}
     end
 
-    test "string key access with double quotes", %{context: context} do
-      {:ok, result} = Expression.extract("$input[\"email\"]", context)
-      assert result == "test@example.com"
+    test "simple boolean with parentheses", %{context: context} do
+      template = "{{ ($input.age > 18) && $input.active }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # (25 > 18) && true = true
     end
 
-    test "string key access with single quotes", %{context: context} do
-      {:ok, result} = Expression.extract("$input['email']", context)
-      assert result == "test@example.com"
+    test "nested boolean with AND/OR precedence", %{context: context} do
+      template = "{{ $input.active && ($input.age > 18 || $input.premium) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # true && (true || false) = true
     end
 
-    test "atom key access", %{context: context} do
-      {:ok, result} = Expression.extract("$input[:atom_email]", context)
-      assert result == "atom@example.com"
+    test "complex nested boolean conditions", %{context: context} do
+      template = "{{ ($input.age >= 18 && $input.score > 80) || ($input.premium && $input.active) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # (true && true) || (false && true) = true
     end
 
-    test "string number key vs integer key distinction", %{context: context} do
-      # String "0" key
-      {:ok, result1} = Expression.extract("$input.user[\"0\"]", context)
-      assert result1 == "string_zero_value"
+    test "boolean with arithmetic in parentheses", %{context: context} do
+      template = "{{ ($input.count * 2) > ($input.age + $input.limit) }}"
 
-      # Integer 0 key  
-      {:ok, result2} = Expression.extract("$input.user[0]", context)
-      assert result2 == "integer_zero_value"
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == false  # (10 * 2) > (25 + 5) = 20 > 30 = false
     end
 
-    test "integer key access in object", %{context: context} do
-      {:ok, result} = Expression.extract("$input.object[0]", context) 
-      assert result == "integer_key_value"
+    test "nested boolean with string comparisons", %{context: context} do
+      template = "{{ ($input.name == \"Alice\") && ($input.role == \"admin\" || $input.premium) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # (true) && (true || false) = true
     end
 
-    test "mixed key types in same object", %{context: context} do
-      {:ok, atom_result} = Expression.extract("$input.mixed_keys[:name]", context)
-      assert atom_result == "John"
+    test "deeply nested boolean logic", %{context: context} do
+      template = "{{ (($input.age > 18 && $input.active) || $input.premium) && ($input.score >= 80) }}"
 
-      {:ok, string_result} = Expression.extract("$input.mixed_keys[\"age\"]", context)
-      assert string_result == 25
-
-      {:ok, dot_result} = Expression.extract("$input.mixed_keys.role", context)
-      assert dot_result == "admin"
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # ((true && true) || false) && true = true
     end
 
-    test "simple atom key access works", %{context: _context} do
-      simple_context = %{
-        "$input" => %{
-          :atom_key => "atom_value"
-        }
-      }
+    test "boolean precedence without parentheses", %{context: context} do
+      # AND has higher precedence than OR
+      template = "{{ $input.active || $input.premium && $input.age > 18 }}"
 
-      {:ok, result} = Expression.extract("$input[:atom_key]", simple_context)
-      assert result == "atom_value"
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # true || (false && true) = true
     end
 
-    test "nested bracket access with debug", %{context: _context} do
-      # Let's test step by step to understand what's happening
-      {:ok, result1} = Expression.extract("$input.mixed_keys[:name]", %{
-        "$input" => %{
-          "mixed_keys" => %{
-            :name => "John"
-          }
-        }
-      })
-      assert result1 == "John"
-    end
-  end
+    test "parentheses override boolean precedence", %{context: context} do
+      template = "{{ ($input.active || $input.premium) && $input.age > 18 }}"
 
-  describe "complex scenarios" do
-    test "workflow node input preparation" do
-      context = %{
-        "$input" => %{
-          "operation" => "send_notifications",
-          "tenant_id" => "tenant_123"
-        },
-        "$nodes" => %{
-          "get_users" => %{
-            "response" => %{
-              "users" => [
-                %{"id" => 1, "email" => "john@test.com", "role" => "admin", "is_active" => true},
-                %{"id" => 2, "email" => "jane@test.com", "role" => "user", "is_active" => true},
-                %{"id" => 3, "email" => "bob@test.com", "role" => "admin", "is_active" => false}
-              ]
-            },
-            "status_code" => 200
-          }
-        },
-        "$variables" => %{
-          "api_base_url" => "https://api.example.com",
-          "notification_template" => "Welcome {{name}}!"
-        }
-      }
-
-      # Prepare input for notification node
-      notification_input = %{
-        "base_url" => "$variables.api_base_url",
-        "tenant_id" => "$input.tenant_id",
-        "template" => "$variables.notification_template",
-        "first_email" => "$nodes.get_users.response.users[0].email",
-        "second_email" => "$nodes.get_users.response.users[1].email",
-        "first_user_id" => "$nodes.get_users.response.users[0].id"
-      }
-
-      {:ok, prepared} = Expression.process_map(notification_input, context)
-
-      assert prepared == %{
-               "base_url" => "https://api.example.com",
-               "tenant_id" => "tenant_123",
-               "template" => "Welcome {{name}}!",
-               "first_email" => "john@test.com",
-               "second_email" => "jane@test.com", 
-               "first_user_id" => 1
-             }
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # (true || false) && true = true
     end
 
-    test "expression edge cases" do
-      context = %{
-        "$input" => %{
-          "empty_list" => [],
-          "null_value" => nil,
-          "nested" => %{"deep" => %{"value" => "found"}}
-        }
-      }
+    test "mixed arithmetic and boolean in nested parentheses", %{context: context} do
+      template = "{{ (($input.count + $input.limit) > $input.age) && ($input.score >= 80) }}"
 
-      # Empty expressions should return as-is
-      {:ok, "$"} = Expression.extract("$", context)
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == false  # ((10 + 5) > 25) && (85 >= 80) = false && true = false
+    end
 
-      # Deep nesting should work
-      {:ok, value} = Expression.extract("$input.nested.deep.value", context)
-      assert value == "found"
+    test "comparison operators with parentheses", %{context: context} do
+      template = "{{ ($input.age >= 21) || ($input.score > 90 && $input.active) }}"
 
-      # Accessing empty arrays should return nil for index access
-      {:ok, empty} = Expression.extract("$input.empty_list[0]", context)
-      assert empty == nil
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # (25 >= 21) || (false && true) = true || false = true
+    end
 
-      # Accessing nil should return nil (graceful handling)
-      {:ok, result} = Expression.extract("$input.null_value.field", context)
-      assert result == nil
+    test "negation with nested parentheses", %{context: context} do
+      # Using inequality as negation since ! operator may not be implemented
+      template = "{{ ($input.premium != true) && ($input.age > 18 && $input.active) }}"
 
-      # Accessing missing root should return nil
-      {:ok, result} = Expression.extract("$nonexistent.field", context)
-      assert result == nil
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # (false != true) && (true && true) = true && true = true
+    end
+
+    test "complex boolean expression with all operators", %{context: context} do
+      template = "{{ (($input.age >= 18 && $input.score > 70) || $input.premium) && ($input.active != false) }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true  # ((true && true) || false) && (true != false) = true && true = true
+    end
+
+    test "boolean in mixed content returns string", %{context: context} do
+      template = "Access: {{ ($input.age >= 18) && $input.active }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == "Access: true"
+      assert is_binary(result)
+    end
+
+    test "pure boolean expression preserves boolean type", %{context: context} do
+      template = "{{ ($input.age >= 18) && $input.active }}"
+
+      assert {:ok, result} = Engine.render(template, context)
+      assert result == true
+      assert is_boolean(result)
+    end
+
+    test "nested boolean with function calls", %{context: context} do
+      # Test boolean logic with function results
+      context_with_items = Map.put(context, "$input", Map.put(context["$input"], "items", ["a", "b", "c"]))
+      template = "{{ ($input.items | length()) > 2 && $input.active }}"
+
+      assert {:ok, result} = Engine.render(template, context_with_items)
+      assert result == true  # (3 > 2) && true = true
     end
   end
 end

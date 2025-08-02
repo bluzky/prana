@@ -57,5 +57,47 @@ defmodule Prana.Template.Filters.NumberFiltersTest do
       assert {:ok, "Price: $123.46"} =
                Engine.render("Price: {{ $input.price | round(2) | format_currency(\"USD\") }}", context)
     end
+
+    test "round filter with default precision", %{context: context} do
+      # Round with no arguments defaults to integer rounding
+      assert {:ok, 123} = Engine.render("{{ $input.price | round }}", context)
+      assert {:ok, 42} = Engine.render("{{ $input.amount | round }}", context)
+      assert {:ok, 3} = Engine.render("{{ $input.number | round }}", context)
+    end
+
+    test "format_currency filter with default currency", %{context: context} do
+      # Format currency with no arguments defaults to USD
+      assert {:ok, "$42.00"} = Engine.render("{{ $input.amount | format_currency }}", context)
+      assert {:ok, "$123.46"} = Engine.render("{{ $input.price | format_currency }}", context)
+      
+      # Mixed template with default currency
+      assert {:ok, "Total: $42.00"} = Engine.render("Total: {{ $input.amount | format_currency }}", context)
+    end
+
+    test "type preservation in pure expressions", %{context: context} do
+      # Pure number expressions should return numbers
+      assert {:ok, result} = Engine.render("{{ $input.price | round(2) }}", context)
+      assert result == 123.46
+      assert is_float(result)
+      
+      # Pure rounded integer should return integer (due to our implementation)
+      assert {:ok, result} = Engine.render("{{ $input.amount | round }}", context)
+      assert result == 42
+      assert is_integer(result)
+    end
+
+    test "mixed content returns string", %{context: context} do
+      # Mixed content should always return string
+      assert {:ok, result} = Engine.render("Price: {{ $input.price | round(2) }}", context)
+      assert result == "Price: 123.46"
+      assert is_binary(result)
+    end
+
+    test "number filters with string input", %{context: context} do
+      # String numbers should be parsed and processed
+      context_with_string = Map.put(context, "$input", Map.put(context["$input"], "string_number", "99.99"))
+      assert {:ok, 100} = Engine.render("{{ $input.string_number | round }}", context_with_string)
+      assert {:ok, "$99.99"} = Engine.render("{{ $input.string_number | format_currency }}", context_with_string)
+    end
   end
 end
