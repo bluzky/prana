@@ -380,9 +380,9 @@ defmodule Prana.Template.ExpressionParser do
         {:call, func_name, args} ->
           {:call, func_name, [acc | args]}
 
-        # Handle other patterns
+        # Handle unsupported pipe_part types with clear error
         other ->
-          {:call, inspect(other), [acc]}
+          raise ArgumentError, "Unsupported pipe operation: #{inspect(other)}. Expected function name (string) or function call tuple."
       end
     end)
   end

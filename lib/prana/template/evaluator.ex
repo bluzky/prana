@@ -210,8 +210,10 @@ defmodule Prana.Template.Evaluator do
   defp apply_binary_operation(:sub, left, right) when is_number(left) and is_number(right), do: left - right
   defp apply_binary_operation(:mul, left, right) when is_number(left) and is_number(right), do: left * right
 
-  defp apply_binary_operation(:div, left, right) when is_number(left) and is_number(right) and right != 0,
-    do: left / right
+  defp apply_binary_operation(:div, _left, 0) do
+    throw({:error, "Division by zero is not allowed"})
+  end
+  defp apply_binary_operation(:div, left, right) when is_number(left) and is_number(right), do: left / right
 
   defp apply_binary_operation(:gt, left, right), do: compare_values(left, right) == :gt
   defp apply_binary_operation(:lt, left, right), do: compare_values(left, right) == :lt
