@@ -8,10 +8,14 @@ defmodule Prana.Template.SecurityValidator do
 
   # Security limits - centralized configuration
   @default_limits %{
-    max_template_size: 100_000,        # 100KB template size limit
-    max_nesting_depth: 50,             # Maximum control structure nesting
-    max_loop_iterations: 10_000,       # Maximum loop iterations
-    max_recursion_depth: 100           # Maximum expression evaluation recursion
+    # 100KB template size limit
+    max_template_size: 100_000,
+    # Maximum control structure nesting
+    max_nesting_depth: 50,
+    # Maximum loop iterations
+    max_loop_iterations: 10_000,
+    # Maximum expression evaluation recursion
+    max_recursion_depth: 100
   }
 
   @doc """

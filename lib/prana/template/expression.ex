@@ -56,7 +56,6 @@ defmodule Prana.Template.Expression do
   - `"variables"` - Workflow variables
   """
 
-
   @doc """
   Extract value from context using expression path.
 

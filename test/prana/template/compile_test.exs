@@ -2,21 +2,22 @@ defmodule Prana.Template.CompileTest do
   use ExUnit.Case, async: false
 
   alias Prana.Template
+  alias Prana.Template.CompiledTemplate
 
   describe "compile/1 and compile/2" do
     test "compiles simple template successfully" do
       assert {:ok, compiled} = Template.compile("Hello {{$input.name}}")
-      assert %Prana.Template.CompiledTemplate{} = compiled
+      assert %CompiledTemplate{} = compiled
       assert is_list(compiled.ast)
       assert is_map(compiled.options)
     end
 
     test "compiles template with options" do
-      opts = [strict_mode: true, max_template_size: 50000]
+      opts = [strict_mode: true, max_template_size: 50_000]
       assert {:ok, compiled} = Template.compile("Hello {{$input.name}}", opts)
-      assert %Prana.Template.CompiledTemplate{} = compiled
+      assert %CompiledTemplate{} = compiled
       assert compiled.options.strict_mode == true
-      assert compiled.options.max_template_size == 50000
+      assert compiled.options.max_template_size == 50_000
     end
 
     test "fails compilation for oversized template" do
@@ -38,14 +39,14 @@ defmodule Prana.Template.CompileTest do
       {:ok, compiled} = Template.compile("Hello {{$input.name}}")
       {:ok, compiled_mixed} = Template.compile("Value: {{$input.value}}")
       {:ok, compiled_pure} = Template.compile("{{$input.value}}")
-      
+
       context = %{
         "$input" => %{
           "name" => "John",
           "value" => 42
         }
       }
-      
+
       {:ok, compiled: compiled, compiled_mixed: compiled_mixed, compiled_pure: compiled_pure, context: context}
     end
 
@@ -111,14 +112,14 @@ defmodule Prana.Template.CompileTest do
     test "compiles and renders templates with filters" do
       {:ok, compiled} = Template.compile("{{$input.name | upper_case}}")
       context = %{"$input" => %{"name" => "john"}}
-      
+
       assert {:ok, "JOHN"} = Template.render(compiled, context)
     end
 
     test "compiles and renders complex filter chains" do
       {:ok, compiled} = Template.compile("{{$input.items | length}} items, first: {{$input.items | first}}")
       context = %{"$input" => %{"items" => [1, 2, 3, 4, 5]}}
-      
+
       assert {:ok, "5 items, first: 1"} = Template.render(compiled, context)
     end
   end
@@ -127,14 +128,14 @@ defmodule Prana.Template.CompileTest do
     test "render/2 works with both string and compiled templates" do
       template_string = "Hello {{$input.name}}!"
       context = %{"$input" => %{"name" => "World"}}
-      
+
       # Render string template
       assert {:ok, result1} = Template.render(template_string, context)
-      
+
       # Compile and render compiled template
       {:ok, compiled} = Template.compile(template_string)
       assert {:ok, result2} = Template.render(compiled, context)
-      
+
       # Both should produce the same result
       assert result1 == result2
       assert result1 == "Hello World!"
@@ -144,14 +145,14 @@ defmodule Prana.Template.CompileTest do
       template_string = "Value: {{$input.value}}"
       context = %{"$input" => %{"value" => 42}}
       opts = [strict_mode: true]
-      
+
       # Render string template with options
       assert {:ok, result1} = Template.render(template_string, context, opts)
-      
+
       # Compile and render compiled template with options (options ignored for compiled)
       {:ok, compiled} = Template.compile(template_string, opts)
       assert {:ok, result2} = Template.render(compiled, context, opts)
-      
+
       # Both should produce the same result
       assert result1 == result2
       assert result1 == "Value: 42"
@@ -174,24 +175,24 @@ defmodule Prana.Template.CompileTest do
   describe "CompiledTemplate struct benefits" do
     test "provides clear structure and type safety" do
       {:ok, compiled} = Template.compile("Hello {{$input.name}}")
-      
+
       # Clear struct pattern matching
-      assert %Prana.Template.CompiledTemplate{ast: ast, options: options} = compiled
+      assert %CompiledTemplate{ast: ast, options: options} = compiled
       assert is_list(ast)
       assert is_map(options)
-      
+
       # Easy access to fields
       assert compiled.ast == ast
       assert compiled.options == options
-      
+
       # Type safety - can't accidentally destructure wrong
       assert compiled.options.strict_mode == false
     end
-    
+
     test "works seamlessly with render function" do
       {:ok, compiled} = Template.compile("Value: {{$input.count}}")
       context = %{"$input" => %{"count" => 42}}
-      
+
       # Both ways work identically
       assert {:ok, result1} = Template.render("Value: {{$input.count}}", context)
       assert {:ok, result2} = Template.render(compiled, context)

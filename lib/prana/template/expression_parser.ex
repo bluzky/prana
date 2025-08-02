@@ -270,6 +270,7 @@ defmodule Prana.Template.ExpressionParser do
 
   # Build AST with proper operator precedence using a simplified approach
   defp build_with_precedence([], [result], []), do: result
+
   defp build_with_precedence([], operands, operators) do
     # Process remaining operators
     apply_remaining_operators(operands, operators)
@@ -277,21 +278,20 @@ defmodule Prana.Template.ExpressionParser do
 
   defp build_with_precedence([[op, operand] | rest], operands, operators) do
     # Check if we should process operators on the stack first
-    case should_process_stack?(op, operators) do
-      true ->
-        # Process one operator from stack and continue
-        {new_operands, new_operators} = process_one_operator(operands, operators)
-        build_with_precedence([[op, operand] | rest], new_operands, new_operators)
-      
-      false ->
-        # Push current operator and operand to stacks
-        build_with_precedence(rest, [operand | operands], [op | operators])
+    if should_process_stack?(op, operators) do
+      # Process one operator from stack and continue
+      {new_operands, new_operators} = process_one_operator(operands, operators)
+      build_with_precedence([[op, operand] | rest], new_operands, new_operators)
+    else
+      # Push current operator and operand to stacks
+      build_with_precedence(rest, [operand | operands], [op | operators])
     end
   end
 
   defp should_process_stack?(current_op, [stack_op | _]) do
     precedence(stack_op) >= precedence(current_op)
   end
+
   defp should_process_stack?(_, []), do: false
 
   defp precedence(:mul), do: 2
@@ -313,6 +313,7 @@ defmodule Prana.Template.ExpressionParser do
   end
 
   defp apply_remaining_operators([result], []), do: result
+
   defp apply_remaining_operators([right, left | operands], [op | operators]) do
     result = {:binary_op, op, left, right}
     apply_remaining_operators([result | operands], operators)
@@ -333,10 +334,10 @@ defmodule Prana.Template.ExpressionParser do
   defp build_pipe_chain_and_binary_ops(elements) do
     # First handle pipe operations, then binary operations
     {base, rest} = extract_base_and_operations(elements)
-    
+
     # Apply pipe operations first
     piped_result = apply_pipe_operations(base, rest)
-    
+
     # Then apply binary operations if any
     apply_binary_operations(piped_result, rest)
   end
@@ -352,7 +353,8 @@ defmodule Prana.Template.ExpressionParser do
   end
 
   defp apply_binary_operations(base, operations) do
-    binary_ops = operations |> Enum.filter(&is_binary_operation?/1)
+    binary_ops = Enum.filter(operations, &is_binary_operation?/1)
+
     case binary_ops do
       [] -> base
       ops -> build_binary_ops([base | ops])

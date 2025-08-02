@@ -1,5 +1,6 @@
 defmodule Prana.Template.ExpressionTest do
   use ExUnit.Case, async: true
+
   alias Prana.Template
 
   describe "simple expression rendering" do
@@ -80,21 +81,24 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ $input.age }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 25  # Number, not "25"
+      # Number, not "25"
+      assert result == 25
     end
 
     test "pure boolean expression returns boolean", %{context: context} do
       template = "{{ $input.active }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # Boolean, not "true"
+      # Boolean, not "true"
+      assert result == true
     end
 
     test "pure nested expression returns original type", %{context: context} do
       template = "{{ $input.nested.field }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == "nested_value"  # String as expected
+      # String as expected
+      assert result == "nested_value"
     end
 
     test "mixed content returns string", %{context: context} do
@@ -109,7 +113,8 @@ defmodule Prana.Template.ExpressionTest do
       template = "Missing: {{ $input.missing_field }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == "Missing: "  # Empty string for missing values
+      # Empty string for missing values
+      assert result == "Missing: "
     end
 
     test "handles missing nested fields gracefully", %{context: context} do
@@ -200,7 +205,8 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ $input.a + $input.b }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 15  # Number, not "15"
+      # Number, not "15"
+      assert result == 15
     end
   end
 
@@ -224,63 +230,72 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ ($input.a + $input.b) * $input.c }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 30  # (10 + 5) * 2 = 30
+      # (10 + 5) * 2 = 30
+      assert result == 30
     end
 
     test "multiple levels of nesting", %{context: context} do
       template = "{{ (($input.a + $input.b) * $input.c) + $input.d }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 33  # ((10 + 5) * 2) + 3 = 33
+      # ((10 + 5) * 2) + 3 = 33
+      assert result == 33
     end
 
     test "nested parentheses with subtraction", %{context: context} do
       template = "{{ ($input.a - ($input.b + $input.c)) * $input.d }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 9  # (10 - (5 + 2)) * 3 = 9
+      # (10 - (5 + 2)) * 3 = 9
+      assert result == 9
     end
 
     test "nested parentheses with division", %{context: context} do
       template = "{{ ($input.a + $input.b) / ($input.c + $input.d) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 3.0  # (10 + 5) / (2 + 3) = 3.0
+      # (10 + 5) / (2 + 3) = 3.0
+      assert result == 3.0
     end
 
     test "complex nested expression with mixed operators", %{context: context} do
       template = "{{ (($input.a * $input.b) + ($input.c - $input.d)) / $input.c }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 24.5  # ((10 * 5) + (2 - 3)) / 2 = 49 / 2 = 24.5
+      # ((10 * 5) + (2 - 3)) / 2 = 49 / 2 = 24.5
+      assert result == 24.5
     end
 
     test "nested parentheses with function calls", %{context: context} do
       template = "{{ ($input.items | length()) + ($input.users | length()) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 5  # 3 + 2 = 5
+      # 3 + 2 = 5
+      assert result == 5
     end
 
     test "function call result in arithmetic expression", %{context: context} do
       template = "{{ ($input.items | length()) * ($input.a + $input.b) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 45  # 3 * (10 + 5) = 45
+      # 3 * (10 + 5) = 45
+      assert result == 45
     end
 
     test "nested function calls with arithmetic", %{context: context} do
       template = "{{ (($input.items | length()) + $input.c) * $input.d }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 15  # ((3) + 2) * 3 = 15
+      # ((3) + 2) * 3 = 15
+      assert result == 15
     end
 
     test "deeply nested with multiple operations", %{context: context} do
       template = "{{ ((($input.a + $input.b) * $input.c) - $input.d) / ($input.items | length()) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 9.0  # (((10 + 5) * 2) - 3) / 3 = 27 / 3 = 9.0
+      # (((10 + 5) * 2) - 3) / 3 = 27 / 3 = 9.0
+      assert result == 9.0
     end
 
     test "nested parentheses in mixed content returns string", %{context: context} do
@@ -303,14 +318,16 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ $input.a + $input.b * $input.c }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 20  # 10 + (5 * 2) = 20, multiplication has higher precedence
+      # 10 + (5 * 2) = 20, multiplication has higher precedence
+      assert result == 20
     end
 
     test "parentheses override natural precedence", %{context: context} do
       template = "{{ ($input.a + $input.b) * $input.c }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == 30  # (10 + 5) * 2 = 30
+      # (10 + 5) * 2 = 30
+      assert result == 30
     end
   end
 
@@ -336,42 +353,48 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ ($input.age > 18) && $input.active }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # (25 > 18) && true = true
+      # (25 > 18) && true = true
+      assert result == true
     end
 
     test "nested boolean with AND/OR precedence", %{context: context} do
       template = "{{ $input.active && ($input.age > 18 || $input.premium) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # true && (true || false) = true
+      # true && (true || false) = true
+      assert result == true
     end
 
     test "complex nested boolean conditions", %{context: context} do
       template = "{{ ($input.age >= 18 && $input.score > 80) || ($input.premium && $input.active) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # (true && true) || (false && true) = true
+      # (true && true) || (false && true) = true
+      assert result == true
     end
 
     test "boolean with arithmetic in parentheses", %{context: context} do
       template = "{{ ($input.count * 2) > ($input.age + $input.limit) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == false  # (10 * 2) > (25 + 5) = 20 > 30 = false
+      # (10 * 2) > (25 + 5) = 20 > 30 = false
+      assert result == false
     end
 
     test "nested boolean with string comparisons", %{context: context} do
-      template = "{{ ($input.name == \"Alice\") && ($input.role == \"admin\" || $input.premium) }}"
+      template = ~s[{{ ($input.name == "Alice") && ($input.role == "admin" || $input.premium) }}]
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # (true) && (true || false) = true
+      # (true) && (true || false) = true
+      assert result == true
     end
 
     test "deeply nested boolean logic", %{context: context} do
       template = "{{ (($input.age > 18 && $input.active) || $input.premium) && ($input.score >= 80) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # ((true && true) || false) && true = true
+      # ((true && true) || false) && true = true
+      assert result == true
     end
 
     test "boolean precedence without parentheses", %{context: context} do
@@ -379,28 +402,32 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ $input.active || $input.premium && $input.age > 18 }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # true || (false && true) = true
+      # true || (false && true) = true
+      assert result == true
     end
 
     test "parentheses override boolean precedence", %{context: context} do
       template = "{{ ($input.active || $input.premium) && $input.age > 18 }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # (true || false) && true = true
+      # (true || false) && true = true
+      assert result == true
     end
 
     test "mixed arithmetic and boolean in nested parentheses", %{context: context} do
       template = "{{ (($input.count + $input.limit) > $input.age) && ($input.score >= 80) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == false  # ((10 + 5) > 25) && (85 >= 80) = false && true = false
+      # ((10 + 5) > 25) && (85 >= 80) = false && true = false
+      assert result == false
     end
 
     test "comparison operators with parentheses", %{context: context} do
       template = "{{ ($input.age >= 21) || ($input.score > 90 && $input.active) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # (25 >= 21) || (false && true) = true || false = true
+      # (25 >= 21) || (false && true) = true || false = true
+      assert result == true
     end
 
     test "negation with nested parentheses", %{context: context} do
@@ -408,14 +435,16 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ ($input.premium != true) && ($input.age > 18 && $input.active) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # (false != true) && (true && true) = true && true = true
+      # (false != true) && (true && true) = true && true = true
+      assert result == true
     end
 
     test "complex boolean expression with all operators", %{context: context} do
       template = "{{ (($input.age >= 18 && $input.score > 70) || $input.premium) && ($input.active != false) }}"
 
       assert {:ok, result} = Template.render(template, context)
-      assert result == true  # ((true && true) || false) && (true != false) = true && true = true
+      # ((true && true) || false) && (true != false) = true && true = true
+      assert result == true
     end
 
     test "boolean in mixed content returns string", %{context: context} do
@@ -440,7 +469,8 @@ defmodule Prana.Template.ExpressionTest do
       template = "{{ ($input.items | length()) > 2 && $input.active }}"
 
       assert {:ok, result} = Template.render(template, context_with_items)
-      assert result == true  # (3 > 2) && true = true
+      # (3 > 2) && true = true
+      assert result == true
     end
   end
 end

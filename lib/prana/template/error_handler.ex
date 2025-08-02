@@ -14,13 +14,13 @@ defmodule Prana.Template.ErrorHandler do
     case error_reason do
       {:error, message} when is_binary(message) ->
         {:error, message}
-        
+
       {:error, reason} ->
         {:error, "Template parsing failed: #{inspect(reason)}"}
-        
+
       error when is_binary(error) ->
         {:error, "Template parsing failed: #{error}"}
-        
+
       error ->
         {:error, "Template parsing failed: #{inspect(error)}"}
     end
@@ -34,16 +34,16 @@ defmodule Prana.Template.ErrorHandler do
     case error_reason do
       {:error, message} when is_binary(message) ->
         {:error, message}
-        
+
       {:max_recursion, depth} ->
         {:error, "Maximum recursion depth exceeded at depth #{depth}"}
-        
+
       {:error, reason} ->
         {:error, "Expression evaluation failed: #{inspect(reason)}"}
-        
+
       error when is_binary(error) ->
         {:error, "Expression evaluation failed: #{error}"}
-        
+
       error ->
         {:error, "Expression evaluation failed: #{inspect(error)}"}
     end
@@ -57,13 +57,13 @@ defmodule Prana.Template.ErrorHandler do
     case error_reason do
       {:error, message} when is_binary(message) ->
         {:error, message}
-        
+
       {:error, reason} ->
         {:error, "Control block evaluation failed: #{inspect(reason)}"}
-        
+
       error when is_binary(error) ->
         {:error, "Control block evaluation failed: #{error}"}
-        
+
       error ->
         {:error, "Control block evaluation failed: #{inspect(error)}"}
     end
@@ -79,7 +79,7 @@ defmodule Prana.Template.ErrorHandler do
 
   @doc """
   Apply graceful error handling mode if configured.
-  
+
   In graceful mode, certain errors return fallback values instead of errors.
   Security errors are never handled gracefully.
   """
@@ -100,20 +100,20 @@ defmodule Prana.Template.ErrorHandler do
 
   defp is_security_error?(message) when is_binary(message) do
     String.contains?(message, "exceeds maximum") or
-    String.contains?(message, "security") or
-    String.contains?(message, "limit")
+      String.contains?(message, "security") or
+      String.contains?(message, "limit")
   end
 
   @doc """
   Check if an error should never be handled gracefully (always return error).
-  
+
   Filter errors and function errors should always return errors, even in graceful mode.
   """
   @spec is_always_error?(String.t()) :: boolean()
   def is_always_error?(message) when is_binary(message) do
     is_security_error?(message) or
-    String.contains?(message, "Unknown filter") or
-    String.contains?(message, "Filter application failed") or
-    String.contains?(message, "Filter error")
+      String.contains?(message, "Unknown filter") or
+      String.contains?(message, "Filter application failed") or
+      String.contains?(message, "Filter error")
   end
 end

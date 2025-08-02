@@ -69,7 +69,7 @@ defmodule Prana.Template.Filters.NumberFiltersTest do
       # Format currency with no arguments defaults to USD
       assert {:ok, "$42.00"} = Template.render("{{ $input.amount | format_currency }}", context)
       assert {:ok, "$123.46"} = Template.render("{{ $input.price | format_currency }}", context)
-      
+
       # Mixed template with default currency
       assert {:ok, "Total: $42.00"} = Template.render("Total: {{ $input.amount | format_currency }}", context)
     end
@@ -79,7 +79,7 @@ defmodule Prana.Template.Filters.NumberFiltersTest do
       assert {:ok, result} = Template.render("{{ $input.price | round(2) }}", context)
       assert result == 123.46
       assert is_float(result)
-      
+
       # Pure rounded integer should return integer (due to our implementation)
       assert {:ok, result} = Template.render("{{ $input.amount | round }}", context)
       assert result == 42

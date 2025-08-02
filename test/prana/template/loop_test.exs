@@ -1,5 +1,6 @@
 defmodule Prana.Template.LoopTest do
   use ExUnit.Case, async: true
+
   alias Prana.Template
 
   describe "for loop rendering" do

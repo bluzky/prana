@@ -12,6 +12,7 @@ defmodule Prana.Template.Evaluator do
   """
 
   alias Prana.Template.Expression
+  alias Prana.Template.ExpressionParser
   alias Prana.Template.FilterRegistry
   alias Prana.Template.SecurityValidator
 
@@ -30,27 +31,23 @@ defmodule Prana.Template.Evaluator do
 
   @spec evaluate_expression(any(), map()) :: {:ok, any()} | {:error, String.t()}
   def evaluate_expression(ast, context) do
-    try do
-      result = do_evaluate_expression(ast, context, 0)
-      {:ok, result}
-    rescue
-      error -> {:error, "Expression evaluation failed: #{inspect(error)}"}
-    catch
-      {:error, message} -> {:error, message}
-      {:max_recursion, depth} -> {:error, "Maximum recursion depth exceeded at depth #{depth}"}
-    end
+    result = do_evaluate_expression(ast, context, 0)
+    {:ok, result}
+  rescue
+    error -> {:error, "Expression evaluation failed: #{inspect(error)}"}
+  catch
+    {:error, message} -> {:error, message}
+    {:max_recursion, depth} -> {:error, "Maximum recursion depth exceeded at depth #{depth}"}
   end
 
   @spec evaluate_control_block(atom(), any(), list(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def evaluate_control_block(type, condition, body, context) do
-    try do
-      result = do_evaluate_control_block(type, condition, body, context, 0)
-      {:ok, result}
-    rescue
-      error -> {:error, "Control block evaluation failed: #{inspect(error)}"}
-    catch
-      {:error, message} -> {:error, message}
-    end
+    result = do_evaluate_control_block(type, condition, body, context, 0)
+    {:ok, result}
+  rescue
+    error -> {:error, "Control block evaluation failed: #{inspect(error)}"}
+  catch
+    {:error, message} -> {:error, message}
   end
 
   # Private implementation functions
@@ -59,10 +56,11 @@ defmodule Prana.Template.Evaluator do
     case ast_blocks do
       [{:expression, expression_content}] ->
         # Parse the expression content to get the AST
-        case Prana.Template.ExpressionParser.parse(String.trim(expression_content)) do
+        case ExpressionParser.parse(String.trim(expression_content)) do
           {:ok, ast} -> {:single_expression, ast}
           {:error, _reason} -> :mixed_content
         end
+
       _ ->
         :mixed_content
     end
@@ -73,7 +71,7 @@ defmodule Prana.Template.Evaluator do
   defp evaluate_template_blocks([block | rest], context, acc) do
     case evaluate_template_block(block, context) do
       {:ok, result} ->
-        string_result = if is_binary(result), do: result, else: (if result == nil, do: "", else: to_string(result))
+        string_result = if is_binary(result), do: result, else: if(result == nil, do: "", else: to_string(result))
         evaluate_template_blocks(rest, context, acc <> string_result)
 
       {:error, reason} ->
@@ -87,7 +85,7 @@ defmodule Prana.Template.Evaluator do
   defp evaluate_template_blocks_with_nesting([block | rest], context, acc, nesting_depth) do
     case evaluate_template_block_with_nesting(block, context, nesting_depth) do
       {:ok, result} ->
-        string_result = if is_binary(result), do: result, else: (if result == nil, do: "", else: to_string(result))
+        string_result = if is_binary(result), do: result, else: if(result == nil, do: "", else: to_string(result))
         evaluate_template_blocks_with_nesting(rest, context, acc <> string_result, nesting_depth)
 
       {:error, reason} ->
@@ -99,7 +97,7 @@ defmodule Prana.Template.Evaluator do
 
   defp evaluate_template_block({:expression, expression_content}, context) do
     # Parse and evaluate the expression content
-    case Prana.Template.ExpressionParser.parse(String.trim(expression_content)) do
+    case ExpressionParser.parse(String.trim(expression_content)) do
       {:ok, ast} ->
         evaluate_expression(ast, context)
 
@@ -117,7 +115,7 @@ defmodule Prana.Template.Evaluator do
 
   defp evaluate_template_block_with_nesting({:expression, expression_content}, context, _nesting_depth) do
     # Parse and evaluate the expression content
-    case Prana.Template.ExpressionParser.parse(String.trim(expression_content)) do
+    case ExpressionParser.parse(String.trim(expression_content)) do
       {:ok, ast} ->
         evaluate_expression(ast, context)
 
@@ -126,16 +124,14 @@ defmodule Prana.Template.Evaluator do
     end
   end
 
+  # This will call do_evaluate_control_block with nesting_depth
   defp evaluate_template_block_with_nesting({:control, type, condition, body}, context, nesting_depth) do
-    # This will call do_evaluate_control_block with nesting_depth
-    try do
-      result = do_evaluate_control_block(type, condition, body, context, nesting_depth)
-      {:ok, result}
-    rescue
-      error -> {:error, "Control block evaluation failed: #{inspect(error)}"}
-    catch
-      {:error, message} -> {:error, message}
-    end
+    result = do_evaluate_control_block(type, condition, body, context, nesting_depth)
+    {:ok, result}
+  rescue
+    error -> {:error, "Control block evaluation failed: #{inspect(error)}"}
+  catch
+    {:error, message} -> {:error, message}
   end
 
   defp do_evaluate_expression(ast, context, depth) do
@@ -193,7 +189,6 @@ defmodule Prana.Template.Evaluator do
     end
   end
 
-
   # Helper function for nested value access
   defp get_nested_value(context, []) do
     context
@@ -210,12 +205,13 @@ defmodule Prana.Template.Evaluator do
     nil
   end
 
-
   # Binary operation implementation
   defp apply_binary_operation(:add, left, right) when is_number(left) and is_number(right), do: left + right
   defp apply_binary_operation(:sub, left, right) when is_number(left) and is_number(right), do: left - right
   defp apply_binary_operation(:mul, left, right) when is_number(left) and is_number(right), do: left * right
-  defp apply_binary_operation(:div, left, right) when is_number(left) and is_number(right) and right != 0, do: left / right
+
+  defp apply_binary_operation(:div, left, right) when is_number(left) and is_number(right) and right != 0,
+    do: left / right
 
   defp apply_binary_operation(:gt, left, right), do: compare_values(left, right) == :gt
   defp apply_binary_operation(:lt, left, right), do: compare_values(left, right) == :lt
@@ -255,7 +251,7 @@ defmodule Prana.Template.Evaluator do
       {:error, message} -> throw({:error, message})
     end
 
-    case Prana.Template.ExpressionParser.parse(condition) do
+    case ExpressionParser.parse(condition) do
       {:ok, condition_ast} ->
         condition_result = do_evaluate_expression(condition_ast, context, 0)
 
@@ -308,10 +304,10 @@ defmodule Prana.Template.Evaluator do
     end
   end
 
-
   # Version with nesting depth tracking and graceful iteration limit handling
   defp evaluate_for_loop_with_limits(item_var, collection, body, context, nesting_depth) do
-    max_iterations = 10_000  # Get max from SecurityValidator
+    # Get max from SecurityValidator
+    max_iterations = 10_000
 
     collection
     |> Enum.with_index()
@@ -322,9 +318,10 @@ defmodule Prana.Template.Evaluator do
       end
 
       # Create loop context with item variable and loop_index
-      loop_context = context
-                    |> Map.put("#{item_var}", item)
-                    |> Map.put("loop_index", index)
+      loop_context =
+        context
+        |> Map.put("#{item_var}", item)
+        |> Map.put("loop_index", index)
 
       case evaluate_template_blocks_with_nesting(body, loop_context, "", nesting_depth) do
         {:ok, result} -> {:cont, acc <> result}
@@ -333,14 +330,14 @@ defmodule Prana.Template.Evaluator do
     end)
   end
 
-
   # Helper functions
   defp compare_values(left, right) do
     cond do
       left > right -> :gt
       left < right -> :lt
       left == right -> :eq
-      true -> :eq  # Fallback for incomparable types
+      # Fallback for incomparable types
+      true -> :eq
     end
   end
 
@@ -350,5 +347,4 @@ defmodule Prana.Template.Evaluator do
   defp is_truthy([]), do: false
   defp is_truthy(%{} = map) when map_size(map) == 0, do: false
   defp is_truthy(_), do: true
-
 end

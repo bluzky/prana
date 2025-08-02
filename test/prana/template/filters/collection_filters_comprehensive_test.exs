@@ -247,58 +247,68 @@ defmodule Prana.Template.Filters.CollectionFiltersComprehensiveTest do
       # Extract names
       assert {:ok, result} = Template.render("{{ $input.users | map(\"name\") }}", context)
       assert result == ["Alice", "Bob", "Charlie"]
-      
+
       # Extract roles
       assert {:ok, result} = Template.render("{{ $input.users | map(\"role\") }}", context)
       assert result == ["admin", "user", "admin"]
-      
+
       # Extract ages
       assert {:ok, result} = Template.render("{{ $input.users | map(\"age\") }}", context)
       assert result == [25, 30, 35]
-      
+
       # Mixed template with map filter
-      assert {:ok, "Names: [\"Alice\", \"Bob\", \"Charlie\"]"} = 
-        Template.render("Names: {{ $input.users | map(\"name\") | dump }}", context)
+      assert {:ok, ~s(Names: ["Alice", "Bob", "Charlie"])} =
+               Template.render("Names: {{ $input.users | map(\"name\") | dump }}", context)
     end
 
     test "filter filter", %{context: context} do
       # Filter by role
-      assert {:ok, result} = Template.render("{{ $input.users | filter(\"role\", \"admin\") }}", context)
+      assert {:ok, result} = Template.render(~s[{{ $input.users | filter("role", "admin") }}], context)
       assert length(result) == 2
       assert Enum.all?(result, fn user -> user["role"] == "admin" end)
-      
+
       # Filter by age
       assert {:ok, result} = Template.render("{{ $input.users | filter(\"age\", 30) }}", context)
       assert length(result) == 1
       assert hd(result)["name"] == "Bob"
-      
+
       # Filter with no matches
-      assert {:ok, result} = Template.render("{{ $input.users | filter(\"role\", \"guest\") }}", context)
+      assert {:ok, result} = Template.render(~s[{{ $input.users | filter("role", "guest") }}], context)
       assert result == []
-      
+
       # Mixed template with filter
-      assert {:ok, result} = Template.render("Admins: {{ $input.users | filter(\"role\", \"admin\") | map(\"name\") | join(\", \") }}", context)
+      assert {:ok, result} =
+               Template.render(
+                 ~s[Admins: {{ $input.users | filter("role", "admin") | map("name") | join(", ") }}],
+                 context
+               )
+
       assert result == "Admins: Alice, Charlie"
     end
 
     test "reject filter", %{context: context} do
       # Reject by role
-      assert {:ok, result} = Template.render("{{ $input.users | reject(\"role\", \"admin\") }}", context)
+      assert {:ok, result} = Template.render(~s[{{ $input.users | reject("role", "admin") }}], context)
       assert length(result) == 1
       assert hd(result)["role"] == "user"
       assert hd(result)["name"] == "Bob"
-      
+
       # Reject by age
       assert {:ok, result} = Template.render("{{ $input.users | reject(\"age\", 30) }}", context)
       assert length(result) == 2
       assert Enum.all?(result, fn user -> user["age"] != 30 end)
-      
+
       # Reject with no matches (returns all)
-      assert {:ok, result} = Template.render("{{ $input.users | reject(\"role\", \"guest\") }}", context)
+      assert {:ok, result} = Template.render(~s[{{ $input.users | reject("role", "guest") }}], context)
       assert length(result) == 3
-      
+
       # Mixed template with reject
-      assert {:ok, result} = Template.render("Non-admins: {{ $input.users | reject(\"role\", \"admin\") | map(\"name\") | join(\", \") }}", context)
+      assert {:ok, result} =
+               Template.render(
+                 ~s[Non-admins: {{ $input.users | reject("role", "admin") | map("name") | join(", ") }}],
+                 context
+               )
+
       assert result == "Non-admins: Bob"
     end
 
@@ -372,15 +382,15 @@ defmodule Prana.Template.Filters.CollectionFiltersComprehensiveTest do
     test "dump filter", %{context: context} do
       # Dump list
       assert {:ok, "[1, 2, 3, 4, 5]"} = Template.render("{{ $input.items | dump }}", context)
-      
+
       # Dump map
       assert {:ok, result} = Template.render("{{ $input.user_map | dump }}", context)
       assert String.contains?(result, "name")
       assert String.contains?(result, "John")
-      
+
       # Dump string (should return as-is)
       assert {:ok, "hello world"} = Template.render("{{ $input.text | dump }}", context)
-      
+
       # Mixed template with dump
       assert {:ok, "Data: [1, 2, 3, 4, 5]"} = Template.render("Data: {{ $input.items | dump }}", context)
     end

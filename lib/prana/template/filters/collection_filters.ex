@@ -17,7 +17,7 @@ defmodule Prana.Template.Filters.CollectionFilters do
         %{name: "first", function: {__MODULE__, :first}, description: "Get first item from a collection"},
         %{name: "last", function: {__MODULE__, :last}, description: "Get last item from a collection"},
         %{name: "join", function: {__MODULE__, :join}, description: "Join array elements with separator"},
-        
+
         # List operations
         %{name: "sort", function: {__MODULE__, :sort}, description: "Sort a list"},
         %{name: "reverse", function: {__MODULE__, :reverse}, description: "Reverse a list or string"},
@@ -27,17 +27,17 @@ defmodule Prana.Template.Filters.CollectionFilters do
         %{name: "compact", function: {__MODULE__, :compact}, description: "Remove nil values from list"},
         %{name: "flatten", function: {__MODULE__, :flatten}, description: "Flatten nested lists"},
         %{name: "sum", function: {__MODULE__, :sum}, description: "Sum numeric values in list"},
-        
+
         # Map operations
         %{name: "keys", function: {__MODULE__, :keys}, description: "Get keys of a map"},
         %{name: "values", function: {__MODULE__, :values}, description: "Get values of a map"},
-        
+
         # List of maps operations
         %{name: "group_by", function: {__MODULE__, :group_by}, description: "Group list elements by key"},
         %{name: "map", function: {__MODULE__, :map}, description: "Extract field values from list of maps"},
         %{name: "filter", function: {__MODULE__, :filter}, description: "Filter list of maps by field value"},
         %{name: "reject", function: {__MODULE__, :reject}, description: "Reject list of maps by field value"},
-        
+
         # Display formatting
         %{name: "dump", function: {__MODULE__, :dump}, description: "Format data structures for display"}
       ]
@@ -258,20 +258,24 @@ defmodule Prana.Template.Filters.CollectionFilters do
   Calculate the sum of numeric values in a list.
   """
   def sum(value, []) when is_list(value) do
-    try do
-      result = Enum.reduce(value, 0, fn
-        item, acc when is_number(item) -> acc + item
+    result =
+      Enum.reduce(value, 0, fn
+        item, acc when is_number(item) ->
+          acc + item
+
         item, acc when is_binary(item) ->
           case Float.parse(item) do
             {num, _} -> acc + num
             :error -> throw({:error, "sum filter requires all elements to be numeric"})
           end
-        _item, _acc -> throw({:error, "sum filter requires all elements to be numeric"})
+
+        _item, _acc ->
+          throw({:error, "sum filter requires all elements to be numeric"})
       end)
-      {:ok, result}
-    catch
-      {:error, message} -> {:error, message}
-    end
+
+    {:ok, result}
+  catch
+    {:error, message} -> {:error, message}
   end
 
   def sum(_value, []) do
@@ -320,17 +324,17 @@ defmodule Prana.Template.Filters.CollectionFilters do
   Group list elements by a specified key.
   """
   def group_by(value, [key]) when is_list(value) and is_binary(key) do
-    try do
-      result = Enum.group_by(value, fn item ->
+    result =
+      Enum.group_by(value, fn item ->
         case item do
           %{} -> Map.get(item, key) || Map.get(item, String.to_atom(key))
           _ -> throw({:error, "group_by filter requires a list of maps"})
         end
       end)
-      {:ok, result}
-    catch
-      {:error, message} -> {:error, message}
-    end
+
+    {:ok, result}
+  catch
+    {:error, message} -> {:error, message}
   end
 
   def group_by(_value, _args) do
@@ -341,17 +345,17 @@ defmodule Prana.Template.Filters.CollectionFilters do
   Extract field values from a list of maps.
   """
   def map(value, [key]) when is_list(value) and is_binary(key) do
-    try do
-      result = Enum.map(value, fn item ->
+    result =
+      Enum.map(value, fn item ->
         case item do
           %{} -> Map.get(item, key) || Map.get(item, String.to_atom(key))
           _ -> throw({:error, "map filter requires a list of maps"})
         end
       end)
-      {:ok, result}
-    catch
-      {:error, message} -> {:error, message}
-    end
+
+    {:ok, result}
+  catch
+    {:error, message} -> {:error, message}
   end
 
   def map(_value, _args) do
@@ -362,19 +366,21 @@ defmodule Prana.Template.Filters.CollectionFilters do
   Filter list of maps by field value.
   """
   def filter(value, [key, filter_value]) when is_list(value) and is_binary(key) do
-    try do
-      result = Enum.filter(value, fn item ->
+    result =
+      Enum.filter(value, fn item ->
         case item do
-          %{} -> 
+          %{} ->
             item_value = Map.get(item, key) || Map.get(item, String.to_atom(key))
             item_value == filter_value
-          _ -> throw({:error, "filter filter requires a list of maps"})
+
+          _ ->
+            throw({:error, "filter filter requires a list of maps"})
         end
       end)
-      {:ok, result}
-    catch
-      {:error, message} -> {:error, message}
-    end
+
+    {:ok, result}
+  catch
+    {:error, message} -> {:error, message}
   end
 
   def filter(_value, _args) do
@@ -385,19 +391,21 @@ defmodule Prana.Template.Filters.CollectionFilters do
   Reject list of maps by field value (opposite of filter).
   """
   def reject(value, [key, reject_value]) when is_list(value) and is_binary(key) do
-    try do
-      result = Enum.reject(value, fn item ->
+    result =
+      Enum.reject(value, fn item ->
         case item do
-          %{} -> 
+          %{} ->
             item_value = Map.get(item, key) || Map.get(item, String.to_atom(key))
             item_value == reject_value
-          _ -> throw({:error, "reject filter requires a list of maps"})
+
+          _ ->
+            throw({:error, "reject filter requires a list of maps"})
         end
       end)
-      {:ok, result}
-    catch
-      {:error, message} -> {:error, message}
-    end
+
+    {:ok, result}
+  catch
+    {:error, message} -> {:error, message}
   end
 
   def reject(_value, _args) do
@@ -410,12 +418,14 @@ defmodule Prana.Template.Filters.CollectionFilters do
   Format data structures for display in templates.
   """
   def dump(value, []) do
-    formatted = case value do
-      value when is_list(value) -> inspect(value, charlists: :as_lists)
-      value when is_map(value) -> inspect(value)
-      value when is_binary(value) -> value
-      value -> inspect(value)
-    end
+    formatted =
+      case value do
+        value when is_list(value) -> inspect(value, charlists: :as_lists)
+        value when is_map(value) -> inspect(value)
+        value when is_binary(value) -> value
+        value -> inspect(value)
+      end
+
     {:ok, formatted}
   end
 

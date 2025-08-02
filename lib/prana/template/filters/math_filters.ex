@@ -26,7 +26,7 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Absolute value filter.
-  
+
   ## Examples
       {{ -42 | abs }}          # => 42
       {{ 3.14 | abs }}         # => 3.14
@@ -50,19 +50,19 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Ceiling filter - rounds up to nearest integer.
-  
+
   ## Examples
       {{ 3.14 | ceil }}        # => 4
       {{ 3.0 | ceil }}         # => 3
       {{ -2.5 | ceil }}        # => -2
   """
   def ceil(value, []) when is_number(value) do
-    {:ok, Float.ceil(value / 1) |> trunc()}
+    {:ok, (value / 1) |> Float.ceil() |> trunc()}
   end
 
   def ceil(value, []) when is_binary(value) do
     case Float.parse(value) do
-      {num, _} -> {:ok, Float.ceil(num / 1) |> trunc()}
+      {num, _} -> {:ok, (num / 1) |> Float.ceil() |> trunc()}
       :error -> {:error, "ceil filter requires a numeric value"}
     end
   end
@@ -73,19 +73,19 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Floor filter - rounds down to nearest integer.
-  
+
   ## Examples
       {{ 3.14 | floor }}       # => 3
       {{ 3.9 | floor }}        # => 3
       {{ -2.5 | floor }}       # => -3
   """
   def floor(value, []) when is_number(value) do
-    {:ok, Float.floor(value / 1) |> trunc()}
+    {:ok, (value / 1) |> Float.floor() |> trunc()}
   end
 
   def floor(value, []) when is_binary(value) do
     case Float.parse(value) do
-      {num, _} -> {:ok, Float.floor(num / 1) |> trunc()}
+      {num, _} -> {:ok, (num / 1) |> Float.floor() |> trunc()}
       :error -> {:error, "floor filter requires a numeric value"}
     end
   end
@@ -96,7 +96,7 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Maximum value filter.
-  
+
   ## Examples
       {{ 5 | max(10) }}        # => 10
       {{ 15 | max(10) }}       # => 15
@@ -125,7 +125,7 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Minimum value filter.
-  
+
   ## Examples
       {{ 5 | min(10) }}        # => 5
       {{ 15 | min(10) }}       # => 10
@@ -154,7 +154,7 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Power filter - raises value to the power of exponent.
-  
+
   ## Examples
       {{ 2 | power(3) }}       # => 8.0
       {{ 5 | power(2) }}       # => 25.0
@@ -183,7 +183,7 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Square root filter.
-  
+
   ## Examples
       {{ 16 | sqrt }}          # => 4.0
       {{ 2 | sqrt }}           # => 1.4142135623730951
@@ -210,7 +210,7 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Modulo filter - returns remainder of division.
-  
+
   ## Examples
       {{ 17 | modulo(5) }}     # => 2
       {{ 20 | modulo(3) }}     # => 2
@@ -225,9 +225,11 @@ defmodule Prana.Template.Filters.MathFilters do
 
   def modulo(value, [divisor]) when is_binary(value) do
     case Float.parse(value) do
-      {num, _} when is_number(divisor) and divisor != 0 -> 
+      {num, _} when is_number(divisor) and divisor != 0 ->
         {:ok, rem(trunc(num), trunc(divisor))}
-      :error -> {:error, "modulo filter requires numeric values"}
+
+      :error ->
+        {:error, "modulo filter requires numeric values"}
     end
   end
 
@@ -245,7 +247,7 @@ defmodule Prana.Template.Filters.MathFilters do
 
   @doc """
   Clamp filter - constrains value between min and max.
-  
+
   ## Examples
       {{ 5 | clamp(0, 10) }}   # => 5
       {{ -5 | clamp(0, 10) }}  # => 0
