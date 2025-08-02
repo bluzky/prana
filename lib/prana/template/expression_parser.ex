@@ -294,18 +294,18 @@ defmodule Prana.Template.ExpressionParser do
 
   defp should_process_stack?(_, []), do: false
 
-  defp precedence(:mul), do: 2
-  defp precedence(:div), do: 2
-  defp precedence(:add), do: 1
-  defp precedence(:sub), do: 1
-  defp precedence(:eq), do: 0
-  defp precedence(:neq), do: 0
-  defp precedence(:gt), do: 0
-  defp precedence(:lt), do: 0
-  defp precedence(:gte), do: 0
-  defp precedence(:lte), do: 0
-  defp precedence(:and), do: -1
-  defp precedence(:or), do: -2
+  defp precedence(:or), do: 1
+  defp precedence(:and), do: 2
+  defp precedence(:eq), do: 3
+  defp precedence(:neq), do: 3
+  defp precedence(:gt), do: 3
+  defp precedence(:lt), do: 3
+  defp precedence(:gte), do: 3
+  defp precedence(:lte), do: 3
+  defp precedence(:add), do: 4
+  defp precedence(:sub), do: 4
+  defp precedence(:mul), do: 5
+  defp precedence(:div), do: 5
 
   defp process_one_operator([right, left | operands], [op | operators]) do
     result = {:binary_op, op, left, right}
