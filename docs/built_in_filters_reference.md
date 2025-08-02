@@ -258,11 +258,11 @@ Returns the square root of a number.
 {{ $input.area | sqrt }}            # Square root
 ```
 
-### modulo
+### mod
 Returns the remainder of division.
 ```
-{{ 17 | modulo(5) }}                # => 2
-{{ $input.number | modulo(10) }}    # Remainder when divided by 10
+{{ 17 | mod(5) }}                # => 2
+{{ $input.number | mod(10) }}    # Remainder when divided by 10
 ```
 
 ### clamp
@@ -327,7 +327,7 @@ Items: {{ $input.items | dump }} # Returns: "Items: [1, 2, 3]" (string)
 ## Error Handling
 
 - **Unknown filters**: Return error messages
-- **Invalid arguments**: Return error messages  
+- **Invalid arguments**: Return error messages
 - **Type mismatches**: Return error messages
 - **Missing variables**: Return empty strings (graceful mode) or errors (strict mode)
 

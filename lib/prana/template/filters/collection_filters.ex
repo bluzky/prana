@@ -258,24 +258,19 @@ defmodule Prana.Template.Filters.CollectionFilters do
   Calculate the sum of numeric values in a list.
   """
   def sum(value, []) when is_list(value) do
-    result =
-      Enum.reduce(value, 0, fn
-        item, acc when is_number(item) ->
-          acc + item
+    Enum.reduce_while(value, {:ok, 0}, fn
+      item, {:ok, acc} when is_number(item) ->
+        {:cont, {:ok, acc + item}}
 
-        item, acc when is_binary(item) ->
-          case Float.parse(item) do
-            {num, _} -> acc + num
-            :error -> throw({:error, "sum filter requires all elements to be numeric"})
-          end
+      item, {:ok, acc} when is_binary(item) ->
+        case Float.parse(item) do
+          {num, _} -> {:cont, {:ok, acc + num}}
+          :error -> {:halt, {:error, "sum filter requires all elements to be numeric"}}
+        end
 
-        _item, _acc ->
-          throw({:error, "sum filter requires all elements to be numeric"})
-      end)
-
-    {:ok, result}
-  catch
-    {:error, message} -> {:error, message}
+      _item, {:ok, _acc} ->
+        {:halt, {:error, "sum filter requires all elements to be numeric"}}
+    end)
   end
 
   def sum(_value, []) do

@@ -145,22 +145,22 @@ defmodule Prana.Template.Filters.MathFiltersTest do
       assert String.contains?(result, "sqrt filter cannot calculate square root of negative number")
     end
 
-    test "modulo filter", %{context: context} do
-      # Basic modulo operations
-      assert {:ok, 0} = Template.render("{{ $input.integer | modulo(5) }}", context)
-      assert {:ok, 2} = Template.render("{{ 17 | modulo(5) }}", context)
+    test "mod filter", %{context: context} do
+      # Basic mod operations
+      assert {:ok, 0} = Template.render("{{ $input.integer | mod(5) }}", context)
+      assert {:ok, 2} = Template.render("{{ 17 | mod(5) }}", context)
 
       # With larger numbers
-      assert {:ok, 0} = Template.render("{{ $input.large | modulo(10) }}", context)
+      assert {:ok, 0} = Template.render("{{ $input.large | mod(10) }}", context)
 
       # Mixed template
-      assert {:ok, "Remainder: 0"} = Template.render("Remainder: {{ $input.integer | modulo(5) }}", context)
+      assert {:ok, "Remainder: 0"} = Template.render("Remainder: {{ $input.integer | mod(5) }}", context)
     end
 
-    test "modulo filter with zero divisor", %{context: context} do
+    test "mod filter with zero divisor", %{context: context} do
       # Should return error for division by zero
-      assert {:error, result} = Template.render("{{ $input.integer | modulo(0) }}", context)
-      assert String.contains?(result, "modulo filter cannot divide by zero")
+      assert {:error, result} = Template.render("{{ $input.integer | mod(0) }}", context)
+      assert String.contains?(result, "mod filter cannot divide by zero")
     end
 
     test "clamp filter", %{context: context} do
@@ -175,6 +175,12 @@ defmodule Prana.Template.Filters.MathFiltersTest do
 
       # Mixed template
       assert {:ok, "Clamped: 10"} = Template.render("Clamped: {{ $input.integer | clamp(0, 20) }}", context)
+    end
+
+    test "clamp filter with invalid range", %{context: context} do
+      # Should return error when min_val > max_val
+      assert {:error, result} = Template.render("{{ $input.integer | clamp(20, 10) }}", context)
+      assert String.contains?(result, "clamp filter requires min_val (20) to be <= max_val (10)")
     end
 
     test "chained math filters", %{context: context} do

@@ -18,7 +18,7 @@ defmodule Prana.Template.Filters.MathFilters do
         %{name: "min", function: {__MODULE__, :min}, description: "Minimum of two values"},
         %{name: "power", function: {__MODULE__, :power}, description: "Raise to power"},
         %{name: "sqrt", function: {__MODULE__, :sqrt}, description: "Square root"},
-        %{name: "modulo", function: {__MODULE__, :modulo}, description: "Modulo operation"},
+        %{name: "mod", function: {__MODULE__, :mod}, description: "Modulo operation"},
         %{name: "clamp", function: {__MODULE__, :clamp}, description: "Clamp value between min and max"}
       ]
     }
@@ -212,37 +212,37 @@ defmodule Prana.Template.Filters.MathFilters do
   Modulo filter - returns remainder of division.
 
   ## Examples
-      {{ 17 | modulo(5) }}     # => 2
-      {{ 20 | modulo(3) }}     # => 2
+      {{ 17 | mod(5) }}     # => 2
+      {{ 20 | mod(3) }}     # => 2
   """
-  def modulo(value, [divisor]) when is_number(value) and is_number(divisor) and divisor != 0 do
+  def mod(value, [divisor]) when is_number(value) and is_number(divisor) and divisor != 0 do
     {:ok, rem(trunc(value), trunc(divisor))}
   end
 
-  def modulo(_value, [0]) do
-    {:error, "modulo filter cannot divide by zero"}
+  def mod(_value, [0]) do
+    {:error, "mod filter cannot divide by zero"}
   end
 
-  def modulo(value, [divisor]) when is_binary(value) do
+  def mod(value, [divisor]) when is_binary(value) do
     case Float.parse(value) do
       {num, _} when is_number(divisor) and divisor != 0 ->
         {:ok, rem(trunc(num), trunc(divisor))}
 
       :error ->
-        {:error, "modulo filter requires numeric values"}
+        {:error, "mod filter requires numeric values"}
     end
   end
 
-  def modulo(value, [divisor]) when is_number(value) and is_binary(divisor) do
+  def mod(value, [divisor]) when is_number(value) and is_binary(divisor) do
     case Float.parse(divisor) do
       {num, _} when num != 0.0 -> {:ok, rem(trunc(value), trunc(num))}
-      {num, _} when num == 0.0 -> {:error, "modulo filter cannot divide by zero"}
-      :error -> {:error, "modulo filter requires numeric values"}
+      {num, _} when num == 0.0 -> {:error, "mod filter cannot divide by zero"}
+      :error -> {:error, "mod filter requires numeric values"}
     end
   end
 
-  def modulo(_value, _args) do
-    {:error, "modulo filter requires exactly one numeric argument"}
+  def mod(_value, _args) do
+    {:error, "mod filter requires exactly one numeric argument"}
   end
 
   @doc """
@@ -254,8 +254,12 @@ defmodule Prana.Template.Filters.MathFilters do
       {{ 15 | clamp(0, 10) }}  # => 10
   """
   def clamp(value, [min_val, max_val]) when is_number(value) and is_number(min_val) and is_number(max_val) do
-    clamped = value |> Kernel.max(min_val) |> Kernel.min(max_val)
-    {:ok, clamped}
+    if min_val <= max_val do
+      clamped = value |> Kernel.max(min_val) |> Kernel.min(max_val)
+      {:ok, clamped}
+    else
+      {:error, "clamp filter requires min_val (#{min_val}) to be <= max_val (#{max_val})"}
+    end
   end
 
   def clamp(_value, _args) do
