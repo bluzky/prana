@@ -326,7 +326,7 @@ defmodule Prana.Template.Evaluator do
   defp evaluate_access_chain(base_var_name, accessors, context) do
     # Get base value using the variable name as-is (including $ if present)
     base_value = Map.get(context, base_var_name)
-    
+
     # Apply each accessor in sequence
     Enum.reduce(accessors, base_value, fn accessor, current_value ->
       apply_accessor(accessor, current_value)

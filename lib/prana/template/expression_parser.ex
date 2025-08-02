@@ -81,7 +81,9 @@ defmodule Prana.Template.ExpressionParser do
 
   # Base variable (with optional $ prefix)
   base_variable =
-    optional(ascii_char([?$]))
+    [?$]
+    |> ascii_char()
+    |> optional()
     |> concat(identifier)
     |> reduce({List, :to_string, []})
     |> unwrap_and_tag(:variable)
@@ -96,7 +98,9 @@ defmodule Prana.Template.ExpressionParser do
 
   # Atom literal for bracket access
   atom_literal =
-    ignore(ascii_char([?:]))
+    [?:]
+    |> ascii_char()
+    |> ignore()
     |> concat(identifier)
     |> reduce({__MODULE__, :create_atom, []})
     |> unwrap_and_tag(:literal)
