@@ -240,7 +240,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
     test "batch mode 'batch' passes input data as-is without wrapping" do
       input_map = %{
-        "workflow_id" => "test_workflow", 
+        "workflow_id" => "test_workflow",
         "batch_mode" => "batch"
       }
 
@@ -310,7 +310,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
     test "handles missing main port in input context" do
       input_map = %{
-        "workflow_id" => "test_workflow", 
+        "workflow_id" => "test_workflow",
         "batch_mode" => "batch"
       }
 

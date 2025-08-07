@@ -533,5 +533,4 @@ defmodule Prana.ExecutionTest do
       assert shared_state["data"] == "important"
     end
   end
-
 end

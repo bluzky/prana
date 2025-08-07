@@ -13,6 +13,7 @@ defmodule Prana.WorkflowCompiler do
 
   alias Prana.ExecutionGraph
   alias Prana.IntegrationRegistry
+  alias Prana.LoopDetector
   alias Prana.Node
   alias Prana.Workflow
 
@@ -30,19 +31,22 @@ defmodule Prana.WorkflowCompiler do
   @spec compile(Workflow.t(), String.t() | nil) :: {:ok, ExecutionGraph.t()} | {:error, term()}
   def compile(%Workflow{} = workflow, trigger_node_key \\ nil) do
     with {:ok, trigger_node} <- get_trigger_node(workflow, trigger_node_key) do
-      dependency_graph = build_dependency_graph(workflow)
-      connection_map = build_connection_map(workflow)
-      reverse_connection_map = build_reverse_connection_map(workflow)
-      node_map = build_node_map(workflow)
+      # Detect loops and annotate nodes with metadata
+      annotated_workflow = LoopDetector.detect_and_annotate(workflow)
+
+      dependency_graph = build_dependency_graph(annotated_workflow)
+      connection_map = build_connection_map(annotated_workflow)
+      reverse_connection_map = build_reverse_connection_map(annotated_workflow)
+      node_map = build_node_map(annotated_workflow)
 
       execution_graph = %ExecutionGraph{
-        workflow_id: workflow.id,
+        workflow_id: annotated_workflow.id,
         trigger_node_key: trigger_node.key,
         dependency_graph: dependency_graph,
         connection_map: connection_map,
         reverse_connection_map: reverse_connection_map,
         node_map: node_map,
-        variables: workflow.variables
+        variables: annotated_workflow.variables
       }
 
       {:ok, execution_graph}
