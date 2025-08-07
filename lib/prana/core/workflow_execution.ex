@@ -312,7 +312,7 @@ defmodule Prana.WorkflowExecution do
 
       case last_execution do
         nil -> {node_key, nil}
-        exec -> {node_key, %{"output" => exec.output_data}}
+        exec -> {node_key, %{"output" => exec.output_data, "context" => exec.context || %{}}}
       end
     end)
     |> Enum.reject(fn {_, data} -> is_nil(data) end)
@@ -549,7 +549,10 @@ defmodule Prana.WorkflowExecution do
     # Update runtime state if present
     updated_execution =
       update_runtime_safely(updated_execution, fn runtime ->
-        node_data = %{"output" => completed_node_execution.output_data}
+        node_data = %{
+          "output" => completed_node_execution.output_data,
+          "context" => completed_node_execution.context
+        }
         updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
         Map.put(runtime, "nodes", updated_node_map)
       end)

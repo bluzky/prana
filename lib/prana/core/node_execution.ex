@@ -19,6 +19,7 @@ defmodule Prana.NodeExecution do
     field(:suspension_data, :any)
     field(:execution_index, :integer, default: 0)
     field(:run_index, :integer, default: 0)
+    field(:context, :map, default: %{})
   end
 
   #  status :: "pending" | "running" | "completed" | "failed" | "suspended"
@@ -63,7 +64,7 @@ defmodule Prana.NodeExecution do
   @doc """
   Marks node execution as completed
   """
-  def complete(%__MODULE__{} = node_execution, output_data, output_port) do
+  def complete(%__MODULE__{} = node_execution, output_data, output_port, context \\ %{}) do
     duration = calculate_duration(node_execution.started_at)
 
     %{
@@ -71,6 +72,7 @@ defmodule Prana.NodeExecution do
       | status: "completed",
         output_data: output_data,
         output_port: output_port,
+        context: context,
         completed_at: DateTime.utc_now(),
         duration_ms: duration
     }

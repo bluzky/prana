@@ -336,13 +336,12 @@ defmodule Prana.NodeExecutor do
         {:ok, completed_execution}
 
       {:ok, output_data, output_port, state_updates} ->
-        completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-        # state_updates is the state map directly
-        if map_size(state_updates) > 0 do
-          {:ok, completed_execution, state_updates}
-        else
-          {:ok, completed_execution}
-        end
+        # Extract node context updates from state_updates if present
+        {node_context, remaining_state_updates} = extract_node_context_updates(state_updates)
+
+        completed_execution = NodeExecution.complete(node_execution, output_data, output_port, node_context)
+
+        {:ok, completed_execution, remaining_state_updates}
 
       {:suspend, suspension_type, suspension_data} ->
         suspended_execution = NodeExecution.suspend(node_execution, suspension_type, suspension_data)
@@ -431,4 +430,21 @@ defmodule Prana.NodeExecutor do
 
   defp allows_dynamic_ports?(%Prana.Action{output_ports: ["*"]}), do: true
   defp allows_dynamic_ports?(_action), do: false
+
+  # Extract node context updates from state_updates map
+  # Actions can use special key "node_context" to update current node's context
+  defp extract_node_context_updates(state_updates) when is_map(state_updates) do
+    case Map.pop(state_updates, "node_context") do
+      {nil, remaining} ->
+        {%{}, remaining}
+
+      {node_context, remaining} when is_map(node_context) ->
+        {node_context, remaining}
+
+      {_invalid, remaining} ->
+        {%{}, remaining}
+    end
+  end
+
+  defp extract_node_context_updates(_), do: {%{}, %{}}
 end
