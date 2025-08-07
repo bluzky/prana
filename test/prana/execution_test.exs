@@ -14,6 +14,8 @@ defmodule Prana.ExecutionTest do
         workflow_id: "wf_1",
         workflow_version: 1,
         execution_graph: %{
+          trigger_node_key: "node_1",
+          connection_map: %{},
           node_map: %{
             "node_1" => %{key: "node_1", name: "Node 1"},
             "node_2" => %{key: "node_2", name: "Node 2"},
@@ -84,6 +86,7 @@ defmodule Prana.ExecutionTest do
         current_execution_index: 0,
         execution_graph: %{
           trigger_node_key: "start_node",
+          connection_map: %{},
           node_map: %{},
           reverse_connection_map: %{}
         }
@@ -101,6 +104,8 @@ defmodule Prana.ExecutionTest do
         workflow_id: "wf_1",
         workflow_version: 1,
         execution_graph: %{
+          trigger_node_key: "node_1",
+          connection_map: %{},
           node_map: %{
             "node_1" => %{key: "node_1", name: "Node 1"},
             "node_2" => %{key: "node_2", name: "Node 2"},
@@ -388,6 +393,8 @@ defmodule Prana.ExecutionTest do
         node_executions: %{},
         current_execution_index: 0,
         execution_graph: %{
+          trigger_node_key: "node_1",
+          connection_map: %{},
           node_map: %{
             "node_1" => %{key: "node_1", name: "Node 1"},
             "node_2" => %{key: "node_2", name: "Node 2"},
@@ -488,7 +495,7 @@ defmodule Prana.ExecutionTest do
         workflow_id: "wf_1",
         metadata: %{"shared_state" => %{"counter" => 5, "user_data" => %{"name" => "test"}}},
         node_executions: %{},
-        execution_graph: %{trigger_node_key: "trigger"},
+        execution_graph: %{trigger_node_key: "trigger", connection_map: %{}},
         __runtime: nil
       }
 
@@ -506,7 +513,7 @@ defmodule Prana.ExecutionTest do
         workflow_id: "wf_1",
         metadata: %{"shared_state" => %{"session_id" => "abc123", "step" => 1}},
         node_executions: %{},
-        execution_graph: %{trigger_node_key: "trigger"},
+        execution_graph: %{trigger_node_key: "trigger", connection_map: %{}},
         __runtime: %{"shared_state" => %{"session_id" => "abc123", "step" => 1}}
       }
 
@@ -526,4 +533,5 @@ defmodule Prana.ExecutionTest do
       assert shared_state["data"] == "important"
     end
   end
+
 end

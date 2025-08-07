@@ -176,7 +176,6 @@ defmodule Prana.WorkflowExecution do
     status in ["pending", "running", "suspended"]
   end
 
-
   @doc """
   Resumes a suspended execution by clearing suspension fields.
 
@@ -319,85 +318,98 @@ defmodule Prana.WorkflowExecution do
     |> Map.new()
   end
 
-  # Rebuild active_paths and node_depth using DFS algorithm for loop handling
-  defp rebuild_active_paths_and_node_depth(execution) do
+  # Rebuild active_paths and active_nodes using DFS algorithm for loop handling
+  defp rebuild_active_paths_and_active_nodes(execution) do
     execution_graph = execution.execution_graph
     trigger_node_key = execution_graph.trigger_node_key
-    
-    # Get the latest completed execution for trigger node
-    trigger_execution = get_latest_completed_execution(execution.node_executions, trigger_node_key)
-    
-    case trigger_execution do
-      nil -> 
-        # Trigger not executed yet - it should be ready with depth 0
-        {%{}, %{trigger_node_key => 0}}
-      
-      trigger_exec ->
-        # Start DFS from trigger node
-        initial_active_paths = %{trigger_node_key => %{execution_index: trigger_exec.execution_index}}
-        
-        dfs_traverse(
-          execution_graph,
-          execution.node_executions,
-          trigger_node_key,
-          trigger_exec,
-          initial_active_paths,
-          %{} # initial node_depth
-        )
-    end
+
+    completed_node_maps =
+      Map.new(execution.node_executions || %{}, fn {node_key, executions} ->
+        {node_key, hd(executions)}
+      end)
+
+    dfs_traverse(
+      execution_graph,
+      completed_node_maps,
+      trigger_node_key,
+      # previous node execution
+      nil,
+      # initial active_paths
+      %{},
+      # initial active_nodes
+      %{}
+    )
   end
 
   # Depth-first search traversal following the loop-aware algorithm
-  defp dfs_traverse(execution_graph, node_executions, current_node_key, current_execution, active_paths, node_depth) do
-    # Get all target nodes from current node's output port
-    connections = Map.get(execution_graph.connection_map, {current_node_key, current_execution.output_port}, [])
-    target_nodes = Enum.map(connections, & &1.to)
-    
-    # Process each target node
-    Enum.reduce(target_nodes, {active_paths, node_depth}, fn target_node_key, {acc_active_paths, acc_node_depth} ->
-      target_execution = get_latest_completed_execution(node_executions, target_node_key)
-      
-      case target_execution do
-        nil ->
-          # Node not executed - add to node_depth with previous node execution_index + 1
-          new_depth = current_execution.execution_index + 1
-          new_node_depth = Map.put(acc_node_depth, target_node_key, new_depth)
-          {acc_active_paths, new_node_depth}
-        
-        target_exec ->
-          cond do
-            # Node completed and execution_index < previous node execution_index
-            # Add to node_depth with previous_node_execution + 1
-            target_exec.execution_index < current_execution.execution_index ->
-              new_depth = current_execution.execution_index + 1
-              new_node_depth = Map.put(acc_node_depth, target_node_key, new_depth)
-              {acc_active_paths, new_node_depth}
-            
-            # Node completed and execution_index >= previous node execution_index
-            # Add to active_path and continue DFS traversal
-            target_exec.execution_index >= current_execution.execution_index ->
-              new_active_paths = Map.put(acc_active_paths, target_node_key, %{execution_index: target_exec.execution_index})
-              
-              # Continue DFS traversal from this node
-              dfs_traverse(
-                execution_graph,
-                node_executions,
-                target_node_key,
-                target_exec,
-                new_active_paths,
-                acc_node_depth
-              )
-          end
-      end
-    end)
-  end
+  #
+  # This algorithm builds active paths and active nodes from the execution graph and completed node executions.
+  # For the given current_node_key:
+  # - if current execution is nil, then add node to active_nodes because node execution not completed
+  # - if current execution is completed:
+  #   + if previous_node_execution is nil, then add to active_paths,
+  #     then for each connection from current node via output port, recursively traverse to next node and accumulate both active_paths and active_nodes
+  #   + if previous_node_execution is not nil, then check execution_index:
+  #     - if current execution_index is greater than previous, then add to active_paths
+  #       then for each connection from current node via output port, recursively traverse to next node and accumulate both active_paths and active_nodes
+  #     - if current execution_index is less than or equal to previous, then do not add to active_paths but add to active_nodes
 
-  # Helper function to get latest completed execution for a node
-  defp get_latest_completed_execution(node_executions, node_key) do
-    node_executions
-    |> Map.get(node_key, [])
-    |> Enum.filter(&(&1.status == "completed"))
-    |> Enum.max_by(&(&1.execution_index), fn -> nil end)
+  defp dfs_traverse(
+         execution_graph,
+         completed_node_maps,
+         current_node_key,
+         previous_node_execution,
+         active_paths,
+         active_nodes
+       ) do
+    current_execution = Map.get(completed_node_maps, current_node_key)
+
+    next_execution_index = if is_nil(previous_node_execution), do: 0, else: previous_node_execution.execution_index + 1
+
+    cond do
+      is_nil(current_execution) ->
+        # No execution found for this node, add to active_nodes
+        {active_paths, Map.put(active_nodes, current_node_key, next_execution_index)}
+
+      current_execution.status == "completed" and
+          (is_nil(previous_node_execution) or
+             current_execution.execution_index > previous_node_execution.execution_index) ->
+        # if no previous execution, or current execution is newer than previous
+        # add to active_paths and continue traversal
+        new_active_paths =
+          Map.put(active_paths, current_node_key, %{
+            execution_index: current_execution.execution_index
+          })
+
+        # Get all target nodes connected to this node via output port
+        target_nodes =
+          execution_graph.connection_map
+          |> Map.get({current_node_key, current_execution.output_port}, [])
+          |> Enum.map(& &1.to)
+
+        Enum.reduce(target_nodes, {new_active_paths, active_nodes}, fn target_node_key,
+                                                                       {acc_active_paths, acc_active_nodes} ->
+          # Recursively traverse to next nodes
+          dfs_traverse(
+            execution_graph,
+            completed_node_maps,
+            target_node_key,
+            current_execution,
+            acc_active_paths,
+            acc_active_nodes
+          )
+        end)
+
+      current_execution.status == "completed" ->
+        # if current execution is completed but not newer than previous
+        # Do not add to active_paths, but add to active_nodes
+        new_active_nodes = Map.put(active_nodes, current_node_key, next_execution_index)
+        {active_paths, new_active_nodes}
+
+      true ->
+        # Current execution is not completed, add to active_nodes for example in case of resuming, retrying, etc.
+        {active_paths, Map.put(active_nodes, current_node_key, next_execution_index)}
+    end
   end
 
   @doc """
@@ -415,7 +427,7 @@ defmodule Prana.WorkflowExecution do
   - `"nodes"` - Map of completed node outputs for routing
   - `"env"` - Environment data from application
   - `"active_paths"` - Map of completed nodes in current loop iterations: %{node_key => %{execution_index: index}}
-  - `"node_depth"` - Map of ready-to-execute nodes with their execution depths: %{node_key => depth}
+  - `"active_nodes"` - Map of ready-to-execute nodes with their execution depths: %{node_key => depth}
   - `"shared_state"` - Shared state data that persists across node executions within the same workflow
 
   ## Example
@@ -431,12 +443,12 @@ defmodule Prana.WorkflowExecution do
       execution.__runtime["nodes"]         # %{"node_1" => %{...}, "node_2" => %{...}}
       execution.__runtime["env"]           # %{"api_key" => "abc123", ...}
       execution.__runtime["active_paths"]  # %{"loop_node" => %{execution_index: 3}}
-      execution.__runtime["node_depth"]    # %{"ready_node" => 4}
+      execution.__runtime["active_nodes"]  # %{"ready_node" => 4}
       execution.__runtime["shared_state"]  # %{"counter" => 5, "user_data" => %{...}}
   """
   def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
     node_outputs = rebuild_completed_node_outputs(execution.node_executions)
-    {active_paths, node_depth} = rebuild_active_paths_and_node_depth(execution)
+    {active_paths, active_nodes} = rebuild_active_paths_and_active_nodes(execution)
 
     max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
     current_iteration_count = execution.metadata["iteration_count"] || 0
@@ -450,7 +462,7 @@ defmodule Prana.WorkflowExecution do
       "iteration_count" => current_iteration_count,
       "max_iterations" => max_iterations,
       "active_paths" => active_paths,
-      "node_depth" => node_depth,
+      "active_nodes" => active_nodes,
       "shared_state" => shared_state
     }
 
@@ -713,39 +725,65 @@ defmodule Prana.WorkflowExecution do
     end
   end
 
-  # Update active_nodes and node_depth when a node completes.
+  # Update active_nodes when a node completes.
   # This function updates the runtime state to reflect that a node has completed execution
   # by removing it from active_nodes and adding its target nodes based on the output port.
-  # It also maintains node_depth tracking for branch-following execution strategy.
+  # It also maintains active_nodes tracking for branch-following execution strategy.
   defp update_active_nodes_on_completion(execution, completed_node_key, node_execution) do
     update_runtime_safely(execution, fn runtime ->
-      # Get current active_nodes and node_depth from runtime
-      current_node_depth = runtime["node_depth"] || %{}
+      # Get current active_nodes and active_paths from runtime
+      current_active_nodes = runtime["active_nodes"] || %{}
+      current_active_paths = runtime["active_paths"] || %{}
 
-      # Get completed node's depth
-      completed_node_depth = node_execution.execution_index
-      current_node_depth = Map.delete(current_node_depth, completed_node_key)
+      # Get completed node's execution index
+      completed_execution_index = node_execution.execution_index
 
-      # Add target nodes from completed node's output connections and assign depths
-      final_node_depth =
+      # Remove completed node from active_nodes
+      updated_active_nodes = Map.delete(current_active_nodes, completed_node_key)
+
+      # Add completed node to active_paths for loop tracking
+      updated_active_paths =
+        Map.put(current_active_paths, completed_node_key, %{execution_index: completed_execution_index})
+
+      # Add target nodes from completed node's output connections
+      # this check because some test missing the runtime state
+      {final_active_nodes, final_active_paths} =
         if execution.execution_graph && Map.has_key?(execution.execution_graph, :connection_map) do
           connections =
             Map.get(execution.execution_graph.connection_map, {completed_node_key, node_execution.output_port}, [])
 
-          target_nodes = MapSet.new(connections, & &1.to)
+          new_active_nodes =
+            Enum.reduce(connections, updated_active_nodes, fn %{to: node_key}, acc_active_nodes ->
+              Map.put(acc_active_nodes, node_key, completed_execution_index + 1)
+            end)
 
-          # Assign depth = completed_node_depth + 1 to all target nodes
-          target_depth = completed_node_depth + 1
+          existing_path_node = Map.get(updated_active_paths, completed_node_key)
 
-          Enum.reduce(target_nodes, current_node_depth, fn node_key, depth_map ->
-            Map.put(depth_map, node_key, target_depth)
-          end)
+          new_active_paths =
+            case existing_path_node do
+              nil ->
+                Map.put(updated_active_paths, completed_node_key, %{execution_index: node_execution.execution_index})
+
+              _ ->
+                # If path already exists, remove all nodes with higher execution index of existing node
+                # then add the completed node with its execution index
+                updated_active_paths
+                |> Enum.reject(fn {_, path_info} ->
+                  path_info.execution_index > existing_path_node.execution_index
+                end)
+                |> Map.new()
+                |> Map.put(completed_node_key, %{execution_index: node_execution.execution_index})
+            end
+
+          {new_active_nodes, new_active_paths}
         else
-          current_node_depth
+          {updated_active_nodes, updated_active_paths}
         end
 
-      # Update runtime state
-      Map.put(runtime, "node_depth", final_node_depth)
+      # Update runtime state with both active_nodes and active_paths
+      runtime
+      |> Map.put("active_nodes", final_active_nodes)
+      |> Map.put("active_paths", final_active_paths)
     end)
   end
 
@@ -834,7 +872,7 @@ defmodule Prana.WorkflowExecution do
   MapSet of active node keys
   """
   def get_active_nodes(execution) do
-    (execution.__runtime["node_depth"] || %{}) |> Map.keys() |> MapSet.new()
+    (execution.__runtime["active_nodes"] || %{}) |> Map.keys() |> MapSet.new()
   end
 
   @doc """
