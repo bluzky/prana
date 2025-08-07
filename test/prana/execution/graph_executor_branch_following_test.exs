@@ -226,52 +226,5 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
              "Branch following not detected. Execution order: #{inspect(execution_order)}. " <>
                "Expected one branch to complete before other starts, but got interleaved execution."
     end
-
-    test "select_node_for_branch_following prioritizes nodes by depth" do
-      # Test the node selection logic directly
-
-      # Create nodes
-      shallow_node = %Node{key: "shallow", type: "test.shallow_action"}
-      deep_node = %Node{key: "deep", type: "test.deep_action"}
-
-      # Context with node depths
-      execution_context = %{
-        "node_depth" => %{
-          "shallow" => 1,
-          "deep" => 3
-        }
-      }
-
-      ready_nodes = [shallow_node, deep_node]
-
-      # Should select the deeper node (higher depth = more advanced in execution)
-      selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_context)
-
-      assert selected.key == "deep",
-             "Expected to select deeper node, but got #{selected.key}"
-    end
-
-    test "select_node_for_branch_following handles nodes with same depth" do
-      # Test when nodes have the same depth (should select first one)
-
-      node_a = %Node{key: "node_a", type: "test.node_a_action"}
-      node_b = %Node{key: "node_b", type: "test.node_b_action"}
-
-      # Context with same depth for both nodes
-      execution_context = %{
-        "node_depth" => %{
-          "node_a" => 2,
-          "node_b" => 2
-        }
-      }
-
-      ready_nodes = [node_a, node_b]
-
-      # Should select the first node when depths are equal
-      selected = GraphExecutor.select_node_for_branch_following(ready_nodes, execution_context)
-
-      assert selected.key == "node_a",
-             "Expected to select first node when depths are equal, but got #{selected.key}"
-    end
   end
 end

@@ -36,12 +36,13 @@ defmodule Prana.WorkflowExecution do
   use Skema
 
   alias Prana.Core.Error
+  alias Prana.ExecutionGraph
 
   defschema do
     field(:id, :string, required: true)
     field(:workflow_id, :string, required: true)
     field(:workflow_version, :integer, default: 1)
-    field(:execution_graph, Prana.ExecutionGraph)
+    field(:execution_graph, ExecutionGraph)
     field(:parent_execution_id, :string)
     field(:execution_mode, :atom, default: :async)
     field(:status, :string, default: "pending")
@@ -618,28 +619,6 @@ defmodule Prana.WorkflowExecution do
     end
   end
 
-  # @doc """
-  # Get incoming connections for a specific node and port.
-
-  # This function retrieves all connections that target a specific node and input port
-  # using the execution graph's reverse connection map for O(1) lookup performance.
-
-  # ## Parameters
-  # - `execution_graph` - The execution graph containing connection maps
-  # - `node_key` - The key of the target node
-  # - `input_port` - The name of the input port
-
-  # ## Returns
-  # List of Connection structs targeting the specified node and port
-  # """
-  defp get_incoming_connections_for_node_port(execution_graph, node_key, input_port) do
-    reverse_map = Map.get(execution_graph, :reverse_connection_map, %{})
-    all_incoming = Map.get(reverse_map, node_key, [])
-
-    # Filter for connections targeting the specific input port
-    Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)
-  end
-
   @doc """
   Extract multi-port input data for a node by computing routing from execution graph and runtime state.
 
@@ -662,7 +641,8 @@ defmodule Prana.WorkflowExecution do
     multi_port_input =
       Enum.reduce(input_ports, %{}, fn input_port, acc ->
         # Find all connections that target this node's input port
-        incoming_connections = get_incoming_connections_for_node_port(execution.execution_graph, node.key, input_port)
+        incoming_connections =
+          ExecutionGraph.get_incoming_connections_for_node_port(execution.execution_graph, node.key, input_port)
 
         # For same input port with multiple connections, use most recent execution_index
         port_data = resolve_input_port_data(incoming_connections, execution)
@@ -872,7 +852,7 @@ defmodule Prana.WorkflowExecution do
   MapSet of active node keys
   """
   def get_active_nodes(execution) do
-    (execution.__runtime["active_nodes"] || %{}) |> Map.keys() |> MapSet.new()
+    execution.__runtime["active_nodes"] || %{}
   end
 
   @doc """
@@ -982,20 +962,20 @@ defmodule Prana.WorkflowExecution do
   2. All its input dependencies have been satisfied
   3. It's reachable from completed nodes or is an entry node
   4. It's on an active conditional execution path (for conditional branching)
+  5. Then select a single node for execution, prioritizing branch completion with highest execution_index.
 
   ## Parameters
 
   - `execution` - The execution containing ExecutionGraph and runtime state
-  - `execution_context` - Current execution context with conditional path tracking
 
   ## Returns
 
-  List of Node structs that are ready for execution.
+  Single Node struct selected for execution.
   """
-  @spec find_ready_nodes(t()) :: [Prana.Node.t()]
-  def find_ready_nodes(%__MODULE__{} = execution) do
+  @spec find_next_ready_node(t()) :: [Prana.Node.t()]
+  def find_next_ready_node(%__MODULE__{} = execution) do
     # Get active nodes from execution context
-    active_nodes = get_active_nodes(execution)
+    active_nodes = execution.__runtime["active_nodes"]
 
     # Extract completed node IDs from map structure for dependency checking
     completed_node_ids =
@@ -1006,11 +986,18 @@ defmodule Prana.WorkflowExecution do
 
     # Only check active nodes instead of all nodes
     active_nodes
+    |> Map.keys()
     |> Enum.map(fn node_key -> execution.execution_graph.node_map[node_key] end)
     |> Enum.reject(&is_nil/1)
     |> Enum.filter(fn node ->
       dependencies_satisfied?(node, execution.execution_graph, completed_node_ids)
     end)
+    |> Enum.sort_by(fn node ->
+      execution_index = Map.get(active_nodes, node.key, 0)
+      # Use negative depth for descending sort (deepest first)
+      -execution_index
+    end)
+    |> List.first()
   end
 
   # Check if all input ports for a node are satisfied (port-based logic)
@@ -1027,7 +1014,7 @@ defmodule Prana.WorkflowExecution do
   # Check if a specific input port is satisfied (at least one source available)
   defp input_port_satisfied?(node_key, input_port, execution_graph, completed_node_ids) do
     # Get all incoming connections for this node and port
-    incoming_connections = get_incoming_connections_for_node_port(execution_graph, node_key, input_port)
+    incoming_connections = ExecutionGraph.get_incoming_connections_for_node_port(execution_graph, node_key, input_port)
 
     # If no incoming connections, port is satisfied (no dependencies)
     if Enum.empty?(incoming_connections) do

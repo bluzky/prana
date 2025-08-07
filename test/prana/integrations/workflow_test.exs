@@ -3,12 +3,6 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
   alias Prana.Integrations.Workflow.ExecuteWorkflowAction
 
-  # Test helper
-  defp execute_with_input(params, input_data) do
-    context = %{"$input" => %{"main" => input_data}}
-    ExecuteWorkflowAction.execute(params, context)
-  end
-
   describe "execute/1" do
     test "returns suspension for synchronous execution with valid parameters" do
       input_map = %{

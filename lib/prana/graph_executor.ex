@@ -81,8 +81,8 @@ defmodule Prana.GraphExecutor do
     __runtime: %{
       "nodes" => %{node_key => output_data},     # completed node outputs
       "env" => map(),                           # environment data
-      "active_nodes" => MapSet.t(String.t()),   # nodes ready for execution
-      "node_depth" => %{node_key => integer()}   # depth tracking for branch following
+      "active_node" => %{node_key => integer()}   # depth tracking for branch following, and active nodes to check for next execution
+      "active_paths" => %{String.t() => map()}, # active execution paths tracking
     }
   }
   ```
@@ -105,7 +105,6 @@ defmodule Prana.GraphExecutor do
   alias Prana.Core.Error
   alias Prana.ExecutionGraph
   alias Prana.Middleware
-  alias Prana.Node
   alias Prana.NodeExecutor
   alias Prana.WorkflowExecution
 
@@ -237,7 +236,7 @@ defmodule Prana.GraphExecutor do
       # Get active nodes from runtime state
       active_nodes = WorkflowExecution.get_active_nodes(execution)
 
-      if MapSet.size(active_nodes) == 0 do
+      if Enum.empty?(active_nodes) do
         completed_execution = WorkflowExecution.complete(execution)
         Middleware.call(:execution_completed, %{execution: completed_execution})
 
@@ -260,9 +259,9 @@ defmodule Prana.GraphExecutor do
   # Find ready nodes and execute following branch-completion strategy.
   # Uses WorkflowExecution.__runtime for tracking active paths and executed nodes.
   defp find_and_execute_ready_nodes(execution) do
-    ready_nodes = WorkflowExecution.find_ready_nodes(execution)
+    ready_node = WorkflowExecution.find_next_ready_node(execution)
 
-    if Enum.empty?(ready_nodes) do
+    if is_nil(ready_node) do
       # No ready nodes but workflow not complete - likely an error condition
       error_reason = %{
         type: "no_ready_nodes",
@@ -275,53 +274,8 @@ defmodule Prana.GraphExecutor do
       Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_reason})
       {:error, failed_execution}
     else
-      # Select single node to execute, prioritizing branch completion
-      selected_node = select_node_for_branch_following(ready_nodes, execution.__runtime)
-
-      execute_single_node(selected_node, execution)
+      execute_single_node(ready_node, execution)
     end
-
-    # rescue
-    #   error ->
-    #     # Unexpected error during node execution
-    #     {:error,
-    #      %{
-    #        type: "execution_exception",
-    #        message: "Exception during node execution: #{Exception.message(error)}",
-    #        details: %{exception: error}
-    # }}
-  end
-
-  @doc """
-  Select a single node for execution, prioritizing branch completion over batch execution.
-
-  Strategy:
-  1. If there are nodes continuing active branches, prioritize those
-  2. Otherwise, select the first ready node to start a new branch
-  3. Prefer nodes with fewer dependencies (closer to completion)
-
-  ## Parameters
-
-  - `ready_nodes` - List of Node structs that are ready for execution
-  - `execution_graph` - The ExecutionGraph for connection analysis
-  - `execution_context` - Current execution context with active path tracking
-
-  ## Returns
-
-  Single Node struct selected for execution.
-  """
-  @spec select_node_for_branch_following([Node.t()], map()) :: Node.t()
-  def select_node_for_branch_following(ready_nodes, execution_context) do
-    node_depth = Map.get(execution_context, "node_depth", %{})
-
-    # Sort nodes by depth (deepest first) to ensure branch following
-    ready_nodes
-    |> Enum.sort_by(fn node ->
-      depth = Map.get(node_depth, node.key, 0)
-      # Use negative depth for descending sort (deepest first)
-      -depth
-    end)
-    |> List.first()
   end
 
   defp execute_single_node(node, execution, custom_input_map \\ nil) do
