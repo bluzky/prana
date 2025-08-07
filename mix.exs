@@ -21,8 +21,8 @@ defmodule Prana.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:mau, "~> 0.3"},
       {:nestex, "~> 0.2"},
-      {:nimble_parsec, "~> 1.4"},
       {:req, "~> 0.5"},
       {:skema, "~> 1.0"},
       {:uuid, "~> 1.1"},
