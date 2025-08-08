@@ -193,7 +193,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       assert is_struct(suspension_data.triggered_at, DateTime)
     end
 
-    test "batch mode defaults to 'single' and wraps non-array input in list" do
+    test "batch mode defaults to 'all' and wraps non-array input in list" do
       input_map = %{
         "workflow_id" => "test_workflow"
       }
@@ -207,7 +207,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "single"
+      assert suspension_data.batch_mode == "all"
       # Non-array input should be wrapped in list for single mode
       assert suspension_data.input_data == [%{"user_id" => 123, "name" => "John"}]
     end
@@ -235,7 +235,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "batch mode 'batch' passes input data as-is without wrapping" do
       input_map = %{
         "workflow_id" => "test_workflow",
-        "batch_mode" => "batch"
+        "batch_mode" => "all"
       }
 
       context = %{
@@ -247,7 +247,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "batch"
+      assert suspension_data.batch_mode == "all"
       # Batch mode passes input as-is (no wrapping in list)
       assert suspension_data.input_data == %{"user_id" => 123, "name" => "John"}
     end
@@ -255,7 +255,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "batch mode 'batch' with array input passes array as-is" do
       input_map = %{
         "workflow_id" => "test_workflow",
-        "batch_mode" => "batch"
+        "batch_mode" => "all"
       }
 
       context = %{
@@ -267,7 +267,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "batch"
+      assert suspension_data.batch_mode == "all"
       # Batch mode passes array input as-is
       assert suspension_data.input_data == [%{"user_id" => 123}, %{"user_id" => 456}]
     end
@@ -305,7 +305,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "handles missing main port in input context" do
       input_map = %{
         "workflow_id" => "test_workflow",
-        "batch_mode" => "batch"
+        "batch_mode" => "all"
       }
 
       # Context with input but no main port
@@ -316,7 +316,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "batch"
+      assert suspension_data.batch_mode == "all"
       # Missing main port should default to empty map
       assert suspension_data.input_data == %{}
     end

@@ -6,7 +6,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   - workflow_id: The ID of the sub-workflow to execute
   - input_data: Data to pass to the sub-workflow (optional, defaults to full input from parent workflow)
   - execution_mode: Execution mode - "sync" | "async" | "fire_and_forget" (optional, defaults to "sync")
-  - batch_mode: Batch processing mode - "batch" | "single" (optional, defaults to "single")
+  - batch_mode: Batch processing mode - "all" | "single" (optional, defaults to "single")
   - timeout_ms: Maximum time to wait for sub-workflow completion in milliseconds (optional, defaults to 5 minutes)
   - failure_strategy: How to handle sub-workflow failures - "fail_parent" | "continue" (optional, defaults to "fail_parent")
 
@@ -18,7 +18,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   - Fire-and-Forget ("fire_and_forget"): Parent workflow triggers sub-workflow and continues immediately
 
   Batch Processing Modes:
-  - Batch ("batch"): Run sub-workflow once with all items from input main port (input passed as-is)
+  - All ("all"): Run sub-workflow once with all items from input main port (input passed as-is)
   - Single ("single"): Run sub-workflow for each item individually - non-arrays are wrapped in a list for consistent processing (default)
 
   The integrating application is responsible for handling the actual batch execution logic.
@@ -39,7 +39,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   defschema ExecuteWorkflowSchema do
     field(:workflow_id, :string, required: true, length: [min: 1])
     field(:execution_mode, :string, default: "sync", in: ["sync", "async", "fire_and_forget"])
-    field(:batch_mode, :string, default: "single", in: ["batch", "single"])
+    field(:batch_mode, :string, default: "all", in: ["all", "single"])
     field(:timeout_ms, :integer, default: 300_000, number: [min: 1])
     field(:failure_strategy, :string, default: "fail_parent", in: ["fail_parent", "continue"])
   end
@@ -78,7 +78,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
         # Normalize input data based on batch mode
         input_data =
           case validated_params.batch_mode do
-            "batch" ->
+            "all" ->
               # Batch mode: pass input as-is, default to empty map if nil
               raw_input_data || %{}
 

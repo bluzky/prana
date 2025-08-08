@@ -439,7 +439,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
             params: %{
               "workflow_id" => "batch_child_workflow",
               "execution_mode" => "sync",
-              "batch_mode" => "batch",
+              "batch_mode" => "all",
               "timeout_ms" => 300_000
             }
           }
@@ -466,11 +466,11 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       batch_execution = Enum.find(all_executions, &(&1.node_key == "batch_sub_workflow"))
 
       assert batch_execution.status == "suspended"
-      assert batch_execution.suspension_data.batch_mode == "batch"
+      assert batch_execution.suspension_data.batch_mode == "all"
       assert batch_execution.suspension_data.workflow_id == "batch_child_workflow"
     end
 
-    test "includes single batch_mode as default in suspension data" do
+    test "includes all batch_mode as default in suspension data" do
       # Create workflow without explicit batch_mode (should default to "single")
       workflow = %Workflow{
         id: "single_workflow",
@@ -503,7 +503,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       {:ok, execution_graph} = WorkflowCompiler.compile(convert_connections_to_map(workflow), "trigger")
       result = GraphExecutor.execute_workflow(execution_graph, %{})
 
-      # Should suspend at single sub-workflow node  
+      # Should suspend at single sub-workflow node
       assert {:suspend, suspended_execution, _} = result
 
       # Find suspended node execution and verify default batch_mode
@@ -511,7 +511,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       single_execution = Enum.find(all_executions, &(&1.node_key == "single_sub_workflow"))
 
       assert single_execution.status == "suspended"
-      assert single_execution.suspension_data.batch_mode == "single"
+      assert single_execution.suspension_data.batch_mode == "all"
       assert single_execution.suspension_data.workflow_id == "single_child_workflow"
     end
 
@@ -625,7 +625,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
             params: %{
               "workflow_id" => "batch_processor_workflow",
               "execution_mode" => "sync",
-              "batch_mode" => "batch"
+              "batch_mode" => "all"
             }
           }
         ],
@@ -651,7 +651,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       batch_execution = Enum.find(all_executions, &(&1.node_key == "batch_preserve_sub_workflow"))
 
       assert batch_execution.status == "suspended"
-      assert batch_execution.suspension_data.batch_mode == "batch"
+      assert batch_execution.suspension_data.batch_mode == "all"
       # Input should be preserved as-is for batch mode
       assert batch_execution.suspension_data.input_data == %{"users" => [%{"name" => "john"}, %{"name" => "jane"}]}
     end
