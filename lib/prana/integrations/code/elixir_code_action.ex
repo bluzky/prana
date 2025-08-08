@@ -40,7 +40,7 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
         # Always use compiled mode for execution (Sequin's production pattern)
         case Sandbox.run_compiled(code, code_identifier, context) do
           {:ok, result} ->
-            {:ok, %{result: result}}
+            {:ok, result}
 
           {:error, error} ->
             {:error, format_error(error)}

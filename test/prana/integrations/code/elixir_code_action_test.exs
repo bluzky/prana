@@ -19,7 +19,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:ok, %{result: 3}} = ElixirCodeAction.execute(params, context)
+      assert {:ok, 3} = ElixirCodeAction.execute(params, context)
     end
 
     test "executes string operations in compiled mode" do
@@ -36,7 +36,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:ok, %{result: "HELLO"}} = ElixirCodeAction.execute(params, context)
+      assert {:ok, "HELLO"} = ElixirCodeAction.execute(params, context)
     end
 
     test "uses input parameter in compiled mode" do
@@ -53,7 +53,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:ok, %{result: "John"}} = ElixirCodeAction.execute(params, context)
+      assert {:ok, "John"} = ElixirCodeAction.execute(params, context)
     end
 
     test "executes complex expressions" do
@@ -70,7 +70,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:ok, %{result: [2, 4, 6]}} = ElixirCodeAction.execute(params, context)
+      assert {:ok, [2, 4, 6]} = ElixirCodeAction.execute(params, context)
     end
 
     test "rejects dangerous code" do
@@ -105,7 +105,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:ok, %{result: "Alice in production"}} = ElixirCodeAction.execute(params, context)
+      assert {:ok, "Alice in production"} = ElixirCodeAction.execute(params, context)
     end
 
     test "rejects non-run function definitions" do
@@ -161,7 +161,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         "$execution" => %{"current_node_key" => "test_context_node"}
       }
 
-      assert {:ok, %{result: "first"}} = ElixirCodeAction.execute(params, context1)
+      assert {:ok, "first"} = ElixirCodeAction.execute(params, context1)
 
       # Second execution with same node but different input value
       context2 = %{
@@ -171,7 +171,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       }
 
       # Should return "second", not "first" (proving no context baking)
-      assert {:ok, %{result: "second"}} = ElixirCodeAction.execute(params, context2)
+      assert {:ok, "second"} = ElixirCodeAction.execute(params, context2)
     end
 
     test "interpreted and compiled modes handle context identically" do
