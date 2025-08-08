@@ -113,7 +113,14 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
       node_executions: %{},
       __runtime: %{
         "nodes" => %{},
-        "env" => %{},
+        "env" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
         "active_nodes" => %{}  # Empty active nodes
       }
     }
@@ -148,7 +155,14 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
       node_executions: %{},
       __runtime: %{
         "nodes" => %{},
-        "env" => %{},
+        "env" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
         "active_nodes" => %{"node_b" => 1}  # Node B is active but depends on uncompleted node_a
       }
     }
@@ -174,7 +188,14 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
       node_executions: %{},
       __runtime: %{
         "nodes" => %{},
-        "env" => %{},
+        "env" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
         "active_nodes" => %{"ready_node" => 1}
       }
     }
@@ -201,7 +222,14 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
       node_executions: %{},
       __runtime: %{
         "nodes" => %{},
-        "env" => %{},
+        "env" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
         "active_nodes" => %{
           "shallow_node" => 1,  # Lower execution_index
           "deep_node" => 3      # Higher execution_index - should be selected
@@ -230,7 +258,14 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
       node_executions: %{},
       __runtime: %{
         "nodes" => %{},
-        "env" => %{},
+        "env" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
         "active_nodes" => %{"trigger_node" => 1}
       }
     }
@@ -271,7 +306,14 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
       node_executions: %{"completed_node" => [completed_execution]},
       __runtime: %{
         "nodes" => %{"completed_node" => %{"result" => "success"}},
-        "env" => %{},
+        "env" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
         "active_nodes" => %{
           "completed_node" => 1,    # This is completed, shouldn't be selected
           "uncompleted_node" => 2   # This should be selected
@@ -313,7 +355,14 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
       node_executions: %{},
       __runtime: %{
         "nodes" => %{},
-        "env" => %{},
+        "env" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
         "active_nodes" => active_nodes  # Should select node_depth_5 (highest execution_index)
       }
     }

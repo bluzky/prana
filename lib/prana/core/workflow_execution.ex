@@ -69,6 +69,18 @@ defmodule Prana.WorkflowExecution do
     # Runtime state
     field(:__runtime, :map, default: %{})
 
+    # Execution data containing context and active state
+    field(:execution_data, :map,
+      default: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
+        "active_nodes" => %{}
+      }
+    )
+
     # Additional metadata
     field(:preparation_data, :map, default: %{})
     field(:metadata, :map, default: %{})
@@ -312,15 +324,23 @@ defmodule Prana.WorkflowExecution do
 
       case last_execution do
         nil -> {node_key, nil}
-        exec -> {node_key, %{"output" => exec.output_data, "context" => exec.context || %{}}}
+        exec -> {node_key, %{"output" => exec.output_data}}
       end
     end)
     |> Enum.reject(fn {_, data} -> is_nil(data) end)
     |> Map.new()
   end
 
-  # Rebuild active_paths and active_nodes using DFS algorithm for loop handling
-  defp rebuild_active_paths_and_active_nodes(execution) do
+  @doc """
+  Rebuild active_paths and active_nodes using DFS algorithm for loop handling.
+
+  This function is primarily used for debugging, testing, and migration scenarios
+  where active state needs to be reconstructed from the execution audit trail.
+
+  In normal operation, active_paths and active_nodes are maintained in execution_data
+  and do not need to be rebuilt.
+  """
+  def rebuild_active_paths_and_active_nodes(execution) do
     execution_graph = execution.execution_graph
     trigger_node_key = execution_graph.trigger_node_key
 
@@ -427,10 +447,8 @@ defmodule Prana.WorkflowExecution do
   Updated execution with rebuilt __runtime state containing:
   - `"nodes"` - Map of completed node outputs for routing
   - `"env"` - Environment data from application
-  - `"active_paths"` - Map of completed nodes in current loop iterations: %{node_key => %{execution_index: index}}
-  - `"active_nodes"` - Map of ready-to-execute nodes with their execution depths: %{node_key => depth}
-  - `"shared_state"` - Shared state data that persists across node executions within the same workflow
-
+  - `"iteration_count"` - Current iteration count for loop protection
+  - `"max_iterations"` - Maximum allowed iterations limit
   ## Example
 
       # Load from storage (has nil __runtime)
@@ -443,30 +461,24 @@ defmodule Prana.WorkflowExecution do
       # Now ready for execution/resume
       execution.__runtime["nodes"]         # %{"node_1" => %{...}, "node_2" => %{...}}
       execution.__runtime["env"]           # %{"api_key" => "abc123", ...}
-      execution.__runtime["active_paths"]  # %{"loop_node" => %{execution_index: 3}}
-      execution.__runtime["active_nodes"]  # %{"ready_node" => 4}
-      execution.__runtime["shared_state"]  # %{"counter" => 5, "user_data" => %{...}}
+      execution.execution_data["active_paths"]  # %{"loop_node" => %{execution_index: 3}}
+      execution.execution_data["active_nodes"]  # %{"ready_node" => 4}
+      execution.execution_data["context_data"]["workflow"]  # %{"counter" => 5, "user_data" => %{...}}
   """
   def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
     node_outputs = rebuild_completed_node_outputs(execution.node_executions)
-    {active_paths, active_nodes} = rebuild_active_paths_and_active_nodes(execution)
 
     max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
     current_iteration_count = execution.metadata["iteration_count"] || 0
-
-    # Restore shared state from metadata if available
-    shared_state = execution.metadata["shared_state"] || %{}
 
     runtime = %{
       "nodes" => node_outputs,
       "env" => env_data,
       "iteration_count" => current_iteration_count,
-      "max_iterations" => max_iterations,
-      "active_paths" => active_paths,
-      "active_nodes" => active_nodes,
-      "shared_state" => shared_state
+      "max_iterations" => max_iterations
     }
 
+    # active_paths and active_nodes are already persistent in execution_data - no need to rebuild!
     %{execution | __runtime: runtime}
   end
 
@@ -529,7 +541,7 @@ defmodule Prana.WorkflowExecution do
       # Both persistent and runtime state updated
       execution.node_executions  # Contains the completed NodeExecution
       execution.__runtime["nodes"]["api_call"]  # Contains %{user_id: 123}
-      execution.__runtime["active_nodes"]  # Updated based on completed node's outputs
+      execution.execution_data["active_nodes"]  # Updated based on completed node's outputs
   """
   def complete_node(%__MODULE__{} = execution, %Prana.NodeExecution{status: "completed"} = completed_node_execution) do
     node_key = completed_node_execution.node_key
@@ -550,8 +562,7 @@ defmodule Prana.WorkflowExecution do
     updated_execution =
       update_runtime_safely(updated_execution, fn runtime ->
         node_data = %{
-          "output" => completed_node_execution.output_data,
-          "context" => completed_node_execution.context
+          "output" => completed_node_execution.output_data
         }
 
         updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
@@ -714,61 +725,61 @@ defmodule Prana.WorkflowExecution do
   # by removing it from active_nodes and adding its target nodes based on the output port.
   # It also maintains active_nodes tracking for branch-following execution strategy.
   defp update_active_nodes_on_completion(execution, completed_node_key, node_execution) do
-    update_runtime_safely(execution, fn runtime ->
-      # Get current active_nodes and active_paths from runtime
-      current_active_nodes = runtime["active_nodes"] || %{}
-      current_active_paths = runtime["active_paths"] || %{}
+    # Get current active_nodes and active_paths from execution_data
+    current_active_nodes = execution.execution_data["active_nodes"] || %{}
+    current_active_paths = execution.execution_data["active_paths"] || %{}
 
-      # Get completed node's execution index
-      completed_execution_index = node_execution.execution_index
+    # Get completed node's execution index
+    completed_execution_index = node_execution.execution_index
 
-      # Remove completed node from active_nodes
-      updated_active_nodes = Map.delete(current_active_nodes, completed_node_key)
+    # Remove completed node from active_nodes
+    updated_active_nodes = Map.delete(current_active_nodes, completed_node_key)
 
-      # Add completed node to active_paths for loop tracking
-      updated_active_paths =
-        Map.put(current_active_paths, completed_node_key, %{execution_index: completed_execution_index})
+    # Add completed node to active_paths for loop tracking
+    updated_active_paths =
+      Map.put(current_active_paths, completed_node_key, %{execution_index: completed_execution_index})
 
-      # Add target nodes from completed node's output connections
-      # this check because some test missing the runtime state
-      {final_active_nodes, final_active_paths} =
-        if execution.execution_graph && Map.has_key?(execution.execution_graph, :connection_map) do
-          connections =
-            Map.get(execution.execution_graph.connection_map, {completed_node_key, node_execution.output_port}, [])
+    # Add target nodes from completed node's output connections
+    {final_active_nodes, final_active_paths} =
+      if execution.execution_graph && Map.has_key?(execution.execution_graph, :connection_map) do
+        connections =
+          Map.get(execution.execution_graph.connection_map, {completed_node_key, node_execution.output_port}, [])
 
-          new_active_nodes =
-            Enum.reduce(connections, updated_active_nodes, fn %{to: node_key}, acc_active_nodes ->
-              Map.put(acc_active_nodes, node_key, completed_execution_index + 1)
-            end)
+        new_active_nodes =
+          Enum.reduce(connections, updated_active_nodes, fn %{to: node_key}, acc_active_nodes ->
+            Map.put(acc_active_nodes, node_key, completed_execution_index + 1)
+          end)
 
-          existing_path_node = Map.get(updated_active_paths, completed_node_key)
+        existing_path_node = Map.get(updated_active_paths, completed_node_key)
 
-          new_active_paths =
-            case existing_path_node do
-              nil ->
-                Map.put(updated_active_paths, completed_node_key, %{execution_index: node_execution.execution_index})
+        new_active_paths =
+          case existing_path_node do
+            nil ->
+              Map.put(updated_active_paths, completed_node_key, %{execution_index: node_execution.execution_index})
 
-              _ ->
-                # If path already exists, remove all nodes with higher execution index of existing node
-                # then add the completed node with its execution index
-                updated_active_paths
-                |> Enum.reject(fn {_, path_info} ->
-                  path_info.execution_index > existing_path_node.execution_index
-                end)
-                |> Map.new()
-                |> Map.put(completed_node_key, %{execution_index: node_execution.execution_index})
-            end
+            _ ->
+              # If path already exists, remove all nodes with higher execution index of existing node
+              # then add the completed node with its execution index
+              updated_active_paths
+              |> Enum.reject(fn {_, path_info} ->
+                path_info.execution_index > existing_path_node.execution_index
+              end)
+              |> Map.new()
+              |> Map.put(completed_node_key, %{execution_index: node_execution.execution_index})
+          end
 
-          {new_active_nodes, new_active_paths}
-        else
-          {updated_active_nodes, updated_active_paths}
-        end
+        {new_active_nodes, new_active_paths}
+      else
+        {updated_active_nodes, updated_active_paths}
+      end
 
-      # Update runtime state with both active_nodes and active_paths
-      runtime
+    # Update execution_data with both active_nodes and active_paths
+    updated_execution_data =
+      execution.execution_data
       |> Map.put("active_nodes", final_active_nodes)
       |> Map.put("active_paths", final_active_paths)
-    end)
+
+    %{execution | execution_data: updated_execution_data}
   end
 
   @doc """
@@ -800,12 +811,12 @@ defmodule Prana.WorkflowExecution do
   end
 
   def loopback_node?(execution, node) do
-    Map.has_key?(execution.__runtime["active_paths"], node.key)
+    Map.has_key?(execution.execution_data["active_paths"], node.key)
   end
 
   @doc """
   Extract loop metadata from node and combine with runtime loopback information.
-  
+
   Returns a map containing:
   - loop_level: Nesting depth (0 = no loop, 1 = outer, 2+ = nested)
   - loop_role: :start_loop, :in_loop, :end_loop, or :not_in_loop
@@ -818,7 +829,7 @@ defmodule Prana.WorkflowExecution do
     if node_loop_metadata do
       %{
         loop_level: Map.get(node.metadata, :loop_level, 0),
-        loop_role: Map.get(node.metadata, :loop_role, :not_in_loop) |> to_string(),
+        loop_role: node.metadata |> Map.get(:loop_role, :not_in_loop) |> to_string(),
         loop_ids: Map.get(node.metadata, :loop_ids, []),
         loopback: loopback_node?(execution, node)
       }
@@ -889,32 +900,66 @@ defmodule Prana.WorkflowExecution do
   MapSet of active node keys
   """
   def get_active_nodes(execution) do
-    execution.__runtime["active_nodes"] || %{}
+    execution.execution_data["active_nodes"] || %{}
   end
 
   @doc """
-  Update shared state with new or modified values.
+  Get node-specific context data.
 
-  This function updates the shared state both in runtime context and persists
-  it to metadata for recovery after suspension/resume cycles.
+  ## Parameters
+  - `execution` - The execution to get node context from
+  - `node_key` - The key of the node to get context for
+
+  ## Returns
+  Map containing the node's context data, or empty map if no context exists
+  """
+  def get_node_context(execution, node_key) do
+    execution.execution_data["context_data"]["node"][node_key] || %{}
+  end
+
+  @doc """
+  Update node-specific context data with new or modified values.
 
   ## Parameters
   - `execution` - The execution to update
-  - `updates` - Map of key-value pairs to update in shared state
+  - `node_key` - The key of the node to update context for
+  - `updates` - Map of key-value pairs to update in node context
 
   ## Returns
-  Updated execution with modified shared state
+  Updated execution with modified node context
   """
-  def update_shared_state(execution, updates) when is_map(updates) do
-    current_shared_state = execution.__runtime["shared_state"] || %{}
-    new_shared_state = Map.merge(current_shared_state, updates)
+  def update_node_context(execution, node_key, updates) when is_map(updates) do
+    current_node_contexts = execution.execution_data["context_data"]["node"] || %{}
+    current_node_context = current_node_contexts[node_key] || %{}
+    updated_node_context = Map.merge(current_node_context, updates)
 
-    # Update both runtime and persistent metadata
-    execution
-    |> update_runtime_safely(fn runtime ->
-      Map.put(runtime, "shared_state", new_shared_state)
-    end)
-    |> put_in([Access.key(:metadata), "shared_state"], new_shared_state)
+    updated_node_contexts = Map.put(current_node_contexts, node_key, updated_node_context)
+    updated_context_data = Map.put(execution.execution_data["context_data"], "node", updated_node_contexts)
+    updated_execution_data = Map.put(execution.execution_data, "context_data", updated_context_data)
+
+    %{execution | execution_data: updated_execution_data}
+  end
+
+  @doc """
+  Update shared workflow context with new or modified values.
+
+  This function updates the workflow context in execution_data structure.
+  Uses the new execution_data.context_data.workflow for persistent storage.
+
+  ## Parameters
+  - `execution` - The execution to update
+  - `updates` - Map of key-value pairs to update in workflow context
+
+  ## Returns
+  Updated execution with modified workflow context
+  """
+  def update_execution_context(execution, updates) when is_map(updates) do
+    current_workflow_context = execution.execution_data["context_data"]["workflow"] || %{}
+    new_workflow_context = Map.merge(current_workflow_context, updates)
+
+    # Update execution_data with new workflow context
+    updated_execution_data = put_in(execution.execution_data, ["context_data", "workflow"], new_workflow_context)
+    %{execution | execution_data: updated_execution_data}
   end
 
   @doc """
@@ -1012,7 +1057,7 @@ defmodule Prana.WorkflowExecution do
   @spec find_next_ready_node(t()) :: [Prana.Node.t()]
   def find_next_ready_node(%__MODULE__{} = execution) do
     # Get active nodes from execution context
-    active_nodes = execution.__runtime["active_nodes"]
+    active_nodes = execution.execution_data["active_nodes"]
 
     # Extract completed node IDs from map structure for dependency checking
     completed_node_ids =

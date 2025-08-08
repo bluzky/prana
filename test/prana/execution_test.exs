@@ -68,8 +68,8 @@ defmodule Prana.ExecutionTest do
 
       # Verify runtime state structure
       assert result.__runtime["nodes"] == %{
-               "node_1" => %{"output" => %{user_id: 123}, "context" => %{}},
-               "node_2" => %{"output" => %{email: "test@example.com"}, "context" => %{}}
+               "node_1" => %{"output" => %{user_id: 123}},
+               "node_2" => %{"output" => %{email: "test@example.com"}}
              }
 
       assert result.__runtime["env"] == env_data
@@ -154,7 +154,7 @@ defmodule Prana.ExecutionTest do
       result = WorkflowExecution.rebuild_runtime(execution, %{})
 
       # Only completed nodes should be in nodes map
-      assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}, "context" => %{}}}
+      assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}}}
     end
   end
 
@@ -191,7 +191,7 @@ defmodule Prana.ExecutionTest do
       assert completed_node.output_port == "main"
 
       # Verify runtime state
-      assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data, "context" => %{}}
+      assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data}
     end
 
     test "integrates completed node execution into execution state" do
@@ -355,7 +355,7 @@ defmodule Prana.ExecutionTest do
         },
         current_execution_index: 1,
         __runtime: %{
-          "nodes" => %{"node_1" => %{"output" => %{user_id: 123}, "context" => %{}}},
+          "nodes" => %{"node_1" => %{"output" => %{user_id: 123}}},
           "env" => %{"api_key" => "test"}
         }
       }
@@ -371,8 +371,8 @@ defmodule Prana.ExecutionTest do
       result = WorkflowExecution.complete_node(execution, completed_node_execution_2)
 
       # Verify state synchronization
-      assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}, "context" => %{}}
-      assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}, "context" => %{}}
+      assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}}
+      assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}}
       # Note: executed_nodes not included in simplified rebuild_runtime
       # Note: active_paths not included in simplified rebuild_runtime
 
@@ -451,86 +451,197 @@ defmodule Prana.ExecutionTest do
       execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
-        metadata: %{"shared_state" => %{"counter" => 5, "email" => "test@example.com"}},
-        __runtime: %{"shared_state" => %{"counter" => 5, "email" => "test@example.com"}}
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{"counter" => 5, "email" => "test@example.com"},
+            "node" => %{}
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        }
       }
 
       # Update only counter, email should be preserved
       updates = %{"counter" => 10}
-      updated_execution = WorkflowExecution.update_shared_state(execution, updates)
+      updated_execution = WorkflowExecution.update_execution_context(execution, updates)
 
-      # Check runtime state - counter updated, email preserved
-      shared_state = updated_execution.__runtime["shared_state"]
-      assert shared_state["counter"] == 10
-      assert shared_state["email"] == "test@example.com"
-
-      # Check persistent metadata
-      assert updated_execution.metadata["shared_state"]["counter"] == 10
-      assert updated_execution.metadata["shared_state"]["email"] == "test@example.com"
+      # Check execution_data workflow context - counter updated, email preserved
+      workflow_context = updated_execution.execution_data["context_data"]["workflow"]
+      assert workflow_context["counter"] == 10
+      assert workflow_context["email"] == "test@example.com"
     end
 
     test "update_shared_state/2 adds new values while preserving existing" do
       execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
-        metadata: %{"shared_state" => %{"counter" => 1, "email" => "test@example.com"}},
-        __runtime: %{"shared_state" => %{"counter" => 1, "email" => "test@example.com"}}
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{"counter" => 1, "email" => "test@example.com"},
+            "node" => %{}
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        }
       }
 
       # Add user_id, update counter, preserve email
       updates = %{"user_id" => 123, "counter" => 2}
-      updated_execution = WorkflowExecution.update_shared_state(execution, updates)
+      updated_execution = WorkflowExecution.update_execution_context(execution, updates)
 
-      shared_state = updated_execution.__runtime["shared_state"]
-      assert shared_state["counter"] == 2
+      workflow_context = updated_execution.execution_data["context_data"]["workflow"]
+      assert workflow_context["counter"] == 2
       # preserved
-      assert shared_state["email"] == "test@example.com"
+      assert workflow_context["email"] == "test@example.com"
       # added
-      assert shared_state["user_id"] == 123
+      assert workflow_context["user_id"] == 123
     end
 
-    test "rebuild_runtime/2 restores shared state from metadata" do
+    test "rebuild_runtime/2 no longer restores shared state (now in execution_data)" do
       execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
-        metadata: %{"shared_state" => %{"counter" => 5, "user_data" => %{"name" => "test"}}},
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{"counter" => 5, "user_data" => %{"name" => "test"}},
+            "node" => %{}
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        },
         node_executions: %{},
         execution_graph: %{trigger_node_key: "trigger", connection_map: %{}},
         __runtime: nil
       }
 
       rebuilt_execution = WorkflowExecution.rebuild_runtime(execution, %{})
-      shared_state = rebuilt_execution.__runtime["shared_state"]
 
-      assert shared_state["counter"] == 5
-      assert shared_state["user_data"]["name"] == "test"
+      # Workflow context should remain in execution_data, not in __runtime
+      workflow_context = rebuilt_execution.execution_data["context_data"]["workflow"]
+      assert workflow_context["counter"] == 5
+      assert workflow_context["user_data"]["name"] == "test"
+
+      # __runtime should not have shared_state
+      refute Map.has_key?(rebuilt_execution.__runtime, "shared_state")
     end
 
-    test "shared state survives suspension and resume cycles" do
-      # Initial execution with shared state
+    test "workflow context survives suspension and resume cycles" do
+      # Initial execution with workflow context
       execution = %WorkflowExecution{
         id: "exec_1",
         workflow_id: "wf_1",
-        metadata: %{"shared_state" => %{"session_id" => "abc123", "step" => 1}},
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{"session_id" => "abc123", "step" => 1},
+            "node" => %{}
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        },
         node_executions: %{},
         execution_graph: %{trigger_node_key: "trigger", connection_map: %{}},
-        __runtime: %{"shared_state" => %{"session_id" => "abc123", "step" => 1}}
+        __runtime: %{}
       }
 
-      # Update shared state before suspension
-      updated_execution = WorkflowExecution.update_shared_state(execution, %{"step" => 2, "data" => "important"})
+      # Update workflow context before suspension
+      updated_execution = WorkflowExecution.update_execution_context(execution, %{"step" => 2, "data" => "important"})
 
       # Simulate suspension (runtime state lost)
       suspended_execution = %{updated_execution | __runtime: nil}
 
       # Rebuild runtime (simulating resume)
       resumed_execution = WorkflowExecution.rebuild_runtime(suspended_execution, %{})
-      shared_state = resumed_execution.__runtime["shared_state"]
+      workflow_context = resumed_execution.execution_data["context_data"]["workflow"]
 
-      # Shared state should be restored
-      assert shared_state["session_id"] == "abc123"
-      assert shared_state["step"] == 2
-      assert shared_state["data"] == "important"
+      # Workflow context should be preserved in execution_data
+      assert workflow_context["session_id"] == "abc123"
+      assert workflow_context["step"] == 2
+      assert workflow_context["data"] == "important"
+
+      # __runtime should not have shared_state
+      refute Map.has_key?(resumed_execution.__runtime, "shared_state")
+    end
+  end
+
+  describe "context management API" do
+    test "get_node_context/2 returns empty map for non-existent node context" do
+      execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{}
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        }
+      }
+
+      result = WorkflowExecution.get_node_context(execution, "non_existent_node")
+      assert result == %{}
+    end
+
+    test "get_node_context/2 returns existing node context" do
+      execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{
+              "test_node" => %{"counter" => 5, "status" => "active"}
+            }
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        }
+      }
+
+      result = WorkflowExecution.get_node_context(execution, "test_node")
+      assert result == %{"counter" => 5, "status" => "active"}
+    end
+
+    test "update_node_context/3 creates new node context when none exists" do
+      execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{}
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        }
+      }
+
+      result = WorkflowExecution.update_node_context(execution, "new_node", %{"step" => 1})
+
+      node_context = WorkflowExecution.get_node_context(result, "new_node")
+      assert node_context == %{"step" => 1}
+    end
+
+    test "update_node_context/3 merges updates with existing context" do
+      execution = %WorkflowExecution{
+        id: "exec_1",
+        workflow_id: "wf_1",
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{
+              "existing_node" => %{"counter" => 3, "name" => "test"}
+            }
+          },
+          "active_paths" => %{},
+          "active_nodes" => %{}
+        }
+      }
+
+      result = WorkflowExecution.update_node_context(execution, "existing_node", %{"counter" => 5, "status" => "updated"})
+
+      node_context = WorkflowExecution.get_node_context(result, "existing_node")
+      assert node_context == %{"counter" => 5, "name" => "test", "status" => "updated"}
     end
   end
 end

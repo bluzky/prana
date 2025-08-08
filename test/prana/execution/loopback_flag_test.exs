@@ -69,10 +69,17 @@ defmodule Prana.Execution.LoopbackFlagTest do
       node_executions: %{},
       current_execution_index: 0,
       __runtime: %{
-        "active_paths" => %{},
         "env" => %{},
         "executed_nodes" => [],
         "nodes" => %{}
+      },
+      execution_data: %{
+        "context_data" => %{
+          "workflow" => %{},
+          "node" => %{}
+        },
+        "active_paths" => %{},
+        "active_nodes" => %{}
       }
     }
   end
@@ -94,10 +101,17 @@ defmodule Prana.Execution.LoopbackFlagTest do
       # Create execution with different node in active_paths
       execution = %{create_test_execution() | 
         __runtime: %{
-          "active_paths" => %{"other_node" => %{execution_index: 0}},
           "env" => %{},
           "executed_nodes" => ["other_node"],
           "nodes" => %{}
+        },
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{}
+          },
+          "active_paths" => %{"other_node" => %{execution_index: 0}},
+          "active_nodes" => %{}
         }
       }
 
@@ -116,10 +130,17 @@ defmodule Prana.Execution.LoopbackFlagTest do
       # Create execution with node already in active_paths
       execution = %{create_test_execution() | 
         __runtime: %{
-          "active_paths" => %{"loop_node" => %{execution_index: 0}},
           "env" => %{},
           "executed_nodes" => ["loop_node"],
           "nodes" => %{}
+        },
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{}
+          },
+          "active_paths" => %{"loop_node" => %{execution_index: 0}},
+          "active_nodes" => %{}
         }
       }
 

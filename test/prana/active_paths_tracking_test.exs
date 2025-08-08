@@ -55,15 +55,18 @@ defmodule Prana.ActivePathsTrackingTest do
         current_execution_index: 2
       }
 
-      result = WorkflowExecution.rebuild_runtime(execution, %{})
+      # Rebuild active state from audit trail and update execution_data
+      {active_paths, active_nodes} = WorkflowExecution.rebuild_active_paths_and_active_nodes(execution)
+      _result = %{execution | execution_data: Map.merge(execution.execution_data, %{
+        "active_paths" => active_paths,
+        "active_nodes" => active_nodes
+      })}
 
       # Check active_paths contains completed nodes with their execution indices
-      active_paths = result.__runtime["active_paths"]
       assert active_paths["start"] == %{execution_index: 0}
       assert active_paths["process"] == %{execution_index: 1}
 
       # Check active_nodes contains the next ready node
-      active_nodes = result.__runtime["active_nodes"]
       # execution_index + 1 from process node
       assert active_nodes["end"] == 2
     end
@@ -126,16 +129,19 @@ defmodule Prana.ActivePathsTrackingTest do
         current_execution_index: 3
       }
 
-      result = WorkflowExecution.rebuild_runtime(execution, %{})
+      # Rebuild active state from audit trail and update execution_data
+      {active_paths, active_nodes} = WorkflowExecution.rebuild_active_paths_and_active_nodes(execution)
+      _result = %{execution | execution_data: Map.merge(execution.execution_data, %{
+        "active_paths" => active_paths,
+        "active_nodes" => active_nodes
+      })}
 
       # Check active_paths contains completed nodes
-      active_paths = result.__runtime["active_paths"]
       assert active_paths["start"] == %{execution_index: 0}
       assert active_paths["loop_node"] == %{execution_index: 1}
       assert active_paths["intermediate"] == %{execution_index: 2}
 
       # Check active_nodes - loop_node should be ready for re-execution (loop detected)
-      active_nodes = result.__runtime["active_nodes"]
       # execution_index + 1 from intermediate
       assert active_nodes["loop_node"] == 3
     end
@@ -160,11 +166,14 @@ defmodule Prana.ActivePathsTrackingTest do
         current_execution_index: 0
       }
 
-      result = WorkflowExecution.rebuild_runtime(execution, %{})
+      # Rebuild active state from audit trail and update execution_data
+      {active_paths, active_nodes} = WorkflowExecution.rebuild_active_paths_and_active_nodes(execution)
+      _result = %{execution | execution_data: Map.merge(execution.execution_data, %{
+        "active_paths" => active_paths,
+        "active_nodes" => active_nodes
+      })}
 
       # Should have empty active_paths and trigger in active_nodes with depth 0
-      active_paths = result.__runtime["active_paths"]
-      active_nodes = result.__runtime["active_nodes"]
 
       assert active_paths == %{}
       assert active_nodes["start"] == 0
@@ -216,17 +225,20 @@ defmodule Prana.ActivePathsTrackingTest do
       }
 
       # This should complete without infinite recursion
-      result = WorkflowExecution.rebuild_runtime(execution, %{})
+      # Rebuild active state from audit trail and update execution_data
+      {active_paths, active_nodes} = WorkflowExecution.rebuild_active_paths_and_active_nodes(execution)
+      _result = %{execution | execution_data: Map.merge(execution.execution_data, %{
+        "active_paths" => active_paths,
+        "active_nodes" => active_nodes
+      })}
 
       # Verify results
-      active_paths = result.__runtime["active_paths"]
       assert active_paths["start"] == %{execution_index: 0}
       assert active_paths["self_loop"] == %{execution_index: 1}
 
       # self_loop gets added to active_paths (execution_index: 1 > start's 0)
       # When self_loop tries to connect to itself, execution_index comparison (1 == 1) 
       # prevents further traversal and adds it to active_nodes for re-execution
-      active_nodes = result.__runtime["active_nodes"]
       # Ready for next iteration
       assert active_nodes["self_loop"] == 2
     end
@@ -256,7 +268,13 @@ defmodule Prana.ActivePathsTrackingTest do
         current_execution_index: 1,
         __runtime: %{
           "nodes" => %{},
-          "env" => %{},
+          "env" => %{}
+        },
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{}
+          },
           # node_1 is ready
           "active_nodes" => %{"node_1" => 0},
           # No completed nodes yet
@@ -274,11 +292,11 @@ defmodule Prana.ActivePathsTrackingTest do
       result = WorkflowExecution.complete_node(execution, node_execution)
 
       # Verify active_paths updated
-      active_paths = result.__runtime["active_paths"]
+      active_paths = result.execution_data["active_paths"]
       assert active_paths["node_1"] == %{execution_index: 0}
 
       # Verify active_nodes updated - node_1 removed, target nodes added
-      active_nodes = result.__runtime["active_nodes"]
+      active_nodes = result.execution_data["active_nodes"]
       # Should be removed
       refute Map.has_key?(active_nodes, "node_1")
       # execution_index + 1
@@ -322,7 +340,13 @@ defmodule Prana.ActivePathsTrackingTest do
           "nodes" => %{
             "loop_node" => %{"output" => %{iteration: 1}}
           },
-          "env" => %{},
+          "env" => %{}
+        },
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{}
+          },
           "active_nodes" => %{"intermediate" => 1},
           "active_paths" => %{
             "loop_node" => %{execution_index: 0},
@@ -342,7 +366,7 @@ defmodule Prana.ActivePathsTrackingTest do
       result = WorkflowExecution.complete_node(execution, node_execution)
 
       # Check active_paths - should add intermediate and clean up future nodes if loop detected
-      active_paths = result.__runtime["active_paths"]
+      active_paths = result.execution_data["active_paths"]
       assert active_paths["intermediate"] == %{execution_index: 1}
 
       # If loop_node already exists in active_paths, future nodes should be cleaned up
@@ -352,7 +376,7 @@ defmodule Prana.ActivePathsTrackingTest do
       assert active_paths["loop_node"] == %{execution_index: 0}
 
       # Check active_nodes - should add loop_node for re-execution
-      active_nodes = result.__runtime["active_nodes"]
+      active_nodes = result.execution_data["active_nodes"]
       # Should be removed
       refute Map.has_key?(active_nodes, "intermediate")
       # execution_index + 1
@@ -371,7 +395,13 @@ defmodule Prana.ActivePathsTrackingTest do
         current_execution_index: 1,
         __runtime: %{
           "nodes" => %{},
-          "env" => %{},
+          "env" => %{}
+        },
+        execution_data: %{
+          "context_data" => %{
+            "workflow" => %{},
+            "node" => %{}
+          },
           "active_nodes" => %{"node_1" => 0},
           "active_paths" => %{}
         }
@@ -386,10 +416,10 @@ defmodule Prana.ActivePathsTrackingTest do
       result = WorkflowExecution.complete_node(execution, node_execution)
 
       # Should still update active_paths and remove completed node from active_nodes
-      active_paths = result.__runtime["active_paths"]
+      active_paths = result.execution_data["active_paths"]
       assert active_paths["node_1"] == %{execution_index: 0}
 
-      active_nodes = result.__runtime["active_nodes"]
+      active_nodes = result.execution_data["active_nodes"]
       refute Map.has_key?(active_nodes, "node_1")
     end
   end

@@ -291,18 +291,8 @@ defmodule Prana.GraphExecutor do
     Middleware.call(:node_starting, %{node: node, execution: execution})
 
     case NodeExecutor.execute_node(node, execution, routed_input, current_context) do
-      {:ok, result_node_execution} ->
-        updated_execution = WorkflowExecution.complete_node(execution, result_node_execution)
-        Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
-        {:ok, updated_execution, result_node_execution.output_data}
-
-      {:ok, result_node_execution, shared_state_updates} ->
-        # completed node with additional state update
-        updated_execution =
-          execution
-          |> WorkflowExecution.complete_node(result_node_execution)
-          |> WorkflowExecution.update_shared_state(shared_state_updates)
-
+      {:ok, result_node_execution, updated_execution} ->
+        # NodeExecutor always returns updated WorkflowExecution (consistent API)
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
         {:ok, updated_execution, result_node_execution.output_data}
 
@@ -434,9 +424,8 @@ defmodule Prana.GraphExecutor do
              resume_data,
              current_context
            ) do
-        {:ok, completed_node_execution} ->
-          # Complete the node execution at workflow level
-          updated_execution = WorkflowExecution.complete_node(resume_execution, completed_node_execution)
+        {:ok, completed_node_execution, updated_execution} ->
+          # NodeExecutor always returns updated WorkflowExecution (consistent API)
           Middleware.call(:node_completed, %{node: suspended_node, node_execution: completed_node_execution})
 
           {:ok, updated_execution, completed_node_execution.output_data}
