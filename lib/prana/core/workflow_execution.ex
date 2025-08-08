@@ -915,7 +915,7 @@ defmodule Prana.WorkflowExecution do
   Map containing the node's context data, or empty map if no context exists
   """
   def get_node_context(execution, node_key) do
-    execution.execution_data["context_data"]["node"][node_key] || %{}
+    Nested.get(execution.execution_data, ["context_data", "node", node_key]) || %{}
   end
 
   @doc """
@@ -1053,9 +1053,9 @@ defmodule Prana.WorkflowExecution do
 
   ## Returns
 
-  Single Node struct selected for execution.
+  Single Node struct selected for execution, or nil if no ready nodes are found.
   """
-  @spec find_next_ready_node(t()) :: [Prana.Node.t()]
+  @spec find_next_ready_node(t()) :: Prana.Node.t() | nil
   def find_next_ready_node(%__MODULE__{} = execution) do
     # Get active nodes from execution context
     active_nodes = execution.execution_data["active_nodes"]
