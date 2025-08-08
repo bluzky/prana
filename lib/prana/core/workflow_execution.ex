@@ -399,7 +399,7 @@ defmodule Prana.WorkflowExecution do
         # add to active_paths and continue traversal
         new_active_paths =
           Map.put(active_paths, current_node_key, %{
-            execution_index: current_execution.execution_index
+            "execution_index" => current_execution.execution_index
           })
 
         # Get all target nodes connected to this node via output port
@@ -738,7 +738,7 @@ defmodule Prana.WorkflowExecution do
 
     # Add completed node to active_paths for loop tracking
     updated_active_paths =
-      Map.put(current_active_paths, completed_node_key, %{execution_index: completed_execution_index})
+      Map.put(current_active_paths, completed_node_key, %{"execution_index" => completed_execution_index})
 
     # Add target nodes from completed node's output connections
     {final_active_nodes, final_active_paths} =
@@ -756,17 +756,17 @@ defmodule Prana.WorkflowExecution do
         new_active_paths =
           case existing_path_node do
             nil ->
-              Map.put(updated_active_paths, completed_node_key, %{execution_index: node_execution.execution_index})
+              Map.put(updated_active_paths, completed_node_key, %{"execution_index" => node_execution.execution_index})
 
             _ ->
               # If path already exists, remove all nodes with higher execution index of existing node
               # then add the completed node with its execution index
               updated_active_paths
               |> Enum.reject(fn {_, path_info} ->
-                path_info.execution_index > existing_path_node.execution_index
+                path_info["execution_index"] > existing_path_node["execution_index"]
               end)
               |> Map.new()
-              |> Map.put(completed_node_key, %{execution_index: node_execution.execution_index})
+              |> Map.put(completed_node_key, %{"execution_index" => node_execution.execution_index})
           end
 
         {new_active_nodes, new_active_paths}
