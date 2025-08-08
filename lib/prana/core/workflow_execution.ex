@@ -317,14 +317,14 @@ defmodule Prana.WorkflowExecution do
   end
 
   # Rebuild completed node outputs from execution history
-  defp rebuild_completed_node_outputs(node_executions) do
-    node_executions
+  defp rebuild_completed_node_outputs(execution) do
+    execution.node_executions
     |> Enum.map(fn {node_key, executions} ->
       last_execution = Enum.find(executions, &(&1.status == "completed"))
 
       case last_execution do
         nil -> {node_key, nil}
-        exec -> {node_key, %{"output" => exec.output_data}}
+        exec -> {node_key, %{"output" => exec.output_data, "context" => get_node_context(execution, node_key)}}
       end
     end)
     |> Enum.reject(fn {_, data} -> is_nil(data) end)
@@ -466,7 +466,7 @@ defmodule Prana.WorkflowExecution do
       execution.execution_data["context_data"]["workflow"]  # %{"counter" => 5, "user_data" => %{...}}
   """
   def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
-    node_outputs = rebuild_completed_node_outputs(execution.node_executions)
+    node_outputs = rebuild_completed_node_outputs(execution)
 
     max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
     current_iteration_count = execution.metadata["iteration_count"] || 0
@@ -562,7 +562,8 @@ defmodule Prana.WorkflowExecution do
     updated_execution =
       update_runtime_safely(updated_execution, fn runtime ->
         node_data = %{
-          "output" => completed_node_execution.output_data
+          "output" => completed_node_execution.output_data,
+          "context" => get_node_context(execution, node_key)
         }
 
         updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)

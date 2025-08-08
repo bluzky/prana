@@ -41,7 +41,7 @@ defmodule Prana.NodeExecutor do
     with {:ok, prepared_params} <- prepare_params(node, action_context),
          {:ok, action} <- get_action(node) do
       node_execution = %{node_execution | params: prepared_params}
-      handle_action_execution(action, prepared_params, action_context, node_execution, execution, node)
+      handle_action_execution(action, prepared_params, action_context, node_execution, execution)
     else
       {:error, reason} ->
         handle_execution_error(node_execution, reason)
@@ -75,7 +75,7 @@ defmodule Prana.NodeExecutor do
 
     case get_action(node) do
       {:ok, action} ->
-        handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution, node)
+        handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution)
 
       {:error, reason} ->
         handle_execution_error(suspended_node_execution, reason)
@@ -324,7 +324,7 @@ defmodule Prana.NodeExecutor do
     |> NodeExecution.start()
   end
 
-  defp handle_action_execution(action, prepared_params, context, node_execution, execution, node) do
+  defp handle_action_execution(action, prepared_params, context, node_execution, execution) do
     case invoke_action(action, prepared_params, context) do
       {:ok, output_data, output_port} ->
         completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
@@ -353,7 +353,7 @@ defmodule Prana.NodeExecutor do
     end
   end
 
-  defp handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution, node) do
+  defp handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution) do
     resume_execution = NodeExecution.resume(suspended_node_execution)
 
     case invoke_resume_action(action, params, context, resume_data) do

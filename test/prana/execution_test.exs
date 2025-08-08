@@ -68,8 +68,8 @@ defmodule Prana.ExecutionTest do
 
       # Verify runtime state structure
       assert result.__runtime["nodes"] == %{
-               "node_1" => %{"output" => %{user_id: 123}},
-               "node_2" => %{"output" => %{email: "test@example.com"}}
+               "node_1" => %{"output" => %{user_id: 123}, "context" => %{}},
+               "node_2" => %{"output" => %{email: "test@example.com"}, "context" => %{}}
              }
 
       assert result.__runtime["env"] == env_data
@@ -154,7 +154,7 @@ defmodule Prana.ExecutionTest do
       result = WorkflowExecution.rebuild_runtime(execution, %{})
 
       # Only completed nodes should be in nodes map
-      assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}}}
+      assert result.__runtime["nodes"] == %{"node_3" => %{"output" => %{result: "success"}, "context" => %{}}}
     end
   end
 
@@ -191,7 +191,7 @@ defmodule Prana.ExecutionTest do
       assert completed_node.output_port == "main"
 
       # Verify runtime state
-      assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data}
+      assert result.__runtime["nodes"]["node_1"] == %{"output" => output_data, "context" => %{}}
     end
 
     test "integrates completed node execution into execution state" do
@@ -372,7 +372,7 @@ defmodule Prana.ExecutionTest do
 
       # Verify state synchronization
       assert result.__runtime["nodes"]["node_1"] == %{"output" => %{user_id: 123}}
-      assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}}
+      assert result.__runtime["nodes"]["node_2"] == %{"output" => %{email: "test@example.com"}, "context" => %{}}
       # Note: executed_nodes not included in simplified rebuild_runtime
       # Note: active_paths not included in simplified rebuild_runtime
 
