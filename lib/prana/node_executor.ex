@@ -24,30 +24,24 @@ defmodule Prana.NodeExecutor do
   - `run_index` - Per-node iteration index
 
   ## Returns
-  - `{:ok, node_execution}` - Successful execution
-  - `{:ok, node_execution, shared_state_updates}` - Successful execution with shared state updates
+  - `{:ok, node_execution, updated_execution}` - Successful execution with updated WorkflowExecution
   - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
-  @spec execute_node(Node.t(), Prana.WorkflowExecution.t(), map(), integer(), integer()) ::
-          {:ok, NodeExecution.t()}
-          | {:ok, NodeExecution.t(), map()}
+  @spec execute_node(Node.t(), Prana.WorkflowExecution.t(), map(), map()) ::
+          {:ok, NodeExecution.t(), Prana.WorkflowExecution.t()}
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
-  def execute_node(
-        %Node{} = node,
-        %Prana.WorkflowExecution{} = execution,
-        routed_input,
-        execution_index \\ 0,
-        run_index \\ 0
-      ) do
+  def execute_node(%Node{} = node, %Prana.WorkflowExecution{} = execution, routed_input, execution_context \\ %{}) do
+    execution_index = Map.get(execution_context, :execution_index, 0)
+    run_index = Map.get(execution_context, :run_index, 0)
     node_execution = create_node_execution(node, execution_index, run_index)
-    context = build_expression_context(node_execution, execution, routed_input)
+    action_context = build_expression_context(node_execution, execution, routed_input, execution_context)
 
-    with {:ok, prepared_params} <- prepare_params(node, context),
+    with {:ok, prepared_params} <- prepare_params(node, action_context),
          {:ok, action} <- get_action(node) do
       node_execution = %{node_execution | params: prepared_params}
-      handle_action_execution(action, prepared_params, context, node_execution)
+      handle_action_execution(action, prepared_params, action_context, node_execution, execution)
     else
       {:error, reason} ->
         handle_execution_error(node_execution, reason)
@@ -64,23 +58,24 @@ defmodule Prana.NodeExecutor do
   - `resume_data` - Data to complete the suspended execution with
 
   ## Returns
-  - `{:ok, node_execution}` - Successfully resumed and completed
+  - `{:ok, node_execution, updated_execution}` - Successfully resumed with updated WorkflowExecution
   - `{:error, {reason, failed_node_execution}}` - Resume failed
   """
   @spec resume_node(Node.t(), Prana.WorkflowExecution.t(), NodeExecution.t(), map()) ::
-          {:ok, NodeExecution.t()} | {:error, {term(), NodeExecution.t()}}
+          {:ok, NodeExecution.t(), Prana.WorkflowExecution.t()} | {:error, {term(), NodeExecution.t()}}
   def resume_node(
         %Node{} = node,
         %Prana.WorkflowExecution{} = execution,
         %NodeExecution{} = suspended_node_execution,
-        resume_data
+        resume_data,
+        execution_context \\ %{}
       ) do
-    context = build_expression_context(suspended_node_execution, execution, %{})
+    context = build_expression_context(suspended_node_execution, execution, %{}, execution_context)
     params = suspended_node_execution.params || %{}
 
     case get_action(node) do
       {:ok, action} ->
-        handle_resume_action(action, params, context, resume_data, suspended_node_execution)
+        handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution)
 
       {:error, reason} ->
         handle_execution_error(suspended_node_execution, reason)
@@ -329,20 +324,25 @@ defmodule Prana.NodeExecutor do
     |> NodeExecution.start()
   end
 
-  defp handle_action_execution(action, prepared_params, context, node_execution) do
+  defp handle_action_execution(action, prepared_params, context, node_execution, execution) do
     case invoke_action(action, prepared_params, context) do
       {:ok, output_data, output_port} ->
         completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-        {:ok, completed_execution}
+        # Always return updated WorkflowExecution, even when no context updates
+        updated_execution = Prana.WorkflowExecution.complete_node(execution, completed_execution)
+        {:ok, completed_execution, updated_execution}
 
       {:ok, output_data, output_port, state_updates} ->
+        # Extract node context updates from state_updates if present
+        {node_context_updates, workflow_state_updates} = extract_node_context_updates(state_updates)
+
         completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-        # state_updates is the state map directly
-        if map_size(state_updates) > 0 do
-          {:ok, completed_execution, state_updates}
-        else
-          {:ok, completed_execution}
-        end
+
+        # Apply context updates to the WorkflowExecution
+        updated_execution =
+          complete_node_with_context_update(execution, completed_execution, node_context_updates, workflow_state_updates)
+
+        {:ok, completed_execution, updated_execution}
 
       {:suspend, suspension_type, suspension_data} ->
         suspended_execution = NodeExecution.suspend(node_execution, suspension_type, suspension_data)
@@ -353,17 +353,27 @@ defmodule Prana.NodeExecutor do
     end
   end
 
-  defp handle_resume_action(action, params, context, resume_data, suspended_node_execution) do
+  defp handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution) do
     resume_execution = NodeExecution.resume(suspended_node_execution)
 
     case invoke_resume_action(action, params, context, resume_data) do
       {:ok, output_data, output_port} ->
         completed_execution = NodeExecution.complete(resume_execution, output_data, output_port)
-        {:ok, completed_execution}
+        # Always return updated WorkflowExecution, even when no context updates
+        updated_execution = Prana.WorkflowExecution.complete_node(execution, completed_execution)
+        {:ok, completed_execution, updated_execution}
 
-      {:ok, output_data, output_port, _context} ->
+      {:ok, output_data, output_port, state_updates} ->
+        # Extract node context updates from state_updates if present
+        {node_context_updates, workflow_state_updates} = extract_node_context_updates(state_updates)
+
         completed_execution = NodeExecution.complete(resume_execution, output_data, output_port)
-        {:ok, completed_execution}
+
+        # Apply context updates to the WorkflowExecution
+        updated_execution =
+          complete_node_with_context_update(execution, completed_execution, node_context_updates, workflow_state_updates)
+
+        {:ok, completed_execution, updated_execution}
 
       {:suspend, suspension_type, suspension_data} ->
         suspended_execution = NodeExecution.suspend(resume_execution, suspension_type, suspension_data)
@@ -383,8 +393,8 @@ defmodule Prana.NodeExecutor do
   # CONTEXT BUILDING
   # =============================================================================
 
-  @spec build_expression_context(NodeExecution.t(), Prana.WorkflowExecution.t(), map()) :: map()
-  defp build_expression_context(node_execution, %Prana.WorkflowExecution{} = execution, routed_input) do
+  @spec build_expression_context(NodeExecution.t(), Prana.WorkflowExecution.t(), map(), map()) :: map()
+  defp build_expression_context(node_execution, %Prana.WorkflowExecution{} = execution, routed_input, execution_context) do
     %{
       "$input" => routed_input,
       "$nodes" => execution.__runtime["nodes"],
@@ -400,10 +410,12 @@ defmodule Prana.NodeExecutor do
         "execution_index" => node_execution.execution_index,
         "id" => execution.id,
         "mode" => execution.execution_mode,
+        "loopback" => get_in(execution_context, [:loop_metadata, :loopback]) || false,
+        "loop" => Map.get(execution_context, :loop_metadata, %{}),
         "preparation" => execution.preparation_data,
-        "state" => execution.__runtime["shared_state"] || %{},
-        "now" => DateTime.utc_now()
-      }
+        "state" => execution.execution_data["context_data"]["workflow"] || %{}
+      },
+      "$now" => DateTime.utc_now()
     }
   end
 
@@ -431,4 +443,48 @@ defmodule Prana.NodeExecutor do
 
   defp allows_dynamic_ports?(%Prana.Action{output_ports: ["*"]}), do: true
   defp allows_dynamic_ports?(_action), do: false
+
+  # Extract node context updates from state_updates map
+  # Actions can use special key "node_context" to update current node's context
+  defp extract_node_context_updates(state_updates) when is_map(state_updates) do
+    case Map.pop(state_updates, "node_context") do
+      {nil, remaining} ->
+        {%{}, remaining}
+
+      {node_context, remaining} when is_map(node_context) ->
+        {node_context, remaining}
+
+      {_invalid, remaining} ->
+        {%{}, remaining}
+    end
+  end
+
+  defp extract_node_context_updates(_), do: {%{}, %{}}
+
+  # Apply context updates to WorkflowExecution and complete the node
+  defp complete_node_with_context_update(
+         execution,
+         %{node_key: node_key} = completed_node_execution,
+         node_context_updates,
+         workflow_state_updates
+       ) do
+    execution
+    |> Prana.WorkflowExecution.complete_node(completed_node_execution)
+    |> then(fn exec ->
+      # Apply node context updates if present
+      if map_size(node_context_updates) > 0 do
+        Prana.WorkflowExecution.update_node_context(exec, node_key, node_context_updates)
+      else
+        exec
+      end
+    end)
+    |> then(fn exec ->
+      # Apply workflow context updates if present
+      if map_size(workflow_state_updates) > 0 do
+        Prana.WorkflowExecution.update_execution_context(exec, workflow_state_updates)
+      else
+        exec
+      end
+    end)
+  end
 end

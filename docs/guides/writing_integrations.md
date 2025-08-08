@@ -81,7 +81,39 @@ end
 - Enables complex conditional workflow patterns
 - Port must be listed in the action's `output_ports`
 
-#### 4. Suspension for Async Operations
+#### 4. Context and State Updates
+
+Actions can update both workflow-level shared state and node-specific context in a single return:
+
+```elixir
+def execute(input, _context) do
+  result = process_data(input)
+
+  # Standard return format with state updates
+  {:ok, result, "success", %{
+    # Workflow shared state updates (accessible via $execution.state)
+    "shared_state_key" => "value",
+    "user_session" => %{"role" => "admin"},
+    "batch_counter" => 15,
+
+    # Node context updates (accessible via $nodes[node_key].context)
+    "node_context" => %{
+      "loop_index" => 3,
+      "is_loop_back" => true,
+      "processing_time_ms" => 150,
+      "custom_metadata" => "any_data"
+    }
+  }}
+end
+```
+
+**Return Format Variants:**
+- `{:ok, data}` - Simple success
+- `{:ok, data, port}` - Success with explicit port
+- `{:ok, data, state_updates}` - Success with state updates (uses default success port)
+- `{:ok, data, port, state_updates}` - Success with port and state updates
+
+#### 5. Suspension for Async Operations
 ```elixir
 def execute(input, _context) do
   # Validate and prepare sub-workflow execution
@@ -365,6 +397,76 @@ def execute(input, context) do
 end
 ```
 
+## Node Context and State Updates
+
+Prana provides two mechanisms for actions to update state during execution:
+
+### 1. Node Context Updates
+
+Actions can update their own node's context, which becomes accessible to other nodes in the workflow. This is perfect for loop tracking, metadata, and inter-node communication.
+
+```elixir
+def execute(input, context) do
+  # Calculate loop information
+  current_node = context["$execution"]["current_node_key"]
+  loop_iteration = calculate_iteration(context, current_node)
+
+  result = process_input(input)
+
+  # Return with node context updates
+  {:ok, result, "success", %{
+    "node_context" => %{
+      "loop_index" => loop_iteration,
+      "is_loop_back" => loop_iteration > 0,
+      "processing_metadata" => %{
+        "duration_ms" => 250,
+        "items_processed" => 42
+      }
+    }
+  }}
+end
+```
+
+**Accessing Node Context from Other Nodes:**
+
+```elixir
+# In templates or other actions
+"$nodes['loop_node'].context.loop_index"        # => 3
+"$nodes['loop_node'].context.is_loop_back"      # => true
+"$nodes['loop_node'].context.processing_metadata.duration_ms"  # => 250
+```
+
+### 2. Workflow Shared State Updates
+
+Actions can update workflow-level shared state that persists across node executions and is accessible via `$execution.state`:
+
+```elixir
+def execute(input, context) do
+  result = process_input(input)
+
+  # Update both node context AND shared workflow state
+  {:ok, result, "success", %{
+    # Workflow-level shared state (persists across all nodes)
+    "user_session" => %{"authenticated" => true, "role" => "admin"},
+    "batch_counter" => 15,
+    "temp_data" => input["processing_cache"],
+
+    # Node-specific context (tied to this node only)
+    "node_context" => %{
+      "local_metadata" => "node-specific data"
+    }
+  }}
+end
+```
+
+**Accessing Shared State:**
+
+```elixir
+# In templates or other actions
+"$execution.state.user_session.role"     # => "admin"
+"$execution.state.batch_counter"         # => 15
+```
+
 ### Context Structure
 
 Actions receive two parameters: `input` (prepared parameters) and `context` (full workflow context):
@@ -386,9 +488,22 @@ context = %{
   },
   "$nodes" => %{
     # Results from all completed nodes (keyed by node key)
-    "validation_step" => %{"valid" => true, "score" => 95},
-    "api_call" => %{"response" => %{"status" => "success"}},
-    "transform" => %{"processed_data" => [...]}
+    "validation_step" => %{
+      "output" => %{"valid" => true, "score" => 95},
+      "context" => %{}  # Node-specific context (empty if none set)
+    },
+    "api_call" => %{
+      "output" => %{"response" => %{"status" => "success"}},
+      "context" => %{"retry_count" => 2, "response_time_ms" => 150}
+    },
+    "loop_processor" => %{
+      "output" => %{"processed_items" => [...]},
+      "context" => %{
+        "loop_index" => 3,
+        "is_loop_back" => true,
+        "total_iterations" => 5
+      }
+    }
   },
   "$vars" => %{
     # All workflow variables
@@ -468,6 +583,23 @@ defmodule MyApp.CustomIntegrationTest do
 
     assert {:suspend, :custom_suspension, suspension_data} = result
     assert suspension_data.task_id
+  end
+
+  test "execute returns node context updates" do
+    input = %{"data" => "test"}
+    context = %{
+      "$input" => %{},
+      "$nodes" => %{},
+      "$vars" => %{},
+      "$execution" => %{"current_node_key" => "test_node"}
+    }
+
+    result = CustomIntegration.execute(input, context)
+
+    assert {:ok, %{result: "processed"}, "success", state_updates} = result
+    assert %{"node_context" => node_context} = state_updates
+    assert node_context["loop_index"]
+    assert is_boolean(node_context["is_loop_back"])
   end
 end
 ```

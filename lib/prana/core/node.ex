@@ -9,6 +9,7 @@ defmodule Prana.Node do
     field(:key, :string, required: true)
     field(:type, :string, required: true)
     field(:params, :map, default: %{})
+    field(:metadata, :map, default: %{})
   end
 
   @doc """

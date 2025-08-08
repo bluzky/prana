@@ -422,6 +422,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       assert event_data.execution.status == "suspended"
       assert event_data.suspended_node.key == "sub_workflow_node"
     end
+
     test "includes batch_mode in suspension data" do
       # Create workflow with batch mode set to "batch"
       workflow = %Workflow{
@@ -446,7 +447,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
         connections: [
           %Connection{
             from: "trigger",
-            to: "batch_sub_workflow", 
+            to: "batch_sub_workflow",
             from_port: "main",
             to_port: "main"
           }
@@ -472,7 +473,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
     test "includes single batch_mode as default in suspension data" do
       # Create workflow without explicit batch_mode (should default to "single")
       workflow = %Workflow{
-        id: "single_workflow", 
+        id: "single_workflow",
         name: "Single Processing Workflow",
         nodes: [
           %Node{
@@ -492,7 +493,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
           %Connection{
             from: "trigger",
             to: "single_sub_workflow",
-            from_port: "main", 
+            from_port: "main",
             to_port: "main"
           }
         ]
@@ -564,7 +565,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
     test "preserves array input for single mode" do
       # Create workflow with single mode processing an array input
       workflow = %Workflow{
-        id: "single_array_workflow", 
+        id: "single_array_workflow",
         name: "Single Mode Array Processing",
         nodes: [
           %Node{

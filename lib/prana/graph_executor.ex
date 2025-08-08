@@ -81,8 +81,8 @@ defmodule Prana.GraphExecutor do
     __runtime: %{
       "nodes" => %{node_key => output_data},     # completed node outputs
       "env" => map(),                           # environment data
-      "active_nodes" => MapSet.t(String.t()),   # nodes ready for execution
-      "node_depth" => %{node_key => integer()}   # depth tracking for branch following
+      "active_node" => %{node_key => integer()}   # depth tracking for branch following, and active nodes to check for next execution
+      "active_paths" => %{String.t() => map()}, # active execution paths tracking
     }
   }
   ```
@@ -105,7 +105,6 @@ defmodule Prana.GraphExecutor do
   alias Prana.Core.Error
   alias Prana.ExecutionGraph
   alias Prana.Middleware
-  alias Prana.Node
   alias Prana.NodeExecutor
   alias Prana.WorkflowExecution
 
@@ -237,7 +236,7 @@ defmodule Prana.GraphExecutor do
       # Get active nodes from runtime state
       active_nodes = WorkflowExecution.get_active_nodes(execution)
 
-      if MapSet.size(active_nodes) == 0 do
+      if Enum.empty?(active_nodes) do
         completed_execution = WorkflowExecution.complete(execution)
         Middleware.call(:execution_completed, %{execution: completed_execution})
 
@@ -260,9 +259,9 @@ defmodule Prana.GraphExecutor do
   # Find ready nodes and execute following branch-completion strategy.
   # Uses WorkflowExecution.__runtime for tracking active paths and executed nodes.
   defp find_and_execute_ready_nodes(execution) do
-    ready_nodes = WorkflowExecution.find_ready_nodes(execution)
+    ready_node = WorkflowExecution.find_next_ready_node(execution)
 
-    if Enum.empty?(ready_nodes) do
+    if is_nil(ready_node) do
       # No ready nodes but workflow not complete - likely an error condition
       error_reason = %{
         type: "no_ready_nodes",
@@ -275,77 +274,25 @@ defmodule Prana.GraphExecutor do
       Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_reason})
       {:error, failed_execution}
     else
-      # Select single node to execute, prioritizing branch completion
-      selected_node = select_node_for_branch_following(ready_nodes, execution.__runtime)
-
-      execute_single_node(selected_node, execution)
+      execute_single_node(ready_node, execution)
     end
-
-    # rescue
-    #   error ->
-    #     # Unexpected error during node execution
-    #     {:error,
-    #      %{
-    #        type: "execution_exception",
-    #        message: "Exception during node execution: #{Exception.message(error)}",
-    #        details: %{exception: error}
-    # }}
-  end
-
-  @doc """
-  Select a single node for execution, prioritizing branch completion over batch execution.
-
-  Strategy:
-  1. If there are nodes continuing active branches, prioritize those
-  2. Otherwise, select the first ready node to start a new branch
-  3. Prefer nodes with fewer dependencies (closer to completion)
-
-  ## Parameters
-
-  - `ready_nodes` - List of Node structs that are ready for execution
-  - `execution_graph` - The ExecutionGraph for connection analysis
-  - `execution_context` - Current execution context with active path tracking
-
-  ## Returns
-
-  Single Node struct selected for execution.
-  """
-  @spec select_node_for_branch_following([Node.t()], map()) :: Node.t()
-  def select_node_for_branch_following(ready_nodes, execution_context) do
-    node_depth = Map.get(execution_context, "node_depth", %{})
-
-    # Sort nodes by depth (deepest first) to ensure branch following
-    ready_nodes
-    |> Enum.sort_by(fn node ->
-      depth = Map.get(node_depth, node.key, 0)
-      # Use negative depth for descending sort (deepest first)
-      -depth
-    end)
-    |> List.first()
   end
 
   defp execute_single_node(node, execution, custom_input_map \\ nil) do
     routed_input = custom_input_map || WorkflowExecution.extract_multi_port_input(node, execution)
 
-    # Get execution tracking indices
-    execution_index = execution.current_execution_index
-    run_index = WorkflowExecution.get_next_run_index(execution, node.key)
+    # Get execution tracking indices and loop metadata
+    current_context = %{
+      execution_index: execution.current_execution_index,
+      run_index: WorkflowExecution.get_next_run_index(execution, node.key),
+      loop_metadata: WorkflowExecution.get_node_loop_metadata(execution, node)
+    }
 
     Middleware.call(:node_starting, %{node: node, execution: execution})
 
-    case NodeExecutor.execute_node(node, execution, routed_input, execution_index, run_index) do
-      {:ok, result_node_execution} ->
-        updated_execution = WorkflowExecution.complete_node(execution, result_node_execution)
-        Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
-        {:ok, updated_execution, result_node_execution.output_data}
-
-      {:ok, result_node_execution, shared_state_updates} ->
-        # completed node with additional state update
-        updated_execution =
-          execution
-          |> WorkflowExecution.complete_node(result_node_execution)
-          |> WorkflowExecution.update_shared_state(shared_state_updates)
-
+    case NodeExecutor.execute_node(node, execution, routed_input, current_context) do
+      {:ok, result_node_execution, updated_execution} ->
+        # NodeExecutor always returns updated WorkflowExecution (consistent API)
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
         {:ok, updated_execution, result_node_execution.output_data}
 
@@ -464,10 +411,21 @@ defmodule Prana.GraphExecutor do
       # Clear suspension state for resume (runtime state already initialized in resume_workflow)
       resume_execution = WorkflowExecution.resume_suspension(suspended_execution)
 
-      case NodeExecutor.resume_node(suspended_node, resume_execution, suspended_node_execution, resume_data) do
-        {:ok, completed_node_execution} ->
-          # Complete the node execution at workflow level
-          updated_execution = WorkflowExecution.complete_node(resume_execution, completed_node_execution)
+      current_context = %{
+        execution_index: suspended_node_execution.execution_index,
+        run_index: suspended_node_execution.run_index,
+        loop_metadata: WorkflowExecution.get_node_loop_metadata(resume_execution, suspended_node)
+      }
+
+      case NodeExecutor.resume_node(
+             suspended_node,
+             resume_execution,
+             suspended_node_execution,
+             resume_data,
+             current_context
+           ) do
+        {:ok, completed_node_execution, updated_execution} ->
+          # NodeExecutor always returns updated WorkflowExecution (consistent API)
           Middleware.call(:node_completed, %{node: suspended_node, node_execution: completed_node_execution})
 
           {:ok, updated_execution, completed_node_execution.output_data}
@@ -488,4 +446,5 @@ defmodule Prana.GraphExecutor do
       {:error, failed_execution}
     end
   end
+
 end

@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Prana** is an Elixir workflow automation platform built around a node-based graph execution model. It orchestrates workflows consisting of nodes (triggers, actions, logic, wait, output) connected through explicit ports with conditional routing and expression-based data flow.
+**Prana** is an Elixir workflow automation platform built around a node-based graph execution model. It orchestrates workflows consisting of nodes (triggers, actions, logic, wait, output) connected through explicit ports with conditional routing and template-based data flow.
+
+**Current Status**: **Production-Ready Core Platform** (~95% complete)
+- ✅ Complete execution engine with conditional branching and sub-workflow support
+- ✅ Comprehensive built-in integrations (Manual, Logic, Data, Workflow, Wait, HTTP, Code)
+- ✅ Advanced features: Loop constructs, template engine integration, and performance optimizations
+- 🎯 Current branch: `feature/for-each-loop` - Adding enhanced loop processing capabilities
 
 ## Key Commands
 
@@ -23,9 +29,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Testing Patterns
 - Tests use ExUnit framework
-- Comprehensive test coverage exists for core modules
+- **Current test coverage**: 72.98% (below 90% threshold)
+- **25 test files** with comprehensive coverage for core execution engine
+- **Test coverage priorities**: HTTP integration (55-80%), Code integration (34-85%)
 - Test files follow `*_test.exs` naming convention
 - Use `mix test --trace` for detailed test output
+- Use `mix test --cover` to generate coverage reports
 
 ## Architecture Overview
 
@@ -33,7 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Type Safety**: All data uses proper Elixir structs with compile-time checking
 - **Behavior-Driven**: Clean contracts for integrations and middleware
 - **Node-Port Model**: Explicit data flow through named ports between nodes
-- **Expression System**: Built-in path evaluation (`$input.field`, `$nodes.api.response`) for dynamic data access
+- **Template Integration**: Dynamic data access and templating using MAU library
 - **Action Behavior Pattern**: Actions implemented as modules following Prana.Behaviour.Action with prepare/execute/resume methods
 
 ### Key Components
@@ -70,9 +79,9 @@ restored_workflow = Prana.Workflow.from_map(workflow_data)
 ```
 
 #### Execution Engine
-- **`Prana.NodeExecutor`** (`node_executor.ex`): ✅ **PRODUCTION READY** - Executes individual nodes with expression-based input preparation, Action behavior execution, suspension/resume patterns, and comprehensive error handling
-- **`Prana.GraphExecutor`** (`execution/graph_executor.ex`): ✅ **PRODUCTION READY** - Orchestrates workflow execution using NodeExecutor, handles conditional branching, port-based routing, sub-workflow coordination, and middleware integration
-- **`Prana.ExpressionEngine`** (`expression_engine.ex`): ✅ **COMPLETE** - Path-based expression evaluation for dynamic data access
+- **`Prana.NodeExecutor`** (`node_executor.ex`): ✅ **PRODUCTION READY** - Executes individual nodes with template-based input preparation, Action behavior execution, suspension/resume patterns, and comprehensive error handling
+- **`Prana.GraphExecutor`** (`execution/graph_executor.ex`): ✅ **PRODUCTION READY** - Orchestrates workflow execution using NodeExecutor, handles conditional branging, port-based routing, sub-workflow coordination, and middleware integration
+- **`Prana.Template`** (`template.ex`): ✅ **COMPLETE** - Template processing using MAU library for dynamic data access
 
 #### Registry & Extension System
 - **`Prana.IntegrationRegistry`** (`registry/integration_registry.ex`): GenServer managing integrations and their actions
@@ -80,34 +89,26 @@ restored_workflow = Prana.Workflow.from_map(workflow_data)
 - **`Prana.Behaviour.Middleware`**: Contract for workflow lifecycle event handling
 
 #### Built-in Integrations (`lib/prana/integrations/`)
-- **`Prana.Integrations.Manual`** (`manual.ex`): Test actions for development and testing workflows
-- **`Prana.Integrations.Logic`** (`logic.ex`): Conditional branching with IF/ELSE and switch/case routing
-- **`Prana.Integrations.Data`** (`data.ex`): Data merging and combination operations for fork-join patterns
-- **`Prana.Integrations.Workflow`** (`workflow.ex`): Sub-workflow orchestration with suspension/resume coordination
+- **`Prana.Integrations.Manual`** (`manual.ex`): Test actions for development and testing workflows (100% coverage)
+- **`Prana.Integrations.Logic`** (`logic.ex`): Conditional branching with IF/ELSE and switch/case routing (100% coverage)
+- **`Prana.Integrations.Data`** (`data.ex`): Data merging and combination operations for fork-join patterns (100% coverage)
+- **`Prana.Integrations.Workflow`** (`workflow.ex`): Sub-workflow orchestration with suspension/resume coordination (100% coverage)
+- **`Prana.Integrations.Wait`** (`wait.ex`): Delay actions and timeout handling for time-based workflows (96% coverage)
+- **`Prana.Integrations.HTTP`** (`http.ex`): HTTP requests, webhooks, and API interactions (55-80% coverage)
+- **`Prana.Integrations.Code`** (`code.ex`): Secure Elixir code execution with sandboxing (34-85% coverage)
+- **`Prana.Integrations.Schedule`** (`schedule.ex`): Cron-based scheduling and time triggers (100% coverage)
 
 #### Middleware System
 - **`Prana.Middleware`** (`middleware.ex`): Pipeline execution engine for lifecycle events
 - Events: `:execution_started`, `:execution_completed`, `:execution_failed`, `:node_starting`, `:node_completed`, `:node_failed`, `:node_suspended`, `:execution_suspended`
 
-### Expression System Usage
+### Template System Integration
 
-The expression engine supports:
+The platform uses MAU library for template processing and dynamic data access:
 ```elixir
-# Simple field access
-"$input.email"                    # Single value
-"$nodes.api_call.response.user_id" # Nested access
-"$variables.api_url"               # Variables
-
-# Array access
-"$input.users[0].name"             # Index access
-
-# Wildcard extraction (returns arrays)
-"$input.users.*.name"              # All names
-"$input.users.*.skills.*"          # Nested wildcards
-
-# Filtering (returns arrays)
-"$input.users.{role: \"admin\"}.email"        # Simple filter
-"$input.orders.{status: \"completed\", user_id: 123}" # Multiple conditions
+# Template expressions are processed by MAU library
+# Refer to MAU documentation for syntax and capabilities
+# Context includes: input, nodes, variables, and execution state
 ```
 
 ### Conditional Execution Patterns
@@ -167,12 +168,14 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 
 ### Current Implementation Status
 
-**Overall Progress**: ~95% Complete (Core execution engine and sub-workflow orchestration complete)
+**Overall Progress**: ~95% Complete (Production-ready platform with advanced features)
+**Test Coverage**: 72.98% (below 90% threshold - focus area for improvement)
+**Current Development**: Loop constructs and for-each batch processing capabilities
 
 #### ✅ COMPLETED (Core Platform)
 1. **All Core Data Structures** - Comprehensive struct-based design with proper type safety
 2. **Behavior Definitions** - Simplified contracts (Integration, Middleware only)
-3. **Expression Engine** - Complete path-based expression evaluation with wildcards and filtering
+3. **Template Integration** - MAU library integration for dynamic content processing
 4. **Integration Registry** - Runtime integration management with health checking
 5. **Middleware System** - Event-driven lifecycle handling with comprehensive test coverage
 6. **Node Executor** - **PRODUCTION READY** individual node execution with suspension/resume support
@@ -183,22 +186,27 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 2. **Graph Executor Phase 3.2** - Conditional Branching (IF/ELSE, Switch patterns) ✅ **COMPLETE**
 3. **Graph Executor Phase 4.1** - Sub-workflow Orchestration (Parent-child coordination) ✅ **COMPLETE**
 
-#### ✅ BUILT-IN INTEGRATIONS - COMPLETE
-1. **Manual Integration** - Test actions and triggers for development workflows ✅ **COMPLETE**
-2. **Logic Integration** - IF/ELSE and switch/case routing with dynamic ports ✅ **COMPLETE**
-3. **Data Integration** - Merge operations for fork-join patterns (append, merge, concat) ✅ **COMPLETE**
-4. **Workflow Integration** - Sub-workflow orchestration with suspension/resume ✅ **COMPLETE**
+#### ✅ BUILT-IN INTEGRATIONS - COMPREHENSIVE SUITE
+1. **Manual Integration** - Test actions and triggers for development workflows ✅ **COMPLETE** (100% coverage)
+2. **Logic Integration** - IF/ELSE and switch/case routing with dynamic ports ✅ **COMPLETE** (100% coverage)
+3. **Data Integration** - Merge operations for fork-join patterns (append, merge, concat) ✅ **COMPLETE** (100% coverage)
+4. **Workflow Integration** - Sub-workflow orchestration with suspension/resume ✅ **COMPLETE** (100% coverage)
+5. **Wait Integration** - Delay actions and timeout handling ✅ **COMPLETE** (96% coverage)
+6. **HTTP Integration** - Request/webhook actions and API interactions ✅ **COMPLETE** (55-80% coverage)
+7. **Code Integration** - Secure Elixir execution with sandboxing ✅ **COMPLETE** (34-85% coverage)
+8. **Schedule Integration** - Cron triggers and time-based scheduling ✅ **COMPLETE** (100% coverage)
 
-#### 🎯 CURRENT PRIORITY (Phase 4.2+ - Additional Integrations)
-- **Wait Integration**: Delay actions and timeout handling for time-based workflows
-- **HTTP Integration**: HTTP requests, webhooks, and API interactions
-- **Transform Integration**: Data transformation, filtering, and mapping operations
-- **Log Integration**: Structured logging actions for workflow debugging
+#### 🎯 CURRENT PRIORITY (Advanced Features & Quality)
+- **Loop Integration**: For-each batch processing and iteration patterns (in development)
+- **Test Coverage Improvement**: Increase coverage from 72.98% to 90%+ threshold
+- **Template Engine Integration**: MAU library integration for advanced templating
+- **Performance Optimization**: Further execution engine enhancements
 
-#### 📋 FUTURE PHASES
-- **Phase 5**: Main API - Public interface for workflow management
-- **Phase 6**: Development Tools - Builder, validation, testing utilities
-- **Phase 7**: Advanced Patterns - Loop constructs, complex coordination patterns
+#### 📋 FUTURE ENHANCEMENTS
+- **Main API**: Public interface for workflow management
+- **Development Tools**: Visual workflow builder, validation utilities, testing frameworks
+- **Advanced Patterns**: Complex coordination patterns, parallel execution optimizations
+- **Integration Ecosystem**: Plugin system for third-party integrations
 
 ### Key Design Decisions
 
@@ -206,7 +214,7 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 2. **Module-Based Integrations** - Only support behavior-implementing modules, no map definitions
 3. **Middleware for Application Logic** - Clean separation between library (execution) and application (persistence)
 4. **Port-Based Routing** - Explicit named ports for data flow instead of implicit connections
-5. **MFA Action Pattern** - Actions defined as `{module, function, args}` tuples
+5. **Third-Party Template Engine** - Uses MAU library instead of built-in expression system
 6. **Failed Executions Design** - Failed nodes have `output_port = nil`, error routing handled at graph level
 7. **Simplified Behaviors** - Removed storage adapters, hook system; middleware provides better composability
 8. **No Complex Validation** - Trust integration structs, simplified registry without normalization
@@ -214,28 +222,34 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 ### Working with the Codebase
 
 #### Important Context for Development
-- **Core execution engine is production-ready** with comprehensive test coverage across all patterns
-- **Built-in integrations are complete** - Manual, Logic, Data, and Workflow integrations fully implemented
-- **Sub-workflow orchestration is complete** with suspension/resume mechanisms for parent-child coordination
-- **NodeExecutor supports suspension/resume** with `execute_node/2` and `resume_node/4` methods
-- **GraphExecutor handles all execution patterns** - sequential, conditional branching, fork-join, sub-workflows
-- **Current focus** is additional integrations (Wait, HTTP, Transform, Log) for broader workflow capabilities
-- **Major performance improvements**: Single trigger execution, graph pruning, O(1) connection lookups
+- **Production-ready platform** with comprehensive execution engine and 8 built-in integrations
+- **Advanced execution patterns**: Conditional branching, diamond patterns, sub-workflow coordination, loop constructs
+- **Comprehensive integration suite**: Manual, Logic, Data, Workflow, Wait, HTTP, Code, Schedule integrations
+- **Template integration**: Uses MAU library for template processing and dynamic data access
+- **Current development focus**: Loop integration for for-each batch processing (feature/for-each-loop branch)
+- **Test coverage priority**: Improving from 72.98% to 90%+ threshold, especially HTTP/Code integrations
+- **Performance optimizations**: Single trigger execution, graph pruning, O(1) connection lookups
 - **Double-indexed connections**: Optimized `%{node_key => %{output_port => [connections]}}` structure for ultra-fast routing
-- **Advanced execution patterns**: Conditional branching, diamond patterns, sub-workflow coordination
+- **Suspension/resume support**: Full parent-child workflow coordination with NodeExecutor methods
 
 #### Adding New Features
 - Follow existing struct patterns in `lib/prana/core/`
 - Use behaviors for extensibility (`lib/prana/behaviours/`)
 - Add comprehensive tests following existing patterns (see `node_executor_test.exs` for examples)
-- Use `mix credo` to ensure code quality
+- Aim for 90%+ test coverage on new integrations
+- Use `mix credo` to ensure code quality and maintain consistency
 - All new components should integrate with the middleware event system
+- Use MAU library for any template processing or dynamic content needs
 
 #### Testing Patterns
-- Expression engine: `"$input.field"`, `"$nodes.api.response"`, wildcards, filtering
-- Node execution: Multiple return formats, error handling, context management
-- Middleware: Event handling, pipeline execution, error resilience
+- **Template processing**: MAU library integration for dynamic content and data access
+- **Node execution**: Multiple return formats, error handling, context management, suspension/resume
+- **Integration patterns**: Action execution, error handling, port routing, schema validation
+- **Middleware**: Event handling, pipeline execution, error resilience
+- **Performance testing**: Use `benchee` for execution engine benchmarking
 - Use `mix test --trace` for detailed test output during development
+- Focus on improving coverage for HTTP and Code integrations
+- MAU library handles all template processing - no need for expression engine tests
 
 #### Integration Development
 ```elixir
@@ -281,9 +295,14 @@ end
 ### Dependencies
 
 - **Elixir**: ~> 1.16
-- **nested2**: Path traversal and data extraction
-- **styler** (dev/test): Code formatting
-- **credo** (dev/test): Static analysis
+- **mau**: ~> 0.3 - Template engine for dynamic content processing
+- **nestex**: ~> 0.2 - Path traversal and data extraction for template processing
+- **req**: ~> 0.5 - HTTP client for HTTP integration
+- **skema**: ~> 1.0 - Schema validation and data transformation
+- **uuid**: ~> 1.1 - UUID generation for workflow and execution IDs
+- **styler** (dev/test): ~> 1.5 - Code formatting
+- **credo** (dev/test): ~> 1.7 - Static analysis
+- **benchee** (dev): ~> 1.3 - Performance benchmarking
 
 ### Key Documentation References
 

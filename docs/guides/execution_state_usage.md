@@ -34,7 +34,7 @@ def execute(params, context) do
   # Read current execution state
   state = context["$execution"]["state"]
   counter = Map.get(state, "counter", 0)
-  
+
   # Your action logic here...
 end
 ```
@@ -47,10 +47,10 @@ Actions can modify state by returning a state map that gets **merged** with the 
 def execute(params, context) do
   # Read current counter from state
   current_counter = Map.get(context["$execution"]["state"], "counter", 0)
-  
+
   # Create state updates (only specify what changes)
   state_updates = %{"counter" => current_counter + 1}
-  
+
   # Return with state updates (will be merged with existing state)
   {:ok, result_data, "main", state_updates}
 end
@@ -64,10 +64,10 @@ end
 # Action that increments a counter in execution state
 def execute(params, context) do
   current_counter = Map.get(context["$execution"]["state"], "counter", 0)
-  
+
   # Only return the changes - existing state is preserved
   state_updates = %{"counter" => current_counter + 1}
-  
+
   {:ok, %{"new_counter" => current_counter + 1}, "main", state_updates}
 end
 ```
@@ -82,10 +82,10 @@ end
 def execute(params, context) do
   current_state = context["$execution"]["state"]
   # Original: %{"counter" => 1, "email" => "test@example.com"}
-  
+
   # Only specify what changes
   state_updates = %{"counter" => 2}
-  
+
   {:ok, %{"status" => "updated"}, "main", state_updates}
   # Final state will be: %{"counter" => 2, "email" => "test@example.com"}
 end
@@ -101,10 +101,10 @@ def execute(params, context) do
     "session_id" => UUID.uuid4(),
     "login_time" => DateTime.utc_now()
   }
-  
+
   # Add session data to state (other state values preserved)
   state_updates = %{"session" => session_data}
-  
+
   {:ok, session_data, "main", state_updates}
 end
 ```
@@ -117,10 +117,10 @@ def execute(params, context) do
   step_name = params["step_name"]
   current_flags = Map.get(context["$execution"]["state"], "completed_steps", [])
   updated_flags = [step_name | current_flags]
-  
+
   # Only update the completed_steps field
   state_updates = %{"completed_steps" => updated_flags}
-  
+
   {:ok, %{"completed_step" => step_name}, "main", state_updates}
 end
 ```
@@ -130,11 +130,11 @@ end
 ### WorkflowExecution Functions
 
 ```elixir
-# Update state (merges with existing state)
-WorkflowExecution.update_shared_state(execution, %{"counter" => 5, "flag" => true})
+# Update workflow context (merges with existing context)
+WorkflowExecution.update_execution_context(execution, %{"counter" => 5, "flag" => true})
 
-# Access state directly from runtime
-execution.__runtime["shared_state"]
+# Access workflow context directly from execution_data
+execution.execution_data["context_data"]["workflow"]
 ```
 
 ### Context Structure

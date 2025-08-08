@@ -70,4 +70,26 @@ defmodule Prana.ExecutionGraph do
           node_map: map(),
           variables: map()
         }
+
+  @doc """
+  Get incoming connections for a specific node and port.
+
+  This function retrieves all connections that target a specific node and input port
+  using the execution graph's reverse connection map for O(1) lookup performance.
+
+  ## Parameters
+  - `execution_graph` - The execution graph containing connection maps
+  - `node_key` - The key of the target node
+  - `input_port` - The name of the input port
+
+  ## Returns
+  List of Connection structs targeting the specified node and port
+  """
+  def get_incoming_connections_for_node_port(execution_graph, node_key, input_port) do
+    reverse_map = Map.get(execution_graph, :reverse_connection_map, %{})
+    all_incoming = Map.get(reverse_map, node_key, [])
+
+    # Filter for connections targeting the specific input port
+    Enum.filter(all_incoming, fn conn -> conn.to_port == input_port end)
+  end
 end
