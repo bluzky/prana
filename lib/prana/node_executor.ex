@@ -29,25 +29,21 @@ defmodule Prana.NodeExecutor do
   - `{:suspend, node_execution}` - Node suspended for async coordination
   - `{:error, reason}` - Execution failed
   """
-  @spec execute_node(Node.t(), Prana.WorkflowExecution.t(), map(), integer(), integer()) ::
+  @spec execute_node(Node.t(), Prana.WorkflowExecution.t(), map(), map()) ::
           {:ok, NodeExecution.t()}
           | {:ok, NodeExecution.t(), map()}
           | {:suspend, NodeExecution.t()}
           | {:error, term()}
-  def execute_node(
-        %Node{} = node,
-        %Prana.WorkflowExecution{} = execution,
-        routed_input,
-        execution_index \\ 0,
-        run_index \\ 0
-      ) do
+  def execute_node(%Node{} = node, %Prana.WorkflowExecution{} = execution, routed_input, execution_context \\ %{}) do
+    execution_index = Map.get(execution_context, :execution_index, 0)
+    run_index = Map.get(execution_context, :run_index, 0)
     node_execution = create_node_execution(node, execution_index, run_index)
-    context = build_expression_context(node_execution, execution, routed_input)
+    action_context = build_expression_context(node_execution, execution, routed_input, execution_context)
 
-    with {:ok, prepared_params} <- prepare_params(node, context),
+    with {:ok, prepared_params} <- prepare_params(node, action_context),
          {:ok, action} <- get_action(node) do
       node_execution = %{node_execution | params: prepared_params}
-      handle_action_execution(action, prepared_params, context, node_execution)
+      handle_action_execution(action, prepared_params, action_context, node_execution)
     else
       {:error, reason} ->
         handle_execution_error(node_execution, reason)
@@ -73,9 +69,10 @@ defmodule Prana.NodeExecutor do
         %Node{} = node,
         %Prana.WorkflowExecution{} = execution,
         %NodeExecution{} = suspended_node_execution,
-        resume_data
+        resume_data,
+        execution_context \\ %{}
       ) do
-    context = build_expression_context(suspended_node_execution, execution, %{})
+    context = build_expression_context(suspended_node_execution, execution, %{}, execution_context)
     params = suspended_node_execution.params || %{}
 
     case get_action(node) do
@@ -382,8 +379,8 @@ defmodule Prana.NodeExecutor do
   # CONTEXT BUILDING
   # =============================================================================
 
-  @spec build_expression_context(NodeExecution.t(), Prana.WorkflowExecution.t(), map()) :: map()
-  defp build_expression_context(node_execution, %Prana.WorkflowExecution{} = execution, routed_input) do
+  @spec build_expression_context(NodeExecution.t(), Prana.WorkflowExecution.t(), map(), map()) :: map()
+  defp build_expression_context(node_execution, %Prana.WorkflowExecution{} = execution, routed_input, execution_context) do
     %{
       "$input" => routed_input,
       "$nodes" => execution.__runtime["nodes"],
@@ -399,10 +396,12 @@ defmodule Prana.NodeExecutor do
         "execution_index" => node_execution.execution_index,
         "id" => execution.id,
         "mode" => execution.execution_mode,
+        "loopback" => get_in(execution_context, [:loop_metadata, :loopback]) || false,
+        "loop" => Map.get(execution_context, :loop_metadata, %{}),
         "preparation" => execution.preparation_data,
-        "state" => execution.__runtime["shared_state"] || %{},
-        "now" => DateTime.utc_now()
-      }
+        "state" => execution.__runtime["shared_state"] || %{}
+      },
+      "$now" => DateTime.utc_now()
     }
   end
 

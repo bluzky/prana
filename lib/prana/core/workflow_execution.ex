@@ -553,6 +553,7 @@ defmodule Prana.WorkflowExecution do
           "output" => completed_node_execution.output_data,
           "context" => completed_node_execution.context
         }
+
         updated_node_map = Map.put(runtime["nodes"] || %{}, node_key, node_data)
         Map.put(runtime, "nodes", updated_node_map)
       end)
@@ -798,6 +799,39 @@ defmodule Prana.WorkflowExecution do
     }
   end
 
+  def loopback_node?(execution, node) do
+    Map.has_key?(execution.__runtime["active_paths"], node.key)
+  end
+
+  @doc """
+  Extract loop metadata from node and combine with runtime loopback information.
+  
+  Returns a map containing:
+  - loop_level: Nesting depth (0 = no loop, 1 = outer, 2+ = nested)
+  - loop_role: :start_loop, :in_loop, :end_loop, or :not_in_loop
+  - loop_ids: Array of loop identifiers the node belongs to
+  - loopback: Whether this execution is a loop-back (node previously executed)
+  """
+  def get_node_loop_metadata(execution, node) do
+    node_loop_metadata = Map.get(node.metadata, :loop_level, 0) > 0
+
+    if node_loop_metadata do
+      %{
+        loop_level: Map.get(node.metadata, :loop_level, 0),
+        loop_role: Map.get(node.metadata, :loop_role, :not_in_loop) |> to_string(),
+        loop_ids: Map.get(node.metadata, :loop_ids, []),
+        loopback: loopback_node?(execution, node)
+      }
+    else
+      %{
+        loop_level: 0,
+        loop_role: "not_in_loop",
+        loop_ids: [],
+        loopback: false
+      }
+    end
+  end
+
   @doc """
   Increment iteration count for loop protection.
 
@@ -842,7 +876,7 @@ defmodule Prana.WorkflowExecution do
   Maximum iterations as integer
   """
   def get_max_iterations(execution) do
-    execution.__runtime["max_iterations"] || 100
+    execution.__runtime["max_iterations"] || 10_000
   end
 
   @doc """

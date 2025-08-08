@@ -281,13 +281,16 @@ defmodule Prana.GraphExecutor do
   defp execute_single_node(node, execution, custom_input_map \\ nil) do
     routed_input = custom_input_map || WorkflowExecution.extract_multi_port_input(node, execution)
 
-    # Get execution tracking indices
-    execution_index = execution.current_execution_index
-    run_index = WorkflowExecution.get_next_run_index(execution, node.key)
+    # Get execution tracking indices and loop metadata
+    current_context = %{
+      execution_index: execution.current_execution_index,
+      run_index: WorkflowExecution.get_next_run_index(execution, node.key),
+      loop_metadata: WorkflowExecution.get_node_loop_metadata(execution, node)
+    }
 
     Middleware.call(:node_starting, %{node: node, execution: execution})
 
-    case NodeExecutor.execute_node(node, execution, routed_input, execution_index, run_index) do
+    case NodeExecutor.execute_node(node, execution, routed_input, current_context) do
       {:ok, result_node_execution} ->
         updated_execution = WorkflowExecution.complete_node(execution, result_node_execution)
         Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
@@ -418,7 +421,19 @@ defmodule Prana.GraphExecutor do
       # Clear suspension state for resume (runtime state already initialized in resume_workflow)
       resume_execution = WorkflowExecution.resume_suspension(suspended_execution)
 
-      case NodeExecutor.resume_node(suspended_node, resume_execution, suspended_node_execution, resume_data) do
+      current_context = %{
+        execution_index: suspended_node_execution.execution_index,
+        run_index: suspended_node_execution.run_index,
+        loop_metadata: WorkflowExecution.get_node_loop_metadata(resume_execution, suspended_node)
+      }
+
+      case NodeExecutor.resume_node(
+             suspended_node,
+             resume_execution,
+             suspended_node_execution,
+             resume_data,
+             current_context
+           ) do
         {:ok, completed_node_execution} ->
           # Complete the node execution at workflow level
           updated_execution = WorkflowExecution.complete_node(resume_execution, completed_node_execution)
@@ -442,4 +457,5 @@ defmodule Prana.GraphExecutor do
       {:error, failed_execution}
     end
   end
+
 end

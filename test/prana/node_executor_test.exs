@@ -290,7 +290,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"value" => 10}
 
       assert {:ok, node_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert node_execution.status == "completed"
       assert node_execution.output_data == %{result: 20}
@@ -308,7 +308,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"premium" => true}
 
       assert {:ok, node_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert node_execution.status == "completed"
       assert node_execution.output_data == %{status: "premium"}
@@ -320,7 +320,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"data" => "test"}
 
       assert {:ok, node_execution, state_updates} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert node_execution.status == "completed"
       assert node_execution.output_data == %{data: %{"data" => "test"}}
@@ -333,7 +333,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
 
@@ -349,7 +349,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
 
@@ -365,7 +365,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:suspend, suspended_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert suspended_execution.status == "suspended"
       assert suspended_execution.suspension_type == :sub_workflow_sync
@@ -381,7 +381,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"value" => 10}
 
       assert {:ok, node_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert node_execution.params == %{}
     end
@@ -397,7 +397,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"amount" => 100}
 
       assert {:ok, node_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert node_execution.params == %{
                "value" => 100,
@@ -413,7 +413,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
       assert reason.code == "action_not_found"
@@ -425,7 +425,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
       assert reason.code == "action_not_found"
@@ -439,7 +439,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
       assert reason.code == "action_execution_failed"
@@ -453,7 +453,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
       assert reason.code == "invalid_action_return_format"
@@ -466,7 +466,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"type" => "premium"}
 
       assert {:ok, node_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert node_execution.status == "completed"
       assert node_execution.output_port == "dynamic_premium"
@@ -478,7 +478,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{}
 
       assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
       assert reason.code == "invalid_output_port"
@@ -494,7 +494,7 @@ defmodule Prana.NodeExecutorTest do
 
       # First execute to get suspended state
       {:suspend, suspended_execution} =
-        NodeExecutor.execute_node(node, execution, %{}, 1, 0)
+        NodeExecutor.execute_node(node, execution, %{}, %{execution_index: 1, run_index: 0})
 
       # Now resume
       resume_data = %{result: "resumed_successfully"}
@@ -784,7 +784,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"value" => 42}
 
       assert {:ok, node_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 1, 0)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert node_execution.params == %{
                "input_value" => 42,
@@ -803,7 +803,7 @@ defmodule Prana.NodeExecutorTest do
       routed_input = %{"value" => 10}
 
       assert {:ok, node_execution} =
-               NodeExecutor.execute_node(node, execution, routed_input, 5, 2)
+               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 5, run_index: 2})
 
       assert node_execution.execution_index == 5
       assert node_execution.run_index == 2
