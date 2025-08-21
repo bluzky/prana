@@ -10,6 +10,7 @@ defmodule Prana.Node do
     field(:type, :string, required: true)
     field(:params, :map, default: %{})
     field(:metadata, :map, default: %{})
+    field(:settings, Prana.NodeSettings, default: %Prana.NodeSettings{})
   end
 
   @doc """
@@ -72,7 +73,9 @@ defmodule Prana.Node do
       # Ready for storage or API transport
   """
   def to_map(%__MODULE__{} = node) do
-    Map.from_struct(node)
+    node
+    |> Map.from_struct()
+    |> Map.update!(:settings, &Prana.NodeSettings.to_map/1)
   end
 
   defp generate_custom_id(name) do

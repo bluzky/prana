@@ -417,18 +417,57 @@ defmodule Prana.GraphExecutor do
         loop_metadata: WorkflowExecution.get_node_loop_metadata(resume_execution, suspended_node)
       }
 
-      case NodeExecutor.resume_node(
-             suspended_node,
-             resume_execution,
-             suspended_node_execution,
-             resume_data,
-             current_context
-           ) do
+      # Check if this is a retry suspension or regular resume
+      result = 
+        if suspended_node_execution.suspension_type == :retry do
+          # Use retry_node for retry suspensions
+          NodeExecutor.retry_node(
+            suspended_node,
+            resume_execution,
+            suspended_node_execution,
+            current_context
+          )
+        else
+          # Use resume_node for regular suspensions
+          NodeExecutor.resume_node(
+            suspended_node,
+            resume_execution,
+            suspended_node_execution,
+            resume_data,
+            current_context
+          )
+        end
+
+      case result do
         {:ok, completed_node_execution, updated_execution} ->
           # NodeExecutor always returns updated WorkflowExecution (consistent API)
           Middleware.call(:node_completed, %{node: suspended_node, node_execution: completed_node_execution})
 
           {:ok, updated_execution, completed_node_execution.output_data}
+
+        {:suspend, suspended_node_execution} ->
+          # Handle case where retry_node returns another suspension (for further retries)
+          %{suspension_type: suspension_type, suspension_data: suspension_data} = suspended_node_execution
+
+          Middleware.call(:node_suspended, %{
+            node: suspended_node,
+            node_execution: suspended_node_execution,
+            suspension_type: suspension_type,
+            suspension_data: suspension_data
+          })
+
+          suspended_execution =
+            resume_execution
+            |> WorkflowExecution.add_node_execution_to_map(suspended_node_execution)
+            |> WorkflowExecution.suspend(suspended_node.key, suspension_type, suspension_data)
+
+          Middleware.call(:execution_suspended, %{
+            execution: suspended_execution,
+            suspended_node: suspended_node,
+            node_execution: suspended_node_execution
+          })
+
+          {:suspend, suspended_execution, suspension_data}
 
         {:error, {reason, _failed_node_execution}} ->
           {:error, reason}

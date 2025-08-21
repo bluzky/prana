@@ -15,6 +15,7 @@ Prana provides a **unified suspension/resume mechanism** for async coordination 
 2. **Sub-workflow Orchestration** - Parent-child workflow execution
 3. **External System Polling** - API status monitoring with conditions
 4. **Time-based Delays** - Scheduled execution with flexible duration
+5. **Node Retry Mechanism** - Automatic retry of failed nodes with configurable delay and limits
 
 ---
 
@@ -526,6 +527,223 @@ defmodule MyApp.DelayScheduler do
           schedule_persistent_delay(delay.execution_id, delay.resume_at)
         end)
     end
+  end
+end
+```
+
+### **Use Case 5: Node Retry Mechanism**
+
+**Pattern**: Handle failed node executions with automatic retry scheduling and attempt limiting.
+
+```elixir
+# Add to your workflow
+retry_node = %Prana.Node{
+  key: "api_call",
+  type: "http.request",
+  params: %{url: "https://api.example.com/data"},
+  settings: %Prana.NodeSettings{
+    retry_on_failed: true,
+    max_retries: 3,
+    retry_delay_ms: 5000  # 5 second delay between retries
+  }
+}
+```
+
+**Application Implementation**:
+```elixir
+defmodule MyApp.RetryHandler do
+  require Logger
+
+  @doc "Handle workflow execution results with retry support"
+  def execute_workflow_with_retries(workflow_id, input_data) do
+    case Prana.GraphExecutor.execute_workflow(workflow_id, input_data) do
+      {:ok, completed_execution} ->
+        Logger.info("Workflow #{workflow_id} completed successfully")
+        {:ok, completed_execution}
+
+      {:suspend, suspended_execution, suspension_data} ->
+        handle_suspension(suspended_execution, suspension_data)
+
+      {:error, reason} ->
+        Logger.error("Workflow #{workflow_id} failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp handle_suspension(suspended_execution, suspension_data) do
+    case suspended_execution.suspension_type do
+      :retry ->
+        handle_retry_suspension(suspended_execution, suspension_data)
+      
+      :webhook ->
+        handle_webhook_suspension(suspended_execution, suspension_data)
+        
+      :wait ->
+        handle_wait_suspension(suspended_execution, suspension_data)
+        
+      other ->
+        Logger.warning("Unknown suspension type: #{other}")
+        {:error, :unknown_suspension_type}
+    end
+  end
+
+  defp handle_retry_suspension(suspended_execution, suspension_data) do
+    retry_delay_ms = Map.get(suspension_data, "retry_delay_ms", 1000)
+    attempt_number = Map.get(suspension_data, "attempt_number", 1)
+    max_attempts = Map.get(suspension_data, "max_attempts", 3)
+    original_error = Map.get(suspension_data, "original_error")
+
+    Logger.info("Scheduling retry #{attempt_number}/#{max_attempts} for workflow #{suspended_execution.id} (delay: #{retry_delay_ms}ms)")
+    Logger.debug("Original error: #{inspect(original_error)}")
+
+    # Store suspension for tracking
+    MyApp.Database.store_retry_suspension(suspended_execution, suspension_data)
+
+    # Schedule retry using Process.send_after or job queue
+    schedule_retry_resume(suspended_execution, retry_delay_ms)
+
+    {:ok, :retry_scheduled}
+  end
+
+  defp schedule_retry_resume(suspended_execution, delay_ms) do
+    if delay_ms < @short_delay_threshold do
+      # Use in-memory scheduling for short delays
+      Process.send_after(self(), {:resume_retry, suspended_execution.id}, delay_ms)
+    else
+      # Use persistent job queue for longer delays
+      MyApp.JobQueue.schedule_retry_resume(suspended_execution.id, delay_ms)
+    end
+  end
+
+  # Handle retry resume message
+  def handle_info({:resume_retry, execution_id}, state) do
+    Logger.info("Resuming retry for execution #{execution_id}")
+    
+    case Prana.GraphExecutor.resume_workflow(execution_id, %{}) do
+      {:ok, completed_execution} ->
+        Logger.info("Retry succeeded for execution #{execution_id}")
+        MyApp.Database.mark_retry_completed(execution_id)
+        handle_workflow_completion(completed_execution)
+
+      {:suspend, still_suspended_execution, suspension_data} ->
+        Logger.info("Another suspension after retry for execution #{execution_id}")
+        handle_suspension(still_suspended_execution, suspension_data)
+
+      {:error, reason} ->
+        Logger.error("Retry failed for execution #{execution_id}: #{inspect(reason)}")
+        MyApp.Database.mark_retry_failed(execution_id, reason)
+        handle_retry_failure(execution_id, reason)
+    end
+
+    {:noreply, state}
+  end
+
+  defp handle_retry_failure(execution_id, reason) do
+    # Implement failure handling - notification, cleanup, etc.
+    MyApp.NotificationService.send_retry_exhausted_alert(execution_id, reason)
+    cleanup_retry_resources(execution_id)
+  end
+
+  defp cleanup_retry_resources(execution_id) do
+    MyApp.Database.cleanup_retry_suspension(execution_id)
+    MyApp.JobQueue.cancel_pending_retries(execution_id)
+  end
+
+  # Module attribute for retry delay threshold (e.g., 30 seconds)
+  @short_delay_threshold 30_000
+end
+```
+
+**Retry Scheduler for Production**:
+```elixir
+defmodule MyApp.RetryScheduler do
+  use GenServer
+  require Logger
+
+  def start_link(_opts) do
+    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  end
+
+  def schedule_retry(execution_id, delay_ms) do
+    GenServer.cast(__MODULE__, {:schedule_retry, execution_id, delay_ms})
+  end
+
+  def cancel_retry(execution_id) do
+    GenServer.cast(__MODULE__, {:cancel_retry, execution_id})
+  end
+
+  def init(state) do
+    # Restore pending retries on startup
+    restore_pending_retries()
+    {:ok, %{timers: %{}}}
+  end
+
+  def handle_cast({:schedule_retry, execution_id, delay_ms}, %{timers: timers} = state) do
+    # Cancel existing timer if present
+    if Map.has_key?(timers, execution_id) do
+      Process.cancel_timer(timers[execution_id])
+    end
+
+    # Schedule new retry
+    timer_ref = Process.send_after(self(), {:retry_ready, execution_id}, delay_ms)
+    new_timers = Map.put(timers, execution_id, timer_ref)
+
+    Logger.debug("Scheduled retry for execution #{execution_id} in #{delay_ms}ms")
+    {:noreply, %{state | timers: new_timers}}
+  end
+
+  def handle_cast({:cancel_retry, execution_id}, %{timers: timers} = state) do
+    case Map.pop(timers, execution_id) do
+      {nil, _} -> 
+        {:noreply, state}
+      {timer_ref, remaining_timers} ->
+        Process.cancel_timer(timer_ref)
+        Logger.debug("Cancelled retry for execution #{execution_id}")
+        {:noreply, %{state | timers: remaining_timers}}
+    end
+  end
+
+  def handle_info({:retry_ready, execution_id}, %{timers: timers} = state) do
+    # Remove timer from tracking
+    new_timers = Map.delete(timers, execution_id)
+    
+    # Attempt to resume the workflow
+    case Prana.GraphExecutor.resume_workflow(execution_id, %{}) do
+      {:ok, completed_execution} ->
+        Logger.info("Retry successful for execution #{execution_id}")
+        MyApp.WorkflowEvents.retry_succeeded(execution_id, completed_execution)
+
+      {:suspend, still_suspended_execution, suspension_data} ->
+        Logger.info("Workflow still suspended after retry: #{execution_id}")
+        MyApp.RetryHandler.handle_suspension(still_suspended_execution, suspension_data)
+
+      {:error, reason} ->
+        Logger.warning("Retry failed for execution #{execution_id}: #{inspect(reason)}")
+        MyApp.WorkflowEvents.retry_failed(execution_id, reason)
+    end
+
+    {:noreply, %{state | timers: new_timers}}
+  end
+
+  defp restore_pending_retries do
+    case MyApp.Database.get_pending_retry_suspensions() do
+      [] -> :ok
+      pending_retries ->
+        Enum.each(pending_retries, fn retry ->
+          remaining_delay = calculate_remaining_delay(retry.scheduled_for)
+          if remaining_delay > 0 do
+            schedule_retry(retry.execution_id, remaining_delay)
+          else
+            # Retry time has passed, resume immediately
+            send(self(), {:retry_ready, retry.execution_id})
+          end
+        end)
+    end
+  end
+
+  defp calculate_remaining_delay(scheduled_time) do
+    now = DateTime.utc_now()
+    max(0, DateTime.diff(scheduled_time, now, :millisecond))
   end
 end
 ```
