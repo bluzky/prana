@@ -268,21 +268,194 @@ end
 
 ### Error Handling Best Practices
 
-#### Structured Error Returns
+#### Understanding Retry Behavior
+
+Prana's retry mechanism automatically retries failed nodes that return action errors. **All action errors are retryable** - the retry decision is made at the workflow level through node settings, not based on error classification.
+
+**Required Error Format**: Actions **MUST** return errors using the `Prana.Core.Error.action_error/3` helper function.
+
+**Unified Error Return Format**:
+```elixir
+{:error, Prana.Core.Error.action_error(error_type, message, details)}
+```
+
+#### Action Error Returns (Unified Format)
 ```elixir
 def execute(input, _context) do
   case perform_operation(input) do
     {:ok, result} ->
       {:ok, result}
 
+    # Network/timeout errors
     {:error, :network_timeout} ->
-      {:error, %{type: "timeout", retryable: true}, "retry"}
+      {:error, Prana.Core.Error.action_error("timeout", "Network timeout during API call", %{timeout_ms: 5000})}
 
-    {:error, :invalid_credentials} ->
-      {:error, %{type: "auth_error", retryable: false}, "auth_failed"}
+    {:error, :connection_refused} ->
+      {:error, Prana.Core.Error.action_error("network_error", "Connection refused by remote server", %{host: "api.example.com", port: 443})}
 
+    # Unknown errors
     {:error, reason} ->
-      {:error, %{type: "unknown", reason: reason}, "error"}
+      {:error, Prana.Core.Error.action_error("unknown_error", "Unexpected error occurred", %{original_reason: reason})}
+  end
+end
+```
+
+**Important Notes**:
+- **All action errors are retryable** by the engine - retry control is managed through node settings
+- The `error_type` (first parameter) is stored in `details["error_type"]` for categorization and logging
+- Never create `%Prana.Core.Error{}` structs directly - always use the `action_error/3` helper
+- The error gets wrapped by NodeExecutor into an `"action_error"` code for engine processing
+
+#### Integration-Specific Retry Examples
+
+**HTTP Integration**:
+```elixir
+defmodule MyApp.HTTPIntegration do
+  def request(params, _context) do
+    case HTTPClient.get(params["url"]) do
+      {:ok, %{status: 200, body: body}} ->
+        {:ok, %{status: "success", data: body}}
+
+      {:ok, %{status: 429}} ->
+        # Rate limited
+        {:error, %Prana.Core.Error{
+          code: "rate_limit",
+          message: "Rate limit exceeded",
+          details: %{status_code: 429}
+        }}
+
+      {:ok, %{status: 500}} ->
+        # Server error
+        {:error, %Prana.Core.Error{
+          code: "service_unavailable",
+          message: "Internal server error",
+          details: %{status_code: 500}
+        }}
+
+      {:ok, %{status: 401}} ->
+        # Authentication error
+        {:error, %Prana.Core.Error{
+          code: "authentication_error",
+          message: "Unauthorized access",
+          details: %{status_code: 401}
+        }}
+
+      {:ok, %{status: 400}} ->
+        # Bad request
+        {:error, %Prana.Core.Error{
+          code: "validation_error",
+          message: "Bad request format",
+          details: %{status_code: 400}
+        }}
+
+      {:error, :timeout} ->
+        # Network timeout
+        {:error, %Prana.Core.Error{
+          code: "timeout",
+          message: "Request timeout",
+          details: %{timeout_ms: 30000}
+        }}
+
+      {:error, :nxdomain} ->
+        # DNS error
+        {:error, %Prana.Core.Error{
+          code: "network_error",
+          message: "DNS resolution failed",
+          details: %{domain: params["url"]}
+        }}
+    end
+  end
+end
+```
+
+**Database Integration**:
+```elixir
+defmodule MyApp.DatabaseIntegration do
+  def query(params, _context) do
+    case Database.execute(params["query"]) do
+      {:ok, result} ->
+        {:ok, %{rows: result.rows, count: result.num_rows}}
+
+      {:error, :connection_lost} ->
+        # Connection issues
+        {:error, %Prana.Core.Error{
+          code: "network_error",
+          message: "Database connection lost",
+          details: %{reconnect_recommended: true}
+        }}
+
+      {:error, :timeout} ->
+        # Query timeout
+        {:error, %Prana.Core.Error{
+          code: "timeout",
+          message: "Query execution timeout",
+          details: %{query_timeout_ms: 30000}
+        }}
+
+      {:error, :syntax_error} ->
+        # SQL syntax error
+        {:error, %Prana.Core.Error{
+          code: "validation_error",
+          message: "Invalid SQL syntax",
+          details: %{query: params["query"]}
+        }}
+
+      {:error, :permission_denied} ->
+        # Access denied
+        {:error, %Prana.Core.Error{
+          code: "authorization_error",
+          message: "Insufficient database permissions",
+          details: %{required_permission: "SELECT"}
+        }}
+    end
+  end
+end
+```
+
+#### Error Classification Guidelines
+
+**RETRYABLE Errors** (use these codes):
+- `"network_error"` - Connection issues, DNS failures
+- `"timeout"` - Request/operation timeouts
+- `"service_unavailable"` - 5xx HTTP errors, service down
+- `"rate_limit"` - 429 HTTP errors, quota exceeded
+- `"unknown_error"` - Unexpected errors that might be transient
+
+**NON-RETRYABLE Errors** (use these codes):
+- `"validation_error"` - 400 HTTP errors, invalid input format
+- `"authentication_error"` - 401 HTTP errors, invalid credentials
+- `"authorization_error"` - 403 HTTP errors, insufficient permissions
+- `"not_found"` - 404 HTTP errors, resource doesn't exist
+- `"invalid_input"` - Schema validation failures, malformed data
+
+#### Testing Retry Behavior
+
+```elixir
+defmodule MyIntegrationTest do
+  test "returns retryable error for network timeout" do
+    # Mock network timeout
+    expect(HTTPClient, :get, fn _ -> {:error, :timeout} end)
+
+    result = MyIntegration.execute(%{"url" => "http://example.com"}, %{})
+
+    # Should return Prana.Core.Error with retryable code
+    assert {:error, %Prana.Core.Error{code: "timeout"}} = result
+
+    # Verify this error will be retried by the engine
+    assert Prana.NodeExecutor.is_retryable_error?(elem(result, 1))
+  end
+
+  test "returns non-retryable error for authentication failure" do
+    # Mock auth failure
+    expect(HTTPClient, :get, fn _ -> {:ok, %{status: 401}} end)
+
+    result = MyIntegration.execute(%{"url" => "http://example.com"}, %{})
+
+    # Should return non-retryable error
+    assert {:error, %Prana.Core.Error{code: "authentication_error"}} = result
+
+    # Verify this error will NOT be retried
+    refute Prana.NodeExecutor.is_retryable_error?(elem(result, 1))
   end
 end
 ```

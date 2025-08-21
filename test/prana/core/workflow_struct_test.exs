@@ -252,6 +252,79 @@ defmodule Prana.Core.WorkflowStructTest do
                "default_value" => nil
              }
     end
+
+    test "restores node with settings field" do
+      node_map = %{
+        "key" => "retry_node",
+        "name" => "Retry Node",
+        "type" => "http.request",
+        "params" => %{},
+        "settings" => %{
+          "retry_on_failed" => true,
+          "max_retries" => 3,
+          "retry_delay_ms" => 2000
+        }
+      }
+
+      node = Node.from_map(node_map)
+
+      assert node.key == "retry_node"
+      assert node.name == "Retry Node"
+      assert node.type == "http.request"
+      assert node.settings.retry_on_failed == true
+      assert node.settings.max_retries == 3
+      assert node.settings.retry_delay_ms == 2000
+    end
+
+    test "restores node with default settings when not provided" do
+      node_map = %{
+        "key" => "basic_node",
+        "name" => "Basic Node",
+        "type" => "manual.test"
+      }
+
+      node = Node.from_map(node_map)
+
+      assert node.key == "basic_node"
+      assert node.name == "Basic Node"
+      assert node.type == "manual.test"
+      assert node.settings.retry_on_failed == false
+      assert node.settings.max_retries == 1
+      assert node.settings.retry_delay_ms == 1000
+    end
+
+    test "node to_map includes settings field" do
+      node = Node.new("Test Node", "http.request", %{}, "test_key")
+      node = %{node | settings: Prana.NodeSettings.new(%{retry_on_failed: true, max_retries: 5})}
+
+      node_map = Node.to_map(node)
+
+      assert node_map[:key] == "test_key"
+      assert node_map[:name] == "Test Node"
+      assert node_map[:type] == "http.request"
+      assert node_map[:settings][:retry_on_failed] == true
+      assert node_map[:settings][:max_retries] == 5
+      assert node_map[:settings][:retry_delay_ms] == 1000
+    end
+
+    test "node roundtrip serialization preserves settings" do
+      original_node = Node.new("Retry Node", "http.request")
+      original_node = %{original_node | settings: Prana.NodeSettings.new(%{
+        retry_on_failed: true,
+        max_retries: 5,
+        retry_delay_ms: 3000
+      })}
+
+      node_map = Node.to_map(original_node)
+      restored_node = Node.from_map(node_map)
+
+      assert restored_node.key == original_node.key
+      assert restored_node.name == original_node.name
+      assert restored_node.type == original_node.type
+      assert restored_node.settings.retry_on_failed == original_node.settings.retry_on_failed
+      assert restored_node.settings.max_retries == original_node.settings.max_retries
+      assert restored_node.settings.retry_delay_ms == original_node.settings.retry_delay_ms
+    end
   end
 
   describe "Connection.from_map/1" do

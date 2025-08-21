@@ -1,6 +1,6 @@
 # Task: Implement Node Retry Mechanism
 
-**Status**: Planning  
+**Status**: ✅ COMPLETED  
 **Priority**: Medium  
 **Estimated Effort**: 2-3 days  
 **Related ADR**: [ADR-008: Node Retry Mechanism](../adr/008-node-retry-mechanism.md)
@@ -22,41 +22,42 @@ Implement retry functionality for failed node executions by leveraging the exist
 
 ## Progress Checklist
 
-### Phase 1: Core Data Structures ⏳
-- [ ] 1.1 Create NodeSettings struct
-- [ ] 1.2 Write NodeSettings unit tests
-- [ ] 1.3 Update Node struct with settings field
-- [ ] 1.4 Write Node struct tests for settings
-- [ ] 1.5 Phase 1 validation and cleanup
+### Phase 1: Core Data Structures ✅
+- [x] 1.1 Create NodeSettings struct
+- [x] 1.2 Write NodeSettings unit tests
+- [x] 1.3 Update Node struct with settings field
+- [x] 1.4 Write Node struct tests for settings
+- [x] 1.5 Phase 1 validation and cleanup
 
-### Phase 2: NodeExecutor Retry Logic ⏳
-- [ ] 2.1 Add retry helper functions
-- [ ] 2.2 Modify handle_execution_error to handle_execution_error/3
-- [ ] 2.3 Add handle_resume_error/2 function
-- [ ] 2.4 Update all error handler call sites
-- [ ] 2.5 Write unit tests for retry decision logic
-- [ ] 2.6 Write unit tests for error handler separation
-- [ ] 2.7 Phase 2 validation and cleanup
+### Phase 2: NodeExecutor Retry Logic ✅
+- [x] 2.1 Add retry helper functions
+- [x] 2.2 Modify handle_execution_error to handle_execution_error/3  
+- [x] 2.3 Add handle_resume_error/2 function
+- [x] 2.4 Update all error handler call sites
+- [x] 2.5 Write unit tests for retry decision logic
+- [x] 2.6 Write unit tests for error handler separation  
+- [x] 2.7 Phase 2 validation and cleanup
+- [x] 2.8 Fix IntegrationRegistry setup in tests
 
-### Phase 3: Retry Execution Function ⏳
-- [ ] 3.1 Implement retry_node/4 function
-- [ ] 3.2 Write comprehensive retry_node tests
-- [ ] 3.3 Test retry vs resume separation
-- [ ] 3.4 Phase 3 validation and cleanup
+### Phase 3: Retry Execution Function ✅
+- [x] 3.1 Implement retry_node/4 function
+- [x] 3.2 Write comprehensive retry_node tests
+- [x] 3.3 Test retry vs resume separation
+- [x] 3.4 Phase 3 validation and cleanup
 
-### Phase 4: GraphExecutor Integration ⏳
-- [ ] 4.1 Update GraphExecutor resume logic
-- [ ] 4.2 Add retry vs resume decision logic
-- [ ] 4.3 Write GraphExecutor retry tests
-- [ ] 4.4 Write end-to-end retry workflow tests
-- [ ] 4.5 Phase 4 validation and cleanup
+### Phase 4: GraphExecutor Integration ✅
+- [x] 4.1 Update GraphExecutor resume logic
+- [x] 4.2 Add retry vs resume decision logic
+- [x] 4.3 Write GraphExecutor retry tests
+- [x] 4.4 Write end-to-end retry workflow tests
+- [x] 4.5 Phase 4 validation and cleanup
 
-### Phase 5: Final Integration ⏳
-- [ ] 5.1 Run full test suite
-- [ ] 5.2 Fix any integration issues
-- [ ] 5.3 Update documentation with examples
-- [ ] 5.4 Performance validation
-- [ ] 5.5 Final review and cleanup
+### Phase 5: Final Integration ✅
+- [x] 5.1 Run full test suite
+- [x] 5.2 Fix any integration issues (IntegrationRegistry async conflicts)
+- [x] 5.3 Update documentation with examples (CLAUDE.md, application-integration-guide.md, and building_workflows.md updated)
+- [x] 5.4 Performance validation (minimal overhead confirmed)
+- [x] 5.5 Final review and cleanup
 
 ## Implementation Plan
 

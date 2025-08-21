@@ -725,6 +725,265 @@ Coordinate multiple levels of sub-workflow execution.
 }
 ```
 
+## Node Configuration
+
+### Node Settings
+
+Every node supports optional settings that control execution behavior. Settings are configured using the `Prana.NodeSettings` struct:
+
+```elixir
+node_with_settings = %Node{
+  id: "api_call",
+  custom_id: "api_call", 
+  type: :action,
+  integration_name: "http",
+  action_name: "request",
+  params: %{
+    url: "https://api.example.com/data",
+    method: "GET"
+  },
+  # Node settings for execution behavior
+  settings: %Prana.NodeSettings{
+    retry_on_failed: true,
+    max_retries: 3,
+    retry_delay_ms: 2000
+  }
+}
+```
+
+### Retry Configuration
+
+**Purpose**: Automatically retry failed nodes with configurable delay and attempt limits.
+
+**When to Use Retry**:
+- External API calls that might have transient failures
+- Network operations prone to timeouts
+- Services with occasional unavailability
+- Any operation where temporary failures are expected
+
+**Retry Settings**:
+
+```elixir
+# Basic retry configuration
+basic_retry = %Prana.NodeSettings{
+  retry_on_failed: true,    # Enable retry on failure
+  max_retries: 3,           # Maximum retry attempts (1-10)
+  retry_delay_ms: 1000      # Delay between retries (0-60,000ms)
+}
+
+# Conservative retry for critical operations
+conservative_retry = %Prana.NodeSettings{
+  retry_on_failed: true,
+  max_retries: 5,           # More attempts for critical calls
+  retry_delay_ms: 5000      # Longer delay for stability
+}
+
+# Aggressive retry for reliable services  
+aggressive_retry = %Prana.NodeSettings{
+  retry_on_failed: true,
+  max_retries: 2,           # Fewer attempts for fast feedback
+  retry_delay_ms: 500       # Shorter delay for quick retry
+}
+```
+
+### Retry Examples by Use Case
+
+**HTTP API Calls**:
+```elixir
+api_node = %Node{
+  id: "fetch_user_data",
+  custom_id: "fetch_user_data",
+  type: :action,
+  integration_name: "http", 
+  action_name: "request",
+  params: %{
+    url: "https://api.userservice.com/users/{{input.user_id}}",
+    method: "GET",
+    headers: %{"Authorization" => "Bearer {{variables.api_token}}"}
+  },
+  settings: %Prana.NodeSettings{
+    retry_on_failed: true,
+    max_retries: 3,
+    retry_delay_ms: 2000  # 2 second delay for API rate limiting
+  }
+}
+```
+
+**Code Execution**:
+```elixir
+code_node = %Node{
+  id: "data_processing",
+  custom_id: "data_processing", 
+  type: :action,
+  integration_name: "code",
+  action_name: "elixir",
+  params: %{
+    code: "process_data(input)"
+  },
+  settings: %Prana.NodeSettings{
+    retry_on_failed: true,
+    max_retries: 2,
+    retry_delay_ms: 1000  # Quick retry for code execution
+  }
+}
+```
+
+**External Service Integration**:
+```elixir
+service_node = %Node{
+  id: "payment_processing",
+  custom_id: "payment_processing",
+  type: :action, 
+  integration_name: "payment_service",
+  action_name: "charge_card",
+  params: %{
+    amount: "{{input.amount}}",
+    card_token: "{{input.payment_token}}"
+  },
+  settings: %Prana.NodeSettings{
+    retry_on_failed: true,
+    max_retries: 4,         # Financial operations need more attempts
+    retry_delay_ms: 3000    # Longer delay for payment processing
+  }
+}
+```
+
+### Retry Workflow Patterns
+
+**Simple Retry Chain**:
+```elixir
+workflow = %Workflow{
+  id: "reliable_api_workflow", 
+  name: "Reliable API Workflow",
+  nodes: [
+    # Trigger node
+    %Node{
+      id: "start",
+      custom_id: "start",
+      type: :trigger,
+      integration_name: "manual",
+      action_name: "trigger"
+    },
+    
+    # API call with retry
+    %Node{
+      id: "api_call",
+      custom_id: "api_call", 
+      type: :action,
+      integration_name: "http",
+      action_name: "request",
+      params: %{
+        url: "https://api.example.com/process",
+        method: "POST",
+        body: "{{input}}"
+      },
+      settings: %Prana.NodeSettings{
+        retry_on_failed: true,
+        max_retries: 3,
+        retry_delay_ms: 2000
+      }
+    },
+    
+    # Process results
+    %Node{
+      id: "process_response",
+      custom_id: "process_response",
+      type: :action, 
+      integration_name: "code",
+      action_name: "elixir",
+      params: %{
+        code: "format_response(nodes.api_call)"
+      }
+    }
+  ],
+  connections: %{
+    "start" => %{
+      "main" => [%Connection{from_node: "start", from_port: "main", to_node: "api_call", to_port: "main"}]
+    },
+    "api_call" => %{
+      "main" => [%Connection{from_node: "api_call", from_port: "main", to_node: "process_response", to_port: "main"}]
+      # Note: Failed retries will eventually route to error port if all attempts exhausted
+    }
+  }
+}
+```
+
+**Mixed Retry/Non-Retry Workflow**:
+```elixir
+workflow = %Workflow{
+  id: "mixed_reliability_workflow",
+  name: "Mixed Reliability Workflow", 
+  nodes: [
+    # Critical API call - needs retry
+    %Node{
+      id: "critical_api",
+      custom_id: "critical_api",
+      type: :action,
+      integration_name: "http", 
+      action_name: "request",
+      params: %{url: "https://critical-service.com/api"},
+      settings: %Prana.NodeSettings{
+        retry_on_failed: true,
+        max_retries: 5,         # High retry for critical operation
+        retry_delay_ms: 3000
+      }
+    },
+    
+    # Local validation - no retry needed
+    %Node{
+      id: "validate_data",
+      custom_id: "validate_data",
+      type: :action,
+      integration_name: "logic",
+      action_name: "if_condition", 
+      params: %{condition: "nodes.critical_api.status == 'success'"}
+      # No settings - uses defaults (no retry)
+    },
+    
+    # Notification service - quick retry
+    %Node{
+      id: "send_notification", 
+      custom_id: "send_notification",
+      type: :action,
+      integration_name: "notification_service",
+      action_name: "send_email",
+      params: %{to: "admin@company.com"},
+      settings: %Prana.NodeSettings{
+        retry_on_failed: true,
+        max_retries: 2,         # Quick failure for notifications
+        retry_delay_ms: 1000
+      }
+    }
+  ],
+  connections: %{
+    "critical_api" => %{
+      "main" => [%Connection{from_node: "critical_api", from_port: "main", to_node: "validate_data", to_port: "main"}]
+    },
+    "validate_data" => %{
+      "true" => [%Connection{from_node: "validate_data", from_port: "true", to_node: "send_notification", to_port: "main"}]
+    }
+  }
+}
+```
+
+### Retry Best Practices
+
+**Choosing Max Retries**:
+- **1-2 retries**: Fast feedback operations, user-facing actions
+- **3-4 retries**: Standard API calls, moderate reliability needs
+- **5+ retries**: Critical operations, financial transactions
+
+**Setting Retry Delays**:
+- **500-1000ms**: Quick internal operations, low-latency services
+- **2000-5000ms**: External APIs, rate-limited services
+- **5000+ms**: Critical operations, payment processing
+
+**When NOT to Use Retry**:
+- Operations with side effects that shouldn't be repeated
+- User input validation (errors are permanent)
+- Authentication failures (credentials won't suddenly work)
+- Resource creation operations (might create duplicates)
+
 ## Best Practices
 
 ### Node Naming

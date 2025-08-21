@@ -10,8 +10,11 @@ defmodule Prana.NodeExecutorSuspensionTest do
   alias Prana.WorkflowExecution
 
   setup do
-    # Start registry for tests
-    {:ok, registry_pid} = IntegrationRegistry.start_link()
+    # Start registry for tests or get existing process
+    registry_pid = case IntegrationRegistry.start_link() do
+      {:ok, pid} -> pid
+      {:error, {:already_started, pid}} -> pid
+    end
 
     # Ensure modules are loaded before registration
     Code.ensure_loaded!(Workflow)
@@ -43,9 +46,18 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
     execution = WorkflowExecution.rebuild_runtime(execution, %{})
 
+    # Clean up registry on exit only if we started it
     on_exit(fn ->
+      # Only stop if we started it and it's still the same process
       if Process.alive?(registry_pid) do
-        GenServer.stop(registry_pid)
+        case Process.info(registry_pid, :registered_name) do
+          {:registered_name, Prana.IntegrationRegistry} -> 
+            # This is the named registry - don't stop it as other tests might need it
+            :ok
+          _ -> 
+            # This is an unnamed process we started - safe to stop
+            GenServer.stop(registry_pid)
+        end
       end
     end)
 

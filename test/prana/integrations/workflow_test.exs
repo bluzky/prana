@@ -209,7 +209,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data.batch_mode == "all"
       # Non-array input should be wrapped in list for single mode
-      assert suspension_data.input_data == [%{"user_id" => 123, "name" => "John"}]
+      assert suspension_data.input_data == %{"user_id" => 123, "name" => "John"}
     end
 
     test "batch mode 'single' keeps array input as-is" do

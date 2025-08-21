@@ -98,6 +98,12 @@ restored_workflow = Prana.Workflow.from_map(workflow_data)
 - **`Prana.Integrations.Code`** (`code.ex`): Secure Elixir code execution with sandboxing (34-85% coverage)
 - **`Prana.Integrations.Schedule`** (`schedule.ex`): Cron-based scheduling and time triggers (100% coverage)
 
+#### Node Retry System ✅ **NEW**
+- **`Prana.NodeSettings`** (`core/node_settings.ex`): Per-node retry configuration with delay and attempt limits
+- **Suspension-based retry**: Failed nodes return `{:suspend, :retry, suspension_data}` for application scheduling
+- **Smart retry logic**: Distinguishes between execution failures (retryable) and resume failures (not retryable)
+- **Full integration**: Works with existing suspension/resume infrastructure and middleware events
+
 #### Middleware System
 - **`Prana.Middleware`** (`middleware.ex`): Pipeline execution engine for lifecycle events
 - Events: `:execution_started`, `:execution_completed`, `:execution_failed`, `:node_starting`, `:node_completed`, `:node_failed`, `:node_suspended`, `:execution_suspended`
@@ -196,6 +202,9 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 7. **Code Integration** - Secure Elixir execution with sandboxing ✅ **COMPLETE** (34-85% coverage)
 8. **Schedule Integration** - Cron triggers and time-based scheduling ✅ **COMPLETE** (100% coverage)
 
+#### ✅ RECENTLY COMPLETED
+- **Node Retry System**: Suspension-based retry mechanism with configurable delay and attempt limits ✅ **COMPLETE** (100% coverage)
+
 #### 🎯 CURRENT PRIORITY (Advanced Features & Quality)
 - **Loop Integration**: For-each batch processing and iteration patterns (in development)
 - **Test Coverage Improvement**: Increase coverage from 72.98% to 90%+ threshold
@@ -250,6 +259,32 @@ Based on thorough examination of the docs/* files and testing, here's the accura
 - Use `mix test --trace` for detailed test output during development
 - Focus on improving coverage for HTTP and Code integrations
 - MAU library handles all template processing - no need for expression engine tests
+
+#### Node Retry Configuration
+```elixir
+# Create a node with retry settings
+node_with_retry = %Prana.Node{
+  key: "http_request",
+  type: "http.request",
+  params: %{url: "https://api.example.com/data"},
+  settings: %Prana.NodeSettings{
+    retry_on_failed: true,
+    max_retries: 3,
+    retry_delay_ms: 5000  # 5 second delay between retries
+  }
+}
+
+# Application handles retry suspensions like other suspensions
+case Prana.GraphExecutor.execute_workflow(execution, input) do
+  {:suspend, suspended_execution, %{"retry_delay_ms" => delay}} ->
+    # Schedule retry using same mechanism as webhooks/timers
+    Process.send_after(self(), {:resume_execution, suspended_execution}, delay)
+    
+  {:suspend, suspended_execution, other_data} ->
+    # Handle other suspension types normally
+    handle_other_suspension(suspended_execution, other_data)
+end
+```
 
 #### Integration Development
 ```elixir
@@ -323,3 +358,15 @@ For detailed implementation context, refer to these documents:
 - **`docs/guides/writing_integrations.md`** - Comprehensive guide for creating custom integrations
 - **`docs/guides/building_workflows.md`** - Guide for composing workflows using built-in integrations
 - **`docs/guides/serialization_guide.md`** - Complete guide for serializing/deserializing workflows and executions for persistence and APIs
+
+- use mix run -e "code" to run custom code or short snipped
+- use mix test test_file_path.exs --trace for verbose output log, there is no -v option
+- you have to setup IntegrationRegistry before test. So add this to setup ` {:ok, registry_pid} = IntegrationRegistry.start_link()`
+and remember to terminate process on exit
+ on_exit(fn ->
+        if Process.alive?(registry_pid) do
+          GenServer.stop(registry_pid)
+        end
+      end)
+
+- Using `tree` command to check directory structure

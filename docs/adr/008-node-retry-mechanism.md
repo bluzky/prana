@@ -1,6 +1,6 @@
 # ADR-008: Node Retry Mechanism
 
-**Status**: Proposed  
+**Status**: Accepted & Implemented  
 **Date**: 2025-01-10  
 **Deciders**: Development Team
 
