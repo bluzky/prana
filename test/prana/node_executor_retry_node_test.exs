@@ -1,16 +1,20 @@
 defmodule Prana.NodeExecutorRetryNodeTest do
   use ExUnit.Case, async: false
 
+  alias Prana.Actions.SimpleAction
+  alias Prana.Core.Error
+  alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecution
   alias Prana.NodeExecutor
   alias Prana.NodeSettings
-  alias Prana.IntegrationRegistry
   alias Prana.WorkflowExecution
 
   # Test actions for retry_node testing
   defmodule SuccessAfterRetryAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -29,7 +33,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
     def execute(_params, context) do
       # Check if this is a retry by looking for retry attempt in context
       retry_attempt = get_in(context, ["$execution", "state", "retry_count"]) || 0
-      
+
       if retry_attempt == 0 do
         # First attempt - fail
         {:error, "First attempt fails"}
@@ -41,7 +45,9 @@ defmodule Prana.NodeExecutorRetryNodeTest do
   end
 
   defmodule AlwaysFailAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -63,6 +69,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
   end
 
   defmodule TestIntegration do
+    @moduledoc false
     @behaviour Prana.Behaviour.Integration
 
     def definition do
@@ -80,7 +87,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
   setup do
     # Start IntegrationRegistry
     {:ok, registry_pid} = IntegrationRegistry.start_link()
-    
+
     # Register test integration
     IntegrationRegistry.register_integration(TestIntegration)
 
@@ -141,23 +148,24 @@ defmodule Prana.NodeExecutorRetryNodeTest do
       # Create a failed node execution (simulating previous failure)
       failed_node_execution = NodeExecution.new(node.key, 1, 0)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 1,
-        "max_attempts" => 2,
-        "retry_delay_ms" => 1000,
-        "original_error" => "First attempt fails"
-      })
+
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          "attempt_number" => 1,
+          "max_attempts" => 2,
+          "retry_delay_ms" => 1000,
+          "original_error" => "First attempt fails"
+        })
 
       # Update execution state to simulate retry context
-      execution = %{execution | 
-        execution_data: %{"context_data" => %{"workflow" => %{"retry_count" => 1}}}
-      }
+      execution = %{execution | execution_data: %{"context_data" => %{"workflow" => %{"retry_count" => 1}}}}
 
       # Call retry_node
-      result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 2,
-        run_index: 0
-      })
+      result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 2,
+          run_index: 0
+        })
 
       # Should succeed on retry
       assert {:ok, completed_node_execution, _updated_execution} = result
@@ -174,19 +182,20 @@ defmodule Prana.NodeExecutorRetryNodeTest do
       original_run_index = 5
       failed_node_execution = NodeExecution.new(node.key, 1, original_run_index)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 1,
-        "max_attempts" => 2
-      })
 
-      execution = %{execution | 
-        execution_data: %{"context_data" => %{"workflow" => %{"retry_count" => 1}}}
-      }
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          "attempt_number" => 1,
+          "max_attempts" => 2
+        })
 
-      result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 2,
-        run_index: original_run_index
-      })
+      execution = %{execution | execution_data: %{"context_data" => %{"workflow" => %{"retry_count" => 1}}}}
+
+      result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 2,
+          run_index: original_run_index
+        })
 
       assert {:ok, completed_node_execution, _} = result
       assert completed_node_execution.run_index == original_run_index
@@ -200,17 +209,21 @@ defmodule Prana.NodeExecutorRetryNodeTest do
       # Create failed node execution from first attempt
       failed_node_execution = NodeExecution.new(node.key, 1, 0)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 1,
-        "max_attempts" => 3,
-        "retry_delay_ms" => 1000,
-        "original_error" => Prana.Core.Error.new("action_error", "Action returned error", %{"error" => "Always fails", "port" => "error"})
-      })
 
-      result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 2,
-        run_index: 0
-      })
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          "attempt_number" => 1,
+          "max_attempts" => 3,
+          "retry_delay_ms" => 1000,
+          "original_error" =>
+            Error.new("action_error", "Action returned error", %{"error" => "Always fails", "port" => "error"})
+        })
+
+      result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 2,
+          run_index: 0
+        })
 
       # Should return another retry suspension (attempt 2)
       assert {:suspend, suspended_node_execution} = result
@@ -227,17 +240,21 @@ defmodule Prana.NodeExecutorRetryNodeTest do
       # Create failed node execution at max attempts
       failed_node_execution = NodeExecution.new(node.key, 1, 0)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 2,  # Already at max
-        "max_attempts" => 2,
-        "retry_delay_ms" => 1000,
-        "original_error" => "Previous failure"
-      })
 
-      result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 3,
-        run_index: 0
-      })
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          # Already at max
+          "attempt_number" => 2,
+          "max_attempts" => 2,
+          "retry_delay_ms" => 1000,
+          "original_error" => "Previous failure"
+        })
+
+      result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 3,
+          run_index: 0
+        })
 
       # Should fail permanently (no more retries)
       assert {:error, {_reason, final_failed_execution}} = result
@@ -253,15 +270,18 @@ defmodule Prana.NodeExecutorRetryNodeTest do
 
       failed_node_execution = NodeExecution.new(node.key, 1, 0)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 1,
-        "max_attempts" => 2
-      })
 
-      result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 2,
-        run_index: 0
-      })
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          "attempt_number" => 1,
+          "max_attempts" => 2
+        })
+
+      result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 2,
+          run_index: 0
+        })
 
       # Should fail immediately - action not found is not retryable
       assert {:error, {reason, failed_execution}} = result
@@ -271,11 +291,11 @@ defmodule Prana.NodeExecutorRetryNodeTest do
 
     test "retry_node handles parameter preparation errors", %{execution: execution} do
       settings = NodeSettings.new(%{retry_on_failed: true, max_retries: 2})
-      
+
       # This test is actually hard to construct because template processing is resilient.
       # For now, let's test the principle by checking that a non-retryable error type
       # would not be retried. We'll update this when we have a real param prep failure case.
-      
+
       # Create a node that would work normally
       node = Node.new("Test Node", "test.success_after_retry")
       node = %{node | settings: settings}
@@ -283,16 +303,19 @@ defmodule Prana.NodeExecutorRetryNodeTest do
       # Simulate a parameter preparation error by creating a NodeExecution with params_error
       failed_node_execution = NodeExecution.new(node.key, 1, 0)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 1,
-        "max_attempts" => 2,
-        "original_error" => Prana.Core.Error.new("params_error", "Parameter preparation failed", %{"error_type" => "test"})
-      })
 
-      result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 2,
-        run_index: 0
-      })
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          "attempt_number" => 1,
+          "max_attempts" => 2,
+          "original_error" => Error.new("params_error", "Parameter preparation failed", %{"error_type" => "test"})
+        })
+
+      result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 2,
+          run_index: 0
+        })
 
       # Should fail immediately - parameter preparation errors are not retryable  
       assert {:error, {reason, failed_execution}} = result
@@ -305,31 +328,37 @@ defmodule Prana.NodeExecutorRetryNodeTest do
     test "retry_node calls action.execute(), not action.resume()", %{execution: execution} do
       # This test verifies that retry_node rebuilds input and calls execute
       # rather than using stored params and calling resume
-      
+
       settings = NodeSettings.new(%{retry_on_failed: true, max_retries: 2})
       node = Node.new("Execute vs Resume", "test.success_after_retry")
       node = %{node | settings: settings}
 
       failed_node_execution = NodeExecution.new(node.key, 1, 0)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 1,
-        "max_attempts" => 2
-      })
 
-      execution = %{execution | 
-        execution_data: %{execution.execution_data | 
-          "context_data" => %{execution.execution_data["context_data"] | 
-            "workflow" => Map.put(execution.execution_data["context_data"]["workflow"], "retry_count", 1)
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          "attempt_number" => 1,
+          "max_attempts" => 2
+        })
+
+      execution = %{
+        execution
+        | execution_data: %{
+            execution.execution_data
+            | "context_data" => %{
+                execution.execution_data["context_data"]
+                | "workflow" => Map.put(execution.execution_data["context_data"]["workflow"], "retry_count", 1)
+              }
           }
-        }
       }
 
       # Call retry_node
-      retry_result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 2,
-        run_index: 0
-      })
+      retry_result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 2,
+          run_index: 0
+        })
 
       # Should succeed because action.execute() sees retry context
       assert {:ok, completed_execution, _} = retry_result
@@ -337,10 +366,12 @@ defmodule Prana.NodeExecutorRetryNodeTest do
 
       # Compare with resume_node which would not have retry context
       suspended_for_resume = NodeExecution.suspend(failed_node_execution, :webhook, %{})
-      resume_result = NodeExecutor.resume_node(node, execution, suspended_for_resume, %{}, %{
-        execution_index: 3,
-        run_index: 0
-      })
+
+      resume_result =
+        NodeExecutor.resume_node(node, execution, suspended_for_resume, %{}, %{
+          execution_index: 3,
+          run_index: 0
+        })
 
       # Resume would fail because action.resume() is not implemented for our test action
       assert {:error, _} = resume_result
@@ -354,24 +385,32 @@ defmodule Prana.NodeExecutorRetryNodeTest do
       node = %{node | settings: settings}
 
       # Create execution with specific context
-      execution = %{execution |
-        vars: %{"test_var" => "test_value"},
-        execution_data: %{"context_data" => %{"workflow" => %{
-          "retry_count" => 1,
-          "custom_state" => "preserved"
-        }}}
+      execution = %{
+        execution
+        | vars: %{"test_var" => "test_value"},
+          execution_data: %{
+            "context_data" => %{
+              "workflow" => %{
+                "retry_count" => 1,
+                "custom_state" => "preserved"
+              }
+            }
+          }
       }
 
       failed_node_execution = NodeExecution.new(node.key, 1, 0)
       failed_node_execution = NodeExecution.start(failed_node_execution)
-      failed_node_execution = NodeExecution.suspend(failed_node_execution, :retry, %{
-        "attempt_number" => 1
-      })
 
-      result = NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-        execution_index: 2,
-        run_index: 0
-      })
+      failed_node_execution =
+        NodeExecution.suspend(failed_node_execution, :retry, %{
+          "attempt_number" => 1
+        })
+
+      result =
+        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
+          execution_index: 2,
+          run_index: 0
+        })
 
       # Should succeed and preserve context
       assert {:ok, _completed_execution, updated_execution} = result

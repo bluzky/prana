@@ -1,7 +1,7 @@
 defmodule Prana.Integrations.Core do
   @moduledoc """
   Core Integration - Essential control flow and loop constructs
-  
+
   Provides fundamental workflow control actions including:
   - Loop constructs (for_each)
   - Core control flow operations

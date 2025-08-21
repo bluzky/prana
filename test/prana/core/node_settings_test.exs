@@ -1,23 +1,25 @@
 defmodule Prana.NodeSettingsTest do
   use ExUnit.Case, async: true
+
   alias Prana.NodeSettings
 
   describe "new/1" do
     test "creates settings with default values" do
       settings = NodeSettings.new(%{})
-      
+
       assert settings.retry_on_failed == false
       assert settings.max_retries == 1
       assert settings.retry_delay_ms == 1000
     end
 
     test "creates settings with custom values" do
-      settings = NodeSettings.new(%{
-        retry_on_failed: true,
-        max_retries: 3,
-        retry_delay_ms: 5000
-      })
-      
+      settings =
+        NodeSettings.new(%{
+          retry_on_failed: true,
+          max_retries: 3,
+          retry_delay_ms: 5000
+        })
+
       assert settings.retry_on_failed == true
       assert settings.max_retries == 3
       assert settings.retry_delay_ms == 5000
@@ -43,7 +45,7 @@ defmodule Prana.NodeSettingsTest do
   describe "default/0" do
     test "creates default settings" do
       settings = NodeSettings.default()
-      
+
       assert settings.retry_on_failed == false
       assert settings.max_retries == 1
       assert settings.retry_delay_ms == 1000
@@ -57,9 +59,9 @@ defmodule Prana.NodeSettingsTest do
         "max_retries" => 5,
         "retry_delay_ms" => 2500
       }
-      
+
       settings = NodeSettings.from_map(data)
-      
+
       assert settings.retry_on_failed == true
       assert settings.max_retries == 5
       assert settings.retry_delay_ms == 2500
@@ -67,9 +69,9 @@ defmodule Prana.NodeSettingsTest do
 
     test "loads settings with partial data (uses defaults)" do
       data = %{"retry_on_failed" => true}
-      
+
       settings = NodeSettings.from_map(data)
-      
+
       assert settings.retry_on_failed == true
       assert settings.max_retries == 1
       assert settings.retry_delay_ms == 1000
@@ -81,9 +83,9 @@ defmodule Prana.NodeSettingsTest do
         max_retries: 3,
         retry_delay_ms: 1500
       }
-      
+
       settings = NodeSettings.from_map(data)
-      
+
       assert settings.retry_on_failed == true
       assert settings.max_retries == 3
       assert settings.retry_delay_ms == 1500
@@ -98,66 +100,70 @@ defmodule Prana.NodeSettingsTest do
 
   describe "to_map/1" do
     test "converts settings to map" do
-      settings = NodeSettings.new(%{
-        retry_on_failed: true,
-        max_retries: 3,
-        retry_delay_ms: 2000
-      })
-      
+      settings =
+        NodeSettings.new(%{
+          retry_on_failed: true,
+          max_retries: 3,
+          retry_delay_ms: 2000
+        })
+
       map = NodeSettings.to_map(settings)
-      
+
       assert map == %{
-        retry_on_failed: true,
-        max_retries: 3,
-        retry_delay_ms: 2000
-      }
+               retry_on_failed: true,
+               max_retries: 3,
+               retry_delay_ms: 2000
+             }
     end
 
     test "round-trip serialization works" do
-      original_settings = NodeSettings.new(%{
-        retry_on_failed: true,
-        max_retries: 5,
-        retry_delay_ms: 3500
-      })
-      
+      original_settings =
+        NodeSettings.new(%{
+          retry_on_failed: true,
+          max_retries: 5,
+          retry_delay_ms: 3500
+        })
+
       map = NodeSettings.to_map(original_settings)
       restored_settings = NodeSettings.from_map(map)
-      
+
       assert original_settings == restored_settings
     end
   end
 
-
   describe "edge cases and validation" do
     test "accepts minimum valid values" do
-      settings = NodeSettings.new(%{
-        retry_on_failed: false,
-        max_retries: 1,
-        retry_delay_ms: 0
-      })
-      
+      settings =
+        NodeSettings.new(%{
+          retry_on_failed: false,
+          max_retries: 1,
+          retry_delay_ms: 0
+        })
+
       assert settings.retry_on_failed == false
       assert settings.max_retries == 1
       assert settings.retry_delay_ms == 0
     end
 
     test "accepts maximum valid values" do
-      settings = NodeSettings.new(%{
-        retry_on_failed: true,
-        max_retries: 10,
-        retry_delay_ms: 60_000
-      })
-      
+      settings =
+        NodeSettings.new(%{
+          retry_on_failed: true,
+          max_retries: 10,
+          retry_delay_ms: 60_000
+        })
+
       assert settings.retry_on_failed == true
       assert settings.max_retries == 10
       assert settings.retry_delay_ms == 60_000
     end
 
     test "handles boolean conversion from strings" do
-      settings = NodeSettings.from_map(%{
-        "retry_on_failed" => "true"
-      })
-      
+      settings =
+        NodeSettings.from_map(%{
+          "retry_on_failed" => "true"
+        })
+
       assert settings.retry_on_failed == true
     end
   end

@@ -1,16 +1,21 @@
 defmodule Prana.GraphExecutorRetrySimpleTest do
   use ExUnit.Case, async: false
 
+  alias Prana.Actions.SimpleAction
+  alias Prana.ExecutionGraph
   alias Prana.GraphExecutor
+  alias Prana.IntegrationRegistry
+  alias Prana.Integrations.Manual
+  alias Prana.Integrations.Wait
   alias Prana.Node
   alias Prana.NodeSettings
   alias Prana.WorkflowExecution
-  alias Prana.ExecutionGraph
-  alias Prana.IntegrationRegistry
 
   # Test actions for retry integration testing
   defmodule FailOnceAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -29,7 +34,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
     def execute(_params, context) do
       # Check if this is a retry by looking at the execution state
       retry_count = get_in(context, ["$execution", "state", "retry_count"]) || 0
-      
+
       if retry_count == 0 do
         # First attempt - fail
         {:error, "First attempt fails"}
@@ -41,7 +46,9 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
   end
 
   defmodule AlwaysFailAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -63,6 +70,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
   end
 
   defmodule RetryTestIntegration do
+    @moduledoc false
     @behaviour Prana.Behaviour.Integration
 
     def definition do
@@ -79,33 +87,35 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
 
   setup do
     # Ensure modules are loaded before registration
-    Code.ensure_loaded!(Prana.Integrations.Wait)
-    Code.ensure_loaded!(Prana.Integrations.Manual)
-    
+    Code.ensure_loaded!(Wait)
+    Code.ensure_loaded!(Manual)
+
     # Start IntegrationRegistry or get existing process
-    registry_pid = case IntegrationRegistry.start_link() do
-      {:ok, pid} -> pid
-      {:error, {:already_started, pid}} -> pid
-    end
-    
+    registry_pid =
+      case IntegrationRegistry.start_link() do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
+
     # Register test integration
     IntegrationRegistry.register_integration(RetryTestIntegration)
-    
+
     # Register Wait integration for webhook tests
-    IntegrationRegistry.register_integration(Prana.Integrations.Wait)
-    
+    IntegrationRegistry.register_integration(Wait)
+
     # Register Manual integration for trigger nodes
-    IntegrationRegistry.register_integration(Prana.Integrations.Manual)
+    IntegrationRegistry.register_integration(Manual)
 
     # Clean up registry on exit only if we started it
     on_exit(fn ->
       # Only stop if we started it and it's still the same process
       if Process.alive?(registry_pid) do
         case Process.info(registry_pid, :registered_name) do
-          {:registered_name, Prana.IntegrationRegistry} -> 
+          {:registered_name, IntegrationRegistry} ->
             # This is the named registry - don't stop it as other tests might need it
             :ok
-          _ -> 
+
+          _ ->
             # This is an unnamed process we started - safe to stop
             GenServer.stop(registry_pid)
         end
@@ -294,7 +304,11 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
                 "attempt_number" => 1,
                 "max_attempts" => 3,
                 "retry_delay_ms" => 100,
-                "original_error" => Prana.Core.Error.new("action_error", "Action returned error", %{"error" => "Always fails", "port" => "error"})
+                "original_error" =>
+                  Prana.Core.Error.new("action_error", "Action returned error", %{
+                    "error" => "Always fails",
+                    "port" => "error"
+                  })
               }
             }
           ]

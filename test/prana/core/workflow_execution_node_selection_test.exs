@@ -1,7 +1,13 @@
 defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
   use ExUnit.Case, async: false
 
-  alias Prana.{Connection, ExecutionGraph, IntegrationRegistry, Node, NodeExecution, TestSupport.TestIntegration, WorkflowExecution}
+  alias Prana.Connection
+  alias Prana.ExecutionGraph
+  alias Prana.IntegrationRegistry
+  alias Prana.Node
+  alias Prana.NodeExecution
+  alias Prana.TestSupport.TestIntegration
+  alias Prana.WorkflowExecution
 
   setup_all do
     # Start the integration registry
@@ -121,7 +127,8 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
           "node" => %{}
         },
         "active_paths" => %{},
-        "active_nodes" => %{}  # Empty active nodes
+        # Empty active nodes
+        "active_nodes" => %{}
       }
     }
   end
@@ -133,7 +140,7 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
 
     connection = %Connection{
       from: "node_a",
-      to: "node_b", 
+      to: "node_b",
       from_port: "success",
       to_port: "input"
     }
@@ -150,7 +157,7 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
 
     %WorkflowExecution{
       id: "exec_2",
-      workflow_id: "test_workflow", 
+      workflow_id: "test_workflow",
       execution_graph: execution_graph,
       node_executions: %{},
       __runtime: %{
@@ -163,7 +170,8 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
           "node" => %{}
         },
         "active_paths" => %{},
-        "active_nodes" => %{"node_b" => 1}  # Node B is active but depends on uncompleted node_a
+        # Node B is active but depends on uncompleted node_a
+        "active_nodes" => %{"node_b" => 1}
       }
     }
   end
@@ -231,8 +239,10 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
         },
         "active_paths" => %{},
         "active_nodes" => %{
-          "shallow_node" => 1,  # Lower execution_index
-          "deep_node" => 3      # Higher execution_index - should be selected
+          # Lower execution_index
+          "shallow_node" => 1,
+          # Higher execution_index - should be selected
+          "deep_node" => 3
         }
       }
     }
@@ -315,8 +325,10 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
         },
         "active_paths" => %{},
         "active_nodes" => %{
-          "completed_node" => 1,    # This is completed, shouldn't be selected
-          "uncompleted_node" => 2   # This should be selected
+          # This is completed, shouldn't be selected
+          "completed_node" => 1,
+          # This should be selected
+          "uncompleted_node" => 2
         }
       }
     }
@@ -324,19 +336,22 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
 
   defp create_execution_with_sorted_nodes do
     # Create multiple nodes with different execution indices to test sorting
-    nodes = for i <- 1..5 do
-      key = "node_depth_#{i}"
-      {key, Node.new("Node #{i}", "test.trigger_action", %{}, key)}
-    end
+    nodes =
+      for i <- 1..5 do
+        key = "node_depth_#{i}"
+        {key, Node.new("Node #{i}", "test.trigger_action", %{}, key)}
+      end
 
     node_map = Map.new(nodes)
-    active_nodes = Map.new(nodes, fn {key, _node} ->
-      # Extract number from key for execution_index
-      parts = String.split(key, "_")
-      num_str = List.last(parts)
-      execution_index = String.to_integer(num_str)
-      {key, execution_index}
-    end)
+
+    active_nodes =
+      Map.new(nodes, fn {key, _node} ->
+        # Extract number from key for execution_index
+        parts = String.split(key, "_")
+        num_str = List.last(parts)
+        execution_index = String.to_integer(num_str)
+        {key, execution_index}
+      end)
 
     execution_graph = %ExecutionGraph{
       workflow_id: "test_workflow",
@@ -363,7 +378,8 @@ defmodule Prana.Core.WorkflowExecutionNodeSelectionTest do
           "node" => %{}
         },
         "active_paths" => %{},
-        "active_nodes" => active_nodes  # Should select node_depth_5 (highest execution_index)
+        # Should select node_depth_5 (highest execution_index)
+        "active_nodes" => active_nodes
       }
     }
   end

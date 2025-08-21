@@ -156,7 +156,7 @@ defmodule Prana.Integrations.Core.ForEachAction do
     } = node_context
 
     {:ok, {item_or_batch, new_remaining}} = get_next_item_or_batch(remaining_items, validated_params)
-    
+
     node_context_updates = %{
       node_context
       | "remaining_items" => new_remaining,

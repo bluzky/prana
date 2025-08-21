@@ -418,7 +418,7 @@ defmodule Prana.GraphExecutor do
       }
 
       # Check if this is a retry suspension or regular resume
-      result = 
+      result =
         if suspended_node_execution.suspension_type == :retry do
           # Use retry_node for retry suspensions
           NodeExecutor.retry_node(
@@ -485,5 +485,4 @@ defmodule Prana.GraphExecutor do
       {:error, failed_execution}
     end
   end
-
 end

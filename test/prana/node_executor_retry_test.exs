@@ -1,16 +1,19 @@
 defmodule Prana.NodeExecutorRetryTest do
   use ExUnit.Case, async: false
 
+  alias Prana.Actions.SimpleAction
+  alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecution
   alias Prana.NodeExecutor
   alias Prana.NodeSettings
   alias Prana.WorkflowExecution
-  alias Prana.IntegrationRegistry
 
   # Test actions for retry testing
   defmodule FailingAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -32,7 +35,9 @@ defmodule Prana.NodeExecutorRetryTest do
   end
 
   defmodule SuspendingAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -55,6 +60,7 @@ defmodule Prana.NodeExecutorRetryTest do
 
   # Test integration that always fails for retry testing
   defmodule FailingIntegration do
+    @moduledoc false
     @behaviour Prana.Behaviour.Integration
 
     def definition do
@@ -72,7 +78,7 @@ defmodule Prana.NodeExecutorRetryTest do
   setup do
     # Start IntegrationRegistry
     {:ok, registry_pid} = IntegrationRegistry.start_link()
-    
+
     # Register test integration
     IntegrationRegistry.register_integration(FailingIntegration)
 
@@ -114,7 +120,7 @@ defmodule Prana.NodeExecutorRetryTest do
   describe "retry helper functions" do
     test "get_current_attempt_number returns 0 for first attempt" do
       node_execution = NodeExecution.new("test", 1, 1)
-      
+
       result = get_current_attempt_number(node_execution)
       assert result == 0
     end
@@ -122,7 +128,7 @@ defmodule Prana.NodeExecutorRetryTest do
     test "get_current_attempt_number returns attempt from suspension data" do
       node_execution = NodeExecution.new("test", 1, 1)
       node_execution = NodeExecution.suspend(node_execution, :retry, %{"attempt_number" => 2})
-      
+
       result = get_current_attempt_number(node_execution)
       assert result == 2
     end
@@ -130,7 +136,7 @@ defmodule Prana.NodeExecutorRetryTest do
     test "get_next_attempt_number increments attempt number" do
       node_execution = NodeExecution.new("test", 1, 1)
       node_execution = NodeExecution.suspend(node_execution, :retry, %{"attempt_number" => 1})
-      
+
       result = get_next_attempt_number(node_execution)
       assert result == 2
     end
@@ -139,7 +145,7 @@ defmodule Prana.NodeExecutorRetryTest do
       settings = NodeSettings.new(%{retry_on_failed: true, max_retries: 3})
       node = %Node{key: "test", type: "test", settings: settings}
       node_execution = NodeExecution.new("test", 1, 1)
-      
+
       result = should_retry?(node, node_execution, "test error")
       assert result == true
     end
@@ -148,7 +154,7 @@ defmodule Prana.NodeExecutorRetryTest do
       settings = NodeSettings.new(%{retry_on_failed: false, max_retries: 3})
       node = %Node{key: "test", type: "test", settings: settings}
       node_execution = NodeExecution.new("test", 1, 1)
-      
+
       result = should_retry?(node, node_execution, "test error")
       assert result == false
     end
@@ -156,11 +162,11 @@ defmodule Prana.NodeExecutorRetryTest do
     test "should_retry? returns false when max attempts reached" do
       settings = NodeSettings.new(%{retry_on_failed: true, max_retries: 2})
       node = %Node{key: "test", type: "test", settings: settings}
-      
+
       # Create a node execution that's already on attempt 2 (reached max)
       node_execution = NodeExecution.new("test", 1, 1)
       node_execution = NodeExecution.suspend(node_execution, :retry, %{"attempt_number" => 2})
-      
+
       result = should_retry?(node, node_execution, "test error")
       assert result == false
     end
@@ -252,7 +258,8 @@ defmodule Prana.NodeExecutorRetryTest do
     if node_execution.suspension_type == :retry do
       node_execution.suspension_data["attempt_number"] || 0
     else
-      0  # First attempt
+      # First attempt
+      0
     end
   end
 
@@ -263,7 +270,7 @@ defmodule Prana.NodeExecutorRetryTest do
   defp should_retry?(node, node_execution, _error_reason) do
     settings = node.settings
     current_attempt = get_current_attempt_number(node_execution)
-    
+
     settings.retry_on_failed and settings.max_retries > 0 and current_attempt < settings.max_retries
   end
 end

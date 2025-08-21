@@ -1,7 +1,7 @@
 defmodule Prana.Execution.LoopbackFlagTest do
   @moduledoc """
   Unit tests for loopback flag functionality in execution context.
-  
+
   Tests verify that:
   - loopback flag is false on first node execution
   - loopback flag is true when node is executed again (loop-back scenario)
@@ -84,7 +84,6 @@ defmodule Prana.Execution.LoopbackFlagTest do
     }
   end
 
-
   # ============================================================================
   # Unit Tests - Direct NodeExecutor Testing
   # ============================================================================
@@ -93,26 +92,27 @@ defmodule Prana.Execution.LoopbackFlagTest do
     test "returns false when node not in active_paths" do
       node = %Node{
         key: "new_node",
-        name: "New Node", 
+        name: "New Node",
         type: "data.set_data",
         params: %{}
       }
 
       # Create execution with different node in active_paths
-      execution = %{create_test_execution() | 
-        __runtime: %{
-          "env" => %{},
-          "executed_nodes" => ["other_node"],
-          "nodes" => %{}
-        },
-        execution_data: %{
-          "context_data" => %{
-            "workflow" => %{},
-            "node" => %{}
+      execution = %{
+        create_test_execution()
+        | __runtime: %{
+            "env" => %{},
+            "executed_nodes" => ["other_node"],
+            "nodes" => %{}
           },
-          "active_paths" => %{"other_node" => %{execution_index: 0}},
-          "active_nodes" => %{}
-        }
+          execution_data: %{
+            "context_data" => %{
+              "workflow" => %{},
+              "node" => %{}
+            },
+            "active_paths" => %{"other_node" => %{execution_index: 0}},
+            "active_nodes" => %{}
+          }
       }
 
       # Test loopback_node? function directly
@@ -128,20 +128,21 @@ defmodule Prana.Execution.LoopbackFlagTest do
       }
 
       # Create execution with node already in active_paths
-      execution = %{create_test_execution() | 
-        __runtime: %{
-          "env" => %{},
-          "executed_nodes" => ["loop_node"],
-          "nodes" => %{}
-        },
-        execution_data: %{
-          "context_data" => %{
-            "workflow" => %{},
-            "node" => %{}
+      execution = %{
+        create_test_execution()
+        | __runtime: %{
+            "env" => %{},
+            "executed_nodes" => ["loop_node"],
+            "nodes" => %{}
           },
-          "active_paths" => %{"loop_node" => %{execution_index: 0}},
-          "active_nodes" => %{}
-        }
+          execution_data: %{
+            "context_data" => %{
+              "workflow" => %{},
+              "node" => %{}
+            },
+            "active_paths" => %{"loop_node" => %{execution_index: 0}},
+            "active_nodes" => %{}
+          }
       }
 
       # Test loopback_node? function directly
@@ -184,7 +185,7 @@ defmodule Prana.Execution.LoopbackFlagTest do
           %Node{
             key: "init",
             name: "Initialize",
-            type: "data.set_data", 
+            type: "data.set_data",
             params: %{"counter" => 0}
           },
 
@@ -215,7 +216,7 @@ defmodule Prana.Execution.LoopbackFlagTest do
           # Loop condition
           %Node{
             key: "condition",
-            name: "Loop Condition", 
+            name: "Loop Condition",
             type: "logic.if_condition",
             params: %{
               "condition" => "{{$execution.run_index < 2}}"
@@ -263,7 +264,7 @@ defmodule Prana.Execution.LoopbackFlagTest do
 
       # Get all executions of loop_capture node
       loop_capture_executions = Map.get(execution.node_executions, "loop_capture", [])
-      
+
       # Should have multiple executions (3 iterations: 0, 1, 2)
       assert length(loop_capture_executions) == 3
 
@@ -276,7 +277,7 @@ defmodule Prana.Execution.LoopbackFlagTest do
       assert first_execution.output_data["run_index"] == 0
 
       # Second execution (run_index 1) - should have loopback: true
-      second_execution = Enum.at(sorted_executions, 1) 
+      second_execution = Enum.at(sorted_executions, 1)
       assert second_execution.output_data["loopback_captured"] == true
       assert second_execution.output_data["run_index"] == 1
 
@@ -304,7 +305,6 @@ defmodule Prana.Execution.LoopbackFlagTest do
             type: "manual.trigger",
             params: %{}
           },
-          
           %Node{
             key: "loop_node",
             name: "Loop Node",
@@ -335,7 +335,7 @@ defmodule Prana.Execution.LoopbackFlagTest do
 
       # Compile and execute
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{}
@@ -348,12 +348,13 @@ defmodule Prana.Execution.LoopbackFlagTest do
       # Check loop_node execution captured the loop metadata
       loop_executions = Map.get(execution.node_executions, "loop_node", [])
       assert length(loop_executions) == 1
-      
+
       loop_execution = List.first(loop_executions)
       assert loop_execution.output_data["loop_level"] == 1
       assert loop_execution.output_data["loop_role"] == "start_loop"
       assert loop_execution.output_data["loop_ids"] == ["loop_1"]
-      assert loop_execution.output_data["loopback"] == false  # First execution, no loopback
+      # First execution, no loopback
+      assert loop_execution.output_data["loopback"] == false
     end
 
     test "provides default loop metadata for non-loop nodes" do
@@ -367,7 +368,6 @@ defmodule Prana.Execution.LoopbackFlagTest do
             type: "manual.trigger",
             params: %{}
           },
-          
           %Node{
             key: "regular_node",
             name: "Regular Node",
@@ -392,7 +392,7 @@ defmodule Prana.Execution.LoopbackFlagTest do
       }
 
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow, "start")
-      
+
       context = %{
         workflow_loader: fn _id -> {:error, "not implemented"} end,
         variables: %{}
@@ -405,10 +405,10 @@ defmodule Prana.Execution.LoopbackFlagTest do
       # Check regular_node got default loop metadata
       regular_executions = Map.get(execution.node_executions, "regular_node", [])
       assert length(regular_executions) == 1
-      
+
       regular_execution = List.first(regular_executions)
       assert regular_execution.output_data["loop_level"] == 0
-      assert regular_execution.output_data["loop_role"] == "not_in_loop" 
+      assert regular_execution.output_data["loop_role"] == "not_in_loop"
       assert regular_execution.output_data["loop_ids"] == []
       assert regular_execution.output_data["loopback"] == false
     end
@@ -426,11 +426,10 @@ defmodule Prana.Execution.LoopbackFlagTest do
         nodes: [
           %Node{
             key: "start",
-            name: "Start", 
+            name: "Start",
             type: "manual.trigger",
             params: %{}
           },
-
           %Node{
             key: "template_test",
             name: "Template Test",
@@ -443,16 +442,14 @@ defmodule Prana.Execution.LoopbackFlagTest do
               }
             }
           },
-
           %Node{
             key: "condition",
             name: "Condition",
-            type: "logic.if_condition", 
+            type: "logic.if_condition",
             params: %{
               "condition" => "{{$execution.run_index < 1}}"
             }
           },
-
           %Node{
             key: "complete",
             name: "Complete",

@@ -1,17 +1,21 @@
 defmodule Prana.EndToEndRetryTest do
   use ExUnit.Case, async: false
 
+  alias Prana.Actions.SimpleAction
+  alias Prana.Connection
   alias Prana.GraphExecutor
+  alias Prana.IntegrationRegistry
+  alias Prana.Integrations.Manual
   alias Prana.Node
   alias Prana.NodeSettings
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
-  alias Prana.Connection
-  alias Prana.IntegrationRegistry
 
   # Test actions for end-to-end retry testing
   defmodule UnreliableServiceAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -31,27 +35,30 @@ defmodule Prana.EndToEndRetryTest do
       # Get failure rate from params (default 70% failure rate)
       failure_rate = Map.get(params, "failure_rate", 0.7)
       attempt = get_in(context, ["$execution", "state", "retry_count"]) || 0
-      
+
       # Simulate service that gets more reliable with retries (simulating temporary network issues)
-      adjusted_failure_rate = failure_rate * (0.5 ** attempt)
-      
+      adjusted_failure_rate = failure_rate * 0.5 ** attempt
+
       if :rand.uniform() < adjusted_failure_rate do
         {:error, "Service temporarily unavailable (attempt #{attempt + 1})"}
       else
-        {:ok, %{
-          message: "Service call successful", 
-          attempt: attempt + 1,
-          service_response: %{
-            data: "important_data",
-            timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
-          }
-        }}
+        {:ok,
+         %{
+           message: "Service call successful",
+           attempt: attempt + 1,
+           service_response: %{
+             data: "important_data",
+             timestamp: DateTime.to_iso8601(DateTime.utc_now())
+           }
+         }}
       end
     end
   end
 
   defmodule DataProcessorAction do
-    use Prana.Actions.SimpleAction
+    @moduledoc false
+    use SimpleAction
+
     alias Prana.Action
 
     def specification do
@@ -70,18 +77,19 @@ defmodule Prana.EndToEndRetryTest do
     def execute(_params, context) do
       # Get input from previous node
       input = get_in(context, ["$input", "main"]) || %{}
-      
+
       # The input should be the output from the unreliable service
       # Check for both string keys (JSON) and atom keys (direct Elixir)
       has_service_response = Map.has_key?(input, "service_response") or Map.has_key?(input, :service_response)
       has_message = Map.has_key?(input, "message") or Map.has_key?(input, :message)
-      
+
       if has_service_response or has_message do
         processed_data = %{
           original: input,
-          processed_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+          processed_at: DateTime.to_iso8601(DateTime.utc_now()),
           status: "processed_successfully"
         }
+
         {:ok, processed_data}
       else
         {:error, "No service response data to process - received: #{inspect(input)}"}
@@ -90,6 +98,7 @@ defmodule Prana.EndToEndRetryTest do
   end
 
   defmodule E2ERetryIntegration do
+    @moduledoc false
     @behaviour Prana.Behaviour.Integration
 
     def definition do
@@ -119,29 +128,31 @@ defmodule Prana.EndToEndRetryTest do
 
   setup do
     # Ensure modules are loaded before registration
-    Code.ensure_loaded!(Prana.Integrations.Manual)
-    
+    Code.ensure_loaded!(Manual)
+
     # Start IntegrationRegistry or get existing process
-    registry_pid = case IntegrationRegistry.start_link() do
-      {:ok, pid} -> pid
-      {:error, {:already_started, pid}} -> pid
-    end
-    
+    registry_pid =
+      case IntegrationRegistry.start_link() do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
+
     # Register test integration
     IntegrationRegistry.register_integration(E2ERetryIntegration)
-    
+
     # Register Manual integration for trigger nodes
-    IntegrationRegistry.register_integration(Prana.Integrations.Manual)
+    IntegrationRegistry.register_integration(Manual)
 
     # Clean up registry on exit only if we started it
     on_exit(fn ->
       # Only stop if we started it and it's still the same process
       if Process.alive?(registry_pid) do
         case Process.info(registry_pid, :registered_name) do
-          {:registered_name, Prana.IntegrationRegistry} -> 
+          {:registered_name, IntegrationRegistry} ->
             # This is the named registry - don't stop it as other tests might need it
             :ok
-          _ -> 
+
+          _ ->
             # This is an unnamed process we started - safe to stop
             GenServer.stop(registry_pid)
         end
@@ -157,22 +168,25 @@ defmodule Prana.EndToEndRetryTest do
       # 1. Trigger starts the workflow
       # 2. UnreliableService call (with retry enabled)  
       # 3. DataProcessor processes the result
-      
+
       # Set up retry settings for the unreliable service
-      retry_settings = NodeSettings.new(%{
-        retry_on_failed: true, 
-        max_retries: 3, 
-        retry_delay_ms: 10  # Very short delay for testing
-      })
-      
+      retry_settings =
+        NodeSettings.new(%{
+          retry_on_failed: true,
+          max_retries: 3,
+          # Very short delay for testing
+          retry_delay_ms: 10
+        })
+
       unreliable_node = %Node{
         key: "unreliable_service",
         name: "Unreliable Service Call",
         type: "e2e.unreliable_service",
-        params: %{"failure_rate" => 0.8},  # 80% failure rate - should need retries
+        # 80% failure rate - should need retries
+        params: %{"failure_rate" => 0.8},
         settings: retry_settings
       }
-      
+
       workflow = %Workflow{
         id: "e2e_retry_workflow",
         name: "End-to-End Retry Test Workflow",
@@ -184,7 +198,7 @@ defmodule Prana.EndToEndRetryTest do
           },
           unreliable_node,
           %Node{
-            key: "data_processor", 
+            key: "data_processor",
             name: "Process Data",
             type: "e2e.data_processor"
           }
@@ -194,51 +208,54 @@ defmodule Prana.EndToEndRetryTest do
           Connection.new("unreliable_service", "main", "data_processor", "main")
         ]
       }
-      
+
       # Convert connections to map format and compile
       workflow = convert_connections_to_map(workflow)
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       # Execute workflow - may need multiple resume cycles due to retries
       result = execute_workflow_with_retries(execution_graph, %{"test" => "data"})
-      
+
       # Verify final success
       assert {:ok, completed_execution, final_output} = result
       assert completed_execution.status == "completed"
-      
+
       # Check that data processor received and processed the service response
       # The output uses atom keys, not string keys
       assert Map.has_key?(final_output, :original)
-      assert Map.has_key?(final_output, :processed_at) 
+      assert Map.has_key?(final_output, :processed_at)
       assert final_output[:status] == "processed_successfully"
-      
+
       # Verify the unreliable service eventually succeeded  
       assert get_in(final_output, [:original, :message]) == "Service call successful"
     end
 
     test "workflow fails gracefully when max retries exceeded" do
       # Create workflow with very limited retries and high failure rate
-      retry_settings = NodeSettings.new(%{
-        retry_on_failed: true,
-        max_retries: 1,  # Only one retry attempt
-        retry_delay_ms: 10
-      })
-      
+      retry_settings =
+        NodeSettings.new(%{
+          retry_on_failed: true,
+          # Only one retry attempt
+          max_retries: 1,
+          retry_delay_ms: 10
+        })
+
       unreliable_node = %Node{
         key: "unreliable_service",
         name: "Always Failing Service",
-        type: "e2e.unreliable_service", 
-        params: %{"failure_rate" => 0.99},  # 99% failure rate - should exceed retries
+        type: "e2e.unreliable_service",
+        # 99% failure rate - should exceed retries
+        params: %{"failure_rate" => 0.99},
         settings: retry_settings
       }
-      
+
       workflow = %Workflow{
         id: "failing_retry_workflow",
         name: "Failing Retry Test Workflow",
         nodes: [
           %Node{
             key: "trigger",
-            name: "Start", 
+            name: "Start",
             type: "manual.trigger"
           },
           unreliable_node
@@ -247,13 +264,13 @@ defmodule Prana.EndToEndRetryTest do
           Connection.new("trigger", "main", "unreliable_service", "main")
         ]
       }
-      
+
       workflow = convert_connections_to_map(workflow)
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       # Execute workflow - should eventually fail after retries
       result = execute_workflow_with_retries(execution_graph, %{"test" => "data"}, max_retry_cycles: 5)
-      
+
       # Should eventually fail after exhausting retries (though it might succeed due to randomness)
       case result do
         {:error, failed_execution} ->
@@ -264,6 +281,7 @@ defmodule Prana.EndToEndRetryTest do
             # This is likely an Error struct - that's also a valid failure indicator
             assert failed_execution.__struct__ == Prana.Core.Error
           end
+
         {:ok, completed_execution, _output} ->
           # Sometimes the service might succeed even with high failure rate - that's ok
           assert completed_execution.status == "completed"
@@ -272,19 +290,21 @@ defmodule Prana.EndToEndRetryTest do
 
     test "workflow with mixed retry and non-retry nodes" do
       # Test a more complex workflow where only some nodes have retry enabled
-      
+
       # Only the unreliable service has retry enabled - use more retries for reliability
-      retry_settings = NodeSettings.new(%{
-        retry_on_failed: true,
-        max_retries: 5,  # Increased to ensure success with high probability
-        retry_delay_ms: 5
-      })
-      
+      retry_settings =
+        NodeSettings.new(%{
+          retry_on_failed: true,
+          # Increased to ensure success with high probability
+          max_retries: 5,
+          retry_delay_ms: 5
+        })
+
       # No retry settings (default)
       no_retry_settings = NodeSettings.new(%{retry_on_failed: false})
-      
+
       workflow = %Workflow{
-        id: "mixed_retry_workflow", 
+        id: "mixed_retry_workflow",
         name: "Mixed Retry Test Workflow",
         nodes: [
           %Node{
@@ -296,12 +316,13 @@ defmodule Prana.EndToEndRetryTest do
             key: "unreliable_service",
             name: "Service with Retry",
             type: "e2e.unreliable_service",
-            params: %{"failure_rate" => 0.6},  # Moderate failure rate
+            # Moderate failure rate
+            params: %{"failure_rate" => 0.6},
             settings: retry_settings
           },
           %Node{
             key: "data_processor",
-            name: "Processor without Retry", 
+            name: "Processor without Retry",
             type: "e2e.data_processor",
             settings: no_retry_settings
           }
@@ -311,12 +332,12 @@ defmodule Prana.EndToEndRetryTest do
           Connection.new("unreliable_service", "main", "data_processor", "main")
         ]
       }
-      
+
       workflow = convert_connections_to_map(workflow)
       {:ok, execution_graph} = WorkflowCompiler.compile(workflow)
-      
+
       result = execute_workflow_with_retries(execution_graph, %{"test" => "data"})
-      
+
       # Should succeed - unreliable service should eventually work with retries
       # and data processor should work first time (since it gets valid input)
       assert {:ok, completed_execution, final_output} = result
@@ -328,53 +349,57 @@ defmodule Prana.EndToEndRetryTest do
   # Helper function to execute workflow and handle retry suspensions
   defp execute_workflow_with_retries(execution_graph, input_data, opts \\ []) do
     max_cycles = Keyword.get(opts, :max_retry_cycles, 10)
-    
+
     case GraphExecutor.execute_workflow(execution_graph, input_data) do
-      {:ok, execution, output} -> 
+      {:ok, execution, output} ->
         {:ok, execution, output}
-        
+
       {:suspend, suspended_execution, _suspension_data} ->
         # Handle retry suspension by resuming (simulates the application scheduling retries)
         handle_retry_cycles(suspended_execution, max_cycles, 1)
-        
-      {:error, execution} -> 
+
+      {:error, execution} ->
         {:error, execution}
     end
   end
-  
+
   # Recursive function to handle multiple retry cycles
   defp handle_retry_cycles(suspended_execution, max_cycles, current_cycle) when current_cycle > max_cycles do
     # Max cycles exceeded - return as failed
     {:error, %{suspended_execution | status: "failed"}}
   end
-  
+
   defp handle_retry_cycles(suspended_execution, max_cycles, current_cycle) do
     # Update execution context to simulate retry progression
     # Increment retry count in workflow state
     current_retry_count = get_in(suspended_execution.execution_data, ["context_data", "workflow", "retry_count"]) || 0
-    
-    updated_execution = %{suspended_execution |
-      execution_data: %{suspended_execution.execution_data |
-        "context_data" => %{suspended_execution.execution_data["context_data"] |
-          "workflow" => Map.put(
-            suspended_execution.execution_data["context_data"]["workflow"], 
-            "retry_count", 
-            current_retry_count + 1
-          )
+
+    updated_execution = %{
+      suspended_execution
+      | execution_data: %{
+          suspended_execution.execution_data
+          | "context_data" => %{
+              suspended_execution.execution_data["context_data"]
+              | "workflow" =>
+                  Map.put(
+                    suspended_execution.execution_data["context_data"]["workflow"],
+                    "retry_count",
+                    current_retry_count + 1
+                  )
+            }
         }
-      }
     }
-    
+
     # Resume the workflow
     case GraphExecutor.resume_workflow(updated_execution, %{}) do
-      {:ok, execution, output} -> 
+      {:ok, execution, output} ->
         {:ok, execution, output}
-        
+
       {:suspend, suspended_again, _suspension_data} ->
         # Another suspension (likely another retry) - continue the cycle
         handle_retry_cycles(suspended_again, max_cycles, current_cycle + 1)
-        
-      {:error, execution} -> 
+
+      {:error, execution} ->
         {:error, execution}
     end
   end

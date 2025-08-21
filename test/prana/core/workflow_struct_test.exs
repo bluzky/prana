@@ -309,11 +309,16 @@ defmodule Prana.Core.WorkflowStructTest do
 
     test "node roundtrip serialization preserves settings" do
       original_node = Node.new("Retry Node", "http.request")
-      original_node = %{original_node | settings: Prana.NodeSettings.new(%{
-        retry_on_failed: true,
-        max_retries: 5,
-        retry_delay_ms: 3000
-      })}
+
+      original_node = %{
+        original_node
+        | settings:
+            Prana.NodeSettings.new(%{
+              retry_on_failed: true,
+              max_retries: 5,
+              retry_delay_ms: 3000
+            })
+      }
 
       node_map = Node.to_map(original_node)
       restored_node = Node.from_map(node_map)

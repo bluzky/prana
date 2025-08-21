@@ -333,7 +333,7 @@ defmodule Prana.NodeExecutorTest do
       assert node_execution.status == "completed"
       assert node_execution.output_data == %{data: %{"data" => "test"}}
       assert node_execution.output_port == "main"
-      
+
       # Check that workflow context was updated
       workflow_context = updated_execution.execution_data["context_data"]["workflow"]
       assert workflow_context[:processing_time] == 100
@@ -540,7 +540,7 @@ defmodule Prana.NodeExecutorTest do
 
       assert completed_execution.status == "completed"
       assert completed_execution.output_data == resume_data
-      
+
       # Check that workflow context was updated during resume
       workflow_context = updated_execution.execution_data["context_data"]["workflow"]
       assert workflow_context[:resumed] == true
