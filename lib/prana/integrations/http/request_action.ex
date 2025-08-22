@@ -60,10 +60,6 @@ defmodule Prana.Integrations.HTTP.RequestAction do
       number: [min: 1, max: 300_000]
     )
 
-    field(:retry, :integer,
-      default: 0,
-      number: [min: 0, max: 10]
-    )
 
     field(:auth, AuthSchema)
     field(:body, :string)
@@ -174,9 +170,8 @@ defmodule Prana.Integrations.HTTP.RequestAction do
          {:ok, options} <- add_body(options, input_map),
          {:ok, options} <- add_json(options, input_map),
          {:ok, options} <- add_timeout(options, input_map),
-         {:ok, options} <- add_auth(options, input_map),
-         {:ok, options} <- add_params(options, input_map) do
-      add_retry(options, input_map)
+         {:ok, options} <- add_auth(options, input_map) do
+      add_params(options, input_map)
     end
   end
 
@@ -226,14 +221,6 @@ defmodule Prana.Integrations.HTTP.RequestAction do
     end
   end
 
-  defp add_retry(options, input_map) do
-    case Map.get(input_map, "retry") do
-      nil -> {:ok, options}
-      retry when is_boolean(retry) -> {:ok, Keyword.put(options, :retry, retry)}
-      retry when is_integer(retry) -> {:ok, Keyword.put(options, :retry, retry)}
-      _ -> {:error, "Retry must be boolean or integer"}
-    end
-  end
 
   # Build authentication options
   defp build_auth_options(input_map) do

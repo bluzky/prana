@@ -62,16 +62,6 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
                RequestAction.execute(input_map, %{})
     end
 
-    test "validates retry parameter" do
-      input_map = %{
-        "url" => "https://example.com",
-        "method" => "GET",
-        "retry" => "invalid"
-      }
-
-      assert {:error, %Error{code: "action_error", message: "Retry must be boolean or integer"}, "error"} =
-               RequestAction.execute(input_map, %{})
-    end
 
     test "validates authentication configuration" do
       input_map = %{
@@ -134,13 +124,11 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
     test "casts string numbers to integers" do
       input_map = %{
         "url" => "https://example.com",
-        "timeout" => "5000",
-        "retry" => "3"
+        "timeout" => "5000"
       }
 
       assert {:ok, validated} = RequestAction.validate_params(input_map)
       assert validated.timeout == 5000
-      assert validated.retry == 3
     end
 
     test "applies default values" do
@@ -149,7 +137,6 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
       assert {:ok, validated} = RequestAction.validate_params(input_map)
       assert validated.method == "GET"
       assert validated.timeout == 5000
-      assert validated.retry == 0
       assert validated.headers == %{}
       assert validated.params == %{}
     end
