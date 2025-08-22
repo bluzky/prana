@@ -276,9 +276,10 @@ node_with_retry = %Prana.Node{
 
 # Application handles retry suspensions like other suspensions
 case Prana.GraphExecutor.execute_workflow(execution, input) do
-  {:suspend, suspended_execution, %{"retry_delay_ms" => delay}} ->
-    # Schedule retry using same mechanism as webhooks/timers
-    Process.send_after(self(), {:resume_execution, suspended_execution}, delay)
+  {:suspend, suspended_execution, %{"resumed_at" => resumed_at}} ->
+    # Schedule retry using timestamp instead of delay
+    delay_ms = DateTime.diff(resumed_at, DateTime.utc_now(), :millisecond) |> max(0)
+    Process.send_after(self(), {:resume_execution, suspended_execution}, delay_ms)
     
   {:suspend, suspended_execution, other_data} ->
     # Handle other suspension types normally

@@ -141,7 +141,7 @@ defmodule Prana.NodeExecutor do
         next_attempt = current_attempt + 1
 
         retry_suspension_data = %{
-          "retry_delay_ms" => node.settings.retry_delay_ms,
+          "resumed_at" => DateTime.add(DateTime.utc_now(), node.settings.retry_delay_ms, :millisecond),
           "attempt_number" => next_attempt,
           "max_attempts" => node.settings.max_retries,
           # Preserve original error if it exists
@@ -554,7 +554,7 @@ defmodule Prana.NodeExecutor do
       next_attempt = get_next_attempt_number(node_execution)
 
       retry_suspension_data = %{
-        "retry_delay_ms" => node.settings.retry_delay_ms,
+        "resumed_at" => DateTime.add(DateTime.utc_now(), node.settings.retry_delay_ms, :millisecond),
         "attempt_number" => next_attempt,
         "max_attempts" => node.settings.max_retries,
         "original_error" => reason

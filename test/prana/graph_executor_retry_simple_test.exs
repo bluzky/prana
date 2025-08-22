@@ -164,7 +164,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
               suspension_data: %{
                 "attempt_number" => 1,
                 "max_attempts" => 2,
-                "retry_delay_ms" => 100
+                "resumed_at" => DateTime.add(DateTime.utc_now(), 100, :millisecond)
               }
             }
           ]
@@ -303,7 +303,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
               suspension_data: %{
                 "attempt_number" => 1,
                 "max_attempts" => 3,
-                "retry_delay_ms" => 100,
+                "resumed_at" => DateTime.add(DateTime.utc_now(), 100, :millisecond),
                 "original_error" =>
                   Prana.Core.Error.new("action_error", "Action returned error", %{
                     "error" => "Always fails",
