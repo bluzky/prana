@@ -588,13 +588,13 @@ defmodule MyApp.RetryHandler do
   end
 
   defp handle_retry_suspension(suspended_execution, suspension_data) do
-    resumed_at = Map.get(suspension_data, "resumed_at")
+    resume_at = Map.get(suspension_data, "resume_at")
     attempt_number = Map.get(suspension_data, "attempt_number", 1)
     max_attempts = Map.get(suspension_data, "max_attempts", 3)
     original_error = Map.get(suspension_data, "original_error")
 
     # Calculate delay from absolute timestamp
-    delay_ms = DateTime.diff(resumed_at, DateTime.utc_now(), :millisecond) |> max(0)
+    delay_ms = DateTime.diff(resume_at, DateTime.utc_now(), :millisecond) |> max(0)
 
     Logger.info("Scheduling retry #{attempt_number}/#{max_attempts} for workflow #{suspended_execution.id} (delay: #{delay_ms}ms)")
     Logger.debug("Original error: #{inspect(original_error)}")

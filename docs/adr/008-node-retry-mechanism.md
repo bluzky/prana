@@ -57,7 +57,7 @@ Use existing `NodeExecution.suspension_data` field to track retry information:
 
 ```elixir
 suspension_data: %{
-  "resumed_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond), # Absolute timestamp for retry
+  "resume_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond), # Absolute timestamp for retry
   "attempt_number" => 1,           # Current retry attempt (1-based)
   "max_attempts" => 3,             # Max configured attempts
   "original_error" => %{...}       # Error that triggered retry
@@ -76,7 +76,7 @@ defp handle_execution_error(node, node_execution, reason) do
   if should_retry?(node, node_execution, reason) do
     # Return suspension for retry
     retry_suspension_data = %{
-      "resumed_at" => DateTime.add(DateTime.utc_now(), node.settings.retry_delay_ms, :millisecond),
+      "resume_at" => DateTime.add(DateTime.utc_now(), node.settings.retry_delay_ms, :millisecond),
       "attempt_number" => get_next_attempt_number(node_execution),
       "max_attempts" => node.settings.max_retries,
       "original_error" => reason
@@ -158,9 +158,9 @@ Applications handle retry exactly like other suspensions:
 
 ```elixir
 case Prana.GraphExecutor.execute_workflow(execution, input) do
-  {:suspend, suspended_execution, %{"resumed_at" => resumed_at}} ->
+  {:suspend, suspended_execution, %{"resume_at" => resume_at}} ->
     # Schedule retry using timestamp instead of delay
-    delay_ms = DateTime.diff(resumed_at, DateTime.utc_now(), :millisecond) |> max(0)
+    delay_ms = DateTime.diff(resume_at, DateTime.utc_now(), :millisecond) |> max(0)
     Process.send_after(self(), {:resume_execution, suspended_execution}, delay_ms)
     
   {:suspend, suspended_execution, other_suspension_data} ->

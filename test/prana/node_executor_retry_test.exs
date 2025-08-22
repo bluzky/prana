@@ -184,10 +184,10 @@ defmodule Prana.NodeExecutorRetryTest do
       assert suspended_node_execution.suspension_type == :retry
       assert suspended_node_execution.suspension_data["attempt_number"] == 1
       assert suspended_node_execution.suspension_data["max_attempts"] == 3
-      # Check that resumed_at is set to future timestamp
-      resumed_at = suspended_node_execution.suspension_data["resumed_at"]
-      assert %DateTime{} = resumed_at
-      assert DateTime.after?(resumed_at, DateTime.utc_now())
+      # Check that resume_at is set to future timestamp
+      resume_at = suspended_node_execution.suspension_data["resume_at"]
+      assert %DateTime{} = resume_at
+      assert DateTime.after?(resume_at, DateTime.utc_now())
       # Original error is wrapped in Prana.Core.Error
       assert suspended_node_execution.suspension_data["original_error"].details["error"] == "This action always fails"
     end

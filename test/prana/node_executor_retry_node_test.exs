@@ -153,7 +153,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
         NodeExecution.suspend(failed_node_execution, :retry, %{
           "attempt_number" => 1,
           "max_attempts" => 2,
-          "resumed_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond),
+          "resume_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond),
           "original_error" => "First attempt fails"
         })
 
@@ -214,7 +214,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
         NodeExecution.suspend(failed_node_execution, :retry, %{
           "attempt_number" => 1,
           "max_attempts" => 3,
-          "resumed_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond),
+          "resume_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond),
           "original_error" =>
             Error.new("action_error", "Action returned error", %{"error" => "Always fails", "port" => "error"})
         })
@@ -246,7 +246,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
           # Already at max
           "attempt_number" => 2,
           "max_attempts" => 2,
-          "resumed_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond),
+          "resume_at" => DateTime.add(DateTime.utc_now(), 1000, :millisecond),
           "original_error" => "Previous failure"
         })
 
