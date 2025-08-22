@@ -182,17 +182,17 @@ defp handle_external_event_suspension(data) do
   MyApp.Database.save_suspended_workflow(%{
     execution_id: execution_id,
     suspend_type: :external_event,
-    event_type: suspension_data.event_type,
-    event_filter: suspension_data.event_filter,
+    event_type: suspension_data["event_type"],
+    event_filter: suspension_data["event_filter"],
     suspended_at: DateTime.utc_now(),
-    timeout_at: DateTime.add(DateTime.utc_now(), suspension_data.timeout_ms, :millisecond)
+    timeout_at: DateTime.add(DateTime.utc_now(), suspension_data["timeout_ms"], :millisecond)
   })
 
   # 2. Register for event notifications
-  MyApp.EventRouter.register_waiting_workflow(execution_id, suspension_data.event_type, suspension_data.event_filter)
+  MyApp.EventRouter.register_waiting_workflow(execution_id, suspension_data["event_type"], suspension_data["event_filter"])
 
   # 3. Schedule timeout handling
-  MyApp.Scheduler.schedule_timeout(execution_id, suspension_data.timeout_ms, suspension_data.on_timeout)
+  MyApp.Scheduler.schedule_timeout(execution_id, suspension_data["timeout_ms"], suspension_data["on_timeout"])
 
   :ok
 end
@@ -251,10 +251,10 @@ defp handle_sub_workflow_suspension(data) do
   execution_id = data.execution_id
 
   # 1. Load sub-workflow
-  case MyApp.WorkflowLoader.load_workflow(suspension_data.workflow_id) do
+  case MyApp.WorkflowLoader.load_workflow(suspension_data["workflow_id"]) do
     {:ok, sub_workflow} ->
       # 2. Execute sub-workflow
-      case MyApp.WorkflowRunner.execute_workflow(sub_workflow, suspension_data.input_data) do
+      case MyApp.WorkflowRunner.execute_workflow(sub_workflow, suspension_data["input_data"]) do
         {:ok, sub_execution_id} ->
           # 3. Track parent-child relationship
           MyApp.Database.save_workflow_relationship(%{
@@ -438,7 +438,7 @@ end
 defp handle_delay_suspension(data) do
   suspension_data = data.suspension_data
   execution_id = data.execution_id
-  duration_ms = suspension_data.duration_ms
+  duration_ms = suspension_data["duration_ms"]
 
   if duration_ms > @long_delay_threshold do
     # Long delay - persist to database for restart resilience

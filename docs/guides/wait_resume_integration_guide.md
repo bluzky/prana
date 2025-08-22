@@ -296,7 +296,7 @@ defmodule MyApp.WorkflowEngine do
 
   defp activate_webhook(suspension_data, context) do
     # Extract webhook info from suspension_data
-    node_id = suspension_data.node_id  # This would come from NodeExecutor
+    node_id = suspension_data["node_id"]  # This would come from NodeExecutor
     resume_url = context.resume_urls[node_id]
 
     if resume_url do
@@ -304,8 +304,8 @@ defmodule MyApp.WorkflowEngine do
         resume_id: resume_url,
         execution_id: context.execution_id,
         node_id: node_id,
-        expires_at: suspension_data.expires_at,
-        webhook_config: suspension_data.webhook_config || %{}
+        expires_at: suspension_data["expires_at"],
+        webhook_config: suspension_data["webhook_config"] || %{}
       })
     end
   end

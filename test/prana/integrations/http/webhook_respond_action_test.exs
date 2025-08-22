@@ -125,14 +125,14 @@ defmodule Prana.Integrations.HTTP.WebhookRespondActionTest do
       assert {:suspend, :webhook_response, suspension_data} =
                WebhookRespondAction.execute(params, context)
 
-      assert suspension_data.type == :webhook_response
-      assert suspension_data.execution_id == "exec_123"
-      assert suspension_data.node_id == "respond_node_1"
-      assert suspension_data.response_config.respond_with == "text"
-      assert suspension_data.response_config.text == "Processing complete"
-      assert suspension_data.response_config.status_code == 200
-      assert suspension_data.response_config.headers == %{"Custom-Header" => "value"}
-      assert %DateTime{} = suspension_data.suspended_at
+      assert suspension_data["type"] == :webhook_response
+      assert suspension_data["execution_id"] == "exec_123"
+      assert suspension_data["node_id"] == "respond_node_1"
+      assert suspension_data["response_config"].respond_with == "text"
+      assert suspension_data["response_config"].text == "Processing complete"
+      assert suspension_data["response_config"].status_code == 200
+      assert suspension_data["response_config"].headers == %{"Custom-Header" => "value"}
+      assert %DateTime{} = suspension_data["suspended_at"]
     end
 
     test "suspends with webhook response data for JSON response" do
@@ -147,9 +147,9 @@ defmodule Prana.Integrations.HTTP.WebhookRespondActionTest do
       assert {:suspend, :webhook_response, suspension_data} =
                WebhookRespondAction.execute(params, context)
 
-      assert suspension_data.response_config.respond_with == "json"
-      assert suspension_data.response_config.json_data == %{"id" => 123, "status" => "created"}
-      assert suspension_data.response_config.status_code == 201
+      assert suspension_data["response_config"].respond_with == "json"
+      assert suspension_data["response_config"].json_data == %{"id" => 123, "status" => "created"}
+      assert suspension_data["response_config"].status_code == 201
     end
 
     test "suspends with webhook response data for redirect response" do
@@ -165,9 +165,9 @@ defmodule Prana.Integrations.HTTP.WebhookRespondActionTest do
       assert {:suspend, :webhook_response, suspension_data} =
                WebhookRespondAction.execute(params, context)
 
-      assert suspension_data.response_config.respond_with == "redirect"
-      assert suspension_data.response_config.redirect_url == "https://app.com/success"
-      assert suspension_data.response_config.redirect_type == "temporary"
+      assert suspension_data["response_config"].respond_with == "redirect"
+      assert suspension_data["response_config"].redirect_url == "https://app.com/success"
+      assert suspension_data["response_config"].redirect_type == "temporary"
     end
 
     test "suspends with webhook response data for no_data response" do
@@ -181,8 +181,8 @@ defmodule Prana.Integrations.HTTP.WebhookRespondActionTest do
       assert {:suspend, :webhook_response, suspension_data} =
                WebhookRespondAction.execute(params, context)
 
-      assert suspension_data.response_config.respond_with == "no_data"
-      assert suspension_data.response_config.status_code == 204
+      assert suspension_data["response_config"].respond_with == "no_data"
+      assert suspension_data["response_config"].status_code == 204
     end
   end
 

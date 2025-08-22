@@ -126,8 +126,8 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
 
       # Verify suspension data contains synchronous sub-workflow data
       assert sub_execution.suspension_type == :sub_workflow_sync
-      assert sub_execution.suspension_data.workflow_id == "child_workflow"
-      assert sub_execution.suspension_data.execution_mode == "sync"
+      assert sub_execution.suspension_data["workflow_id"] == "child_workflow"
+      assert sub_execution.suspension_data["execution_mode"] == "sync"
 
       # Verify middleware events were emitted
       assert_receive {:middleware_event, :execution_started, _}
@@ -207,8 +207,8 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
 
       # Verify suspension data contains fire-and-forget data
       assert fire_forget_execution.suspension_type == :sub_workflow_fire_forget
-      assert fire_forget_execution.suspension_data.workflow_id == "background_task"
-      assert fire_forget_execution.suspension_data.execution_mode == "fire_and_forget"
+      assert fire_forget_execution.suspension_data["workflow_id"] == "background_task"
+      assert fire_forget_execution.suspension_data["execution_mode"] == "fire_and_forget"
 
       # Simulate caller handling fire-and-forget: trigger child async + immediate resume
       resume_data = %{workflow_id: "background_task"}
@@ -416,7 +416,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       assert_receive {:middleware_event, :node_suspended, event_data}
       assert event_data.node.key == "sub_workflow_node"
       assert event_data.suspension_type == :sub_workflow_sync
-      assert event_data.suspension_data.workflow_id == "child_workflow"
+      assert event_data.suspension_data["workflow_id"] == "child_workflow"
 
       assert_receive {:middleware_event, :execution_suspended, event_data}
       assert event_data.execution.status == "suspended"
@@ -466,8 +466,8 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       batch_execution = Enum.find(all_executions, &(&1.node_key == "batch_sub_workflow"))
 
       assert batch_execution.status == "suspended"
-      assert batch_execution.suspension_data.batch_mode == "all"
-      assert batch_execution.suspension_data.workflow_id == "batch_child_workflow"
+      assert batch_execution.suspension_data["batch_mode"] == "all"
+      assert batch_execution.suspension_data["workflow_id"] == "batch_child_workflow"
     end
 
     test "includes all batch_mode as default in suspension data" do
@@ -511,8 +511,8 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       single_execution = Enum.find(all_executions, &(&1.node_key == "single_sub_workflow"))
 
       assert single_execution.status == "suspended"
-      assert single_execution.suspension_data.batch_mode == "all"
-      assert single_execution.suspension_data.workflow_id == "single_child_workflow"
+      assert single_execution.suspension_data["batch_mode"] == "all"
+      assert single_execution.suspension_data["workflow_id"] == "single_child_workflow"
     end
 
     test "wraps non-array input in list for single mode" do
@@ -557,9 +557,9 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       single_execution = Enum.find(all_executions, &(&1.node_key == "single_map_sub_workflow"))
 
       assert single_execution.status == "suspended"
-      assert single_execution.suspension_data.batch_mode == "single"
+      assert single_execution.suspension_data["batch_mode"] == "single"
       # Input should be wrapped in array for single mode processing
-      assert single_execution.suspension_data.input_data == [%{"user" => "john", "age" => 30}]
+      assert single_execution.suspension_data["input_data"] == [%{"user" => "john", "age" => 30}]
     end
 
     test "preserves array input for single mode" do
@@ -604,9 +604,9 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       single_execution = Enum.find(all_executions, &(&1.node_key == "single_array_sub_workflow"))
 
       assert single_execution.status == "suspended"
-      assert single_execution.suspension_data.batch_mode == "single"
+      assert single_execution.suspension_data["batch_mode"] == "single"
       # Array input should be preserved as-is for single mode processing
-      assert single_execution.suspension_data.input_data == [%{"user" => "john"}, %{"user" => "jane"}]
+      assert single_execution.suspension_data["input_data"] == [%{"user" => "john"}, %{"user" => "jane"}]
     end
 
     test "preserves input as-is for batch mode" do
@@ -651,9 +651,9 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
       batch_execution = Enum.find(all_executions, &(&1.node_key == "batch_preserve_sub_workflow"))
 
       assert batch_execution.status == "suspended"
-      assert batch_execution.suspension_data.batch_mode == "all"
+      assert batch_execution.suspension_data["batch_mode"] == "all"
       # Input should be preserved as-is for batch mode
-      assert batch_execution.suspension_data.input_data == %{"users" => [%{"name" => "john"}, %{"name" => "jane"}]}
+      assert batch_execution.suspension_data["input_data"] == %{"users" => [%{"name" => "john"}, %{"name" => "jane"}]}
     end
   end
 

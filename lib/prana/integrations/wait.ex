@@ -92,8 +92,8 @@ defmodule Prana.Integrations.Wait do
         {:ok, %{}, "main"}
       else
         interval_data = %{
-          mode: "interval",
-          resume_at: DateTime.add(now, duration_ms, :millisecond)
+          "mode" => "interval",
+          "resume_at" => DateTime.add(now, duration_ms, :millisecond)
         }
 
         {:suspend, :interval, interval_data}
@@ -115,9 +115,9 @@ defmodule Prana.Integrations.Wait do
          {:ok, schedule_datetime} <- parse_schedule_datetime(schedule_at, timezone),
          :ok <- validate_schedule_future(schedule_datetime) do
       schedule_data = %{
-        mode: "schedule",
-        resume_at: schedule_datetime,
-        timezone: timezone
+        "mode" => "schedule",
+        "resume_at" => schedule_datetime,
+        "timezone" => timezone
       }
 
       {:suspend, :schedule, schedule_data}
@@ -139,9 +139,9 @@ defmodule Prana.Integrations.Wait do
         expires_at = DateTime.add(now, timeout_hours * 3600, :second)
 
         webhook_data = %{
-          mode: "webhook",
-          expires_at: expires_at,
-          timeout_hours: timeout_hours
+          "mode" => "webhook",
+          "expires_at" => expires_at,
+          "timeout_hours" => timeout_hours
         }
 
         {:suspend, :webhook, webhook_data}

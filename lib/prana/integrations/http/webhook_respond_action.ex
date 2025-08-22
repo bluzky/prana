@@ -65,11 +65,11 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
 
     # Create suspension data for application to handle HTTP response
     suspension_data = %{
-      type: :webhook_response,
-      execution_id: Map.get(context, :execution_id),
-      node_id: Map.get(context, :node_id),
-      response_config: response_config,
-      suspended_at: DateTime.utc_now()
+      "type" => :webhook_response,
+      "execution_id" => Map.get(context, :execution_id),
+      "node_id" => Map.get(context, :node_id),
+      "response_config" => response_config,
+      "suspended_at" => DateTime.utc_now()
     }
 
     {:suspend, :webhook_response, suspension_data}

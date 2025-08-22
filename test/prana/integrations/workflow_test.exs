@@ -15,11 +15,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.workflow_id == "user_onboarding"
-      assert suspension_data.execution_mode == "sync"
-      assert suspension_data.timeout_ms == 300_000
-      assert suspension_data.failure_strategy == "fail_parent"
-      assert %DateTime{} = suspension_data.triggered_at
+      assert suspension_data["workflow_id"] == "user_onboarding"
+      assert suspension_data["execution_mode"] == "sync"
+      assert suspension_data["timeout_ms"] == 300_000
+      assert suspension_data["failure_strategy"] == "fail_parent"
+      assert %DateTime{} = suspension_data["triggered_at"]
     end
 
     test "returns suspension for fire-and-forget execution" do
@@ -32,9 +32,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
-      assert suspension_data.workflow_id == "notification_flow"
-      assert suspension_data.execution_mode == "fire_and_forget"
-      assert suspension_data.timeout_ms == 60_000
+      assert suspension_data["workflow_id"] == "notification_flow"
+      assert suspension_data["execution_mode"] == "fire_and_forget"
+      assert suspension_data["timeout_ms"] == 60_000
     end
 
     test "returns suspension for asynchronous execution" do
@@ -48,11 +48,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:suspend, :sub_workflow_async, suspension_data} = result
-      assert suspension_data.workflow_id == "user_processing"
-      assert suspension_data.execution_mode == "async"
-      assert suspension_data.timeout_ms == 600_000
-      assert suspension_data.failure_strategy == "continue"
-      assert %DateTime{} = suspension_data.triggered_at
+      assert suspension_data["workflow_id"] == "user_processing"
+      assert suspension_data["execution_mode"] == "async"
+      assert suspension_data["timeout_ms"] == 600_000
+      assert suspension_data["failure_strategy"] == "continue"
+      assert %DateTime{} = suspension_data["triggered_at"]
     end
 
     test "uses default values for optional parameters" do
@@ -63,13 +63,13 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.workflow_id == "simple_flow"
+      assert suspension_data["workflow_id"] == "simple_flow"
       # default
-      assert suspension_data.execution_mode == "sync"
+      assert suspension_data["execution_mode"] == "sync"
       # default 5 minutes
-      assert suspension_data.timeout_ms == 300_000
+      assert suspension_data["timeout_ms"] == 300_000
       # default
-      assert suspension_data.failure_strategy == "fail_parent"
+      assert suspension_data["failure_strategy"] == "fail_parent"
     end
 
     test "returns error for missing workflow_id" do
@@ -150,7 +150,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.failure_strategy == "continue"
+      assert suspension_data["failure_strategy"] == "continue"
     end
 
     test "correctly handles different execution modes" do
@@ -186,11 +186,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
 
       # Verify all configuration is preserved for middleware
-      assert suspension_data.workflow_id == "detailed_flow"
-      assert suspension_data.execution_mode == "sync"
-      assert suspension_data.timeout_ms == 120_000
-      assert suspension_data.failure_strategy == "continue"
-      assert is_struct(suspension_data.triggered_at, DateTime)
+      assert suspension_data["workflow_id"] == "detailed_flow"
+      assert suspension_data["execution_mode"] == "sync"
+      assert suspension_data["timeout_ms"] == 120_000
+      assert suspension_data["failure_strategy"] == "continue"
+      assert is_struct(suspension_data["triggered_at"], DateTime)
     end
 
     test "batch mode defaults to 'all' and wraps non-array input in list" do
@@ -207,9 +207,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "all"
+      assert suspension_data["batch_mode"] == "all"
       # Non-array input should be wrapped in list for single mode
-      assert suspension_data.input_data == %{"user_id" => 123, "name" => "John"}
+      assert suspension_data["input_data"] == %{"user_id" => 123, "name" => "John"}
     end
 
     test "batch mode 'single' keeps array input as-is" do
@@ -227,9 +227,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "single"
+      assert suspension_data["batch_mode"] == "single"
       # Array input should remain as array for single mode
-      assert suspension_data.input_data == [%{"user_id" => 123}, %{"user_id" => 456}]
+      assert suspension_data["input_data"] == [%{"user_id" => 123}, %{"user_id" => 456}]
     end
 
     test "batch mode 'batch' passes input data as-is without wrapping" do
@@ -247,9 +247,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "all"
+      assert suspension_data["batch_mode"] == "all"
       # Batch mode passes input as-is (no wrapping in list)
-      assert suspension_data.input_data == %{"user_id" => 123, "name" => "John"}
+      assert suspension_data["input_data"] == %{"user_id" => 123, "name" => "John"}
     end
 
     test "batch mode 'batch' with array input passes array as-is" do
@@ -267,9 +267,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "all"
+      assert suspension_data["batch_mode"] == "all"
       # Batch mode passes array input as-is
-      assert suspension_data.input_data == [%{"user_id" => 123}, %{"user_id" => 456}]
+      assert suspension_data["input_data"] == [%{"user_id" => 123}, %{"user_id" => 456}]
     end
 
     test "returns error for invalid batch_mode" do
@@ -297,9 +297,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "single"
+      assert suspension_data["batch_mode"] == "single"
       # Missing input should default to empty list for single mode
-      assert suspension_data.input_data == []
+      assert suspension_data["input_data"] == []
     end
 
     test "handles missing main port in input context" do
@@ -316,9 +316,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data.batch_mode == "all"
+      assert suspension_data["batch_mode"] == "all"
       # Missing main port should default to empty map
-      assert suspension_data.input_data == %{}
+      assert suspension_data["input_data"] == %{}
     end
 
     test "async mode applies batch_mode normalization" do
@@ -333,7 +333,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_async, suspension_data} = result
-      assert suspension_data.input_data == [%{"user_id" => 123}]
+      assert suspension_data["input_data"] == [%{"user_id" => 123}]
     end
 
     test "fire_and_forget mode applies batch_mode normalization" do
@@ -348,7 +348,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       result = ExecuteWorkflowAction.execute(input_map, context)
 
       assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
-      assert suspension_data.input_data == [%{"notification_id" => "123"}]
+      assert suspension_data["input_data"] == [%{"notification_id" => "123"}]
     end
   end
 end

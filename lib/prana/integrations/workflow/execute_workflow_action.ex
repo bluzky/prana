@@ -93,13 +93,13 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
           end
 
         sub_workflow_data = %{
-          workflow_id: validated_params.workflow_id,
-          execution_mode: validated_params.execution_mode,
-          batch_mode: validated_params.batch_mode,
-          timeout_ms: validated_params.timeout_ms,
-          failure_strategy: validated_params.failure_strategy,
-          input_data: input_data,
-          triggered_at: DateTime.utc_now()
+          "workflow_id" => validated_params.workflow_id,
+          "execution_mode" => validated_params.execution_mode,
+          "batch_mode" => validated_params.batch_mode,
+          "timeout_ms" => validated_params.timeout_ms,
+          "failure_strategy" => validated_params.failure_strategy,
+          "input_data" => input_data,
+          "triggered_at" => DateTime.utc_now()
         }
 
         case validated_params.execution_mode do

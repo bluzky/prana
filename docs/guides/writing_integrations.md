@@ -755,7 +755,7 @@ defmodule MyApp.CustomIntegrationTest do
     result = CustomIntegration.execute(input, context)
 
     assert {:suspend, :custom_suspension, suspension_data} = result
-    assert suspension_data.task_id
+    assert suspension_data["task_id"]
   end
 
   test "execute returns node context updates" do

@@ -78,7 +78,7 @@ defmodule Prana.Workflow do
     workflow
     |> Map.from_struct()
     |> Map.update!(:nodes, fn nodes ->
-      Enum.map(nodes, &Map.from_struct/1)
+      Enum.map(nodes, &Prana.Node.to_map/1)
     end)
     |> Map.update!(:connections, fn connections ->
       convert_connections_to_maps(connections)

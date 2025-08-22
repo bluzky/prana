@@ -97,11 +97,11 @@ defmodule Prana.NodeExecutorSuspensionTest do
       # Verify suspension data stored in NodeExecution
       assert suspended_node_execution.suspension_type == :sub_workflow_sync
       suspension_data = suspended_node_execution.suspension_data
-      assert suspension_data.workflow_id == "user_onboarding"
-      assert suspension_data.execution_mode == "sync"
-      assert suspension_data.timeout_ms == 300_000
-      assert suspension_data.failure_strategy == "fail_parent"
-      assert %DateTime{} = suspension_data.triggered_at
+      assert suspension_data["workflow_id"] == "user_onboarding"
+      assert suspension_data["execution_mode"] == "sync"
+      assert suspension_data["timeout_ms"] == 300_000
+      assert suspension_data["failure_strategy"] == "fail_parent"
+      assert %DateTime{} = suspension_data["triggered_at"]
     end
 
     test "handles fire-and-forget sub-workflow execution", %{execution: execution} do
@@ -126,9 +126,9 @@ defmodule Prana.NodeExecutorSuspensionTest do
       # Verify suspension data stored in NodeExecution
       assert suspended_node_execution.suspension_type == :sub_workflow_fire_forget
       suspension_data = suspended_node_execution.suspension_data
-      assert suspension_data.workflow_id == "notification_flow"
-      assert suspension_data.execution_mode == "fire_and_forget"
-      assert %DateTime{} = suspension_data.triggered_at
+      assert suspension_data["workflow_id"] == "notification_flow"
+      assert suspension_data["execution_mode"] == "fire_and_forget"
+      assert %DateTime{} = suspension_data["triggered_at"]
     end
 
     test "handles sub-workflow validation errors", %{execution: execution} do
