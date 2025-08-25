@@ -32,7 +32,7 @@ defmodule Prana.Core.ExecutionStructTest do
         },
         "current_execution_index" => 1,
         "suspended_node_id" => "node_2",
-        "suspension_type" => "webhook",
+        "suspension_type" => :webhook,
         "suspension_data" => %{"webhook_url" => "https://example.com/webhook"},
         "suspended_at" => "2024-01-01T12:00:00Z",
         "started_at" => "2024-01-01T11:00:00Z",
@@ -54,7 +54,7 @@ defmodule Prana.Core.ExecutionStructTest do
       assert execution.vars == %{"user_id" => "user_456"}
       assert execution.current_execution_index == 1
       assert execution.suspended_node_id == "node_2"
-      assert execution.suspension_type == "webhook"
+      assert execution.suspension_type == :webhook
       assert execution.suspension_data == %{"webhook_url" => "https://example.com/webhook"}
       assert execution.suspended_at == ~U[2024-01-01 12:00:00Z]
       assert execution.started_at == ~U[2024-01-01 11:00:00Z]
@@ -195,7 +195,7 @@ defmodule Prana.Core.ExecutionStructTest do
         "workflow_id" => "wf_suspended",
         "status" => "suspended",
         "suspended_node_id" => "webhook_node",
-        "suspension_type" => "webhook",
+        "suspension_type" => :webhook,
         "suspension_data" => %{
           "webhook_url" => "https://example.com/webhook/abc123",
           "webhook_id" => "wh_456",
@@ -210,7 +210,7 @@ defmodule Prana.Core.ExecutionStructTest do
       assert execution.workflow_id == "wf_suspended"
       assert execution.status == "suspended"
       assert execution.suspended_node_id == "webhook_node"
-      assert execution.suspension_type == "webhook"
+      assert execution.suspension_type == :webhook
 
       assert execution.suspension_data == %{
                "webhook_url" => "https://example.com/webhook/abc123",
@@ -347,7 +347,7 @@ defmodule Prana.Core.ExecutionStructTest do
         "node_key" => "webhook_node",
         "status" => "suspended",
         "params" => %{"webhook_url" => "https://example.com/webhook"},
-        "suspension_type" => "webhook",
+        "suspension_type" => :webhook,
         "suspension_data" => %{
           "webhook_id" => "wh_123",
           "timeout_seconds" => 3600
@@ -362,7 +362,7 @@ defmodule Prana.Core.ExecutionStructTest do
       assert node_execution.node_key == "webhook_node"
       assert node_execution.status == "suspended"
       assert node_execution.params == %{"webhook_url" => "https://example.com/webhook"}
-      assert node_execution.suspension_type == "webhook"
+      assert node_execution.suspension_type == :webhook
 
       assert node_execution.suspension_data == %{
                "webhook_id" => "wh_123",
@@ -489,7 +489,7 @@ defmodule Prana.Core.ExecutionStructTest do
           ]
         },
         suspended_node_id: "node_2",
-        suspension_type: "webhook",
+        suspension_type: :webhook,
         suspension_data: %{"webhook_url" => "https://example.com/webhook"},
         metadata: %{"execution_count" => 3}
       }

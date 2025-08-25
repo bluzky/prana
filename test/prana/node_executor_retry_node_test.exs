@@ -288,40 +288,6 @@ defmodule Prana.NodeExecutorRetryNodeTest do
       assert reason.code == "action_not_found"
       assert failed_execution.status == "failed"
     end
-
-    test "retry_node handles parameter preparation errors", %{execution: execution} do
-      settings = NodeSettings.new(%{retry_on_failed: true, max_retries: 2})
-
-      # This test is actually hard to construct because template processing is resilient.
-      # For now, let's test the principle by checking that a non-retryable error type
-      # would not be retried. We'll update this when we have a real param prep failure case.
-
-      # Create a node that would work normally
-      node = Node.new("Test Node", "test.success_after_retry")
-      node = %{node | settings: settings}
-
-      # Simulate a parameter preparation error by creating a NodeExecution with params_error
-      failed_node_execution = NodeExecution.new(node.key, 1, 0)
-      failed_node_execution = NodeExecution.start(failed_node_execution)
-
-      failed_node_execution =
-        NodeExecution.suspend(failed_node_execution, :retry, %{
-          "attempt_number" => 1,
-          "max_attempts" => 2,
-          "original_error" => Error.new("params_error", "Parameter preparation failed", %{"error_type" => "test"})
-        })
-
-      result =
-        NodeExecutor.retry_node(node, execution, failed_node_execution, %{
-          execution_index: 2,
-          run_index: 0
-        })
-
-      # Should fail immediately - parameter preparation errors are not retryable  
-      assert {:error, {reason, failed_execution}} = result
-      assert reason.code == "params_error"
-      assert failed_execution.status == "failed"
-    end
   end
 
   describe "retry_node/4 vs resume_node/5 separation" do

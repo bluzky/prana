@@ -469,8 +469,23 @@ defmodule Prana.GraphExecutor do
 
           {:suspend, suspended_execution, suspension_data}
 
-        {:error, {reason, _failed_node_execution}} ->
-          {:error, reason}
+        {:error, {_reason, failed_node_execution}} ->
+          error_reason = %{
+            type: "node_execution_failed",
+            message: "Node resume failed: #{suspended_node.key}",
+            node_key: suspended_node.key,
+            node_error: failed_node_execution.error_data
+          }
+
+          failed_execution =
+            resume_execution
+            |> WorkflowExecution.fail_node(failed_node_execution)
+            |> WorkflowExecution.fail(error_reason)
+
+          Middleware.call(:node_failed, %{node: suspended_node, node_execution: failed_node_execution})
+          Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_reason})
+
+          {:error, failed_execution}
       end
     else
       error_reason = %{

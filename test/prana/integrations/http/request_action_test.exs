@@ -62,7 +62,6 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
                RequestAction.execute(input_map, %{})
     end
 
-
     test "validates authentication configuration" do
       input_map = %{
         "url" => "https://example.com",

@@ -58,7 +58,7 @@ defmodule Prana.WorkflowExecution do
 
     # Structured suspension fields
     field(:suspended_node_id, :string)
-    field(:suspension_type, :string)
+    field(:suspension_type, :atom)
     field(:suspension_data, :map)
     field(:suspended_at, :datetime)
 

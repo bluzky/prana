@@ -15,7 +15,7 @@ defmodule Prana.NodeExecution do
     field(:started_at, :datetime)
     field(:completed_at, :datetime)
     field(:duration_ms, :integer)
-    field(:suspension_type, :string)
+    field(:suspension_type, :atom)
     field(:suspension_data, :any)
     field(:execution_index, :integer, default: 0)
     field(:run_index, :integer, default: 0)

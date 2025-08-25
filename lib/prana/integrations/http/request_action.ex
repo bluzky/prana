@@ -60,7 +60,6 @@ defmodule Prana.Integrations.HTTP.RequestAction do
       number: [min: 1, max: 300_000]
     )
 
-
     field(:auth, AuthSchema)
     field(:body, :string)
     field(:json, :map)
@@ -220,7 +219,6 @@ defmodule Prana.Integrations.HTTP.RequestAction do
       _ -> {:error, "Params must be a map"}
     end
   end
-
 
   # Build authentication options
   defp build_auth_options(input_map) do

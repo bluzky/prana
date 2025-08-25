@@ -127,35 +127,24 @@ defmodule Prana.NodeExecutor do
     # Get current attempt number from original failure context
     current_attempt = get_current_attempt_number(original_failed_execution)
 
-    # Check if the ORIGINAL error (the one that caused the first retry) was retryable
-    # This prevents retrying configuration errors even if they later cause different errors
-    original_error = original_failed_execution.suspension_data["original_error"]
+    if should_retry_with_attempt?(node, current_attempt, reason) do
+      # Prepare retry suspension data with incremented attempt
+      next_attempt = current_attempt + 1
 
-    if original_error && not is_retryable_error?(original_error) do
-      # Original error was not retryable - fail immediately
-      failed_execution = NodeExecution.fail(current_node_execution, original_error)
-      {:error, {original_error, failed_execution}}
+      retry_suspension_data = %{
+        "resume_at" => DateTime.add(DateTime.utc_now(), node.settings.retry_delay_ms, :millisecond),
+        "attempt_number" => next_attempt,
+        "max_attempts" => node.settings.max_retries,
+        "original_error" => reason
+      }
+
+      # Suspend for retry
+      suspended_execution = NodeExecution.suspend(current_node_execution, :retry, retry_suspension_data)
+      {:suspend, suspended_execution}
     else
-      if should_retry_with_attempt?(node, current_attempt, reason) do
-        # Prepare retry suspension data with incremented attempt
-        next_attempt = current_attempt + 1
-
-        retry_suspension_data = %{
-          "resume_at" => DateTime.add(DateTime.utc_now(), node.settings.retry_delay_ms, :millisecond),
-          "attempt_number" => next_attempt,
-          "max_attempts" => node.settings.max_retries,
-          # Preserve original error if it exists
-          "original_error" => original_error || reason
-        }
-
-        # Suspend for retry
-        suspended_execution = NodeExecution.suspend(current_node_execution, :retry, retry_suspension_data)
-        {:suspend, suspended_execution}
-      else
-        # No more retries - final failure
-        failed_execution = NodeExecution.fail(current_node_execution, reason)
-        {:error, {reason, failed_execution}}
-      end
+      # No more retries - final failure
+      failed_execution = NodeExecution.fail(current_node_execution, reason)
+      {:error, {reason, failed_execution}}
     end
   end
 
