@@ -248,6 +248,7 @@ defmodule Prana.NodeExecutor do
     process_action_result(result, action)
   rescue
     error ->
+      Logger.error(inspect(error))
       Logger.error(inspect(__STACKTRACE__, pretty: true))
       {:error, build_action_execution_error("action_execution_failed", error, action)}
   catch
