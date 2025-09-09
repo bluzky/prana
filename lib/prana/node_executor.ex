@@ -13,6 +13,8 @@ defmodule Prana.NodeExecutor do
   alias Prana.Node
   alias Prana.NodeExecution
 
+  require Logger
+
   @doc """
   Execute a single node with the given execution and routed input.
 
@@ -56,7 +58,7 @@ defmodule Prana.NodeExecutor do
 
   ## Parameters
   - `node` - The node to retry
-  - `execution` - Current execution state  
+  - `execution` - Current execution state
   - `failed_node_execution` - The failed NodeExecution to retry
   - `execution_context` - Execution context (execution_index, run_index, etc.)
 
@@ -79,7 +81,7 @@ defmodule Prana.NodeExecutor do
     # Resume the failed execution
     resumed_node_execution = NodeExecution.resume(failed_node_execution)
 
-    # Build context and execute action (same as normal execution)  
+    # Build context and execute action (same as normal execution)
     action_context = build_expression_context(resumed_node_execution, execution, routed_input, execution_context)
 
     with {:ok, prepared_params} <- prepare_params(node, action_context),
@@ -246,6 +248,8 @@ defmodule Prana.NodeExecutor do
     process_action_result(result, action)
   rescue
     error ->
+      Logger.error(inspect(error))
+      Logger.error(inspect(__STACKTRACE__, pretty: true))
       {:error, build_action_execution_error("action_execution_failed", error, action)}
   catch
     :exit, reason ->
