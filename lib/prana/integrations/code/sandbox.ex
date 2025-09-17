@@ -141,7 +141,8 @@ defmodule Prana.Integrations.Code.Sandbox do
               {:error, "Validation failed: #{reason}"}
           end
         rescue
-          error -> encode_error(error)
+          error ->
+            encode_error(error)
         end
       end)
 
@@ -162,12 +163,9 @@ defmodule Prana.Integrations.Code.Sandbox do
   # Checks if module exists, compiles if needed.
   # Context is not needed for compilation - only for runtime execution.
   defp ensure_code_is_loaded(module_name, ast, _context) do
-    case Code.ensure_loaded(module_name) do
-      {:module, ^module_name} ->
-        # Module already loaded
+    if Code.loaded?(module_name) do
         :ok
-
-      {:error, :nofile} ->
+      else
         compile_and_load(module_name, ast)
     end
   end
