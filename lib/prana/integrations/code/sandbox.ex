@@ -31,6 +31,7 @@ defmodule Prana.Integrations.Code.Sandbox do
   """
 
   alias Prana.Integrations.Code.AstValidator
+  require Logger
 
   # Sequin uses 1000ms timeout
   @timeout 1000
@@ -88,7 +89,9 @@ defmodule Prana.Integrations.Code.Sandbox do
               {:error, "Validation failed: #{reason}"}
           end
         rescue
-          error -> encode_error(error)
+          error ->
+            Logger.error(inspect(__STACKTRACE__))
+            encode_error(error)
         end
       end)
 
@@ -142,6 +145,7 @@ defmodule Prana.Integrations.Code.Sandbox do
           end
         rescue
           error ->
+            Logger.error(inspect(__STACKTRACE__))
             encode_error(error)
         end
       end)
