@@ -122,7 +122,7 @@ defmodule Prana.IntegrationRegistry do
           description: integration.description,
           category: integration.category,
           version: integration.version,
-          action_count: map_size(integration.actions)
+          action_count: length(integration.actions)
         }
       end)
 
@@ -150,7 +150,7 @@ defmodule Prana.IntegrationRegistry do
       total_integrations: map_size(state.integrations),
       total_actions:
         state.integrations
-        |> Enum.map(fn {_name, %Prana.Integration{actions: actions}} -> map_size(actions) end)
+        |> Enum.map(fn {_name, %Prana.Integration{actions: actions}} -> length(actions) end)
         |> Enum.sum(),
       integrations_by_category:
         state.integrations
@@ -189,11 +189,14 @@ defmodule Prana.IntegrationRegistry do
 
       case integration do
         %Prana.Integration{} = integration ->
-          new_integrations = Map.put(state.integrations, integration.name, integration)
+          # Convert list-based actions to map format if needed
+          normalized_integration = normalize_integration_actions(integration)
+
+          new_integrations = Map.put(state.integrations, normalized_integration.name, normalized_integration)
           new_state = %{state | integrations: new_integrations}
 
           # Logger.info(
-          #   "Registered integration: #{integration.name} (#{module}) with #{map_size(integration.actions)} actions"
+          #   "Registered integration: #{normalized_integration.name} (#{module}) with #{map_size(normalized_integration.actions)} actions"
           # )
 
           {:ok, new_state}
@@ -214,10 +217,10 @@ defmodule Prana.IntegrationRegistry do
     # Search through all integrations and their actions using action.name
     result =
       Enum.reduce_while(state.integrations, nil, fn {_integration_name, %Prana.Integration{actions: actions}}, _acc ->
-        case Enum.find(actions, fn {_action_key, action} ->
+        case Enum.find(actions, fn action ->
                action.name == type
              end) do
-          {_action_key, action} -> {:halt, {:ok, action}}
+          %Prana.Action{} = action -> {:halt, {:ok, action}}
           nil -> {:cont, nil}
         end
       end)
@@ -228,17 +231,49 @@ defmodule Prana.IntegrationRegistry do
     end
   end
 
+  defp normalize_integration_actions(%Prana.Integration{actions: actions} = integration) do
+    case actions do
+      # List of action modules or specs - convert to action specs
+      actions when is_list(actions) ->
+        action_specs =
+          actions
+          |> Enum.map(fn
+            action_module when is_atom(action_module) ->
+              Code.ensure_loaded(action_module)
+
+              if function_exported?(action_module, :definition, 0) do
+                action_spec = action_module.definition()
+                %{action_spec | module: action_module}
+              else
+                Logger.error("Action module #{action_module} does not implement definition/0")
+                nil
+              end
+
+            %Prana.Action{} = action_spec ->
+              action_spec
+          end)
+          |> Enum.reject(&is_nil/1)
+
+        %{integration | actions: action_specs}
+
+      # Invalid format
+      _ ->
+        Logger.error("Invalid actions format: #{inspect(actions)}")
+        integration
+    end
+  end
+
   defp check_integration_health(%Prana.Integration{actions: actions}) do
     # Check if all action modules implement the Action behavior
     invalid_actions =
-      Enum.reject(actions, fn {_name, %Prana.Action{module: module}} ->
+      Enum.reject(actions, fn %Prana.Action{module: module} ->
         function_exported?(module, :execute, 1)
       end)
 
     if Enum.empty?(invalid_actions) do
       :ok
     else
-      action_names = Enum.map(invalid_actions, fn {name, _action} -> name end)
+      action_names = Enum.map(invalid_actions, fn %Prana.Action{name: name} -> name end)
       {:error, "Actions with missing execute/1 function: #{inspect(action_names)}"}
     end
   end

@@ -24,10 +24,10 @@ defmodule Prana.Integrations.Data do
       description: "Data manipulation operations for workflow data processing",
       version: "1.0.0",
       category: "core",
-      actions: %{
-        "merge" => MergeAction.specification(),
-        "set_data" => SetDataAction.specification()
-      }
+      actions: [
+        MergeAction,
+        SetDataAction
+      ]
     }
   end
 end

@@ -29,9 +29,7 @@ defmodule Prana.Integrations.Wait do
       description: "Time-based workflow control with delays and timeouts",
       version: "1.0.0",
       category: "control",
-      actions: %{
-        "wait" => Prana.Integrations.Wait.WaitAction.specification()
-      }
+      actions: [Prana.Integrations.Wait.WaitAction]
     }
   end
 
@@ -226,13 +224,12 @@ defmodule Prana.Integrations.Wait.WaitAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "wait.wait",
       display_name: "Wait",
       description: "Unified wait action supporting multiple modes: interval, schedule, webhook",
       type: :wait,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main", "timeout", "error"]
     }

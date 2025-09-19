@@ -4,15 +4,14 @@ defmodule Prana.Integrations.HTTP.WebhookRespondActionTest do
   alias Prana.Integrations.HTTP.WebhookRespondAction
 
   describe "specification/0" do
-    test "returns correct action specification" do
-      spec = WebhookRespondAction.specification()
+    test "returns correct action definition" do
+      spec = WebhookRespondAction.definition()
 
       assert spec.name == "http.webhook_respond"
       assert spec.display_name == "Webhook Respond"
       assert spec.type == :action
       assert spec.input_ports == ["main"]
       assert spec.output_ports == ["main", "error"]
-      assert spec.module == WebhookRespondAction
     end
   end
 

@@ -14,13 +14,12 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
   alias Prana.Action
   alias Prana.Integrations.Code.Sandbox
 
-  def specification do
+  def definition do
     %Action{
       name: "code.elixir",
       display_name: "Execute Elixir Code",
       description: "Execute Elixir code in a sandboxed environment with security validation",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main", "error"]
     }

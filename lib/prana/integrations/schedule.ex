@@ -16,9 +16,9 @@ defmodule Prana.Integrations.Schedule do
       description: "Cron-based scheduling and timing actions",
       version: "1.0.0",
       category: "scheduling",
-      actions: %{
-        "cron_trigger" => CronTriggerAction.specification()
-      }
+      actions: [
+        CronTriggerAction
+      ]
     }
   end
 end

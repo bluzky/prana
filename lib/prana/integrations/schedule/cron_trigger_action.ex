@@ -30,13 +30,12 @@ defmodule Prana.Integrations.Schedule.CronTriggerAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "schedule.cron_trigger",
       display_name: "Cron Trigger",
       description: "Trigger with crontab pattern configuration",
       type: :trigger,
-      module: __MODULE__,
       input_ports: [],
       output_ports: ["main"],
       params_schema: %{

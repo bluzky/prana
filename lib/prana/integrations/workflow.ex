@@ -30,10 +30,10 @@ defmodule Prana.Integrations.Workflow do
       description: "Sub-workflow orchestration and coordination operations",
       version: "1.0.0",
       category: "coordination",
-      actions: %{
-        "execute_workflow" => ExecuteWorkflowAction.specification(),
-        "set_state" => SetStateAction.specification()
-      }
+      actions: [
+        ExecuteWorkflowAction,
+        SetStateAction
+      ]
     }
   end
 end

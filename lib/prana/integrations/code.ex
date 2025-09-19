@@ -39,9 +39,7 @@ defmodule Prana.Integrations.Code do
       description: "Execute Elixir code in a sandboxed environment with security validation",
       version: "1.0.0",
       category: "development",
-      actions: %{
-        "elixir" => ElixirCodeAction.specification()
-      }
+      actions: [ElixirCodeAction]
     }
   end
 end

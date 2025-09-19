@@ -15,13 +15,12 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "logic.if_condition",
       display_name: "IF Condition",
       description: "Evaluate condition and route to true/false",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["true", "false"]
     }

@@ -10,16 +10,16 @@ defmodule Prana.Integration do
         description: "Send messages and manage Slack channels",
         version: "1.0.0",
         category: "communication",
-        actions: %{
-          "send_message" => %Prana.Action{
+        actions: [
+          %Prana.Action{
             name: "send_message",
             display_name: "Send Message",
             description: "Send a message to a Slack channel",
             module: MyApp.SlackSendMessageAction,
             input_ports: ["input"],
             output_ports: ["success", "error"],
-            
-           
+
+
             params_schema: %{
               type: "object",
               required: ["channel", "message"],
@@ -35,7 +35,7 @@ defmodule Prana.Integration do
               }
             ]
           }
-        },
+        ],
         metadata: %{
           author: "MyApp Team",
           docs_url: "https://docs.myapp.com/integrations/slack"
@@ -50,7 +50,7 @@ defmodule Prana.Integration do
           description: String.t(),
           version: String.t(),
           category: String.t(),
-          actions: %{String.t() => Prana.Action.t()},
+          actions: [Prana.Action.t()],
           metadata: map()
         }
 

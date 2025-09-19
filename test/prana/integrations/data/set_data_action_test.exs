@@ -136,14 +136,13 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
   end
 
   describe "specification/0" do
-    test "returns correct action specification" do
-      spec = SetDataAction.specification()
+    test "returns correct action definition" do
+      spec = SetDataAction.definition()
 
       assert spec.name == "data.set_data"
       assert spec.display_name == "Set Data"
       assert spec.description == "Create or transform data using templates in manual or json mode"
       assert spec.type == :action
-      assert spec.module == SetDataAction
       assert spec.input_ports == ["main"]
       assert spec.output_ports == ["main", "error"]
     end

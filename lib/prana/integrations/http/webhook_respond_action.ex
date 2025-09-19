@@ -12,13 +12,12 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "http.webhook_respond",
       display_name: "Webhook Respond",
       description: "Send custom response back to webhook caller",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main", "error"]
     }

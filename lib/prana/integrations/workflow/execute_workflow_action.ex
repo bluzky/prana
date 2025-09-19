@@ -44,13 +44,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     field(:failure_strategy, :string, default: "fail_parent", in: ["fail_parent", "continue"])
   end
 
-  def specification do
+  def definition do
     %Action{
       name: "workflow.execute_workflow",
       display_name: "Execute Sub-workflow",
       description: "Execute a sub-workflow with synchronous or asynchronous coordination",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main", "error", "failure", "timeout"]
     }

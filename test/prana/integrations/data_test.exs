@@ -11,11 +11,13 @@ defmodule Prana.Integrations.DataTest do
       assert definition.name == "data"
       assert definition.display_name == "Data"
       assert definition.category == "core"
-      assert Map.has_key?(definition.actions, "merge")
+      assert length(definition.actions) == 2
 
-      # Check that the action points to the correct module
-      merge_action = definition.actions["merge"]
-      assert merge_action.module == MergeAction
+      # Check that merge action exists and points to correct module
+      merge_action_module = Enum.find(definition.actions, &(&1 == MergeAction))
+      assert merge_action_module != nil
+      merge_action = merge_action_module.definition()
+      assert merge_action.name == "data.merge"
     end
   end
 

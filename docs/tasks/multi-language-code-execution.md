@@ -64,7 +64,7 @@ defmodule Prana.Integrations.Code do
       version: "1.0.0",
       category: "development",
       actions: %{
-        "elixir" => ElixirCodeAction.specification()
+        "elixir" => ElixirCodeAction
       }
     }
   end
@@ -73,7 +73,7 @@ end
 
 **Deliverables:**
 - Main integration module
-- ElixirCodeAction specification
+- ElixirCodeAction definition
 - Integration registration with Prana.IntegrationRegistry
 
 ### Task 2: ElixirCodeAction Implementation
@@ -115,7 +115,7 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
   alias Prana.Action
   alias Prana.Integrations.Code.{Sandbox, AstValidator, SecurityPolicy}
   
-  def specification do
+  def definition do
     %Action{
       name: "code.elixir",
       display_name: "Execute Elixir Code",
@@ -609,7 +609,7 @@ All tasks have been successfully completed with a production-ready Elixir code e
 
 #### 1. **Core Integration Module** (`lib/prana/integrations/code.ex`)
 - ✅ Main Code integration following Prana patterns
-- ✅ ElixirCodeAction registration and specification
+- ✅ ElixirCodeAction registration and definition
 - ✅ Integration with Prana.IntegrationRegistry
 
 #### 2. **ElixirCodeAction** (`lib/prana/integrations/code/elixir_code_action.ex`)

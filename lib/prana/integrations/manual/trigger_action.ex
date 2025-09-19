@@ -7,13 +7,12 @@ defmodule Prana.Integrations.Manual.TriggerAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "manual.trigger",
       display_name: "Manual Trigger",
       description: "Simple trigger for testing",
       type: :trigger,
-      module: __MODULE__,
       input_ports: [],
       output_ports: ["main"]
     }

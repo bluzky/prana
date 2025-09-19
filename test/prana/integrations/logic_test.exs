@@ -16,21 +16,24 @@ defmodule Prana.Integrations.LogicTest do
       assert definition.version == "1.0.0"
       assert definition.category == "core"
 
+      # Check we have the right number of actions
+      assert length(definition.actions) == 2
+
       # Check if_condition action
-      assert Map.has_key?(definition.actions, "if_condition")
-      if_action = definition.actions["if_condition"]
+      if_action_module = Enum.find(definition.actions, &(&1 == IfConditionAction))
+      assert if_action_module != nil
+      if_action = if_action_module.definition()
       assert if_action.name == "logic.if_condition"
       assert if_action.display_name == "IF Condition"
-      assert if_action.module == IfConditionAction
       assert if_action.input_ports == ["main"]
       assert if_action.output_ports == ["true", "false"]
 
       # Check switch action
-      assert Map.has_key?(definition.actions, "switch")
-      switch_action = definition.actions["switch"]
+      switch_action_module = Enum.find(definition.actions, &(&1 == SwitchAction))
+      assert switch_action_module != nil
+      switch_action = switch_action_module.definition()
       assert switch_action.name == "logic.switch"
       assert switch_action.display_name == "Switch"
-      assert switch_action.module == SwitchAction
       assert switch_action.input_ports == ["main"]
       assert switch_action.output_ports == ["*"]
     end

@@ -36,13 +36,12 @@ defmodule Prana.Integrations.Workflow.SetStateAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "workflow.set_state",
       display_name: "Set State",
       description: "Set or update values in workflow execution state",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main"]
     }

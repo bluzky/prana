@@ -18,7 +18,7 @@ defmodule Prana.EndToEndRetryTest do
 
     alias Prana.Action
 
-    def specification do
+    def definition do
       %Action{
         name: "e2e.unreliable_service",
         display_name: "Unreliable Service",
@@ -61,7 +61,7 @@ defmodule Prana.EndToEndRetryTest do
 
     alias Prana.Action
 
-    def specification do
+    def definition do
       %Action{
         name: "e2e.data_processor",
         display_name: "Data Processor",
@@ -105,10 +105,10 @@ defmodule Prana.EndToEndRetryTest do
       %Prana.Integration{
         name: "e2e",
         display_name: "End-to-End Test Integration",
-        actions: %{
-          "unreliable_service" => UnreliableServiceAction.specification(),
-          "data_processor" => DataProcessorAction.specification()
-        }
+        actions: [
+          UnreliableServiceAction,
+          DataProcessorAction
+        ]
       }
     end
   end

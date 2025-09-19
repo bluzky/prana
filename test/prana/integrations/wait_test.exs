@@ -13,17 +13,21 @@ defmodule Prana.Integrations.WaitTest do
       assert definition.display_name == "Wait"
       assert definition.version == "1.0.0"
       assert definition.category == "control"
-      assert Map.has_key?(definition.actions, "wait")
-      assert map_size(definition.actions) == 1
+      assert length(definition.actions) == 1
+
+      # Check that the action has the correct name
+      wait_action_module = List.first(definition.actions)
+      wait_action = wait_action_module.definition()
+      assert wait_action.name == "wait.wait"
     end
 
     test "wait action has correct configuration" do
       definition = Wait.definition()
-      wait_action = definition.actions["wait"]
+      wait_action_module = List.first(definition.actions)
+      wait_action = wait_action_module.definition()
 
       assert wait_action.name == "wait.wait"
       assert wait_action.display_name == "Wait"
-      assert wait_action.module == Prana.Integrations.Wait.WaitAction
       assert wait_action.input_ports == ["main"]
       assert wait_action.output_ports == ["main", "timeout", "error"]
     end

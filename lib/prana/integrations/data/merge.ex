@@ -8,13 +8,12 @@ defmodule Prana.Integrations.Data.MergeAction do
   alias Prana.Action
   alias Prana.Core.Error
 
-  def specification do
+  def definition do
     %Action{
       name: "data.merge",
       display_name: "Merge Data",
       description: "Combine data from multiple named input ports (diamond pattern coordination)",
       type: :action,
-      module: __MODULE__,
       input_ports: ["input_a", "input_b"],
       output_ports: ["main", "error"]
     }

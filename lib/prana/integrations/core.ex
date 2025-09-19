@@ -20,9 +20,9 @@ defmodule Prana.Integrations.Core do
       description: "Core control flow and loop constructs",
       version: "1.0.0",
       category: "core",
-      actions: %{
-        "for_each" => ForEachAction.specification()
-      }
+      actions: [
+        ForEachAction
+      ]
     }
   end
 end

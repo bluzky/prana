@@ -16,13 +16,12 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
   alias Prana.Integrations.Core.ForEachAction
 
   describe "specification/0" do
-    test "returns correct action specification" do
-      spec = ForEachAction.specification()
+    test "returns correct action definition" do
+      spec = ForEachAction.definition()
 
       assert spec.name == "core.for_each"
       assert spec.display_name == "For Each"
       assert spec.type == :action
-      assert spec.module == ForEachAction
       assert spec.input_ports == ["main"]
       assert spec.output_ports == ["loop", "done", "error"]
     end

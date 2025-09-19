@@ -4,6 +4,7 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
   alias Prana.Action
   alias Prana.Core.Error
   alias Prana.NodeExecutor
+  alias Prana.Integrations.Logic.SwitchAction
 
   describe "dynamic output ports with ['*']" do
     test "allows any port name when output_ports is ['*']" do
@@ -58,7 +59,9 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
 
     test "logic switch action uses dynamic ports" do
       # Test that our Logic integration actually uses dynamic ports
-      logic_action = Prana.Integrations.Logic.definition().actions["switch"]
+      logic_actions = Prana.Integrations.Logic.definition().actions
+      logic_action_module = Enum.find(logic_actions, &(&1 == SwitchAction))
+      logic_action = logic_action_module.definition()
 
       assert logic_action.output_ports == ["*"]
 

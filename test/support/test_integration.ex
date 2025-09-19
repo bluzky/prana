@@ -8,6 +8,7 @@ defmodule Prana.TestSupport.TestIntegration do
   alias Prana.Action
   alias Prana.Integration
   alias Prana.TestSupport.TestIntegration.SimpleTestAction
+  alias Prana.TestSupport.TestIntegration.TriggerTestAction
 
   def definition do
     %Integration{
@@ -16,26 +17,10 @@ defmodule Prana.TestSupport.TestIntegration do
       description: "Simple test integration for unit tests",
       version: "1.0.0",
       category: "testing",
-      actions: %{
-        "simple_action" => %Action{
-          name: "test.simple_action",
-          display_name: "Simple Action",
-          description: "A simple test action that can succeed or fail",
-          type: :action,
-          module: SimpleTestAction,
-          input_ports: ["input"],
-          output_ports: ["main", "error"]
-        },
-        "trigger_action" => %Action{
-          name: "test.trigger_action",
-          display_name: "Test Trigger",
-          description: "A simple test trigger",
-          type: :trigger,
-          module: SimpleTestAction,
-          input_ports: [],
-          output_ports: ["main"]
-        }
-      }
+      actions: [
+        SimpleTestAction,
+        TriggerTestAction
+      ]
     }
   end
 end
@@ -46,6 +31,18 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
   """
 
   use Prana.Actions.SimpleAction
+  alias Prana.Action
+
+  def definition do
+    %Action{
+      name: "test.simple_action",
+      display_name: "Simple Action",
+      description: "A simple test action that can succeed or fail",
+      type: :action,
+      input_ports: ["input"],
+      output_ports: ["main", "error"]
+    }
+  end
 
   @impl true
   def execute(params, _context) do
@@ -66,5 +63,30 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
          timestamp: DateTime.utc_now()
        }}
     end
+  end
+end
+
+defmodule Prana.TestSupport.TestIntegration.TriggerTestAction do
+  @moduledoc """
+  Simple test trigger using Action behavior pattern.
+  """
+
+  use Prana.Actions.SimpleAction
+  alias Prana.Action
+
+  def definition do
+    %Action{
+      name: "test.trigger_action",
+      display_name: "Test Trigger",
+      description: "A simple test trigger",
+      type: :trigger,
+      input_ports: [],
+      output_ports: ["main"]
+    }
+  end
+
+  @impl true
+  def execute(_params, _context) do
+    {:ok, %{triggered: true, timestamp: DateTime.utc_now()}}
   end
 end

@@ -16,7 +16,7 @@ defmodule Prana.NodeExecutorRetryTest do
 
     alias Prana.Action
 
-    def specification do
+    def definition do
       %Action{
         name: "failing.always_fail",
         display_name: "Always Fail",
@@ -40,7 +40,7 @@ defmodule Prana.NodeExecutorRetryTest do
 
     alias Prana.Action
 
-    def specification do
+    def definition do
       %Action{
         name: "failing.fail_with_suspension",
         display_name: "Suspend Action",
@@ -67,10 +67,10 @@ defmodule Prana.NodeExecutorRetryTest do
       %Prana.Integration{
         name: "failing",
         display_name: "Failing Test Integration",
-        actions: %{
-          "always_fail" => FailingAction.specification(),
-          "fail_with_suspension" => SuspendingAction.specification()
-        }
+        actions: [
+          FailingAction,
+          SuspendingAction
+        ]
       }
     end
   end

@@ -10,13 +10,12 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "http.webhook_trigger",
       display_name: "Webhook Trigger",
       description: "Configure webhook endpoint for triggering workflow execution",
       type: :trigger,
-      module: __MODULE__,
       input_ports: [],
       output_ports: ["main"]
     }

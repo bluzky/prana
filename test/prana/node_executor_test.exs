@@ -15,6 +15,18 @@ defmodule Prana.NodeExecutorTest do
     @moduledoc false
     defmodule BasicSuccess do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.basic_success",
+          display_name: "Basic Success",
+          description: "Basic success action",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["output"]
+        }
+      end
+
       def execute(input, _context) do
         value = input["value"] || 0
         {:ok, %{result: value * 2}}
@@ -28,6 +40,18 @@ defmodule Prana.NodeExecutorTest do
     # Action with explicit port
     defmodule ExplicitPort do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.explicit_port",
+          display_name: "Explicit Port",
+          description: "Action with explicit port selection",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["premium", "basic", "main"]
+        }
+      end
+
       def execute(input, _context) do
         if input["premium"] do
           {:ok, %{status: "premium"}, "premium"}
@@ -44,6 +68,18 @@ defmodule Prana.NodeExecutorTest do
     # Action with context
     defmodule WithContext do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.with_context",
+          display_name: "With Context",
+          description: "Action that returns context data",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["main"]
+        }
+      end
+
       def execute(input, _context) do
         {:ok, %{data: input}, "main", %{processing_time: 100}}
       end
@@ -56,6 +92,18 @@ defmodule Prana.NodeExecutorTest do
     # Action that returns error
     defmodule ErrorAction do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.error_action",
+          display_name: "Error Action",
+          description: "Action that returns an error",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["main"]
+        }
+      end
+
       def execute(_input, _context) do
         {:error, "Something went wrong"}
       end
@@ -68,6 +116,18 @@ defmodule Prana.NodeExecutorTest do
     # Action that returns error with port
     defmodule ErrorWithPort do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.error_with_port",
+          display_name: "Error With Port",
+          description: "Action that returns an error with explicit port",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["main", "error", "validation_error"]
+        }
+      end
+
       def execute(_input, _context) do
         {:error, "Invalid input", "validation_error"}
       end
@@ -80,6 +140,18 @@ defmodule Prana.NodeExecutorTest do
     # Action that suspends
     defmodule SuspendAction do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.suspend_action",
+          display_name: "Suspend Action",
+          description: "Action that suspends execution",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["main", "resumed"]
+        }
+      end
+
       def execute(_input, _context) do
         {:suspend, :sub_workflow_sync, %{workflow_id: "child_workflow"}}
       end
@@ -92,6 +164,18 @@ defmodule Prana.NodeExecutorTest do
     # Action that throws exception
     defmodule ExceptionAction do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.exception_action",
+          display_name: "Exception Action",
+          description: "Action that throws an exception",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["main"]
+        }
+      end
+
       def execute(_input, _context) do
         raise "Test exception"
       end
@@ -104,6 +188,18 @@ defmodule Prana.NodeExecutorTest do
     # Action with invalid return format
     defmodule InvalidReturn do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.invalid_return",
+          display_name: "Invalid Return",
+          description: "Action that returns invalid format",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["main"]
+        }
+      end
+
       def execute(_input, _context) do
         "invalid_return"
       end
@@ -116,6 +212,18 @@ defmodule Prana.NodeExecutorTest do
     # Action with dynamic ports
     defmodule DynamicPorts do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.dynamic_ports",
+          display_name: "Dynamic Ports",
+          description: "Action with dynamic output ports",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["*"]
+        }
+      end
+
       def execute(input, _context) do
         port_name = "dynamic_#{input["type"]}"
         {:ok, %{port_used: port_name}, port_name}
@@ -129,6 +237,18 @@ defmodule Prana.NodeExecutorTest do
     # Action with invalid port
     defmodule InvalidPort do
       @moduledoc false
+
+      def definition do
+        %Prana.Action{
+          name: "test.invalid_port",
+          display_name: "Invalid Port",
+          description: "Action that returns invalid port name",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["output"]
+        }
+      end
+
       def execute(_input, _context) do
         {:ok, %{result: "test"}, "nonexistent_port"}
       end
@@ -151,98 +271,18 @@ defmodule Prana.NodeExecutorTest do
         description: "Test integration for NodeExecutor tests",
         version: "1.0.0",
         category: "test",
-        actions: %{
-          "basic_success" => %Action{
-            name: "test.basic_success",
-            display_name: "Basic Success",
-            description: "Basic success action",
-            type: :action,
-            module: TestActions.BasicSuccess,
-            input_ports: ["input"],
-            output_ports: ["output"]
-          },
-          "explicit_port" => %Action{
-            name: "test.explicit_port",
-            display_name: "Explicit Port",
-            description: "Action with explicit port selection",
-            type: :action,
-            module: TestActions.ExplicitPort,
-            input_ports: ["input"],
-            output_ports: ["premium", "basic"]
-          },
-          "with_context" => %Action{
-            name: "test.with_context",
-            display_name: "With Context",
-            description: "Action that returns context data",
-            type: :action,
-            module: TestActions.WithContext,
-            input_ports: ["input"],
-            output_ports: ["main"]
-          },
-          "error_action" => %Action{
-            name: "test.error_action",
-            display_name: "Error Action",
-            description: "Action that returns error",
-            type: :action,
-            module: TestActions.ErrorAction,
-            input_ports: ["input"],
-            output_ports: ["output", "error"]
-          },
-          "error_with_port" => %Action{
-            name: "test.error_with_port",
-            display_name: "Error With Port",
-            description: "Action that returns error with port",
-            type: :action,
-            module: TestActions.ErrorWithPort,
-            input_ports: ["input"],
-            output_ports: ["output", "validation_error"]
-          },
-          "suspend_action" => %Action{
-            name: "test.suspend_action",
-            display_name: "Suspend Action",
-            description: "Action that suspends execution",
-            type: :action,
-            module: TestActions.SuspendAction,
-            input_ports: ["input"],
-            output_ports: ["main", "resumed"]
-          },
-          "exception_action" => %Action{
-            name: "test.exception_action",
-            display_name: "Exception Action",
-            description: "Action that throws exception",
-            type: :action,
-            module: TestActions.ExceptionAction,
-            input_ports: ["input"],
-            output_ports: ["output", "error"]
-          },
-          "invalid_return" => %Action{
-            name: "test.invalid_return",
-            display_name: "Invalid Return",
-            description: "Action with invalid return format",
-            type: :action,
-            module: TestActions.InvalidReturn,
-            input_ports: ["input"],
-            output_ports: ["output"]
-          },
-          "dynamic_ports" => %Action{
-            name: "test.dynamic_ports",
-            display_name: "Dynamic Ports",
-            description: "Action with dynamic port support",
-            type: :action,
-            module: TestActions.DynamicPorts,
-            input_ports: ["input"],
-            output_ports: ["*"]
-          },
-          "invalid_port" => %Action{
-            name: "test.invalid_port",
-            display_name: "Invalid Port",
-            description: "Action that returns invalid port",
-            type: :action,
-            module: TestActions.InvalidPort,
-            input_ports: ["input"],
-            output_ports: ["output"]
-          }
-        }
+        actions: [
+          TestActions.BasicSuccess,
+          TestActions.ExplicitPort,
+          TestActions.WithContext,
+          TestActions.ErrorAction,
+          TestActions.ErrorWithPort,
+          TestActions.SuspendAction,
+          TestActions.ExceptionAction,
+          TestActions.InvalidReturn,
+          TestActions.DynamicPorts,
+          TestActions.InvalidPort
+        ]
       }
     end
   end

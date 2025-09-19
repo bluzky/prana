@@ -31,11 +31,11 @@ defmodule Prana.Integrations.HTTP do
       description: "HTTP requests and webhook handling",
       version: "1.0.0",
       category: "network",
-      actions: %{
-        "request" => RequestAction.specification(),
-        "webhook" => WebhookAction.specification(),
-        "webhook_respond" => WebhookRespondAction.specification()
-      }
+      actions: [
+        RequestAction,
+        WebhookAction,
+        WebhookRespondAction
+      ]
     }
   end
 end

@@ -25,10 +25,10 @@ defmodule Prana.Integrations.Logic do
       description: "Core logic operations for conditional branching and data merging",
       version: "1.0.0",
       category: "core",
-      actions: %{
-        "if_condition" => IfConditionAction.specification(),
-        "switch" => SwitchAction.specification()
-      }
+      actions: [
+        IfConditionAction,
+        SwitchAction
+      ]
     }
   end
 end

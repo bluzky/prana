@@ -7,13 +7,12 @@ defmodule Prana.Integrations.Manual.ProcessAdultAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "manual.process_adult",
       display_name: "Process Adult",
       description: "Process adult data",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main"]
     }

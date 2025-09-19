@@ -15,11 +15,11 @@ defmodule Prana.Integrations.ScheduleTest do
       assert definition.category == "scheduling"
 
       # Check cron_trigger action
-      assert Map.has_key?(definition.actions, "cron_trigger")
-      cron_action = definition.actions["cron_trigger"]
+      assert length(definition.actions) == 1
+      cron_action_module = List.first(definition.actions)
+      cron_action = cron_action_module.definition()
       assert cron_action.name == "schedule.cron_trigger"
       assert cron_action.display_name == "Cron Trigger"
-      assert cron_action.module == CronTriggerAction
       assert cron_action.input_ports == []
       assert cron_action.output_ports == ["main"]
       assert cron_action.type == :trigger
@@ -27,13 +27,12 @@ defmodule Prana.Integrations.ScheduleTest do
   end
 
   describe "CronTriggerAction" do
-    test "specification/0 returns correct action specification" do
-      spec = CronTriggerAction.specification()
+    test "specification/0 returns correct action definition" do
+      spec = CronTriggerAction.definition()
 
       assert spec.name == "schedule.cron_trigger"
       assert spec.display_name == "Cron Trigger"
       assert spec.type == :trigger
-      assert spec.module == CronTriggerAction
       assert spec.input_ports == []
       assert spec.output_ports == ["main"]
 

@@ -11,13 +11,12 @@ defmodule Prana.Integrations.Data.SetDataAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "data.set_data",
       display_name: "Set Data",
       description: "Create or transform data using templates in manual or json mode",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main", "error"]
     }

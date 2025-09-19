@@ -55,13 +55,12 @@ defmodule Prana.Integrations.Core.ForEachAction do
     field(:batch_size, :integer, number: [min: 1])
   end
 
-  def specification do
+  def definition do
     %Action{
       name: "core.for_each",
       display_name: "For Each",
       description: "Iterate over a collection with single or batch processing",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["loop", "done", "error"]
     }

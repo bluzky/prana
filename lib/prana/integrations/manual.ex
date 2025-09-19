@@ -18,11 +18,11 @@ defmodule Prana.Integrations.Manual do
       description: "Manual test actions for development",
       version: "1.0.0",
       category: "test",
-      actions: %{
-        "trigger" => TriggerAction.specification(),
-        "process_adult" => ProcessAdultAction.specification(),
-        "process_minor" => ProcessMinorAction.specification()
-      }
+      actions: [
+        TriggerAction,
+        ProcessAdultAction,
+        ProcessMinorAction
+      ]
     }
   end
 end

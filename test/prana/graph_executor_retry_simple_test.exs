@@ -18,7 +18,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
 
     alias Prana.Action
 
-    def specification do
+    def definition do
       %Action{
         name: "retry.fail_once",
         display_name: "Fail Once",
@@ -51,7 +51,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
 
     alias Prana.Action
 
-    def specification do
+    def definition do
       %Action{
         name: "retry.always_fail",
         display_name: "Always Fail",
@@ -77,10 +77,10 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
       %Prana.Integration{
         name: "retry",
         display_name: "Retry Test Integration",
-        actions: %{
-          "fail_once" => FailOnceAction.specification(),
-          "always_fail" => AlwaysFailAction.specification()
-        }
+        actions: [
+          FailOnceAction,
+          AlwaysFailAction
+        ]
       }
     end
   end

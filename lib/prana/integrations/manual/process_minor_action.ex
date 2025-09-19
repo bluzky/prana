@@ -7,13 +7,12 @@ defmodule Prana.Integrations.Manual.ProcessMinorAction do
 
   alias Prana.Action
 
-  def specification do
+  def definition do
     %Action{
       name: "manual.process_minor",
       display_name: "Process Minor",
       description: "Process minor data",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["main"]
     }

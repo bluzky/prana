@@ -29,13 +29,12 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   alias Prana.Action
   alias Prana.Core.Error
 
-  def specification do
+  def definition do
     %Action{
       name: "logic.switch",
       display_name: "Switch",
       description: "Multi-case routing based on condition expressions",
       type: :action,
-      module: __MODULE__,
       input_ports: ["main"],
       output_ports: ["*"]
     }
