@@ -1,6 +1,20 @@
 defmodule Prana.Integrations.Manual.TriggerAction do
   @moduledoc """
   Manual Trigger Action - Simple trigger for testing workflows
+
+  This action is used to manually start workflow execution, typically for testing purposes.
+  It doesn't require any parameters and simply passes through the input data.
+
+  ## Parameters
+  None required.
+
+  ## Example Params JSON
+  ```json
+  {}
+  ```
+
+  ## Output
+  Returns the input data unchanged through the "main" output port.
   """
 
   use Prana.Actions.SimpleAction
@@ -11,7 +25,7 @@ defmodule Prana.Integrations.Manual.TriggerAction do
     %Action{
       name: "manual.trigger",
       display_name: "Manual Trigger",
-      description: "Simple trigger for testing",
+      description: @moduledoc,
       type: :trigger,
       input_ports: [],
       output_ports: ["main"]

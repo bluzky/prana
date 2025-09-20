@@ -1,8 +1,53 @@
 defmodule Prana.Integrations.HTTP.WebhookAction do
   @moduledoc """
-  Webhook action implementation using Action behavior with suspend/resume pattern
+  Webhook Trigger action implementation using Action behavior with suspend/resume pattern
 
-  Suspends execution and waits for incoming HTTP webhook requests.
+  Creates a webhook endpoint that can trigger workflow execution when HTTP requests are received.
+  The action configures webhook settings and passes through the incoming request data.
+
+  ## Parameters
+  - `path` (optional): Webhook endpoint path (default: "/webhook")
+  - `methods` (optional): Allowed HTTP methods array (default: ["POST"])
+  - `auth` (optional): Authentication configuration object (default: none)
+  - `response_type` (optional): When to respond - "immediately", "on_completion", "at_return_node" (default: "immediately")
+  - `secret` (optional): Webhook secret for validation
+  - `headers` (optional): Expected headers map (default: {})
+
+  ### Authentication Object
+  - `type` (required): "none", "basic", "header", or "jwt"
+  - For basic auth: `username` and `password`
+  - For header auth: `header_name` (default: "Authorization") and `header_value`
+  - For JWT auth: `jwt_secret`
+
+  ## Example Params JSON
+  ```json
+  {
+    "path": "/api/webhooks/github",
+    "methods": ["POST", "PUT"],
+    "auth": {
+      "type": "header",
+      "header_name": "X-GitHub-Token",
+      "header_value": "{{$execution.state.github_secret}}"
+    },
+    "response_type": "immediately",
+    "secret": "my-webhook-secret"
+  }
+  ```
+
+  ## Output Ports
+  - `main`: Webhook request data including headers, body, and metadata
+
+  ## Output Format
+  The webhook passes through the incoming HTTP request data:
+  ```json
+  {
+    "headers": {"content-type": "application/json"},
+    "body": "request body",
+    "method": "POST",
+    "path": "/webhook",
+    "query": {"param": "value"}
+  }
+  ```
   """
 
   use Skema
@@ -14,7 +59,7 @@ defmodule Prana.Integrations.HTTP.WebhookAction do
     %Action{
       name: "http.webhook_trigger",
       display_name: "Webhook Trigger",
-      description: "Configure webhook endpoint for triggering workflow execution",
+      description: @moduledoc,
       type: :trigger,
       input_ports: [],
       output_ports: ["main"]

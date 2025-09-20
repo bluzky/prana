@@ -2,7 +2,58 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   @moduledoc """
   HTTP Request action implementation with Skema schema validation
 
-  Supports GET, POST, PUT, DELETE methods with configurable headers, body, timeout, and authentication.
+  Makes HTTP requests with configurable method, headers, body, timeout, and authentication.
+  Supports GET, POST, PUT, DELETE, HEAD, PATCH, and OPTIONS methods.
+
+  ## Parameters
+  - `url` (required): HTTP/HTTPS URL to make request to
+  - `method` (optional): HTTP method - "GET", "POST", "PUT", "DELETE", "HEAD", "PATCH", "OPTIONS" (default: "GET")
+  - `headers` (optional): Map of HTTP headers (default: {})
+  - `body` (optional): Request body as string
+  - `json` (optional): Request body as JSON object (sets Content-Type header)
+  - `params` (optional): URL query parameters as map (default: {})
+  - `timeout` (optional): Request timeout in milliseconds (default: 5000, max: 300000)
+  - `auth` (optional): Authentication configuration object
+
+  ### Authentication Object
+  - `type` (required): "basic", "bearer", or "api_key"
+  - For basic auth: `username` and `password`
+  - For bearer auth: `token`
+  - For API key: `key` and optional `header` (default: "X-API-Key")
+
+  ## Example Params JSON
+  ```json
+  {
+    "url": "https://api.example.com/users",
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "json": {
+      "name": "John Doe",
+      "email": "john@example.com"
+    },
+    "timeout": 10000,
+    "auth": {
+      "type": "bearer",
+      "token": "{{$execution.state.access_token}}"
+    }
+  }
+  ```
+
+  ## Output Ports
+  - `main`: Successful response with status, headers, and body
+  - `error`: HTTP errors and request failures
+  - `timeout`: Request timeout errors
+
+  ## Response Format
+  ```json
+  {
+    "status": 200,
+    "headers": {"content-type": "application/json"},
+    "body": "response data"
+  }
+  ```
   """
 
   @behaviour Prana.Behaviour.Action
@@ -16,7 +67,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
     %Action{
       name: "http.request",
       display_name: "HTTP Request",
-      description: "Make HTTP requests with configurable method, headers, and body",
+      description: @moduledoc,
       type: :action,
       input_ports: ["main"],
       output_ports: ["main", "error", "timeout"]

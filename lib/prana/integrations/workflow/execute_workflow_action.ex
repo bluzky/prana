@@ -2,32 +2,58 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   @moduledoc """
   Execute Sub-workflow Action - trigger a sub-workflow with coordination and batch processing
 
-  Expected params:
-  - workflow_id: The ID of the sub-workflow to execute
-  - input_data: Data to pass to the sub-workflow (optional, defaults to full input from parent workflow)
-  - execution_mode: Execution mode - "sync" | "async" | "fire_and_forget" (optional, defaults to "sync")
-  - batch_mode: Batch processing mode - "all" | "single" (optional, defaults to "single")
-  - timeout_ms: Maximum time to wait for sub-workflow completion in milliseconds (optional, defaults to 5 minutes)
-  - failure_strategy: How to handle sub-workflow failures - "fail_parent" | "continue" (optional, defaults to "fail_parent")
+  Executes another workflow as a sub-workflow with configurable execution modes and batch processing.
+  Supports synchronous, asynchronous, and fire-and-forget execution patterns.
 
+  ## Parameters
+  - `workflow_id` (required): The ID of the sub-workflow to execute
+  - `execution_mode` (optional): Execution mode - "sync", "async", or "fire_and_forget" (default: "sync")
+  - `batch_mode` (optional): Batch processing mode - "all" or "single" (default: "all")
+  - `timeout_ms` (optional): Maximum time to wait for completion in milliseconds (default: 300000)
+  - `failure_strategy` (optional): How to handle failures - "fail_parent" or "continue" (default: "fail_parent")
+
+  ### Execution Modes
+  - **Synchronous ("sync")**: Parent workflow suspends until sub-workflow completes
+  - **Asynchronous ("async")**: Parent workflow suspends, sub-workflow executes async, parent resumes when complete
+  - **Fire-and-Forget ("fire_and_forget")**: Parent workflow triggers sub-workflow and continues immediately
+
+  ### Batch Processing Modes
+  - **All ("all")**: Run sub-workflow once with all input data passed as-is
+  - **Single ("single")**: Run sub-workflow for each item individually (non-arrays wrapped in list)
+
+  ## Example Params JSON
+
+  ### Synchronous Execution
+  ```json
+  {
+    "workflow_id": "user-processing-workflow",
+    "execution_mode": "sync",
+    "batch_mode": "all",
+    "timeout_ms": 60000,
+    "failure_strategy": "fail_parent"
+  }
+  ```
+
+  ### Batch Processing
+  ```json
+  {
+    "workflow_id": "process-item-workflow",
+    "execution_mode": "async",
+    "batch_mode": "single",
+    "timeout_ms": 300000,
+    "failure_strategy": "continue"
+  }
+  ```
+
+  ## Output Ports
+  - `main`: Sub-workflow completed successfully
+  - `error`: Sub-workflow failed (when failure_strategy="fail_parent")
+  - `failure`: Sub-workflow failed but continuing (when failure_strategy="continue")
+  - `timeout`: Sub-workflow timed out
+
+  ## Behavior
   Input data from parent workflow is automatically passed to the sub-workflow trigger node.
-
-  Execution Modes:
-  - Synchronous ("sync"): Parent workflow suspends until sub-workflow completes
-  - Asynchronous ("async"): Parent workflow suspends, sub-workflow executes async, parent resumes when complete
-  - Fire-and-Forget ("fire_and_forget"): Parent workflow triggers sub-workflow and continues immediately
-
-  Batch Processing Modes:
-  - All ("all"): Run sub-workflow once with all items from input main port (input passed as-is)
-  - Single ("single"): Run sub-workflow for each item individually - non-arrays are wrapped in a list for consistent processing (default)
-
-  The integrating application is responsible for handling the actual batch execution logic.
-
-  Returns:
-  - {:suspend, :sub_workflow_sync, suspension_data} for synchronous execution
-  - {:suspend, :sub_workflow_async, suspension_data} for asynchronous execution
-  - {:suspend, :sub_workflow_fire_forget, suspension_data} for fire-and-forget execution
-  - {:error, reason} if sub-workflow setup fails
+  The action suspends execution and delegates to the application for actual sub-workflow orchestration.
   """
 
   use Skema
@@ -48,7 +74,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     %Action{
       name: "workflow.execute_workflow",
       display_name: "Execute Sub-workflow",
-      description: "Execute a sub-workflow with synchronous or asynchronous coordination",
+      description: @moduledoc,
       type: :action,
       input_ports: ["main"],
       output_ports: ["main", "error", "failure", "timeout"]

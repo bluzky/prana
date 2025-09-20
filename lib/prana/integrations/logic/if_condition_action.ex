@@ -2,13 +2,27 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   @moduledoc """
   IF Condition Action - evaluates a condition and routes to true/false
 
-  Expected params:
-  - condition: expression to evaluate (e.g., "$input.age >= 18")
+  Evaluates a condition expression and routes workflow execution to either the "true" or "false" output port.
+  Uses simple truthiness evaluation - any non-empty, non-nil value is considered true.
 
-  Returns:
-  - {:ok, %{}, "true"} if condition is true
-  - {:ok, %{}, "false"} if condition is false
-  - {:error, reason} if evaluation fails
+  ## Parameters
+  - `condition` (required): Expression or value to evaluate for truthiness
+
+  ## Example Params JSON
+  ```json
+  {
+    "condition": "{{$input.age >= 18}}"
+  }
+  ```
+
+  ## Output Ports
+  - `true`: Routed when condition is truthy (non-nil, non-empty)
+  - `false`: Routed when condition is falsy (nil, empty string, false)
+
+  ## Returns
+  - `{:ok, %{}, "true"}` if condition is true
+  - `{:ok, %{}, "false"}` if condition is false
+  - `{:error, reason}` if evaluation fails
   """
 
   @behaviour Prana.Behaviour.Action
@@ -19,7 +33,7 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
     %Action{
       name: "logic.if_condition",
       display_name: "IF Condition",
-      description: "Evaluate condition and route to true/false",
+      description: @moduledoc,
       type: :action,
       input_ports: ["main"],
       output_ports: ["true", "false"]

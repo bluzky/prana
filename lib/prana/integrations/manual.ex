@@ -6,8 +6,6 @@ defmodule Prana.Integrations.Manual do
   @behaviour Prana.Behaviour.Integration
 
   alias Prana.Integration
-  alias Prana.Integrations.Manual.ProcessAdultAction
-  alias Prana.Integrations.Manual.ProcessMinorAction
   alias Prana.Integrations.Manual.TriggerAction
 
   @impl true
@@ -19,9 +17,7 @@ defmodule Prana.Integrations.Manual do
       version: "1.0.0",
       category: "test",
       actions: [
-        TriggerAction,
-        ProcessAdultAction,
-        ProcessMinorAction
+        TriggerAction
       ]
     }
   end

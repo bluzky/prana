@@ -1,10 +1,63 @@
 defmodule Prana.Integrations.HTTP.WebhookRespondAction do
   @moduledoc """
-  Webhook respond action implementation using Action behavior with suspend pattern
+  Webhook Respond action implementation using Action behavior with suspend pattern
 
-  Suspends execution and returns response configuration for application to handle
-  HTTP response back to webhook caller. Used with webhook triggers that have
-  response_type set to "at_return_node".
+  Sends custom HTTP responses back to webhook callers. Suspends execution to allow the application
+  to handle the actual HTTP response. Used with webhook triggers that have response_type set to "at_return_node".
+
+  ## Parameters
+  - `respond_with` (required): Response type - "text", "json", "redirect", or "no_data" (default: "text")
+  - `status_code` (optional): HTTP status code (default: 200)
+  - `headers` (optional): Additional HTTP headers map (default: {})
+  - `text_data` (required for text): Plain text response content
+  - `json_data` (required for json): JSON object to return
+  - `redirect_url` (required for redirect): URL to redirect to
+  - `redirect_type` (optional): "temporary" or "permanent" (default: "temporary")
+
+  ## Example Params JSON
+
+  ### Text Response
+  ```json
+  {
+    "respond_with": "text",
+    "status_code": 200,
+    "text_data": "Webhook received successfully",
+    "headers": {
+      "X-Custom-Header": "value"
+    }
+  }
+  ```
+
+  ### JSON Response
+  ```json
+  {
+    "respond_with": "json",
+    "status_code": 201,
+    "json_data": {
+      "success": true,
+      "message": "Data processed",
+      "id": "{{$input.user_id}}"
+    }
+  }
+  ```
+
+  ### Redirect Response
+  ```json
+  {
+    "respond_with": "redirect",
+    "status_code": 302,
+    "redirect_url": "https://example.com/success",
+    "redirect_type": "temporary"
+  }
+  ```
+
+  ## Output Ports
+  - `main`: Response sent successfully
+  - `error`: Response configuration or sending errors
+
+  ## Behavior
+  This action suspends workflow execution to allow the application to send the HTTP response,
+  then resumes with success confirmation.
   """
 
   use Prana.Actions.SimpleAction
@@ -16,7 +69,7 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
     %Action{
       name: "http.webhook_respond",
       display_name: "Webhook Respond",
-      description: "Send custom response back to webhook caller",
+      description: @moduledoc,
       type: :action,
       input_ports: ["main"],
       output_ports: ["main", "error"]
