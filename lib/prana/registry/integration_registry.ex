@@ -116,14 +116,7 @@ defmodule Prana.IntegrationRegistry do
   def handle_call(:list_integrations, _from, state) do
     integrations =
       Enum.map(state.integrations, fn {_name, %Prana.Integration{} = integration} ->
-        %{
-          name: integration.name,
-          display_name: integration.display_name,
-          description: integration.description,
-          category: integration.category,
-          version: integration.version,
-          action_count: length(integration.actions)
-        }
+        integration
       end)
 
     {:reply, integrations, state}

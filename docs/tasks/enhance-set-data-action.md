@@ -90,7 +90,7 @@ This mode is for creating complex, nested JSON objects or arrays.
 
 ### Step 2: Update Action Logic (`lib/prana/integrations/data/set_data_action.ex`)
 
-1.  **Update Specification**: Modify the `description` in `specification/0` to reflect the new dual-mode functionality.
+1.  **Update Specification**: Modify the `description` in `definition/0` to reflect the new dual-mode functionality.
 2.  **Rewrite `execute/2`**:
     - Read the `mode` from `params`, defaulting to `"manual"`.
     - Implement a `case` statement to handle the `mode`.

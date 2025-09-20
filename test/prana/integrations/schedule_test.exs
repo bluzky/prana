@@ -27,7 +27,7 @@ defmodule Prana.Integrations.ScheduleTest do
   end
 
   describe "CronTriggerAction" do
-    test "specification/0 returns correct action definition" do
+    test "definition/0 returns correct action definition" do
       spec = CronTriggerAction.definition()
 
       assert spec.name == "schedule.cron_trigger"

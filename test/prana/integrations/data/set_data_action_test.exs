@@ -135,7 +135,7 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
     end
   end
 
-  describe "specification/0" do
+  describe "definition/0" do
     test "returns correct action definition" do
       spec = SetDataAction.definition()
 

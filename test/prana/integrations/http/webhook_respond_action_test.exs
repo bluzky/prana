@@ -3,7 +3,7 @@ defmodule Prana.Integrations.HTTP.WebhookRespondActionTest do
 
   alias Prana.Integrations.HTTP.WebhookRespondAction
 
-  describe "specification/0" do
+  describe "definition/0" do
     test "returns correct action definition" do
       spec = WebhookRespondAction.definition()
 
