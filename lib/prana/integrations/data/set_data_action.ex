@@ -2,9 +2,49 @@ defmodule Prana.Integrations.Data.SetDataAction do
   @moduledoc """
   Set Data Action - Creates or transforms data using templates
 
-  Supports two operating modes:
-  - `manual`: Simple key-value mapping (params already template-rendered by NodeExecutor)
-  - `json`: Complex nested data structures from JSON templates (template-rendered string parsed as JSON)
+  Creates or transforms data using two operating modes: manual key-value mapping or JSON template parsing.
+  Used for data transformation, object creation, and complex data manipulation in workflows.
+
+  ## Parameters
+  - `mode` (optional): Operating mode - "manual" or "json" (default: "manual")
+  - `mapping_map` (for manual mode): Key-value map of data to output
+  - `json_template` (for json mode): JSON string template to parse
+
+  ### Manual Mode
+  Simple key-value mapping where parameters are already template-rendered by NodeExecutor.
+
+  ### JSON Mode
+  Complex nested data structures created from JSON template strings that get parsed.
+
+  ## Example Params JSON
+
+  ### Manual Mode
+  ```json
+  {
+    "mode": "manual",
+    "mapping_map": {
+      "user_id": "{{$input.id}}",
+      "full_name": "{{$input.first_name}} {{$input.last_name}}",
+      "processed_at": "{{$execution.timestamp}}",
+      "status": "active"
+    }
+  }
+  ```
+
+  ### JSON Mode
+  ```json
+  {
+    "mode": "json",
+    "json_template": "{\"user\": {\"id\": \"{{$input.user_id}}\", \"profile\": {\"name\": \"{{$input.name}}\", \"email\": \"{{$input.email}}\"}}, \"metadata\": {\"created_at\": \"{{$execution.timestamp}}\", \"workflow_id\": \"{{$workflow.id}}\"}}"
+  }
+  ```
+
+  ## Output Ports
+  - `main`: Successfully created/transformed data
+  - `error`: Data creation or JSON parsing errors
+
+  ## Output Format
+  Returns the created data object based on the specified mode and templates.
   """
 
   use Prana.Actions.SimpleAction
@@ -15,7 +55,7 @@ defmodule Prana.Integrations.Data.SetDataAction do
     %Action{
       name: "data.set_data",
       display_name: "Set Data",
-      description: "Create or transform data using templates in manual or json mode",
+      description: @moduledoc,
       type: :action,
       input_ports: ["main"],
       output_ports: ["main", "error"]

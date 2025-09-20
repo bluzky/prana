@@ -2,26 +2,48 @@ defmodule Prana.Integrations.Logic.SwitchAction do
   @moduledoc """
   Switch Action - Multi-case routing based on simple condition expressions
 
-  Expected params:
-  - cases: list of case objects with condition, value, port, and optional data
+  Evaluates multiple conditions in order and routes to the first matching case's output port.
+  Uses simple truthiness evaluation - any non-empty, non-nil condition value is considered a match.
 
-  Example:
-  %{
-    "cases" => [
-      %{"condition" => "$input.tier == \"premium\"", "port" => "premium_port"},
-      %{"condition" => "$input.verified == true", "port" => "verified_port"},
-      %{"condition" => "$input.status == \"active\"", "port" => "active_port"},
-      %{"condition" => true, "port" => "default_port"}
+  ## Parameters
+  - `cases` (required): Array of case objects to evaluate in order
+
+  Each case object contains:
+  - `condition` (required): Expression or value to evaluate for truthiness
+  - `port` (required): Output port name to route to if condition matches
+
+  ## Example Params JSON
+  ```json
+  {
+    "cases": [
+      {
+        "condition": "{{$input.tier == 'premium'}}",
+        "port": "premium_port"
+      },
+      {
+        "condition": "{{$input.verified == true}}",
+        "port": "verified_port"
+      },
+      {
+        "condition": "{{$input.status == 'active'}}",
+        "port": "active_port"
+      },
+      {
+        "condition": true,
+        "port": "default_port"
+      }
     ]
   }
+  ```
 
-  Case objects support:
-  - condition: expression to evaluate (e.g., "$input.field == \"value\"")
-  - port: output port name
+  ## Output Ports
+  Dynamic ports based on case definitions. Common patterns:
+  - Named condition ports (e.g., "premium", "standard", "basic")
+  - "default" port for fallback cases
 
-  Returns:
-  - {:ok, nil, port_name} for matching case
-  - {:ok, nil, default_port} for no match
+  ## Returns
+  - `{:ok, nil, port_name}` for first matching case
+  - `{:error, reason}` if no matching case found
   """
 
   use Prana.Actions.SimpleAction
@@ -33,7 +55,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
     %Action{
       name: "logic.switch",
       display_name: "Switch",
-      description: "Multi-case routing based on condition expressions",
+      description: @moduledoc,
       type: :action,
       input_ports: ["main"],
       output_ports: ["*"]

@@ -3,44 +3,63 @@ defmodule Prana.Integrations.Core.ForEachAction do
   For Each Loop Action - Iterate over collections with single or batch processing
 
   Provides loop constructs for workflow execution with optimized iteration strategy.
-  Uses remaining_items approach to avoid expensive array slicing operations.
+  Processes collections item-by-item or in batches, with automatic loopback to continue iteration.
 
   ## Parameters
-  - `collection` - Template expression that evaluates to an array/list
-  - `mode` - Processing mode: "single" | "batch"
-  - `batch_size` - Number of items per batch (required when mode="batch", min: 1)
+  - `collection` (required): Template expression that evaluates to an array/list
+  - `mode` (required): Processing mode - "single" or "batch"
+  - `batch_size` (required for batch mode): Number of items per batch (minimum: 1)
 
-  ## Context Storage (in node context)
-  - `collection` - Original collection (stored on first run)
-  - `item_count` - Total number of items (for efficiency)
-  - `remaining_items` - Items not yet processed
-  - `current_loop_index` - Current position in original collection
-  - `current_run_index` - Run counter (differs in nested loops)
-  - `has_more_item` - Boolean, set to false before processing last item
+  ## Example Params JSON
+
+  ### Single Item Processing
+  ```json
+  {
+    "collection": "{{$input.users}}",
+    "mode": "single"
+  }
+  ```
+
+  ### Batch Processing
+  ```json
+  {
+    "collection": "{{$input.orders}}",
+    "mode": "batch",
+    "batch_size": 10
+  }
+  ```
+
+  ### Complex Collection
+  ```json
+  {
+    "collection": "{{$nodes.data_fetch.output.items}}",
+    "mode": "single"
+  }
+  ```
+
+  ## Output Ports
+  - `loop`: Current item/batch data for processing (continues loop)
+  - `done`: Loop completed, no more items
+  - `error`: Collection validation or processing errors
+
+  ## Loop Behavior
+  1. **First execution**: Evaluates collection, outputs first item/batch via "loop" port
+  2. **Subsequent executions**: Outputs next item/batch via "loop" port
+  3. **Completion**: When no more items remain, exits via "done" port
 
   ## Output Data
-  - Single mode: Returns the individual item
-  - Batch mode: Returns array of items in current batch
+  - **Single mode**: Returns the individual item from the collection
+  - **Batch mode**: Returns array of items in the current batch
 
-  ## Flow
-  1. First execution: Evaluate collection, process first item/batch via "loop" port
-  2. Subsequent executions: Process next item/batch via "loop" port
-  3. Completion: When no more items, exit via "done" port
+  ## Context Storage
+  The action maintains internal context for efficient iteration:
+  - Original collection size and remaining items
+  - Current loop and run indices
+  - Batch processing state
 
-  ## Examples
-
-      # Single mode - process one item at a time
-      %{
-        "collection" => "{{$input.users}}",
-        "mode" => "single"
-      }
-
-      # Batch mode - process 5 items at a time
-      %{
-        "collection" => "{{$input.items}}",
-        "mode" => "batch",
-        "batch_size" => 5
-      }
+  ## Performance
+  Uses remaining_items approach to avoid expensive array slicing operations,
+  making it efficient for large collections.
   """
 
   use Skema
@@ -59,7 +78,7 @@ defmodule Prana.Integrations.Core.ForEachAction do
     %Action{
       name: "core.for_each",
       display_name: "For Each",
-      description: "Iterate over a collection with single or batch processing",
+      description: @moduledoc,
       type: :action,
       input_ports: ["main"],
       output_ports: ["loop", "done", "error"]
