@@ -7,6 +7,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
   ## Parameters
   - `workflow_id` (required): The ID of the sub-workflow to execute
+  - `input_data` (optional): Data to pass to sub-workflow. If not provided, uses context.$input.main
   - `execution_mode` (optional): Execution mode - "sync", "async", or "fire_and_forget" (default: "sync")
   - `batch_mode` (optional): Batch processing mode - "all" or "single" (default: "all")
   - `timeout_ms` (optional): Maximum time to wait for completion in milliseconds (default: 300000)
@@ -34,10 +35,11 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   }
   ```
 
-  ### Batch Processing
+  ### With Custom Input Data
   ```json
   {
     "workflow_id": "process-item-workflow",
+    "input_data": {"user_id": 123, "action": "process"},
     "execution_mode": "async",
     "batch_mode": "single",
     "timeout_ms": 300000,
@@ -52,8 +54,9 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   - `timeout`: Sub-workflow timed out
 
   ## Behavior
-  Input data from parent workflow is automatically passed to the sub-workflow trigger node.
-  The action suspends execution and delegates to the application for actual sub-workflow orchestration.
+  Input data can be explicitly provided via `input_data` parameter or automatically passed from
+  parent workflow context ($input.main). The action suspends execution and delegates to the
+  application for actual sub-workflow orchestration.
   """
 
   use Skema
@@ -64,6 +67,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
   defschema ExecuteWorkflowSchema do
     field(:workflow_id, :string, required: true, length: [min: 1])
+    field(:input_data, :any)
     field(:execution_mode, :string, default: "sync", in: ["sync", "async", "fire_and_forget"])
     field(:batch_mode, :string, default: "all", in: ["all", "single"])
     field(:timeout_ms, :integer, default: 300_000, number: [min: 1])
@@ -97,8 +101,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     # Use Skema validation
     case validate_params(params) do
       {:ok, validated_params} ->
-        # Get input data from parent workflow
-        raw_input_data = get_in(context, ["$input", "main"])
+        # Get input data from params or fallback to context
+        raw_input_data =
+          case Map.get(validated_params, :input_data) do
+            nil -> get_in(context, ["$input", "main"])
+            data -> data
+          end
 
         # Normalize input data based on batch mode
         input_data =
