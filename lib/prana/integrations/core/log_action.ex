@@ -29,7 +29,7 @@ defmodule Prana.Integrations.Core.LogAction do
 
   def definition do
     %Action{
-      name: "core.log",
+      name: "prana_core.log",
       display_name: "Log",
       description: @moduledoc,
       type: :action,

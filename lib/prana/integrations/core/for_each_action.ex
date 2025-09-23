@@ -76,7 +76,7 @@ defmodule Prana.Integrations.Core.ForEachAction do
 
   def definition do
     %Action{
-      name: "core.for_each",
+      name: "prana_core.for_each",
       display_name: "For Each",
       description: @moduledoc,
       type: :action,

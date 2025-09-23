@@ -16,8 +16,8 @@ defmodule Prana.Integrations.Core do
   @impl true
   def definition do
     %Integration{
-      name: "core",
-      display_name: "Core",
+      name: "prana_core",
+      display_name: "Prana Core",
       description: "Core control flow and loop constructs",
       version: "1.0.0",
       category: "core",
