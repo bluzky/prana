@@ -14,7 +14,8 @@ defmodule Prana.Integrations.Core.LogAction do
   ```json
   {
     "message": "Processing user data",
-    "level": "info"
+    "level": "info",
+    "data": ""{{$input.main}}"
   }
   ```
 
@@ -53,7 +54,7 @@ defmodule Prana.Integrations.Core.LogAction do
     # Log the execution context and input data
     log_output = """
     === #{message} ===
-    Node: #{current_node_key} -- Workflow ID: #{workflow_id} -- Execution ID: #{execution_id}: #{inspect(input, pretty: true)}
+    Node: #{current_node_key} -- Workflow ID: #{workflow_id} -- Execution ID: #{execution_id}: #{inspect(params, pretty: true)}
     ==================
     """
 
