@@ -86,7 +86,7 @@ defmodule Prana.Integrations.Logic.SwitchAction do
     case_port = Map.get(case_config, "port", "default")
 
     # A condition is considered matching if it's truthy (not nil, not empty string)
-    if condition && condition != "" do
+    if condition == true do
       {:ok, case_port}
     else
       find_matching_condition_case(remaining_cases, params, context)
