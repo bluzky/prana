@@ -11,6 +11,7 @@ defmodule Prana.Integrations.Core do
 
   alias Prana.Integration
   alias Prana.Integrations.Core.ForEachAction
+  alias Prana.Integrations.Core.LogAction
 
   @impl true
   def definition do
@@ -21,7 +22,8 @@ defmodule Prana.Integrations.Core do
       version: "1.0.0",
       category: "core",
       actions: [
-        ForEachAction
+        ForEachAction,
+        LogAction
       ]
     }
   end
