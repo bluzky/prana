@@ -36,17 +36,17 @@ defmodule Prana.Integrations.Core.LogAction do
       input_ports: ["main"],
       output_ports: ["main"],
       params_schema: %{
-        message: %{
+        message: [
           type: "string",
           description: "Custom message to include in the log output",
           default: "Log Action"
-        },
-        level: %{
+        ],
+        level: [
           type: "string",
           in: ["info", "debug", "warn", "error"],
           description: "Log level",
           default: "info"
-        }
+        ]
       }
     }
   end
