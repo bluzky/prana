@@ -58,38 +58,59 @@ defmodule Prana.Integrations.Logic.SwitchAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["*"]
+      output_ports: ["*"],
+      params_schema: %{
+        cases: [
+          type:
+            {:array,
+             %{
+               condition: [
+                 type: :boolean,
+                 description: "Boolean condition to evaluate",
+                 required: true
+               ],
+               port: [
+                 type: :string,
+                 description: "Output port to route to if condition is true",
+                 required: true
+               ]
+             }},
+          description: "Array of case objects with condition and port",
+          required: true
+        ]
+      }
     }
   end
 
   @impl true
   def execute(params, context) do
-    cases = Map.get(params, "cases", [])
+    # Check if cases parameter exists
+    cases = Map.get(params, :cases)
 
-    # Try each case in order
-    case find_matching_condition_case(cases, params, context) do
-      {:ok, case_port} ->
-        {:ok, nil, case_port}
+    if cases do
+      # Try each case in order
+      case find_matching_condition_case(cases, context) do
+        {:ok, case_port} ->
+          {:ok, nil, case_port}
 
-      :no_match ->
-        {:error, Error.action_error("no_matching_case", "No matching case found")}
+        :no_match ->
+          {:error, Error.action_error("no_matching_case", "No matching case found")}
+      end
+    else
+      {:error, Error.action_error("missing_cases", "Cases parameter is required")}
     end
   end
 
   # Private helper functions
 
   # Find first matching condition case
-  defp find_matching_condition_case([], _params, _context), do: :no_match
+  defp find_matching_condition_case([], _context), do: :no_match
 
-  defp find_matching_condition_case([case_config | remaining_cases], params, context) do
-    condition = Map.get(case_config, "condition")
-    case_port = Map.get(case_config, "port", "default")
-
-    # A condition is considered matching only if it's exactly true
-    if condition === true do
-      {:ok, case_port}
+  defp find_matching_condition_case([case_config | remaining_cases], context) do
+    if case_config.condition do
+      {:ok, case_config.port}
     else
-      find_matching_condition_case(remaining_cases, params, context)
+      find_matching_condition_case(remaining_cases, context)
     end
   end
 end

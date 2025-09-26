@@ -36,7 +36,14 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["true", "false"]
+      output_ports: ["true", "false"],
+      params_schema: %{
+        condition: [
+          type: :boolean,
+          description: "Expression or value to evaluate for truthiness",
+          required: true
+        ]
+      }
     }
   end
 
@@ -47,16 +54,10 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   @impl true
   def execute(params, _context) do
-    case Map.fetch(params, "condition") do
-      {:ok, value} ->
-        if value && value != "" do
-          {:ok, %{}, "true"}
-        else
-          {:ok, %{}, "false"}
-        end
-
-      _ ->
-        {:error, "Missing required 'condition' field"}
+    if params.condition do
+      {:ok, %{}, "true"}
+    else
+      {:ok, %{}, "false"}
     end
   end
 

@@ -46,45 +46,24 @@ defmodule Prana.Integrations.LogicTest do
     end
 
     test "execute/2 returns true port for truthy condition" do
-      params = %{"condition" => "true"}
+      params = %{condition: "true"}
       context = %{}
 
       assert {:ok, %{}, "true"} = IfConditionAction.execute(params, context)
     end
 
     test "execute/2 returns true port for non-empty string condition" do
-      params = %{"condition" => "some value"}
+      params = %{condition: "some value"}
       context = %{}
 
       assert {:ok, %{}, "true"} = IfConditionAction.execute(params, context)
     end
 
     test "execute/2 returns false port for falsy condition" do
-      params = %{"condition" => false}
+      params = %{condition: false}
       context = %{}
 
       assert {:ok, %{}, "false"} = IfConditionAction.execute(params, context)
-    end
-
-    test "execute/2 returns false port for nil condition" do
-      params = %{"condition" => nil}
-      context = %{}
-
-      assert {:ok, %{}, "false"} = IfConditionAction.execute(params, context)
-    end
-
-    test "execute/2 returns false port for empty string condition" do
-      params = %{"condition" => ""}
-      context = %{}
-
-      assert {:ok, %{}, "false"} = IfConditionAction.execute(params, context)
-    end
-
-    test "execute/2 returns error when condition is missing" do
-      params = %{}
-      context = %{}
-
-      assert {:error, "Missing required 'condition' field"} = IfConditionAction.execute(params, context)
     end
 
     test "resume/3 returns error as action does not support suspension" do
@@ -100,9 +79,9 @@ defmodule Prana.Integrations.LogicTest do
   describe "SwitchAction" do
     test "execute/2 returns first matching case port" do
       params = %{
-        "cases" => [
-          %{"condition" => true, "port" => "port1"},
-          %{"condition" => true, "port" => "port2"}
+        :cases => [
+          %{condition: true, port: "port1"},
+          %{condition: true, port: "port2"}
         ]
       }
 
@@ -113,9 +92,9 @@ defmodule Prana.Integrations.LogicTest do
 
     test "execute/2 returns second case when first condition is false" do
       params = %{
-        "cases" => [
-          %{"condition" => false, "port" => "port1"},
-          %{"condition" => true, "port" => "port2"}
+        :cases => [
+          %{condition: false, port: "port1"},
+          %{condition: true, port: "port2"}
         ]
       }
 
@@ -126,9 +105,9 @@ defmodule Prana.Integrations.LogicTest do
 
     test "execute/2 returns second case when first condition is nil" do
       params = %{
-        "cases" => [
-          %{"condition" => nil, "port" => "port1"},
-          %{"condition" => true, "port" => "port2"}
+        :cases => [
+          %{condition: nil, port: "port1"},
+          %{condition: true, port: "port2"}
         ]
       }
 
@@ -137,23 +116,12 @@ defmodule Prana.Integrations.LogicTest do
       assert {:ok, nil, "port2"} = SwitchAction.execute(params, context)
     end
 
-    test "execute/2 uses default port when none specified" do
-      params = %{
-        "cases" => [
-          %{"condition" => true}
-        ]
-      }
-
-      context = %{}
-
-      assert {:ok, nil, "default"} = SwitchAction.execute(params, context)
-    end
-
+    
     test "execute/2 returns error when no cases match" do
       params = %{
-        "cases" => [
-          %{"condition" => false, "port" => "port1"},
-          %{"condition" => nil, "port" => "port2"}
+        :cases => [
+          %{condition: false, port: "port1"},
+          %{condition: nil, port: "port2"}
         ]
       }
 
@@ -169,7 +137,7 @@ defmodule Prana.Integrations.LogicTest do
     end
 
     test "execute/2 returns error when cases is empty" do
-      params = %{"cases" => []}
+      params = %{:cases => []}
       context = %{}
 
       assert {:error,
@@ -188,18 +156,18 @@ defmodule Prana.Integrations.LogicTest do
       assert {:error,
               %Error{
                 code: "action_error",
-                message: "No matching case found",
-                details: %{"error_type" => "no_matching_case"}
+                message: "Cases parameter is required",
+                details: %{"error_type" => "missing_cases"}
               }} =
                SwitchAction.execute(params, context)
     end
 
     test "execute/2 processes cases in order" do
       params = %{
-        "cases" => [
-          %{"condition" => false, "port" => "port1"},
-          %{"condition" => true, "port" => "port2"},
-          %{"condition" => true, "port" => "port3"}
+        :cases => [
+          %{condition: false, port: "port1"},
+          %{condition: true, port: "port2"},
+          %{condition: true, port: "port3"}
         ]
       }
 
@@ -211,11 +179,11 @@ defmodule Prana.Integrations.LogicTest do
 
     test "execute/2 handles complex case structures" do
       params = %{
-        "cases" => [
-          %{"condition" => nil, "port" => "nil_port"},
-          %{"condition" => false, "port" => "false_port"},
-          %{"condition" => true, "port" => "active_port"},
-          %{"condition" => true, "port" => "default_port"}
+        :cases => [
+          %{condition: nil, port: "nil_port"},
+          %{condition: false, port: "false_port"},
+          %{condition: true, port: "active_port"},
+          %{condition: true, port: "default_port"}
         ]
       }
 
