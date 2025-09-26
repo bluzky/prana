@@ -34,17 +34,26 @@ defmodule Prana.Integrations.Core.LogAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main"]
+      output_ports: ["main"],
+      params_schema: %{
+        message: %{
+          type: "string",
+          description: "Custom message to include in the log output",
+          default: "Log Action"
+        },
+        level: %{
+          type: "string",
+          in: ["info", "debug", "warn", "error"],
+          description: "Log level",
+          default: "info"
+        }
+      }
     }
   end
 
   @impl true
   def execute(params, context) do
     input = context["$input"]["main"] || %{}
-
-    # Get optional parameters
-    message = Map.get(params, "message", "Log Action")
-    level = Map.get(params, "level", "info")
 
     # Extract execution context
     current_node_key = get_in(context, ["$execution", "current_node_key"])
@@ -53,13 +62,13 @@ defmodule Prana.Integrations.Core.LogAction do
 
     # Log the execution context and input data
     log_output = """
-    === #{message} ===
+    === #{params.message} ===
     Node: #{current_node_key} -- Workflow ID: #{workflow_id} -- Execution ID: #{execution_id}: #{inspect(params, pretty: true)}
     ==================
     """
 
     # Output to console based on level
-    case level do
+    case params.level do
       "debug" -> IO.puts("[DEBUG] #{log_output}")
       "warn" -> IO.puts("[WARN] #{log_output}")
       "error" -> IO.puts("[ERROR] #{log_output}")
