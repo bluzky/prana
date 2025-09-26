@@ -29,7 +29,7 @@ defmodule Prana.MixProject do
       {:mau, "~> 0.4"},
       {:nestex, "~> 0.2"},
       {:req, "~> 0.5"},
-      {:skema, "~> 1.2"},
+      {:skema, "~> 1.3"},
       {:elixir_uuid, "~> 1.2"},
       {:styler, "~> 1.5", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
