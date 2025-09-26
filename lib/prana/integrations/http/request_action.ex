@@ -117,20 +117,6 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   end
 
   @impl true
-  def params_schema, do: HTTPRequestSchema
-
-  @impl true
-  def validate_params(input_map) do
-    case HTTPRequestSchema.cast_and_validate(input_map) do
-      {:ok, validated_data} ->
-        {:ok, validated_data}
-
-      {:error, errors} ->
-        {:error, format_errors(errors)}
-    end
-  end
-
-  @impl true
   def prepare(_node) do
     {:ok, %{prepared_at: DateTime.utc_now()}}
   end
@@ -155,20 +141,6 @@ defmodule Prana.Integrations.HTTP.RequestAction do
   @impl true
   def resume(_params, _context, _resume_data) do
     {:error, "HTTP request action does not support resume"}
-  end
-
-  # Format validation errors
-  defp format_errors(errors) do
-    Enum.map(errors, fn
-      {field, messages} when is_list(messages) ->
-        "#{field}: #{Enum.join(messages, ", ")}"
-
-      {field, message} when is_binary(message) ->
-        "#{field}: #{message}"
-
-      {field, message} ->
-        "#{field}: #{inspect(message)}"
-    end)
   end
 
   # Make HTTP request using Req

@@ -5,6 +5,7 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
   alias Prana.GraphExecutor
   alias Prana.IntegrationRegistry
   alias Prana.Integrations.Manual
+  alias Prana.TestSupport.Integrations.TestIntegration
   alias Prana.Node
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
@@ -30,9 +31,11 @@ defmodule Prana.WorkflowExecution.GraphExecutorSubWorkflowTest do
     # Ensure modules are loaded before registration
     Code.ensure_loaded!(Prana.Integrations.Workflow)
     Code.ensure_loaded!(Manual)
+    Code.ensure_loaded!(TestIntegration)
 
     :ok = IntegrationRegistry.register_integration(Prana.Integrations.Workflow)
     :ok = IntegrationRegistry.register_integration(Manual)
+    :ok = IntegrationRegistry.register_integration(TestIntegration)
 
     # Track middleware events for testing
     test_pid = self()

@@ -40,10 +40,11 @@ defmodule Prana.NodeExecutor do
     node_execution = create_node_execution(node, execution_index, run_index)
     action_context = build_expression_context(node_execution, execution, routed_input, execution_context)
 
-    with {:ok, prepared_params} <- prepare_params(node, action_context),
-         {:ok, action} <- get_action(node) do
-      node_execution = %{node_execution | params: prepared_params}
-      handle_action_execution(node, action, prepared_params, action_context, node_execution, execution)
+    with {:ok, action} <- get_action(node),
+         {:ok, prepared_params} <- prepare_params(node, action_context),
+         {:ok, validated_params} <- validate_params(prepared_params, action) do
+      node_execution = %{node_execution | params: validated_params}
+      handle_action_execution(node, action, validated_params, action_context, node_execution, execution)
     else
       {:error, reason} ->
         handle_execution_error(node, node_execution, reason)
@@ -84,12 +85,13 @@ defmodule Prana.NodeExecutor do
     # Build context and execute action (same as normal execution)
     action_context = build_expression_context(resumed_node_execution, execution, routed_input, execution_context)
 
-    with {:ok, prepared_params} <- prepare_params(node, action_context),
-         {:ok, action} <- get_action(node) do
-      node_execution = %{resumed_node_execution | params: prepared_params}
+    with {:ok, action} <- get_action(node),
+         {:ok, prepared_params} <- prepare_params(node, action_context),
+         {:ok, validated_params} <- validate_params(prepared_params, action) do
+      node_execution = %{resumed_node_execution | params: validated_params}
 
       # Handle action execution with retry context preservation
-      case invoke_action(action, prepared_params, action_context) do
+      case invoke_action(action, validated_params, action_context) do
         {:ok, output_data, output_port} ->
           completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
           updated_execution = Prana.WorkflowExecution.complete_node(execution, completed_execution)
@@ -183,10 +185,10 @@ defmodule Prana.NodeExecutor do
     context = build_expression_context(suspended_node_execution, execution, %{}, execution_context)
     params = suspended_node_execution.params || %{}
 
-    case get_action(node) do
-      {:ok, action} ->
-        handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution)
-
+    with {:ok, action} <- get_action(node),
+         {:ok, validated_params} <- validate_params(params, action) do
+      handle_resume_action(action, validated_params, context, resume_data, suspended_node_execution, execution)
+    else
       {:error, reason} ->
         handle_resume_error(suspended_node_execution, reason)
     end
@@ -210,6 +212,24 @@ defmodule Prana.NodeExecutor do
 
   defp build_params_error(type, reason, params) do
     Error.new("params_error", reason, %{"error_type" => type, "params" => params})
+  end
+
+  @spec validate_params(map(), Prana.Action.t()) :: {:ok, map()} | {:error, term()}
+  defp validate_params(params, %Prana.Action{params_schema: nil}), do: {:ok, params}
+
+  defp validate_params(params, %Prana.Action{params_schema: schema} = action) when is_map(schema) do
+    case Skema.cast_and_validate(params, schema) do
+      {:ok, validated_params} ->
+        {:ok, validated_params}
+
+      {:error, errors} ->
+        {:error,
+         Error.workflow_error("Action parameters validation failed", %{
+           code: "workflow.invalid_action_params",
+           action_name: action.name,
+           errors: errors.errors
+         })}
+    end
   end
 
   # =============================================================================

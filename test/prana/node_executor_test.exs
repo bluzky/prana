@@ -17,7 +17,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.basic_success",
           display_name: "Basic Success",
           description: "Basic success action",
@@ -42,7 +42,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.explicit_port",
           display_name: "Explicit Port",
           description: "Action with explicit port selection",
@@ -70,7 +70,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.with_context",
           display_name: "With Context",
           description: "Action that returns context data",
@@ -94,7 +94,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.error_action",
           display_name: "Error Action",
           description: "Action that returns an error",
@@ -118,7 +118,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.error_with_port",
           display_name: "Error With Port",
           description: "Action that returns an error with explicit port",
@@ -142,7 +142,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.suspend_action",
           display_name: "Suspend Action",
           description: "Action that suspends execution",
@@ -166,7 +166,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.exception_action",
           display_name: "Exception Action",
           description: "Action that throws an exception",
@@ -190,7 +190,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.invalid_return",
           display_name: "Invalid Return",
           description: "Action that returns invalid format",
@@ -214,7 +214,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.dynamic_ports",
           display_name: "Dynamic Ports",
           description: "Action with dynamic output ports",
@@ -239,7 +239,7 @@ defmodule Prana.NodeExecutorTest do
       @moduledoc false
 
       def definition do
-        %Prana.Action{
+        %Action{
           name: "test.invalid_port",
           display_name: "Invalid Port",
           description: "Action that returns invalid port name",
@@ -255,6 +255,35 @@ defmodule Prana.NodeExecutorTest do
 
       def resume(_params, _context, _resume_data) do
         {:ok, %{result: "test"}, "nonexistent_port"}
+      end
+    end
+
+    # Action with schema validation
+    defmodule SchemaValidatedAction do
+      @moduledoc false
+
+      def definition do
+        %Action{
+          name: "test.schema_validated",
+          display_name: "Schema Validated Action",
+          description: "Action that validates input parameters with schema",
+          type: :action,
+          input_ports: ["input"],
+          output_ports: ["success", "error"],
+          params_schema: %{
+            "name" => [type: :string, length: [min: 1], required: true],
+            "age" => [type: :integer, number: [min: 0, max: 150], required: true],
+            "email" => [type: :string]
+          }
+        }
+      end
+
+      def execute(params, _context) do
+        {:ok, %{validated: true, received_params: params}, "success"}
+      end
+
+      def resume(_params, _context, _resume_data) do
+        {:ok, %{resumed: true}, "success"}
       end
     end
   end
@@ -281,7 +310,8 @@ defmodule Prana.NodeExecutorTest do
           TestActions.ExceptionAction,
           TestActions.InvalidReturn,
           TestActions.DynamicPorts,
-          TestActions.InvalidPort
+          TestActions.InvalidPort,
+          TestActions.SchemaValidatedAction
         ]
       }
     end
@@ -862,6 +892,184 @@ defmodule Prana.NodeExecutorTest do
 
       assert node_execution.execution_index == 5
       assert node_execution.run_index == 2
+    end
+  end
+
+  describe "schema validation" do
+    test "validates parameters successfully with valid data", %{execution: execution} do
+      node = %Node{
+        key: "schema_test_node",
+        type: "test.schema_validated",
+        params: %{
+          "name" => "John Doe",
+          "age" => 25,
+          "email" => "john@example.com"
+        }
+      }
+
+      routed_input = %{"main" => %{}}
+
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input)
+
+      assert node_execution.status == "completed"
+      assert node_execution.output_data[:validated] == true
+      assert node_execution.output_data[:received_params]["name"] == "John Doe"
+      assert node_execution.output_data[:received_params]["age"] == 25
+      assert node_execution.output_data[:received_params]["email"] == "john@example.com"
+    end
+
+    test "validates parameters with template expressions", %{execution: execution} do
+      node = %Node{
+        key: "schema_test_node",
+        type: "test.schema_validated",
+        params: %{
+          "name" => "{{ $input.user_name }}",
+          "age" => "{{ $input.user_age }}",
+          "email" => "test@example.com"
+        }
+      }
+
+      routed_input = %{"user_name" => "Jane Doe", "user_age" => 30}
+
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input)
+
+      assert node_execution.status == "completed"
+      assert node_execution.output_data[:received_params]["name"] == "Jane Doe"
+      assert node_execution.output_data[:received_params]["age"] == 30
+    end
+
+    test "rejects parameters missing required fields", %{execution: execution} do
+      node = %Node{
+        key: "schema_test_node",
+        type: "test.schema_validated",
+        params: %{
+          "name" => "John Doe"
+          # Missing required "age" field
+        }
+      }
+
+      routed_input = %{"main" => %{}}
+
+      assert {:error, {error, node_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input)
+
+      assert error.code == :workflow_error
+      assert error.message == "Action parameters validation failed"
+      assert node_execution.status == "failed"
+
+      assert %{"age" => ["is required"]} = error.details[:errors]
+    end
+
+    test "rejects parameters with invalid types", %{execution: execution} do
+      node = %Node{
+        key: "schema_test_node",
+        type: "test.schema_validated",
+        params: %{
+          "name" => "John Doe",
+          # Invalid type - should be integer
+          "age" => "not_a_number"
+        }
+      }
+
+      routed_input = %{"main" => %{}}
+
+      assert {:error, {error, node_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input)
+
+      assert error.code == :workflow_error
+      assert error.message == "Action parameters validation failed"
+      assert node_execution.status == "failed"
+      assert %{"age" => ["is required"]} = error.details[:errors]
+    end
+
+    test "rejects parameters outside valid range", %{execution: execution} do
+      node = %Node{
+        key: "schema_test_node",
+        type: "test.schema_validated",
+        params: %{
+          "name" => "John Doe",
+          # Above maximum of 150
+          "age" => 200
+        }
+      }
+
+      routed_input = %{"main" => %{}}
+
+      assert {:error, {error, node_execution}} =
+               NodeExecutor.execute_node(node, execution, routed_input)
+
+      assert error.code == :workflow_error
+      assert error.message == "Action parameters validation failed"
+      assert node_execution.status == "failed"
+    end
+
+    test "validates parameters on resume_node", %{execution: execution} do
+      # Create a suspended node execution with valid params
+      suspended_node =
+        "schema_test_node"
+        |> NodeExecution.new(1, 0)
+        |> NodeExecution.start()
+        |> NodeExecution.suspend(:test_suspend, %{})
+
+      # Set valid params
+      suspended_node = %{suspended_node | params: %{"name" => "John Doe", "age" => 25}}
+
+      node = %Node{
+        key: "schema_test_node",
+        type: "test.schema_validated",
+        params: %{}
+      }
+
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.resume_node(node, execution, suspended_node, %{})
+
+      assert node_execution.status == "completed"
+      assert node_execution.output_data[:resumed] == true
+    end
+
+    test "validates parameters on resume_node with invalid params", %{execution: execution} do
+      # Create a suspended node execution with invalid params
+      suspended_node =
+        "schema_test_node"
+        |> NodeExecution.new(1, 0)
+        |> NodeExecution.start()
+        |> NodeExecution.suspend(:test_suspend, %{})
+
+      # Set invalid params (missing required field)
+      suspended_node = %{suspended_node | params: %{"name" => "John Doe"}}
+
+      node = %Node{
+        key: "schema_test_node",
+        type: "test.schema_validated",
+        params: %{}
+      }
+
+      assert {:error, {error, node_execution}} =
+               NodeExecutor.resume_node(node, execution, suspended_node, %{})
+
+      assert error.code == :workflow_error
+      assert node_execution.status == "failed"
+    end
+
+    test "skips validation for actions without params_schema", %{execution: execution} do
+      # Use BasicSuccess which doesn't have params_schema
+      node = %Node{
+        key: "basic_test_node",
+        type: "test.basic_success",
+        params: %{
+          "any_param" => "any_value",
+          "number" => 42
+        }
+      }
+
+      routed_input = %{"value" => 10}
+
+      assert {:ok, node_execution, _updated_execution} =
+               NodeExecutor.execute_node(node, execution, routed_input)
+
+      assert node_execution.status == "completed"
     end
   end
 end

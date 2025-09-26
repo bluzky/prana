@@ -13,9 +13,9 @@ defmodule Prana.Integrations.Manual do
     %Integration{
       name: "manual",
       display_name: "Manual",
-      description: "Manual test actions for development",
+      description: "Manual actions for development",
       version: "1.0.0",
-      category: "test",
+      category: "manual",
       actions: [
         TriggerAction
       ]

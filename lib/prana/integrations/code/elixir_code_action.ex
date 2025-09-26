@@ -161,48 +161,4 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
   defp format_error(%{type: type, message: message}), do: "#{type}: #{message}"
   defp format_error(error), do: inspect(error)
 
-  @doc """
-  Returns parameter schema for this action.
-
-  Defines the expected parameters and their validation rules.
-  """
-  @impl true
-  def params_schema do
-    %{
-      "code" => %{
-        "type" => "string",
-        "required" => true,
-        "description" => "Elixir code to execute"
-      }
-    }
-  end
-
-  @doc """
-  Validates parameters according to schema.
-  """
-  @impl true
-  def validate_params(params) do
-    schema = params_schema()
-    errors = []
-
-    # Validate code parameter
-    errors =
-      if schema["code"]["required"] and is_nil(params["code"]) do
-        ["Code parameter is required" | errors]
-      else
-        errors
-      end
-
-    errors =
-      if params["code"] && !is_binary(params["code"]) do
-        ["Code must be a string" | errors]
-      else
-        errors
-      end
-
-    case errors do
-      [] -> {:ok, params}
-      errors -> {:error, errors}
-    end
-  end
 end
