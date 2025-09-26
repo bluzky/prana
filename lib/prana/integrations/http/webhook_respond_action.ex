@@ -94,23 +94,6 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
   end
 
   @impl true
-  def params_schema, do: WebhookRespondSchema
-
-  @impl true
-  def validate_params(input_map) do
-    case Skema.cast_and_validate(input_map, WebhookRespondSchema) do
-      {:ok, validated_data} ->
-        case validate_response_fields(validated_data) do
-          :ok -> {:ok, validated_data}
-          {:error, reason} -> {:error, [reason]}
-        end
-
-      {:error, errors} ->
-        {:error, format_errors(errors)}
-    end
-  end
-
-  @impl true
   def execute(params, context) do
     # Build response configuration
     response_config = build_respond_config(params)
@@ -174,50 +157,4 @@ defmodule Prana.Integrations.HTTP.WebhookRespondAction do
     end
   end
 
-  # Validate that required fields are present for each response type
-  defp validate_response_fields(%{respond_with: "text", text_data: text_data}) when not is_nil(text_data) do
-    :ok
-  end
-
-  defp validate_response_fields(%{respond_with: "text"}) do
-    {:error, "text_data is required when respond_with is 'text'"}
-  end
-
-  defp validate_response_fields(%{respond_with: "json", json_data: json_data}) when not is_nil(json_data) do
-    :ok
-  end
-
-  defp validate_response_fields(%{respond_with: "json"}) do
-    {:error, "json_data is required when respond_with is 'json'"}
-  end
-
-  defp validate_response_fields(%{respond_with: "redirect", redirect_url: redirect_url}) when not is_nil(redirect_url) do
-    :ok
-  end
-
-  defp validate_response_fields(%{respond_with: "redirect"}) do
-    {:error, "redirect_url is required when respond_with is 'redirect'"}
-  end
-
-  defp validate_response_fields(%{respond_with: "no_data"}) do
-    :ok
-  end
-
-  defp validate_response_fields(%{respond_with: respond_with}) do
-    {:error, "Invalid respond_with value: #{respond_with}"}
-  end
-
-  # Format validation errors
-  defp format_errors(errors) do
-    Enum.map(errors, fn
-      {field, messages} when is_list(messages) ->
-        "#{field}: #{Enum.join(messages, ", ")}"
-
-      {field, message} when is_binary(message) ->
-        "#{field}: #{message}"
-
-      {field, message} ->
-        "#{field}: #{inspect(message)}"
-    end)
-  end
 end

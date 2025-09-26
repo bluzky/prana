@@ -199,31 +199,4 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
     end
   end
 
-  describe "params_schema/0" do
-    test "returns correct parameter schema" do
-      schema = ElixirCodeAction.params_schema()
-
-      assert schema["code"]["type"] == "string"
-      assert schema["code"]["required"] == true
-    end
-  end
-
-  describe "validate_params/1" do
-    test "validates correct parameters" do
-      params = %{"code" => "1 + 2"}
-      assert {:ok, ^params} = ElixirCodeAction.validate_params(params)
-    end
-
-    test "rejects missing code" do
-      params = %{}
-      assert {:error, errors} = ElixirCodeAction.validate_params(params)
-      assert "Code parameter is required" in errors
-    end
-
-    test "rejects non-string code" do
-      params = %{"code" => 123}
-      assert {:error, errors} = ElixirCodeAction.validate_params(params)
-      assert "Code must be a string" in errors
-    end
-  end
 end

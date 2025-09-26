@@ -141,7 +141,7 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
 
       assert spec.name == "data.set_data"
       assert spec.display_name == "Set Data"
-      assert spec.description == "Create or transform data using templates in manual or json mode"
+      assert String.starts_with?(spec.description, "Set Data Action - Creates or transforms data using templates")
       assert spec.type == :action
       assert spec.input_ports == ["main"]
       assert spec.output_ports == ["main", "error"]

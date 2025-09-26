@@ -19,7 +19,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     test "returns correct action definition" do
       spec = ForEachAction.definition()
 
-      assert spec.name == "core.for_each"
+      assert spec.name == "prana_core.for_each"
       assert spec.display_name == "For Each"
       assert spec.type == :action
       assert spec.input_ports == ["main"]
@@ -27,59 +27,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
   end
 
-  describe "validate_params/1" do
-    test "validates single mode parameters" do
-      params = %{"collection" => [1, 2, 3], "mode" => "single"}
-
-      assert {:ok, validated} = ForEachAction.validate_params(params)
-      assert validated.collection == [1, 2, 3]
-      assert validated.mode == "single"
-    end
-
-    test "validates batch mode parameters with batch_size" do
-      params = %{"collection" => [1, 2, 3, 4, 5], "mode" => "batch", "batch_size" => 2}
-
-      assert {:ok, validated} = ForEachAction.validate_params(params)
-      assert validated.collection == [1, 2, 3, 4, 5]
-      assert validated.mode == "batch"
-      assert validated.batch_size == 2
-    end
-
-    test "rejects missing collection" do
-      params = %{"mode" => "single"}
-
-      assert {:error, error} = ForEachAction.validate_params(params)
-      assert error.code == "validation_error"
-    end
-
-    test "rejects missing mode" do
-      params = %{"collection" => [1, 2, 3]}
-
-      assert {:error, error} = ForEachAction.validate_params(params)
-      assert error.code == "validation_error"
-    end
-
-    test "rejects invalid mode" do
-      params = %{"collection" => [1, 2, 3], "mode" => "invalid"}
-
-      assert {:error, error} = ForEachAction.validate_params(params)
-      assert error.code == "validation_error"
-    end
-
-    test "rejects batch mode without batch_size" do
-      params = %{"collection" => [1, 2, 3], "mode" => "batch"}
-
-      assert {:error, error} = ForEachAction.validate_params(params)
-      assert error.code == "validation_error"
-    end
-
-    test "rejects invalid batch_size" do
-      params = %{"collection" => [1, 2, 3], "mode" => "batch", "batch_size" => 0}
-
-      assert {:error, error} = ForEachAction.validate_params(params)
-      assert error.code == "validation_error"
-    end
-  end
 
   describe "execute/2 - single mode" do
     test "starts new loop with first item from collection" do

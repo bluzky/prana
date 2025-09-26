@@ -85,8 +85,7 @@ defmodule Prana.Integrations.Core.ForEachAction do
     }
   end
 
-  @impl true
-  def validate_params(input_map) do
+  defp validate_params(input_map) do
     case Skema.cast_and_validate(input_map, ForEachSchema) do
       {:ok, validated_data} ->
         # Additional validation for batch mode

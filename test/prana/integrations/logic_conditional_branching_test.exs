@@ -15,7 +15,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
   alias Prana.Integrations.Logic.IfConditionAction
   alias Prana.Integrations.Logic.SwitchAction
   alias Prana.Node
-  alias Prana.TestSupport.TestIntegration
+  alias Prana.TestSupport.Integrations.TestIntegration
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
 
@@ -66,10 +66,10 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
     {:ok, registry_pid} = IntegrationRegistry.start_link()
 
     # Register integrations - ensure modules are loaded first
-    Code.ensure_loaded(TestIntegration)
-    Code.ensure_loaded(Logic)
-    Code.ensure_loaded(IfConditionAction)
-    Code.ensure_loaded(SwitchAction)
+    Code.ensure_loaded!(TestIntegration)
+    Code.ensure_loaded!(Logic)
+    Code.ensure_loaded!(IfConditionAction)
+    Code.ensure_loaded!(SwitchAction)
 
     :ok = IntegrationRegistry.register_integration(TestIntegration)
     :ok = IntegrationRegistry.register_integration(Logic)
@@ -162,7 +162,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         key: "if_condition",
         name: "IF Condition",
         type: "logic.if_condition",
-        params: %{"condition" => ""}
+        params: %{"condition" => false}
       }
 
       true_branch = %Node{
@@ -306,8 +306,8 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         type: "logic.switch",
         params: %{
           "cases" => [
-            %{"condition" => "match1", "port" => "case1"},
-            %{"condition" => "match2", "port" => "case2"}
+            %{"condition" => true, "port" => "case1"},
+            %{"condition" => false, "port" => "case2"}
           ]
         }
       }
@@ -376,8 +376,8 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         type: "logic.switch",
         params: %{
           "cases" => [
-            %{"condition" => "", "port" => "case1"},
-            %{"condition" => "match2", "port" => "case2"}
+            %{"condition" => false, "port" => "case1"},
+            %{"condition" => true, "port" => "case2"}
           ]
         }
       }
@@ -446,9 +446,9 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         type: "logic.switch",
         params: %{
           "cases" => [
-            %{"condition" => "", "port" => "case1"},
-            %{"condition" => "", "port" => "case2"},
-            %{"condition" => "match3", "port" => "case3"}
+            %{"condition" => false, "port" => "case1"},
+            %{"condition" => false, "port" => "case2"},
+            %{"condition" => true, "port" => "case3"}
           ]
         }
       }
@@ -537,8 +537,8 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         type: "logic.switch",
         params: %{
           "cases" => [
-            %{"condition" => "", "port" => "case1"},
-            %{"condition" => nil, "port" => "case2"}
+            %{"condition" => false, "port" => "case1"},
+            %{"condition" => false, "port" => "case2"}
           ]
         }
       }
@@ -588,7 +588,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         type: "logic.switch",
         params: %{
           "cases" => [
-            %{"condition" => "match1", "port" => "case1"}
+            %{"condition" => true, "port" => "case1"}
           ]
         }
       }
@@ -597,7 +597,7 @@ defmodule Prana.Integrations.LogicConditionalBranchingTest do
         key: "if_condition",
         name: "IF Condition",
         type: "logic.if_condition",
-        params: %{"condition" => ""}
+        params: %{"condition" => false}
       }
 
       true_branch = %Node{

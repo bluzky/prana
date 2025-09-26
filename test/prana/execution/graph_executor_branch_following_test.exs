@@ -17,7 +17,7 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
   alias Prana.IntegrationRegistry
   alias Prana.Integrations.Data
   alias Prana.Node
-  alias Prana.TestSupport.TestIntegration
+  alias Prana.TestSupport.Integrations.TestIntegration
   alias Prana.Workflow
   alias Prana.WorkflowCompiler
 
@@ -44,8 +44,9 @@ defmodule Prana.GraphExecutorBranchFollowingTest do
       {:ok, registry_pid} = IntegrationRegistry.start_link()
 
       # Register test integration and data integration for merge
+      Code.ensure_loaded!(TestIntegration)
       :ok = IntegrationRegistry.register_integration(TestIntegration)
-      Code.ensure_loaded(Data)
+      Code.ensure_loaded!(Data)
       :ok = IntegrationRegistry.register_integration(Data)
 
       on_exit(fn ->

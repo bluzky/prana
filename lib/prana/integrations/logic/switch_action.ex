@@ -1,16 +1,16 @@
 defmodule Prana.Integrations.Logic.SwitchAction do
   @moduledoc """
-  Switch Action - Multi-case routing based on simple condition expressions
+  Switch Action - Multi-case routing based on boolean conditions
 
   Evaluates multiple conditions in order and routes to the first matching case's output port.
-  Uses simple truthiness evaluation - any non-empty, non-nil condition value is considered a match.
+  Only matches conditions that are exactly `true` - all other values (false, nil, strings, etc.) are considered non-matching.
 
   ## Parameters
   - `cases` (required): Array of case objects to evaluate in order
 
   Each case object contains:
-  - `condition` (required): Expression or value to evaluate for truthiness
-  - `port` (required): Output port name to route to if condition matches
+  - `condition` (required): Boolean value or template expression that evaluates to true/false
+  - `port` (required): Output port name to route to if condition is true
 
   ## Example Params JSON
   ```json
@@ -85,8 +85,8 @@ defmodule Prana.Integrations.Logic.SwitchAction do
     condition = Map.get(case_config, "condition")
     case_port = Map.get(case_config, "port", "default")
 
-    # A condition is considered matching if it's truthy (not nil, not empty string)
-    if condition == true do
+    # A condition is considered matching only if it's exactly true
+    if condition === true do
       {:ok, case_port}
     else
       find_matching_condition_case(remaining_cases, params, context)

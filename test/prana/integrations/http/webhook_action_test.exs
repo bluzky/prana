@@ -52,40 +52,4 @@ defmodule Prana.Integrations.HTTP.WebhookActionTest do
     end
   end
 
-  describe "WebhookAction schema validation" do
-    test "validates invalid HTTP methods" do
-      input_map = %{
-        "methods" => ["INVALID", "POST"]
-      }
-
-      assert {:error, errors} = WebhookAction.validate_params(input_map)
-      assert Enum.any?(errors, &String.contains?(&1, "Invalid HTTP methods: INVALID"))
-    end
-
-    test "applies default webhook config" do
-      input_map = %{}
-
-      assert {:ok, validated} = WebhookAction.validate_params(input_map)
-      assert validated.path == "/webhook"
-      assert validated.secret == nil
-      assert validated.headers == %{}
-    end
-
-    test "validates webhook config schema" do
-      input_map = %{
-        "path" => "/custom-webhook",
-        "secret" => "mysecret",
-        "headers" => %{"X-Custom" => "value"}
-      }
-
-      assert {:ok, validated} = WebhookAction.validate_params(input_map)
-      assert validated.path == "/custom-webhook"
-      assert validated.secret == "mysecret"
-      assert validated.headers == %{"X-Custom" => "value"}
-    end
-
-    test "returns params_schema" do
-      assert WebhookAction.params_schema() == Prana.Integrations.HTTP.WebhookAction.WebhookConfigSchema
-    end
-  end
 end

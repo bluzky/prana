@@ -101,8 +101,8 @@ defmodule Prana.Integrations.LogicTest do
     test "execute/2 returns first matching case port" do
       params = %{
         "cases" => [
-          %{"condition" => "match1", "port" => "port1"},
-          %{"condition" => "match2", "port" => "port2"}
+          %{"condition" => true, "port" => "port1"},
+          %{"condition" => true, "port" => "port2"}
         ]
       }
 
@@ -111,11 +111,11 @@ defmodule Prana.Integrations.LogicTest do
       assert {:ok, nil, "port1"} = SwitchAction.execute(params, context)
     end
 
-    test "execute/2 returns second case when first condition is empty" do
+    test "execute/2 returns second case when first condition is false" do
       params = %{
         "cases" => [
-          %{"condition" => "", "port" => "port1"},
-          %{"condition" => "match2", "port" => "port2"}
+          %{"condition" => false, "port" => "port1"},
+          %{"condition" => true, "port" => "port2"}
         ]
       }
 
@@ -128,7 +128,7 @@ defmodule Prana.Integrations.LogicTest do
       params = %{
         "cases" => [
           %{"condition" => nil, "port" => "port1"},
-          %{"condition" => "match2", "port" => "port2"}
+          %{"condition" => true, "port" => "port2"}
         ]
       }
 
@@ -140,7 +140,7 @@ defmodule Prana.Integrations.LogicTest do
     test "execute/2 uses default port when none specified" do
       params = %{
         "cases" => [
-          %{"condition" => "match1"}
+          %{"condition" => true}
         ]
       }
 
@@ -152,7 +152,7 @@ defmodule Prana.Integrations.LogicTest do
     test "execute/2 returns error when no cases match" do
       params = %{
         "cases" => [
-          %{"condition" => "", "port" => "port1"},
+          %{"condition" => false, "port" => "port1"},
           %{"condition" => nil, "port" => "port2"}
         ]
       }
@@ -197,9 +197,9 @@ defmodule Prana.Integrations.LogicTest do
     test "execute/2 processes cases in order" do
       params = %{
         "cases" => [
-          %{"condition" => "", "port" => "port1"},
-          %{"condition" => "first_match", "port" => "port2"},
-          %{"condition" => "second_match", "port" => "port3"}
+          %{"condition" => false, "port" => "port1"},
+          %{"condition" => true, "port" => "port2"},
+          %{"condition" => true, "port" => "port3"}
         ]
       }
 
@@ -213,15 +213,15 @@ defmodule Prana.Integrations.LogicTest do
       params = %{
         "cases" => [
           %{"condition" => nil, "port" => "nil_port"},
-          %{"condition" => "", "port" => "empty_port"},
-          %{"condition" => "active", "port" => "active_port"},
-          %{"condition" => "fallback", "port" => "default_port"}
+          %{"condition" => false, "port" => "false_port"},
+          %{"condition" => true, "port" => "active_port"},
+          %{"condition" => true, "port" => "default_port"}
         ]
       }
 
       context = %{}
 
-      # Should return active_port as it's the first non-empty condition
+      # Should return active_port as it's the first true condition
       assert {:ok, nil, "active_port"} = SwitchAction.execute(params, context)
     end
   end
