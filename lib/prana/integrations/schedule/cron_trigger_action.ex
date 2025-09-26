@@ -76,19 +76,16 @@ defmodule Prana.Integrations.Schedule.CronTriggerAction do
       input_ports: [],
       output_ports: ["main"],
       params_schema: %{
-        type: "object",
-        required: ["cron_pattern"],
-        properties: %{
-          cron_pattern: %{
-            type: "string",
-            description: "Crontab pattern (5-field format: minute hour day_of_month month day_of_week)"
-          },
-          timezone: %{
-            type: "string",
-            description: "Timezone for the schedule (default: UTC)",
-            default: "UTC"
-          }
-        }
+        cron_pattern: [
+          type: :string,
+          description: "Crontab pattern (5-field format: minute hour day_of_month month day_of_week)",
+          required: true
+        ],
+        timezone: [
+          type: :string,
+          description: "Timezone for the schedule (default: UTC)",
+          default: "UTC"
+        ]
       },
       metadata: %{
         category: "scheduling",
