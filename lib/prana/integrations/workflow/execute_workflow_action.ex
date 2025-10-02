@@ -1,5 +1,4 @@
 defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
-  require Logger
   @moduledoc """
   Execute Sub-workflow Action - trigger a sub-workflow with coordination and batch processing
 
@@ -61,20 +60,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   application for actual sub-workflow orchestration.
   """
 
-  use Skema
   use Prana.Actions.SimpleAction
 
   alias Prana.Action
   alias Prana.Core.Error
 
-  defschema ExecuteWorkflowSchema do
-    field(:workflow_id, :string, required: true, length: [min: 1])
-    field(:input_data, :any)
-    field(:execution_mode, :string, default: "sync", in: ["sync", "async", "fire_and_forget"])
-    field(:batch_mode, :string, default: "all", in: ["all", "single"])
-    field(:timeout_ms, :integer, default: 300_000, number: [min: 1])
-    field(:failure_strategy, :string, default: "fail_parent", in: ["fail_parent", "continue"])
-  end
+  require Logger
 
   def definition do
     %Action{
@@ -83,139 +74,102 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main"]
+      output_ports: ["main"],
+      params_schema: %{
+        workflow_id: [
+          type: :string,
+          description: "The ID of the sub-workflow to execute",
+          required: true,
+          min_length: 1
+        ],
+        input_data: [
+          type: :any,
+          description: "Data to pass to sub-workflow. If not provided, uses context.$input.main"
+        ],
+        execution_mode: [
+          type: :string,
+          description: "Execution mode - sync, async, or fire_and_forget",
+          default: "sync",
+          enum: ["sync", "async", "fire_and_forget"]
+        ],
+        batch_mode: [
+          type: :string,
+          description: "Batch processing mode - all or single",
+          default: "all",
+          enum: ["all", "single"]
+        ],
+        timeout_ms: [
+          type: :integer,
+          description: "Maximum time to wait for completion in milliseconds",
+          default: 300_000,
+          min: 1
+        ],
+        failure_strategy: [
+          type: :string,
+          description: "How to handle failures - fail_parent or continue",
+          default: "fail_parent",
+          enum: ["fail_parent", "continue"]
+        ]
+      }
     }
-  end
-
-  defp validate_params(input_map) do
-    case Skema.cast_and_validate(input_map, ExecuteWorkflowSchema) do
-      {:ok, validated_data} -> {:ok, validated_data}
-      {:error, errors} -> {:error, format_errors(errors)}
-    end
   end
 
   @impl true
   def execute(params, context) do
-    # Use Skema validation
-    case validate_params(params) do
-      {:ok, validated_params} ->
-        # Get input data from params or fallback to context
-        raw_input_data =
-          case Map.get(validated_params, :input_data) do
-            nil -> get_in(context, ["$input", "main"])
-            data -> data
-          end
+    input_data = params[:input_data] || get_in(context, ["$input", "main"])
+    normalized_input = normalize_input(input_data, params.batch_mode)
 
-        # Normalize input data based on batch mode
-        input_data =
-          case validated_params.batch_mode do
-            "all" ->
-              # Batch mode: pass input as-is, default to empty map if nil
-              raw_input_data || %{}
+    sub_workflow_data = %{
+      "workflow_id" => params.workflow_id,
+      "execution_mode" => params.execution_mode,
+      "batch_mode" => params.batch_mode,
+      "timeout_ms" => params.timeout_ms,
+      "failure_strategy" => params.failure_strategy,
+      "input_data" => normalized_input,
+      "triggered_at" => DateTime.utc_now()
+    }
 
-            "single" ->
-              # Single mode: wrap non-arrays in a list for consistent processing
-              # Treat nil/missing input as empty list instead of wrapping nil
-              case raw_input_data do
-                nil -> []
-                data when is_list(data) -> data
-                data -> [data]
-              end
-          end
-
-        sub_workflow_data = %{
-          "workflow_id" => validated_params.workflow_id,
-          "execution_mode" => validated_params.execution_mode,
-          "batch_mode" => validated_params.batch_mode,
-          "timeout_ms" => validated_params.timeout_ms,
-          "failure_strategy" => validated_params.failure_strategy,
-          "input_data" => input_data,
-          "triggered_at" => DateTime.utc_now()
-        }
-
-        case validated_params.execution_mode do
-          "sync" ->
-            # Synchronous execution - suspend parent workflow (caller handles child execution and resume)
-            {:suspend, :sub_workflow_sync, sub_workflow_data}
-
-          "async" ->
-            # Asynchronous execution - suspend parent workflow (caller handles async child execution and resume)
-            {:suspend, :sub_workflow_async, sub_workflow_data}
-
-          "fire_and_forget" ->
-            # Fire-and-forget execution - suspend briefly (caller triggers child and immediately resumes)
-            {:suspend, :sub_workflow_fire_forget, sub_workflow_data}
-        end
-
-      {:error, errors} ->
-        {:error, Error.action_error("action_error", Enum.join(errors, "; "))}
-    end
+    suspension_type = suspension_type_for_mode(params.execution_mode)
+    {:suspend, suspension_type, sub_workflow_data}
   end
+
+  defp normalize_input(input_data, "all"), do: input_data || %{}
+
+  defp normalize_input(nil, "single"), do: []
+  defp normalize_input(data, "single") when is_list(data), do: data
+  defp normalize_input(data, "single"), do: [data]
+
+  defp suspension_type_for_mode("sync"), do: :sub_workflow_sync
+  defp suspension_type_for_mode("async"), do: :sub_workflow_async
+  defp suspension_type_for_mode("fire_and_forget"), do: :sub_workflow_fire_forget
 
   @impl true
   def resume(params, _context, resume_data) do
-    # Use Skema validation for resume as well
-    case validate_params(params) do
-      {:ok, validated_params} ->
-        # Extract sub-workflow execution results
-        execution_mode = validated_params.execution_mode
-        failure_strategy = validated_params.failure_strategy
-
-        # Process sub-workflow completion data
-        case resume_data do
-          %{"output" => output, "status" => "completed"} ->
-            # Sub-workflow completed successfully
-            {:ok, output}
-
-          %{"output" => output} ->
-            # Sub-workflow completed successfully (no explicit status)
-            {:ok, output}
-
-          %{"status" => "failed", "error" => error} when failure_strategy == "fail_parent" ->
-            # Sub-workflow failed and should fail parent
-            {:error, Error.action_error("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error})}
-
-          %{"status" => "failed", "error" => error} when failure_strategy == "continue" ->
-            # Sub-workflow failed but parent should continue - log as warning but don't fail
-            Logger.warning("Sub-workflow failed but continuing: #{inspect(error)}")
-            {:ok, %{sub_workflow_failed: true, error: error}}
-
-          %{"status" => "timeout"} when failure_strategy == "fail_parent" ->
-            # Sub-workflow timed out and should fail parent
-            {:error, Error.action_error("sub_workflow_timeout", "Sub-workflow execution timed out")}
-
-          %{"status" => "timeout"} when failure_strategy == "continue" ->
-            # Sub-workflow timed out but parent should continue - log as warning but don't fail
-            Logger.warning("Sub-workflow timed out but continuing")
-            {:ok, %{sub_workflow_timeout: true}}
-
-          _ when execution_mode == "fire_and_forget" ->
-            {:ok, nil}
-
-          _ ->
-            {:ok, nil}
-        end
-
-      {:error, errors} ->
-        {:error, Error.action_error("action_error", Enum.join(errors, "; "))}
+    case resume_data do
+      %{"output" => output, "status" => "completed"} -> {:ok, output}
+      %{"output" => output} -> {:ok, output}
+      %{"status" => "failed", "error" => error} -> handle_failure(error, params.failure_strategy)
+      %{"status" => "timeout"} -> handle_timeout(params.failure_strategy)
+      _ when params.execution_mode == "fire_and_forget" -> {:ok, nil}
+      _ -> {:ok, nil}
     end
   end
 
-  # ============================================================================
-  # Private Helper Functions
-  # ============================================================================
+  defp handle_failure(error, "fail_parent") do
+    {:error, Error.action_error("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error})}
+  end
 
-  # Format validation errors
-  defp format_errors(errors) do
-    Enum.map(errors, fn
-      {field, messages} when is_list(messages) ->
-        "#{field}: #{Enum.join(messages, ", ")}"
+  defp handle_failure(error, "continue") do
+    Logger.warning("Sub-workflow failed but continuing: #{inspect(error)}")
+    {:ok, %{sub_workflow_failed: true, error: error}}
+  end
 
-      {field, message} when is_binary(message) ->
-        "#{field}: #{message}"
+  defp handle_timeout("fail_parent") do
+    {:error, Error.action_error("sub_workflow_timeout", "Sub-workflow execution timed out")}
+  end
 
-      {field, message} ->
-        "#{field}: #{inspect(message)}"
-    end)
+  defp handle_timeout("continue") do
+    Logger.warning("Sub-workflow timed out but continuing")
+    {:ok, %{sub_workflow_timeout: true}}
   end
 end
