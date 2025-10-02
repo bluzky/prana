@@ -29,7 +29,7 @@ defmodule Prana.Integrations.WaitTest do
       assert wait_action.name == "wait.wait"
       assert wait_action.display_name == "Wait"
       assert wait_action.input_ports == ["main"]
-      assert wait_action.output_ports == ["main", "timeout", "error"]
+      assert wait_action.output_ports == ["main", "timeout"]
     end
   end
 
@@ -37,14 +37,14 @@ defmodule Prana.Integrations.WaitTest do
     test "returns error for missing mode" do
       input_map = %{"duration" => 1000}
 
-      assert {:error, %Error{code: "action_error", message: "mode is required"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "mode is required"}} =
                Wait.wait(input_map)
     end
 
     test "returns error for invalid mode" do
       input_map = %{"mode" => "invalid", "duration" => 1000}
 
-      assert {:error, %Error{code: "action_error", message: "mode must be 'interval', 'schedule', or 'webhook'"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "mode must be 'interval', 'schedule', or 'webhook'"}} =
                Wait.wait(input_map)
     end
 
@@ -67,14 +67,14 @@ defmodule Prana.Integrations.WaitTest do
     test "interval mode returns error for missing duration" do
       input_map = %{"mode" => "interval"}
 
-      assert {:error, %Error{code: "action_error", message: "duration/timeout is required"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "duration/timeout is required"}} =
                Wait.wait(input_map)
     end
 
     test "interval mode returns error for invalid duration" do
       input_map = %{"mode" => "interval", "duration" => -100}
 
-      assert {:error, %Error{code: "action_error", message: "duration/timeout must be a positive number"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "duration/timeout must be a positive number"}} =
                Wait.wait(input_map)
     end
 
@@ -92,21 +92,21 @@ defmodule Prana.Integrations.WaitTest do
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
       input_map = %{"mode" => "schedule", "schedule_at" => past_time}
 
-      assert {:error, %Error{code: "action_error", message: "schedule_at must be in the future"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "schedule_at must be in the future"}} =
                Wait.wait(input_map)
     end
 
     test "schedule mode returns error for invalid datetime" do
       input_map = %{"mode" => "schedule", "schedule_at" => "invalid-datetime"}
 
-      assert {:error, %Error{code: "action_error"}, "error"} =
+      assert {:error, %Error{code: "action_error"}} =
                Wait.wait(input_map)
     end
 
     test "schedule mode returns error for missing schedule_at" do
       input_map = %{"mode" => "schedule"}
 
-      assert {:error, %Error{code: "action_error", message: "schedule_at is required"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "schedule_at is required"}} =
                Wait.wait(input_map)
     end
 
@@ -135,7 +135,7 @@ defmodule Prana.Integrations.WaitTest do
                 code: "action_error",
                 message: "timeout_hours must be a positive number between 1 and 8760 (1 year)"
               },
-              "error"} =
+              } =
                Wait.wait(input_map)
     end
 
@@ -147,7 +147,7 @@ defmodule Prana.Integrations.WaitTest do
                 code: "action_error",
                 message: "timeout_hours must be a positive number between 1 and 8760 (1 year)"
               },
-              "error"} =
+              } =
                Wait.wait(input_map)
     end
   end
@@ -194,7 +194,7 @@ defmodule Prana.Integrations.WaitTest do
       input_map = %{"mode" => "interval", "duration" => 1000, "unit" => "invalid"}
 
       assert {:error, %Error{code: "action_error", message: "unit must be 'ms', 'seconds', 'minutes', or 'hours'"},
-              "error"} =
+              } =
                Wait.wait(input_map)
     end
 

@@ -107,7 +107,7 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main", "error"]
+      output_ports: ["main"]
     }
   end
 

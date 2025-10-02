@@ -81,7 +81,7 @@ defmodule Prana.Integrations.Core.ForEachAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["loop", "done", "error"]
+      output_ports: ["loop", "done"]
     }
   end
 

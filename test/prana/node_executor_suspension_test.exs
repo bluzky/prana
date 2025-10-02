@@ -147,14 +147,9 @@ defmodule Prana.NodeExecutorSuspensionTest do
 
       assert {:error, {error_data, failed_node_execution}} = result
 
-      # Verify error details - the structure is nested under "error" with atom keys
-      assert error_data.code == "action_error"
-      assert error_data.details["error"].code == "action_error"
-
-      assert error_data.details["error"].message ==
-               "errors: %{workflow_id: [\"length must be greater than or equal to 1\"]}"
-
-      assert error_data.details["port"] == "error"
+      # Verify error details
+      assert error_data.code == :workflow_error
+      assert error_data.message == "Action parameters validation failed"
 
       # Verify failed node execution
       assert failed_node_execution.node_key == "invalid_node"

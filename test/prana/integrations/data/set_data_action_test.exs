@@ -144,7 +144,7 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
       assert String.starts_with?(spec.description, "Set Data Action - Creates or transforms data using templates")
       assert spec.type == :action
       assert spec.input_ports == ["main"]
-      assert spec.output_ports == ["main", "error"]
+      assert spec.output_ports == ["main"]
     end
   end
 end

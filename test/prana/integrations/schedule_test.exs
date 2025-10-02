@@ -37,10 +37,12 @@ defmodule Prana.Integrations.ScheduleTest do
       assert spec.output_ports == ["main"]
 
       # Check params schema
-      assert spec.params_schema.type == "object"
-      assert "cron_pattern" in spec.params_schema.required
-      assert Map.has_key?(spec.params_schema.properties, :cron_pattern)
-      assert Map.has_key?(spec.params_schema.properties, :timezone)
+      assert Map.has_key?(spec.params_schema, :cron_pattern)
+      assert Map.has_key?(spec.params_schema, :timezone)
+      assert spec.params_schema.cron_pattern[:type] == :string
+      assert spec.params_schema.cron_pattern[:required] == true
+      assert spec.params_schema.timezone[:type] == :string
+      assert spec.params_schema.timezone[:default] == "UTC"
     end
 
     test "prepare/1 returns empty preparation data" do

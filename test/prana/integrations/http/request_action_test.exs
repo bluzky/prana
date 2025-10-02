@@ -18,14 +18,14 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
     test "validates required URL parameter" do
       input_map = %{"method" => "GET"}
 
-      assert {:error, %Error{code: "action_error", message: "URL is required"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "URL is required"}} =
                RequestAction.execute(input_map, %{})
     end
 
     test "validates HTTP method" do
       input_map = %{"url" => "https://example.com", "method" => "INVALID"}
 
-      assert {:error, %Error{code: "action_error", message: "Unsupported HTTP method: INVALID"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "Unsupported HTTP method: INVALID"}} =
                RequestAction.execute(input_map, %{})
     end
 
@@ -36,7 +36,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
         "headers" => "invalid"
       }
 
-      assert {:error, %Error{code: "action_error", message: "Headers must be a map"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "Headers must be a map"}} =
                RequestAction.execute(input_map, %{})
     end
 
@@ -47,7 +47,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
         "timeout" => "invalid"
       }
 
-      assert {:error, %Error{code: "action_error", message: "Timeout must be an integer (milliseconds)"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "Timeout must be an integer (milliseconds)"}} =
                RequestAction.execute(input_map, %{})
     end
 
@@ -58,7 +58,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
         "params" => "invalid"
       }
 
-      assert {:error, %Error{code: "action_error", message: "Params must be a map"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "Params must be a map"}} =
                RequestAction.execute(input_map, %{})
     end
 
@@ -69,7 +69,7 @@ defmodule Prana.Integrations.HTTP.RequestActionTest do
         "auth" => %{"type" => "invalid"}
       }
 
-      assert {:error, %Error{code: "action_error", message: "Invalid authentication configuration"}, "error"} =
+      assert {:error, %Error{code: "action_error", message: "Invalid authentication configuration"}} =
                RequestAction.execute(input_map, %{})
     end
   end

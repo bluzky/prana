@@ -11,7 +11,7 @@ defmodule Prana.Integrations.HTTP.WebhookRespondActionTest do
       assert spec.display_name == "Webhook Respond"
       assert spec.type == :action
       assert spec.input_ports == ["main"]
-      assert spec.output_ports == ["main", "error"]
+      assert spec.output_ports == ["main"]
     end
   end
 
