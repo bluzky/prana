@@ -1,4 +1,5 @@
 defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
+  require Logger
   @moduledoc """
   Execute Sub-workflow Action - trigger a sub-workflow with coordination and batch processing
 
@@ -49,9 +50,10 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
   ## Output Ports
   - `main`: Sub-workflow completed successfully
-  - `error`: Sub-workflow failed (when failure_strategy="fail_parent")
-  - `failure`: Sub-workflow failed but continuing (when failure_strategy="continue")
-  - `timeout`: Sub-workflow timed out
+
+  ## Error Handling
+  - When `failure_strategy="fail_parent"`: Errors and timeouts fail the parent workflow
+  - When `failure_strategy="continue"`: Errors and timeouts are logged as warnings but execution continues
 
   ## Behavior
   Input data can be explicitly provided via `input_data` parameter or automatically passed from
@@ -81,7 +83,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main", "failure", "timeout"]
+      output_ports: ["main"]
     }
   end
 
@@ -163,33 +165,35 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
         case resume_data do
           %{"output" => output, "status" => "completed"} ->
             # Sub-workflow completed successfully
-            {:ok, output, "main"}
+            {:ok, output}
 
           %{"output" => output} ->
             # Sub-workflow completed successfully (no explicit status)
-            {:ok, output, "main"}
+            {:ok, output}
 
           %{"status" => "failed", "error" => error} when failure_strategy == "fail_parent" ->
             # Sub-workflow failed and should fail parent
             {:error, Error.action_error("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error})}
 
           %{"status" => "failed", "error" => error} when failure_strategy == "continue" ->
-            # Sub-workflow failed but parent should continue
-            {:ok, %{sub_workflow_failed: true, error: error}, "failure"}
+            # Sub-workflow failed but parent should continue - log as warning but don't fail
+            Logger.warning("Sub-workflow failed but continuing: #{inspect(error)}")
+            {:ok, %{sub_workflow_failed: true, error: error}}
 
           %{"status" => "timeout"} when failure_strategy == "fail_parent" ->
             # Sub-workflow timed out and should fail parent
             {:error, Error.action_error("sub_workflow_timeout", "Sub-workflow execution timed out")}
 
           %{"status" => "timeout"} when failure_strategy == "continue" ->
-            # Sub-workflow timed out but parent should continue
-            {:ok, %{sub_workflow_timeout: true}, "timeout"}
+            # Sub-workflow timed out but parent should continue - log as warning but don't fail
+            Logger.warning("Sub-workflow timed out but continuing")
+            {:ok, %{sub_workflow_timeout: true}}
 
           _ when execution_mode == "fire_and_forget" ->
-            {:ok, nil, "main"}
+            {:ok, nil}
 
           _ ->
-            {:ok, nil, "main"}
+            {:ok, nil}
         end
 
       {:error, errors} ->
