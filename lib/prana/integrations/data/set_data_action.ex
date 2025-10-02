@@ -58,7 +58,7 @@ defmodule Prana.Integrations.Data.SetDataAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main", "error"]
+      output_ports: ["main"]
     }
   end
 

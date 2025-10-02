@@ -77,7 +77,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:error, error_data, "error"} = result
+      assert {:error, error_data} = result
       assert error_data.code == "action_error"
       assert error_data.message == "errors: %{workflow_id: [\"is required\"]}"
     end
@@ -87,7 +87,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:error, error_data, "error"} = result
+      assert {:error, error_data} = result
       assert error_data.code == "action_error"
       assert error_data.message == "errors: %{workflow_id: [\"length must be greater than or equal to 1\"]}"
     end
@@ -97,7 +97,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:error, error_data, "error"} = result
+      assert {:error, error_data} = result
       assert error_data.code == "action_error"
       assert error_data.message == "errors: %{workflow_id: [\"is required\"]}"
     end
@@ -110,7 +110,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:error, error_data, "error"} = result
+      assert {:error, error_data} = result
       assert error_data.code == "action_error"
       assert error_data.message == "errors: %{execution_mode: [\"not be in the inclusion list\"]}"
     end
@@ -123,7 +123,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:error, error_data, "error"} = result
+      assert {:error, error_data} = result
       assert error_data.code == "action_error"
       assert error_data.message == "errors: %{timeout_ms: [\"must be greater than or equal to 1\"]}"
     end
@@ -136,7 +136,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:error, error_data, "error"} = result
+      assert {:error, error_data} = result
       assert error_data.code == "action_error"
       assert error_data.message == "errors: %{failure_strategy: [\"not be in the inclusion list\"]}"
     end
@@ -280,7 +280,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
 
-      assert {:error, error_data, "error"} = result
+      assert {:error, error_data} = result
       assert error_data.code == "action_error"
       assert error_data.message == "errors: %{batch_mode: [\"not be in the inclusion list\"]}"
     end

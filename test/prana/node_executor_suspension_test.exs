@@ -154,8 +154,6 @@ defmodule Prana.NodeExecutorSuspensionTest do
       assert error_data.details["error"].message ==
                "errors: %{workflow_id: [\"length must be greater than or equal to 1\"]}"
 
-      assert error_data.details["port"] == "error"
-
       # Verify failed node execution
       assert failed_node_execution.node_key == "invalid_node"
       assert failed_node_execution.status == "failed"

@@ -81,7 +81,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main", "error", "failure", "timeout"]
+      output_ports: ["main", "failure", "timeout"]
     }
   end
 
@@ -146,7 +146,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
         end
 
       {:error, errors} ->
-        {:error, Error.action_error("action_error", Enum.join(errors, "; ")), "error"}
+        {:error, Error.action_error("action_error", Enum.join(errors, "; "))}
     end
   end
 
@@ -171,8 +171,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
           %{"status" => "failed", "error" => error} when failure_strategy == "fail_parent" ->
             # Sub-workflow failed and should fail parent
-            {:error, Error.action_error("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error}),
-             "error"}
+            {:error, Error.action_error("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error})}
 
           %{"status" => "failed", "error" => error} when failure_strategy == "continue" ->
             # Sub-workflow failed but parent should continue
@@ -180,7 +179,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
 
           %{"status" => "timeout"} when failure_strategy == "fail_parent" ->
             # Sub-workflow timed out and should fail parent
-            {:error, Error.action_error("sub_workflow_timeout", "Sub-workflow execution timed out"), "error"}
+            {:error, Error.action_error("sub_workflow_timeout", "Sub-workflow execution timed out")}
 
           %{"status" => "timeout"} when failure_strategy == "continue" ->
             # Sub-workflow timed out but parent should continue
@@ -194,7 +193,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
         end
 
       {:error, errors} ->
-        {:error, Error.action_error("action_error", Enum.join(errors, "; ")), "error"}
+        {:error, Error.action_error("action_error", Enum.join(errors, "; "))}
     end
   end
 

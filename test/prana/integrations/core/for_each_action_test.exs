@@ -23,7 +23,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       assert spec.display_name == "For Each"
       assert spec.type == :action
       assert spec.input_ports == ["main"]
-      assert spec.output_ports == ["loop", "done", "error"]
+      assert spec.output_ports == ["loop", "done"]
     end
   end
 

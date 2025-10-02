@@ -70,7 +70,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main", "error", "timeout"]
+      output_ports: ["main", "timeout"]
     }
   end
 
@@ -131,7 +131,7 @@ defmodule Prana.Integrations.HTTP.RequestAction do
         {:error, Error.action_error("http_timeout", "Request timed out"), "timeout"}
 
       {:error, reason} when is_binary(reason) ->
-        {:error, Error.action_error("http_error", reason), "error"}
+        {:error, Error.action_error("http_error", reason)}
 
       {:error, reason} ->
         {:error, Error.action_error("http_error", format_error(reason)), "error"}
