@@ -20,7 +20,6 @@
   - `process_action_result/2` - Output port determination and validation
   - `update_context/3` - Context state management
 - **Action Return Format Support**:
-  - Explicit port format: `{:ok, data, "success"}`, `{:error, error, "custom_error"}`
   - Default port format: `{:ok, data}`, `{:error, error}`
 - **Comprehensive Test Coverage**: Node Executor test suite with scenarios for:
   - Successful node execution

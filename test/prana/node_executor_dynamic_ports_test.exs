@@ -3,8 +3,8 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
 
   alias Prana.Action
   alias Prana.Core.Error
-  alias Prana.NodeExecutor
   alias Prana.Integrations.Logic.SwitchAction
+  alias Prana.NodeExecutor
 
   describe "dynamic output ports with ['*']" do
     test "allows any port name when output_ports is ['*']" do
@@ -24,13 +24,6 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
       assert {:ok, %{result: "data"}, "very_specific_port"} =
                NodeExecutor.process_action_result(
                  {:ok, %{result: "data"}, "very_specific_port"},
-                 dynamic_action
-               )
-
-      # Test error cases with custom ports
-      assert {:error, %Error{code: "action_error", details: %{"port" => "error_port"}}} =
-               NodeExecutor.process_action_result(
-                 {:error, "something failed", "error_port"},
                  dynamic_action
                )
     end

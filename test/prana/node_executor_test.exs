@@ -425,22 +425,6 @@ defmodule Prana.NodeExecutorTest do
       assert reason == failed_execution.error_data
     end
 
-    test "handles action errors with explicit port", %{execution: execution} do
-      node = Node.new("test_node", "test.error_with_port", %{})
-      routed_input = %{}
-
-      assert {:error, {reason, failed_execution}} =
-               NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
-
-      assert failed_execution.status == "failed"
-
-      assert failed_execution.error_data.code == "action_error"
-      assert failed_execution.error_data.details["error"] == "Invalid input"
-      assert failed_execution.error_data.details["port"] == "validation_error"
-
-      assert reason == failed_execution.error_data
-    end
-
     test "handles node suspension", %{execution: execution} do
       node = Node.new("test_node", "test.suspend_action", %{})
       routed_input = %{}
@@ -812,16 +796,6 @@ defmodule Prana.NodeExecutorTest do
       assert error.code == "action_error"
       assert error.details["error"] == "test_error"
       assert error.details["port"] == "error"
-    end
-
-    test "processes error result with explicit port" do
-      action = %Action{output_ports: ["output", "validation_error"]}
-      result = {:error, "validation failed", "validation_error"}
-
-      assert {:error, error} = NodeExecutor.process_action_result(result, action)
-      assert error.code == "action_error"
-      assert error.details["error"] == "validation failed"
-      assert error.details["port"] == "validation_error"
     end
 
     test "handles dynamic ports" do

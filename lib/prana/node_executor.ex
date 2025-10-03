@@ -47,7 +47,7 @@ defmodule Prana.NodeExecutor do
       handle_action_execution(node, action, validated_params, action_context, node_execution, execution)
     else
       {:error, reason} ->
-        handle_execution_error(node, node_execution, reason)
+        handle_execution_error(node, node_execution, reason, execution)
     end
   end
 
@@ -320,7 +320,6 @@ defmodule Prana.NodeExecutor do
   - `{:ok, data}` - Success with default success port
   - `{:error, error}` - Error with default error port
   - `{:ok, data, port}` - Success with explicit port selection
-  - `{:error, error, port}` - Error with explicit port selection
 
   ### Context-Aware Returns
   - `{:ok, data, port, context}` - Success with port and context data
@@ -380,16 +379,12 @@ defmodule Prana.NodeExecutor do
       {:ok, data, port} when is_binary(port) ->
         handle_success_with_port(data, port, action)
 
-      {:error, error, port} when is_binary(port) ->
-        handle_error_with_port(error, port, action)
-
       {:ok, data} ->
         port = get_default_success_port(action)
         {:ok, data, port}
 
       {:error, error} ->
-        port = get_default_error_port(action)
-        {:error, build_action_error_result(error, port)}
+        {:error, build_action_error_result(error, "error")}
 
       invalid_result ->
         {:error, build_invalid_format_error(invalid_result)}
@@ -407,14 +402,6 @@ defmodule Prana.NodeExecutor do
   defp handle_success_with_port(data, port, action) do
     if valid_port?(port, action) do
       {:ok, data, port}
-    else
-      {:error, build_invalid_port_error(port, action)}
-    end
-  end
-
-  defp handle_error_with_port(error, port, action) do
-    if valid_port?(port, action) do
-      {:error, build_action_error_result(error, port)}
     else
       {:error, build_invalid_port_error(port, action)}
     end
@@ -525,7 +512,7 @@ defmodule Prana.NodeExecutor do
         {:suspend, suspended_execution}
 
       {:error, reason} ->
-        handle_execution_error(node, node_execution, reason)
+        handle_execution_error(node, node_execution, reason, execution)
     end
   end
 
@@ -561,7 +548,7 @@ defmodule Prana.NodeExecutor do
   end
 
   # For execute failures - includes retry logic
-  defp handle_execution_error(node, node_execution, reason) do
+  defp handle_execution_error(node, node_execution, reason, execution) do
     if should_retry?(node, node_execution, reason) do
       # Prepare retry suspension data
       next_attempt = get_next_attempt_number(node_execution)
@@ -578,10 +565,69 @@ defmodule Prana.NodeExecutor do
       suspended_execution = NodeExecution.suspend(node_execution, :retry, retry_suspension_data)
       {:suspend, suspended_execution}
     else
-      # Normal failure path
-      failed_execution = NodeExecution.fail(node_execution, reason)
-      {:error, {reason, failed_execution}}
+      # Check on_error setting after retries are exhausted
+      case node.settings.on_error do
+        "stop_workflow" ->
+          # Current behavior - fail workflow
+          failed_execution = NodeExecution.fail(node_execution, reason)
+          {:error, {reason, failed_execution}}
+
+        "continue" ->
+          # Continue with error through default output port
+          handle_error_continuation(node, node_execution, reason, :default_port, execution)
+
+        "continue_error_output" ->
+          # Continue with error through virtual "error" port
+          handle_error_continuation(node, node_execution, reason, :error_port, execution)
+      end
     end
+  end
+
+  # Handle error continuation based on on_error setting
+  # This function is called from handle_execution_error, which is only used by execute_node
+  # We need to also return the updated WorkflowExecution for GraphExecutor compatibility
+  defp handle_error_continuation(node, node_execution, reason, port_type, execution) do
+    # Determine the output port based on port_type
+    output_port =
+      case port_type do
+        :default_port ->
+          # Get the action to determine default success port
+          case IntegrationRegistry.get_action_by_type(node.type) do
+            {:ok, action} -> get_default_success_port(action)
+            # fallback
+            {:error, _} -> "main"
+          end
+
+        :error_port ->
+          # Virtual error port
+          "error"
+      end
+
+    # Extract the original error information from the Error struct
+    {original_error, original_port} =
+      case reason do
+        %Error{details: %{"error" => error, "port" => port}} ->
+          {error, port}
+
+        %Error{details: %{"error" => error}} ->
+          {error, output_port}
+
+        error ->
+          {error, output_port}
+      end
+
+    # Create error data with port information
+    error_data =
+      Error.new("action_error", "Action returned error", %{
+        "error" => original_error,
+        "port" => original_port,
+        "on_error_behavior" => Atom.to_string(port_type)
+      })
+
+    # Complete the node execution successfully with error data
+    completed_execution = NodeExecution.complete(node_execution, error_data, output_port)
+    updated_execution = Prana.WorkflowExecution.complete_node(execution, completed_execution)
+    {:ok, completed_execution, updated_execution}
   end
 
   # For resume failures - no retry logic
@@ -630,15 +676,6 @@ defmodule Prana.NodeExecutor do
       "main" in ports -> "main"
       length(ports) > 0 -> List.first(ports)
       true -> "main"
-    end
-  end
-
-  @spec get_default_error_port(Prana.Action.t()) :: String.t()
-  defp get_default_error_port(%Prana.Action{output_ports: ports}) do
-    cond do
-      "error" in ports -> "error"
-      "failure" in ports -> "failure"
-      true -> "error"
     end
   end
 
