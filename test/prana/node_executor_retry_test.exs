@@ -24,7 +24,7 @@ defmodule Prana.NodeExecutorRetryTest do
         type: :action,
         module: __MODULE__,
         input_ports: ["main"],
-        output_ports: ["main", "error"]
+        output_ports: ["main"]
       }
     end
 
@@ -48,7 +48,7 @@ defmodule Prana.NodeExecutorRetryTest do
         type: :action,
         module: __MODULE__,
         input_ports: ["main"],
-        output_ports: ["main", "error"]
+        output_ports: ["main"]
       }
     end
 

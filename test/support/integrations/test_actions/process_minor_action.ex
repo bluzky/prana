@@ -14,7 +14,7 @@ defmodule Prana.TestSupport.Integrations.TestActions.ProcessMinorAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main", "input"],
-      output_ports: ["main", "error"]
+      output_ports: ["main"]
     }
   end
 

@@ -12,7 +12,7 @@ The Data integration provides essential data manipulation capabilities for combi
 - **Action Name**: `merge`
 - **Description**: Combine data from multiple named input ports (diamond pattern coordination)
 - **Input Ports**: `["input_a", "input_b"]`
-- **Output Ports**: `["main", "error"]`
+- **Output Ports**: `["main"]`
 
 **Input Parameters**:
 - `strategy`: Merge strategy (`"append"` | `"merge"` | `"concat"`) - defaults to `"append"`
@@ -65,7 +65,7 @@ The Data integration provides essential data manipulation capabilities for combi
 - **Action Name**: `set_data`
 - **Description**: Create or transform data using templates in manual or json mode
 - **Input Ports**: `["main"]`
-- **Output Ports**: `["main", "error"]`
+- **Output Ports**: `["main"]`
 
 **Input Parameters**:
 - `mode`: Operating mode (`"manual"` | `"json"`) - defaults to `"manual"`
