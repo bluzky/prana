@@ -32,7 +32,7 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
       # Create action with fixed ports
       fixed_action = %Action{
         name: "test_action",
-        output_ports: ["main", "error"]
+        output_ports: ["main"]
       }
 
       # Valid port should work

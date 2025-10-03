@@ -43,7 +43,7 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
       description: "A simple test action that can succeed or fail",
       type: :action,
       input_ports: ["input"],
-      output_ports: ["main", "error"]
+      output_ports: ["main"]
     }
   end
 

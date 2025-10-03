@@ -124,7 +124,7 @@ defmodule Prana.NodeExecutorTest do
           description: "Action that returns an error with explicit port",
           type: :action,
           input_ports: ["input"],
-          output_ports: ["main", "error", "validation_error"]
+          output_ports: ["main", "validation_error"]
         }
       end
 
