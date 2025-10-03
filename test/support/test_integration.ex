@@ -7,6 +7,7 @@ defmodule Prana.TestSupport.TestIntegration do
 
   alias Prana.Action
   alias Prana.Integration
+  alias Prana.TestSupport.TestIntegration.FailingAction
   alias Prana.TestSupport.TestIntegration.SimpleTestAction
   alias Prana.TestSupport.TestIntegration.TriggerTestAction
 
@@ -19,7 +20,8 @@ defmodule Prana.TestSupport.TestIntegration do
       category: "testing",
       actions: [
         SimpleTestAction,
-        TriggerTestAction
+        TriggerTestAction,
+        FailingAction
       ]
     }
   end
@@ -31,6 +33,7 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
   """
 
   use Prana.Actions.SimpleAction
+
   alias Prana.Action
 
   def definition do
@@ -72,6 +75,7 @@ defmodule Prana.TestSupport.TestIntegration.TriggerTestAction do
   """
 
   use Prana.Actions.SimpleAction
+
   alias Prana.Action
 
   def definition do
@@ -88,5 +92,31 @@ defmodule Prana.TestSupport.TestIntegration.TriggerTestAction do
   @impl true
   def execute(_params, _context) do
     {:ok, %{triggered: true, timestamp: DateTime.utc_now()}}
+  end
+end
+
+defmodule Prana.TestSupport.TestIntegration.FailingAction do
+  @moduledoc """
+  Failing test action for testing on_error functionality.
+  """
+
+  use Prana.Actions.SimpleAction
+
+  alias Prana.Action
+
+  def definition do
+    %Action{
+      name: "test.failing_action",
+      display_name: "Failing Action",
+      description: "Action that always returns an error",
+      type: :action,
+      input_ports: ["input"],
+      output_ports: ["main"]
+    }
+  end
+
+  @impl true
+  def execute(_params, _context) do
+    {:error, "This action always fails"}
   end
 end

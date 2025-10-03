@@ -218,7 +218,6 @@ end
 ```
 
 ### 9.2 Action Return Formats
-- **Explicit Port**: `{:ok, data, "success"}` or `{:error, error, "timeout"}`
 - **Default Port**: `{:ok, data}` → default success port, `{:error, error}` → default error port
 
 ## 10. Built-in Integrations

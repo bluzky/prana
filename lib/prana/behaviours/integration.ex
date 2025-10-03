@@ -52,7 +52,6 @@ defmodule Prana.Behaviour.Integration do
   - `{:ok, output}` - Success with default success port
   - `{:ok, output, port}` - Success with explicit port
   - `{:error, error}` - Error with default error port
-  - `{:error, error, port}` - Error with explicit port
   """
   @callback definition() :: Prana.Integration.t()
 end
