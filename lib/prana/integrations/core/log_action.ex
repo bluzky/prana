@@ -37,16 +37,17 @@ defmodule Prana.Integrations.Core.LogAction do
       output_ports: ["main"],
       params_schema: %{
         message: [
-          type: "string",
+          type: :string,
           description: "Custom message to include in the log output",
           default: "Log Action"
         ],
         level: [
-          type: "string",
+          type: :string,
           in: ["info", "debug", "warn", "error"],
           description: "Log level",
           default: "info"
-        ]
+        ],
+        data: [type: :any, description: "Data to log (defaults to all input data)"]
       }
     }
   end
@@ -63,7 +64,7 @@ defmodule Prana.Integrations.Core.LogAction do
     # Log the execution context and input data
     log_output = """
     === #{params.message} ===
-    Node: #{current_node_key} -- Workflow ID: #{workflow_id} -- Execution ID: #{execution_id}: #{inspect(params, pretty: true)}
+    Node: #{current_node_key} -- Workflow ID: #{workflow_id} -- Execution ID: #{execution_id}: #{inspect(params.data || input, pretty: true)}
     ==================
     """
 
