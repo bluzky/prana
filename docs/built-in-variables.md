@@ -151,6 +151,8 @@ Access execution-specific metadata and preparation data.
 }
 ```
 
+### `$now` time of node execution start
+
 ## Node Context Access
 
 The structured node access pattern provides access to both output data and execution context:
