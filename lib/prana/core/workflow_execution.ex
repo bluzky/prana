@@ -243,7 +243,7 @@ defmodule Prana.WorkflowExecution do
       # DateTime strings are converted to DateTime structs
   """
   def from_map(data) when is_map(data) do
-    {:ok, execution} = Skema.load(data, __MODULE__)
+    {:ok, execution} = Skema.cast(data, __MODULE__)
 
     # Convert nested node_execution maps to NodeExecution structs
     node_executions = convert_node_executions_to_structs(execution.node_executions)

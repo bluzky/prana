@@ -28,20 +28,20 @@ defmodule Prana.NodeSettingsTest do
       assert settings.on_error == "continue"
     end
 
-    test "validates max_retries minimum value through cast_and_validate" do
-      assert {:error, %{errors: %{max_retries: _}}} = NodeSettings.cast_and_validate(%{max_retries: 0})
+    test "validates max_retries minimum value through cast" do
+      assert {:error, %{errors: %{max_retries: _}}} = NodeSettings.cast(%{max_retries: 0})
     end
 
-    test "validates max_retries maximum value through cast_and_validate" do
-      assert {:error, %{errors: %{max_retries: _}}} = NodeSettings.cast_and_validate(%{max_retries: 11})
+    test "validates max_retries maximum value through cast" do
+      assert {:error, %{errors: %{max_retries: _}}} = NodeSettings.cast(%{max_retries: 11})
     end
 
-    test "validates retry_delay_ms minimum value through cast_and_validate" do
-      assert {:error, %{errors: %{retry_delay_ms: _}}} = NodeSettings.cast_and_validate(%{retry_delay_ms: -1})
+    test "validates retry_delay_ms minimum value through cast" do
+      assert {:error, %{errors: %{retry_delay_ms: _}}} = NodeSettings.cast(%{retry_delay_ms: -1})
     end
 
-    test "validates retry_delay_ms maximum value through cast_and_validate" do
-      assert {:error, %{errors: %{retry_delay_ms: _}}} = NodeSettings.cast_and_validate(%{retry_delay_ms: 60_001})
+    test "validates retry_delay_ms maximum value through cast" do
+      assert {:error, %{errors: %{retry_delay_ms: _}}} = NodeSettings.cast(%{retry_delay_ms: 60_001})
     end
   end
 
@@ -194,8 +194,8 @@ defmodule Prana.NodeSettingsTest do
       assert settings.on_error == "continue_error_output"
     end
 
-    test "validates on_error rejects invalid values through cast_and_validate" do
-      assert {:error, %{errors: %{on_error: _}}} = NodeSettings.cast_and_validate(%{on_error: "invalid_option"})
+    test "validates on_error rejects invalid values through cast" do
+      assert {:error, %{errors: %{on_error: _}}} = NodeSettings.cast(%{on_error: "invalid_option"})
     end
 
     test "on_error field is included in serialization" do

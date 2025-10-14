@@ -44,7 +44,7 @@ defmodule Prana.Connection do
       # Port routing is preserved with proper defaults
   """
   def from_map(data) when is_map(data) do
-    {:ok, data} = Skema.load(data, __MODULE__)
+    {:ok, data} = Skema.cast(data, __MODULE__)
     data
   end
 

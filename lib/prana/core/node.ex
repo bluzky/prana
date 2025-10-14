@@ -50,7 +50,7 @@ defmodule Prana.Node do
       # Complex params are preserved as-is
   """
   def from_map(data) when is_map(data) do
-    {:ok, data} = Skema.load(data, __MODULE__)
+    {:ok, data} = Skema.cast(data, __MODULE__)
     data
   end
 

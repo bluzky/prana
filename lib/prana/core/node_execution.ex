@@ -116,7 +116,7 @@ defmodule Prana.NodeExecution do
       # Status is converted to atom, DateTime strings to DateTime structs
   """
   def from_map(data) when is_map(data) do
-    {:ok, data} = Skema.load(data, __MODULE__)
+    {:ok, data} = Skema.cast(data, __MODULE__)
     data
   end
 

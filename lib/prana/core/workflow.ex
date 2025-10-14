@@ -41,7 +41,7 @@ defmodule Prana.Workflow do
       # All nested structures are properly converted to structs
   """
   def from_map(data) when is_map(data) do
-    {:ok, workflow} = Skema.load(data, __MODULE__)
+    {:ok, workflow} = Skema.cast(data, __MODULE__)
 
     # Convert nested connection maps to Connection structs
     connections = convert_connections_to_structs(workflow.connections)
