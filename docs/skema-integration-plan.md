@@ -115,7 +115,7 @@ This document outlines the implementation plan for integrating Skema schema vali
   ```elixir
   @impl true
   def validate_params(input_map) do
-    case Skema.cast_and_validate(input_map, HTTPRequestSchema) do
+    case Skema.cast(input_map, HTTPRequestSchema) do
       {:ok, validated_data} -> {:ok, validated_data}
       {:error, errors} -> {:error, format_errors(errors)}
     end
@@ -134,7 +134,7 @@ This document outlines the implementation plan for integrating Skema schema vali
   ```elixir
   @impl true
   def validate_params(input_map) do
-    case Skema.cast_and_validate(input_map, WebhookSchema) do
+    case Skema.cast(input_map, WebhookSchema) do
       {:ok, validated_data} -> {:ok, validated_data}
       {:error, errors} -> {:error, format_errors(errors)}
     end

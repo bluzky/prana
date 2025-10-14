@@ -93,7 +93,7 @@ defmodule Prana.NodeSettings do
 
   @doc "Load settings from a map with string keys"
   def from_map(data) when is_map(data) do
-    {:ok, settings} = Skema.load(data, __MODULE__)
+    {:ok, settings} = Skema.cast(data, __MODULE__)
     settings
   end
 

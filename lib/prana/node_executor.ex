@@ -218,7 +218,7 @@ defmodule Prana.NodeExecutor do
   defp validate_params(params, %Prana.Action{params_schema: nil}), do: {:ok, params}
 
   defp validate_params(params, %Prana.Action{params_schema: schema} = action) when is_map(schema) do
-    case Skema.cast_and_validate(params, schema) do
+    case Skema.cast(params, schema) do
       {:ok, validated_params} ->
         {:ok, validated_params}
 

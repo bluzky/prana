@@ -955,7 +955,7 @@ defmodule Prana.NodeExecutorTest do
       assert error.code == :workflow_error
       assert error.message == "Action parameters validation failed"
       assert node_execution.status == "failed"
-      assert %{"age" => ["is required"]} = error.details[:errors]
+      assert %{"age" => ["is invalid"]} = error.details[:errors]
     end
 
     test "rejects parameters outside valid range", %{execution: execution} do
