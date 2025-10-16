@@ -207,11 +207,15 @@ defmodule Prana.NodeExecutor do
     end
   rescue
     error ->
-      {:error, build_params_error("params_preparation_failed", inspect(error), params)}
+      {:error, build_params_error("params_preparation_failed", error, params)}
   end
 
   defp build_params_error(type, reason, params) do
-    Error.new("params_error", reason, %{"error_type" => type, "params" => params})
+    Error.new("params_error", "Failed to prepare params for action", %{
+      "error_type" => type,
+      "details" => reason,
+      "params" => params
+    })
   end
 
   @spec validate_params(map(), Prana.Action.t()) :: {:ok, map()} | {:error, term()}
@@ -268,15 +272,11 @@ defmodule Prana.NodeExecutor do
     process_action_result(result, action)
   rescue
     error ->
+      stacktrace = Exception.format_stacktrace(__STACKTRACE__)
       Logger.error(inspect(error))
-      Logger.error(inspect(__STACKTRACE__, pretty: true))
-      {:error, build_action_execution_error("action_execution_failed", error, action)}
-  catch
-    :exit, reason ->
-      {:error, build_action_execution_error("action_exit", reason, action)}
+      Logger.error(stacktrace)
 
-    :throw, value ->
-      {:error, build_action_execution_error("action_throw", value, action)}
+      {:error, build_action_execution_error("action_execution_failed", error, stacktrace, action)}
   end
 
   # Public for test purposes, but generally not used directly
@@ -286,18 +286,17 @@ defmodule Prana.NodeExecutor do
     process_action_result(result, action)
   rescue
     error ->
-      {:error, build_action_execution_error("action_resume_failed", error, action)}
-  catch
-    :exit, reason ->
-      {:error, build_action_execution_error("action_resume_exit", reason, action)}
+      stacktrace = Exception.format_stacktrace(__STACKTRACE__)
+      Logger.error(inspect(error))
+      Logger.error(stacktrace)
 
-    :throw, value ->
-      {:error, build_action_execution_error("action_resume_throw", value, action)}
+      {:error, build_action_execution_error("action_resume_failed", error, stacktrace, action)}
   end
 
-  defp build_action_execution_error(type, error_data, action) do
+  defp build_action_execution_error(type, error_data, stacktrace, action) do
     Error.new(type, "Action execution failed", %{
-      "details" => inspect(error_data),
+      "details" => error_data,
+      "stacktrace" => stacktrace,
       "module" => action.module,
       "action" => action.name
     })

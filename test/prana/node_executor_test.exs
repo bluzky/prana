@@ -510,7 +510,7 @@ defmodule Prana.NodeExecutorTest do
       assert reason.code == "action_execution_failed"
       assert reason.details["module"] == TestActions.ExceptionAction
       assert reason.details["action"] == "test.exception_action"
-      assert String.contains?(reason.details["details"], "RuntimeError")
+      assert %RuntimeError{} = reason.details["details"]
     end
 
     test "handles invalid return format", %{execution: execution} do
