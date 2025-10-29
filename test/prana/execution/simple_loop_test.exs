@@ -48,50 +48,29 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
     Code.ensure_loaded(WorkflowIntegration)
     {:ok, registry_pid} = Prana.IntegrationRegistry.start_link()
 
-    # Register required integrations with error handling
-    case Prana.IntegrationRegistry.register_integration(Logic) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        GenServer.stop(registry_pid)
-        raise "Failed to register Logic integration: #{inspect(reason)}"
-    end
-
-    case Prana.IntegrationRegistry.register_integration(Manual) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        GenServer.stop(registry_pid)
-        raise "Failed to register Manual integration: #{inspect(reason)}"
-    end
-
-    case Prana.IntegrationRegistry.register_integration(Data) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        GenServer.stop(registry_pid)
-        raise "Failed to register Data integration: #{inspect(reason)}"
-    end
-
-    case Prana.IntegrationRegistry.register_integration(WorkflowIntegration) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        GenServer.stop(registry_pid)
-        raise "Failed to register Workflow integration: #{inspect(reason)}"
-    end
-
-    on_exit(fn ->
+    # Helper to safely stop the registry
+    stop_registry = fn ->
       if Process.alive?(registry_pid) do
-        GenServer.stop(registry_pid)
+        try do
+          GenServer.stop(registry_pid, :normal, 1000)
+        catch
+          :exit, _ -> :ok
+        end
       end
-    end)
+    end
 
-    :ok
+    # Register required integrations with error handling
+    with :ok <- Prana.IntegrationRegistry.register_integration(Logic),
+         :ok <- Prana.IntegrationRegistry.register_integration(Manual),
+         :ok <- Prana.IntegrationRegistry.register_integration(Data),
+         :ok <- Prana.IntegrationRegistry.register_integration(WorkflowIntegration) do
+      on_exit(fn -> stop_registry.() end)
+      :ok
+    else
+      {:error, reason} ->
+        stop_registry.()
+        raise "Failed to register integration: #{inspect(reason)}"
+    end
   end
 
   defp create_simple_counter_loop_workflow do
