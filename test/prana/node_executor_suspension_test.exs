@@ -244,7 +244,7 @@ defmodule Prana.NodeExecutorSuspensionTest do
       processed = NodeExecutor.process_action_result(invalid_result, action)
 
       assert {:error, error_data} = processed
-      assert error_data.code == "invalid_action_return_format"
+      assert error_data.code == "action.invalid_return"
       assert error_data.message =~ "Actions must return"
     end
   end

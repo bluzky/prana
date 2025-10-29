@@ -17,6 +17,7 @@ defmodule Prana.EndToEndRetryTest do
     use SimpleAction
 
     alias Prana.Action
+    alias Prana.Core.Error
 
     def definition do
       %Action{
@@ -40,7 +41,8 @@ defmodule Prana.EndToEndRetryTest do
       adjusted_failure_rate = failure_rate * 0.5 ** attempt
 
       if :rand.uniform() < adjusted_failure_rate do
-        {:error, "Service temporarily unavailable (attempt #{attempt + 1})"}
+        error_msg = "Service temporarily unavailable (attempt #{attempt + 1})"
+        {:error, Error.new("action_error", error_msg, %{error: error_msg})}
       else
         {:ok,
          %{
@@ -60,6 +62,7 @@ defmodule Prana.EndToEndRetryTest do
     use SimpleAction
 
     alias Prana.Action
+    alias Prana.Core.Error
 
     def definition do
       %Action{
@@ -92,7 +95,8 @@ defmodule Prana.EndToEndRetryTest do
 
         {:ok, processed_data}
       else
-        {:error, "No service response data to process - received: #{inspect(input)}"}
+        error_msg = "No service response data to process - received: #{inspect(input)}"
+        {:error, Error.new("action_error", error_msg, %{error: error_msg})}
       end
     end
   end

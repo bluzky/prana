@@ -35,6 +35,7 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
   use Prana.Actions.SimpleAction
 
   alias Prana.Action
+  alias Prana.Core.Error
 
   def definition do
     %Action{
@@ -52,11 +53,7 @@ defmodule Prana.TestSupport.TestIntegration.SimpleTestAction do
     if Map.get(params, "force_error", false) do
       # Simulate a failure
       {:error,
-       %{
-         type: "test_error",
-         message: "Simulated test failure",
-         details: %{input: params}
-       }}
+       Error.new("test_error", "Simulated test failure", %{input: params})}
     else
       # Normal success case
       {:ok,
@@ -103,6 +100,7 @@ defmodule Prana.TestSupport.TestIntegration.FailingAction do
   use Prana.Actions.SimpleAction
 
   alias Prana.Action
+  alias Prana.Core.Error
 
   def definition do
     %Action{
@@ -117,6 +115,6 @@ defmodule Prana.TestSupport.TestIntegration.FailingAction do
 
   @impl true
   def execute(_params, _context) do
-    {:error, "This action always fails"}
+    {:error, Error.new("action_error", "This action always fails", %{error: "This action always fails"})}
   end
 end

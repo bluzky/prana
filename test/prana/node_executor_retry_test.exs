@@ -2,6 +2,7 @@ defmodule Prana.NodeExecutorRetryTest do
   use ExUnit.Case, async: false
 
   alias Prana.Actions.SimpleAction
+  alias Prana.Core.Error
   alias Prana.IntegrationRegistry
   alias Prana.Node
   alias Prana.NodeExecution
@@ -15,6 +16,7 @@ defmodule Prana.NodeExecutorRetryTest do
     use SimpleAction
 
     alias Prana.Action
+    alias Prana.Core.Error
 
     def definition do
       %Action{
@@ -30,7 +32,7 @@ defmodule Prana.NodeExecutorRetryTest do
 
     @impl true
     def execute(_params, _context) do
-      {:error, "This action always fails"}
+      {:error, Error.new("action_error", "This action always fails", %{error: "This action always fails"})}
     end
   end
 
@@ -188,8 +190,11 @@ defmodule Prana.NodeExecutorRetryTest do
       resume_at = suspended_node_execution.suspension_data["resume_at"]
       assert %DateTime{} = resume_at
       assert DateTime.after?(resume_at, DateTime.utc_now())
-      # Original error is wrapped in Prana.Core.Error
-      assert suspended_node_execution.suspension_data["original_error"].details["error"] == "This action always fails"
+      # Original error is wrapped in Prana.Core.Error - NodeExecutor wraps it again
+      original_error = suspended_node_execution.suspension_data["original_error"]
+      assert %Error{code: "action.execution_error"} = original_error
+      assert original_error.details[:code] == "action_error"
+      assert original_error.details[:details][:error] == "This action always fails"
     end
 
     test "execute_node returns error when retry is disabled", %{execution: execution} do
@@ -200,8 +205,10 @@ defmodule Prana.NodeExecutorRetryTest do
       result = NodeExecutor.execute_node(node, execution, %{}, %{execution_index: 1, run_index: 0})
 
       assert {:error, {reason, failed_execution}} = result
-      # Reason is now wrapped in Prana.Core.Error
-      assert reason.details["error"] == "This action always fails"
+      # Reason is wrapped by NodeExecutor as action.execution_error containing the original Error struct
+      assert %Error{code: "action.execution_error"} = reason
+      assert reason.details[:code] == "action_error"
+      assert reason.details[:details][:error] == "This action always fails"
       assert failed_execution.status == "failed"
     end
 

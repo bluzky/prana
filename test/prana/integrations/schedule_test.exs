@@ -116,7 +116,8 @@ defmodule Prana.Integrations.ScheduleTest do
       context = %{}
       resume_data = %{}
 
-      assert {:error, "Resume not supported"} = CronTriggerAction.resume(params, context, resume_data)
+      assert {:error, %Prana.Core.Error{code: "action_error", message: "Resume not supported"}} =
+               CronTriggerAction.resume(params, context, resume_data)
     end
   end
 

@@ -17,6 +17,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
     use SimpleAction
 
     alias Prana.Action
+    alias Prana.Core.Error
 
     def definition do
       %Action{
@@ -37,7 +38,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
 
       if retry_count == 0 do
         # First attempt - fail
-        {:error, "First attempt fails"}
+        {:error, Error.new("action_error", "First attempt fails", %{error: "First attempt fails"})}
       else
         # Retry attempt - succeed
         {:ok, %{message: "Success on retry", attempt: retry_count}}
@@ -50,6 +51,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
     use SimpleAction
 
     alias Prana.Action
+    alias Prana.Core.Error
 
     def definition do
       %Action{
@@ -65,7 +67,7 @@ defmodule Prana.GraphExecutorRetrySimpleTest do
 
     @impl true
     def execute(_params, _context) do
-      {:error, "Always fails"}
+      {:error, Error.new("action_error", "Always fails", %{error: "Always fails"})}
     end
   end
 
