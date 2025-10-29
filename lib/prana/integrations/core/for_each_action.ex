@@ -68,12 +68,6 @@ defmodule Prana.Integrations.Core.ForEachAction do
   alias Prana.Action
   alias Prana.Core.Error
 
-  defschema ForEachSchema do
-    field(:collection, :any, required: true)
-    field(:mode, :string, required: true, in: ["single", "batch"])
-    field(:batch_size, :integer, number: [min: 1])
-  end
-
   def definition do
     %Action{
       name: "prana_core.for_each",
@@ -81,70 +75,56 @@ defmodule Prana.Integrations.Core.ForEachAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["loop", "done"]
+      output_ports: ["loop", "done"],
+      params_schema: %{
+        collection: [
+          type: :any,
+          description: "Template expression that evaluates to an array/list to iterate over",
+          required: true
+        ],
+        mode: [
+          type: :string,
+          description: "Processing mode - 'single' (one item per execution) or 'batch' (multiple items per execution)",
+          required: true,
+          in: ["single", "batch"]
+        ],
+        batch_size: [
+          type: :integer,
+          description: "Number of items per batch (required for batch mode, must be >= 1)"
+        ]
+      }
     }
-  end
-
-  defp validate_params(input_map) do
-    case Skema.cast(input_map, ForEachSchema) do
-      {:ok, validated_data} ->
-        # Additional validation for batch mode
-        case validated_data do
-          %{mode: "batch"} ->
-            if is_nil(validated_data.batch_size) do
-              {:error,
-               Error.new("validation_error", "batch_size is required for batch mode and must be >= 1", %{
-                 "errors" => [%{field: :batch_size, message: "is required for batch mode and must be >= 1"}]
-               })}
-            else
-              {:ok, validated_data}
-            end
-
-          _ ->
-            {:ok, validated_data}
-        end
-
-      {:error, errors} ->
-        {:error, format_errors(errors)}
-    end
   end
 
   @impl true
   def execute(params, context) do
-    # Use Skema validation
-    case validate_params(params) do
-      {:ok, validated_params} ->
-        node_key = context["$execution"]["current_node_key"]
-        loopback = context["$execution"]["loopback"]
-        node_context = Nested.get(context, ["$nodes", node_key, "context"]) || %{}
+    node_key = context["$execution"]["current_node_key"]
+    loopback = context["$execution"]["loopback"]
+    node_context = Nested.get(context, ["$nodes", node_key, "context"]) || %{}
 
-        case {loopback, node_context} do
-          {false, _} ->
-            # First execution - start new loop
-            start_new_loop(validated_params, context)
+    case {loopback, node_context} do
+      {false, _} ->
+        # First execution - start new loop
+        start_new_loop(params, context)
 
-          {true, %{"remaining_items" => []}} ->
-            {:ok, %{}, "done"}
+      {true, %{"remaining_items" => []}} ->
+        {:ok, %{}, "done"}
 
-          {true, %{"remaining_items" => _remaining}} ->
-            continue_loop(validated_params, context, node_context)
+      {true, %{"remaining_items" => _remaining}} ->
+        continue_loop(params, context, node_context)
 
-          _ ->
-            {:error, Error.new("invalid_loopback", "Loopback context is invalid or missing")}
-        end
-
-      {:error, error} ->
-        {:error, error}
+      _ ->
+        {:error, Error.new("invalid_loopback", "Loopback context is invalid or missing")}
     end
   end
 
   # Start new loop - evaluate collection and process first item/batch
-  defp start_new_loop(validated_params, context) do
+  defp start_new_loop(params, context) do
     # Collection is passed as validated parameter
-    collection = validated_params.collection
+    collection = params.collection
 
     with :ok <- validate_collection(collection),
-         {:ok, {item_or_batch, remaining_items}} <- get_next_item_or_batch(collection, validated_params) do
+         {:ok, {item_or_batch, remaining_items}} <- get_next_item_or_batch(collection, params) do
       node_context_updates = %{
         "item_count" => length(collection),
         "remaining_items" => remaining_items,
@@ -165,14 +145,14 @@ defmodule Prana.Integrations.Core.ForEachAction do
   end
 
   # Continue existing loop - process next item/batch from remaining items
-  defp continue_loop(validated_params, _context, node_context) do
+  defp continue_loop(params, _context, node_context) do
     %{
       "remaining_items" => remaining_items,
       "current_loop_index" => current_loop_index,
       "current_run_index" => current_run_index
     } = node_context
 
-    {:ok, {item_or_batch, new_remaining}} = get_next_item_or_batch(remaining_items, validated_params)
+    {:ok, {item_or_batch, new_remaining}} = get_next_item_or_batch(remaining_items, params)
 
     node_context_updates = %{
       node_context
@@ -183,23 +163,6 @@ defmodule Prana.Integrations.Core.ForEachAction do
     }
 
     {:ok, item_or_batch, "loop", %{"node_context" => node_context_updates}}
-  end
-
-  # Format Skema validation errors
-  defp format_errors(%{errors: errors}) when is_map(errors) do
-    formatted_errors =
-      Enum.map(errors, fn {field, messages} ->
-        message = if is_list(messages), do: Enum.join(messages, ", "), else: messages
-
-        %{
-          field: field,
-          message: message
-        }
-      end)
-
-    Error.new("validation_error", "Parameter validation failed", %{
-      "errors" => formatted_errors
-    })
   end
 
   # Validate that collection is an enumerable list/array
@@ -215,14 +178,17 @@ defmodule Prana.Integrations.Core.ForEachAction do
 
   defp get_next_item_or_batch([], _), do: :no_more_items
 
-  defp get_next_item_or_batch(remaining_items, %{mode: "single"}) do
-    [first | rest] = remaining_items
-    {:ok, {first, rest}}
-  end
+  defp get_next_item_or_batch(remaining_items, params) do
+    # params is validated by framework via params_schema, so it has atom keys
+    case params.mode do
+      "single" ->
+        [first | rest] = remaining_items
+        {:ok, {first, rest}}
 
-  defp get_next_item_or_batch(remaining_items, %{mode: "batch", batch_size: batch_size}) do
-    batch = Enum.take(remaining_items, batch_size)
-    remaining = Enum.drop(remaining_items, batch_size)
-    {:ok, {batch, remaining}}
+      "batch" ->
+        batch = Enum.take(remaining_items, params.batch_size)
+        remaining = Enum.drop(remaining_items, params.batch_size)
+        {:ok, {batch, remaining}}
+    end
   end
 end

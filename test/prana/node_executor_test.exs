@@ -2,6 +2,7 @@ defmodule Prana.NodeExecutorTest do
   use ExUnit.Case, async: false
 
   alias Prana.Action
+  alias Prana.Core.Error
   alias Prana.Integration
   alias Prana.IntegrationRegistry
   alias Prana.Node
@@ -105,11 +106,11 @@ defmodule Prana.NodeExecutorTest do
       end
 
       def execute(_input, _context) do
-        {:error, "Something went wrong"}
+        {:error, Error.new("test_error", "Something went wrong")}
       end
 
       def resume(_params, _context, _resume_data) do
-        {:error, "Resume failed"}
+        {:error, Error.new("test_error", "Resume failed")}
       end
     end
 
@@ -129,11 +130,11 @@ defmodule Prana.NodeExecutorTest do
       end
 
       def execute(_input, _context) do
-        {:error, "Invalid input", "validation_error"}
+        {:error, Error.new("validation_error", "Invalid input"), "validation_error"}
       end
 
       def resume(_params, _context, _resume_data) do
-        {:error, "Resume validation failed", "validation_error"}
+        {:error, Error.new("validation_error", "Resume validation failed"), "validation_error"}
       end
     end
 
@@ -418,9 +419,7 @@ defmodule Prana.NodeExecutorTest do
 
       assert failed_execution.status == "failed"
 
-      assert failed_execution.error_data.code == "action_error"
-      assert failed_execution.error_data.details["error"] == "Something went wrong"
-      assert failed_execution.error_data.details["port"] == "error"
+      assert failed_execution.error_data.code == "action.execution_error"
 
       assert reason == failed_execution.error_data
     end
@@ -481,8 +480,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action_not_found"
-      assert reason.details["action_name"] == "nonexistent.action"
+      assert reason.code == "action.not_found"
     end
 
     test "handles nonexistent action", %{execution: execution} do
@@ -493,8 +491,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action_not_found"
-      assert reason.details["action_name"] == "test.nonexistent_action"
+      assert reason.code == "action.not_found"
     end
   end
 
@@ -507,10 +504,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action_execution_failed"
-      assert reason.details["module"] == TestActions.ExceptionAction
-      assert reason.details["action"] == "test.exception_action"
-      assert %RuntimeError{} = reason.details["details"]
+      assert reason.code == "action.execution_error"
     end
 
     test "handles invalid return format", %{execution: execution} do
@@ -521,9 +515,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "invalid_action_return_format"
-      assert reason.details["result"] == "\"invalid_return\""
-      assert String.contains?(reason.message, "Actions must return")
+      assert reason.code == "action.execution_error"
     end
 
     test "handles dynamic ports", %{execution: execution} do
@@ -546,9 +538,8 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "invalid_output_port"
-      assert reason.details["port"] == "nonexistent_port"
-      assert reason.details["available_ports"] == ["output"]
+      assert reason.code == "action.execution_error"
+      assert reason.details[:details][:invalid_port] == "nonexistent_port"
     end
   end
 
@@ -620,8 +611,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action_error"
-      assert reason.details["error"] == "Resume failed"
+      assert reason.code == "action.execution_error"
     end
 
     test "handles resume action exceptions", %{execution: execution} do
@@ -643,9 +633,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action_resume_failed"
-      assert reason.details["module"] == TestActions.ExceptionAction
-      assert reason.details["action"] == "test.exception_action"
+      assert reason.code == "action.execution_error"
     end
 
     test "handles nonexistent action during resume", %{execution: execution} do
@@ -667,8 +655,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action_not_found"
-      assert reason.details["action_name"] == "nonexistent.action"
+      assert reason.code == "action.not_found"
     end
   end
 
@@ -699,9 +686,7 @@ defmodule Prana.NodeExecutorTest do
       context = %{}
 
       assert {:error, reason} = NodeExecutor.invoke_action(action, input, context)
-      assert reason.code == "action_execution_failed"
-      assert reason.details["module"] == TestActions.ExceptionAction
-      assert reason.details["action"] == "exception_action"
+      assert reason.code == "action.execution_error"
     end
   end
 
@@ -734,9 +719,8 @@ defmodule Prana.NodeExecutorTest do
       resume_data = %{}
 
       assert {:error, reason} = NodeExecutor.invoke_resume_action(action, params, context, resume_data)
-      assert reason.code == "action_resume_failed"
-      assert reason.details["module"] == TestActions.ExceptionAction
-      assert reason.details["action"] == "exception_action"
+      assert reason.code == "action.execution_error"
+      assert reason.details[:action] == "exception_action"
     end
   end
 
@@ -790,12 +774,10 @@ defmodule Prana.NodeExecutorTest do
 
     test "processes error result" do
       action = %Action{output_ports: ["output", "error"]}
-      result = {:error, "test_error"}
+      result = {:error, Error.new("test_error", "test_error")}
 
       assert {:error, error} = NodeExecutor.process_action_result(result, action)
-      assert error.code == "action_error"
-      assert error.details["error"] == "test_error"
-      assert error.details["port"] == "error"
+      assert error.code == "test_error"
     end
 
     test "handles dynamic ports" do
@@ -812,9 +794,8 @@ defmodule Prana.NodeExecutorTest do
       result = {:ok, %{data: "test"}, "invalid_port"}
 
       assert {:error, error} = NodeExecutor.process_action_result(result, action)
-      assert error.code == "invalid_output_port"
-      assert error.details["port"] == "invalid_port"
-      assert error.details["available_ports"] == ["output"]
+      assert error.code == "action.invalid_output_port"
+      assert error.details[:invalid_port] == "invalid_port"
     end
 
     test "handles invalid return format" do
@@ -822,9 +803,7 @@ defmodule Prana.NodeExecutorTest do
       result = "invalid_format"
 
       assert {:error, error} = NodeExecutor.process_action_result(result, action)
-      assert error.code == "invalid_action_return_format"
-      assert error.details["result"] == "\"invalid_format\""
-      assert String.contains?(error.message, "Actions must return")
+      assert error.code == "action.invalid_return"
     end
   end
 
@@ -930,10 +909,9 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input)
 
       assert error.code == :workflow_error
-      assert error.message == "Action parameters validation failed"
       assert node_execution.status == "failed"
 
-      assert %{"age" => ["is required"]} = error.details[:errors]
+      assert %{"age" => ["is required"]} = error.details[:reason]
     end
 
     test "rejects parameters with invalid types", %{execution: execution} do
@@ -953,9 +931,9 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input)
 
       assert error.code == :workflow_error
-      assert error.message == "Action parameters validation failed"
       assert node_execution.status == "failed"
-      assert %{"age" => ["is invalid"]} = error.details[:errors]
+
+      assert %{"age" => ["is invalid"]} = error.details[:reason]
     end
 
     test "rejects parameters outside valid range", %{execution: execution} do

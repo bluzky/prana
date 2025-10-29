@@ -128,13 +128,13 @@ defmodule Prana.Integrations.HTTP.RequestAction do
         {:ok, format_response(response), "success"}
 
       {:error, :timeout} ->
-        {:error, Error.action_error("http_timeout", "Request timed out"), "timeout"}
+        {:error, Error.new("http_timeout", "Request timed out"), "timeout"}
 
       {:error, reason} when is_binary(reason) ->
-        {:error, Error.action_error("http_error", reason)}
+        {:error, Error.new("http_error", reason), "error"}
 
       {:error, reason} ->
-        {:error, Error.action_error("http_error", format_error(reason)), "error"}
+        {:error, Error.new("http_error", format_error(reason)), "error"}
     end
   end
 

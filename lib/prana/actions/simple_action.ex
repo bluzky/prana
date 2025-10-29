@@ -70,7 +70,7 @@ defmodule Prana.Actions.SimpleAction do
       if your action needs to support resumption.
       """
       def resume(_params, _context, _resume_data) do
-        {:error, "Resume not supported"}
+        {:error, Prana.Core.Error.new("action_error", "Resume not supported", %{error: "Resume not supported"})}
       end
 
       @doc """

@@ -30,7 +30,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
 
   describe "execute/2 - single mode" do
     test "starts new loop with first item from collection" do
-      params = %{"collection" => [1, 2, 3], "mode" => "single"}
+      params = %{collection: [1, 2, 3], mode: "single"}
 
       context = %{
         "$execution" => %{
@@ -56,7 +56,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "continues loop with remaining items" do
-      params = %{"collection" => [1, 2, 3], "mode" => "single"}
+      params = %{collection: [1, 2, 3], mode: "single"}
 
       # Simulate context from previous iteration
       node_context = %{
@@ -92,7 +92,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "processes last item with has_more_item = false" do
-      params = %{"collection" => [1, 2, 3], "mode" => "single"}
+      params = %{collection: [1, 2, 3], mode: "single"}
 
       # Context for last item
       node_context = %{
@@ -127,7 +127,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "completes loop when no remaining items" do
-      params = %{"collection" => [1, 2, 3], "mode" => "single"}
+      params = %{collection: [1, 2, 3], mode: "single"}
 
       # Context after all items processed
       node_context = %{
@@ -152,7 +152,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "handles single item collection correctly" do
-      params = %{"collection" => ["only_item"], "mode" => "single"}
+      params = %{collection: ["only_item"], mode: "single"}
 
       context = %{
         "$execution" => %{
@@ -180,7 +180,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
 
   describe "execute/2 - batch mode" do
     test "starts new loop with first batch" do
-      params = %{"collection" => [1, 2, 3, 4, 5], "mode" => "batch", "batch_size" => 2}
+      params = %{collection: [1, 2, 3, 4, 5], mode: "batch", batch_size: 2}
 
       context = %{
         "$execution" => %{
@@ -206,7 +206,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "continues with next batch" do
-      params = %{"collection" => [1, 2, 3, 4, 5], "mode" => "batch", "batch_size" => 2}
+      params = %{collection: [1, 2, 3, 4, 5], mode: "batch", batch_size: 2}
 
       # Context from previous batch iteration
       node_context = %{
@@ -242,7 +242,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "processes final partial batch" do
-      params = %{"collection" => [1, 2, 3, 4, 5], "mode" => "batch", "batch_size" => 2}
+      params = %{collection: [1, 2, 3, 4, 5], mode: "batch", batch_size: 2}
 
       # Context for final partial batch
       node_context = %{
@@ -277,7 +277,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "handles exact batch size division" do
-      params = %{"collection" => [1, 2, 3, 4], "mode" => "batch", "batch_size" => 2}
+      params = %{collection: [1, 2, 3, 4], mode: "batch", batch_size: 2}
 
       context = %{
         "$execution" => %{
@@ -314,7 +314,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
 
   describe "execute/2 - error handling" do
     test "handles invalid collection type" do
-      params = %{"collection" => "not_a_list", "mode" => "single"}
+      params = %{collection: "not_a_list", mode: "single"}
 
       context = %{
         "$execution" => %{
@@ -329,7 +329,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "handles empty collection" do
-      params = %{"collection" => [], "mode" => "single"}
+      params = %{collection: [], mode: "single"}
 
       context = %{
         "$execution" => %{
@@ -345,7 +345,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "handles corrupted context on loopback" do
-      params = %{"collection" => [1, 2, 3], "mode" => "single"}
+      params = %{collection: [1, 2, 3], mode: "single"}
 
       context = %{
         "$execution" => %{
@@ -367,7 +367,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
   describe "execute/2 - edge cases" do
     test "handles very large batch sizes" do
       collection = Enum.to_list(1..10)
-      params = %{"collection" => collection, "mode" => "batch", "batch_size" => 100}
+      params = %{collection: collection, mode: "batch", batch_size: 100}
 
       context = %{
         "$execution" => %{
@@ -388,7 +388,7 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "handles batch_size of 1 (equivalent to single mode)" do
-      params = %{"collection" => [1, 2, 3], "mode" => "batch", "batch_size" => 1}
+      params = %{collection: [1, 2, 3], mode: "batch", batch_size: 1}
 
       context = %{
         "$execution" => %{
@@ -409,8 +409,8 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
     end
 
     test "maintains separate contexts for different node keys" do
-      params1 = %{"collection" => [1, 2], "mode" => "single"}
-      params2 = %{"collection" => ["a", "b"], "mode" => "single"}
+      params1 = %{collection: [1, 2], mode: "single"}
+      params2 = %{collection: ["a", "b"], mode: "single"}
 
       # First loop node
       context1 = %{

@@ -42,7 +42,7 @@ defmodule Prana.NodeExecutor do
 
     with {:ok, action} <- get_action(node),
          {:ok, prepared_params} <- prepare_params(node, action_context),
-         {:ok, validated_params} <- validate_params(prepared_params, action) do
+         {:ok, validated_params} <- validate_params(prepared_params, node, action) do
       node_execution = %{node_execution | params: validated_params}
       handle_action_execution(node, action, validated_params, action_context, node_execution, execution)
     else
@@ -87,7 +87,7 @@ defmodule Prana.NodeExecutor do
 
     with {:ok, action} <- get_action(node),
          {:ok, prepared_params} <- prepare_params(node, action_context),
-         {:ok, validated_params} <- validate_params(prepared_params, action) do
+         {:ok, validated_params} <- validate_params(prepared_params, node, action) do
       node_execution = %{resumed_node_execution | params: validated_params}
 
       # Handle action execution with retry context preservation
@@ -116,8 +116,9 @@ defmodule Prana.NodeExecutor do
           {:suspend, suspended_execution}
 
         {:error, reason} ->
+          error = Error.new("action.execution_error", "Node execution failed", Error.to_map(reason))
           # For retry failures, we need to handle retry logic with proper attempt counting
-          handle_retry_failure(node, failed_node_execution, resumed_node_execution, reason)
+          handle_retry_failure(node, failed_node_execution, resumed_node_execution, error)
       end
     else
       {:error, reason} ->
@@ -186,7 +187,7 @@ defmodule Prana.NodeExecutor do
     params = suspended_node_execution.params || %{}
 
     with {:ok, action} <- get_action(node),
-         {:ok, validated_params} <- validate_params(params, action) do
+         {:ok, validated_params} <- validate_params(params, node, action) do
       handle_resume_action(action, validated_params, context, resume_data, suspended_node_execution, execution)
     else
       {:error, reason} ->
@@ -197,31 +198,35 @@ defmodule Prana.NodeExecutor do
   @spec prepare_params(Node.t(), map()) :: {:ok, map()} | {:error, term()}
   defp prepare_params(%Node{params: nil}, _context), do: {:ok, %{}}
 
-  defp prepare_params(%Node{params: params}, context) when is_map(params) do
+  defp prepare_params(%Node{params: params} = node, context) when is_map(params) do
     case Prana.Template.process_map(params, context) do
       {:ok, processed_map} ->
         {:ok, processed_map || %{}}
 
       {:error, reason} ->
-        {:error, build_params_error("expression_evaluation_failed", reason, params)}
+        {:error,
+         Error.engine_error("Failed to process action's params", %{
+           reason: reason,
+           params: params,
+           node: node.key,
+           action: node.type
+         })}
     end
   rescue
     error ->
-      {:error, build_params_error("params_preparation_failed", error, params)}
+      {:error,
+       Error.engine_error("Failed to process action's params", %{
+         reason: error,
+         params: params,
+         node: node.key,
+         action: node.type
+       })}
   end
 
-  defp build_params_error(type, reason, params) do
-    Error.new("params_error", "Failed to prepare params for action", %{
-      "error_type" => type,
-      "details" => reason,
-      "params" => params
-    })
-  end
+  @spec validate_params(map(), Node.t(), Prana.Action.t()) :: {:ok, map()} | {:error, term()}
+  defp validate_params(params, _node, %Prana.Action{params_schema: nil}), do: {:ok, params}
 
-  @spec validate_params(map(), Prana.Action.t()) :: {:ok, map()} | {:error, term()}
-  defp validate_params(params, %Prana.Action{params_schema: nil}), do: {:ok, params}
-
-  defp validate_params(params, %Prana.Action{params_schema: schema} = action) when is_map(schema) do
+  defp validate_params(params, node, %Prana.Action{params_schema: schema} = action) when is_map(schema) do
     case Skema.cast(params, schema) do
       {:ok, validated_params} ->
         {:ok, validated_params}
@@ -230,8 +235,9 @@ defmodule Prana.NodeExecutor do
         {:error,
          Error.workflow_error("Action parameters validation failed", %{
            code: "workflow.invalid_action_params",
-           action_name: action.name,
-           errors: errors.errors
+           node: node.key,
+           action: action.name,
+           reason: errors.errors
          })}
     end
   end
@@ -246,19 +252,11 @@ defmodule Prana.NodeExecutor do
         {:ok, action}
 
       {:error, :not_found} ->
-        {:error, build_action_error("action_not_found", node.type)}
+        {:error, Error.new("action.not_found", "Action not found", %{node: node.key, action: node.type})}
 
       {:error, reason} ->
-        {:error, build_registry_error(reason)}
+        {:error, Error.engine_error("Registry error occurred", %{reason: reason, node: node.key, action: node.type})}
     end
-  end
-
-  defp build_action_error(type, action_name) do
-    Error.new(type, "Action not found", %{"action_name" => action_name})
-  end
-
-  defp build_registry_error(reason) do
-    Error.new("registry_error", "Registry error occurred", %{"reason" => reason})
   end
 
   # =============================================================================
@@ -276,7 +274,12 @@ defmodule Prana.NodeExecutor do
       Logger.error(inspect(error))
       Logger.error(stacktrace)
 
-      {:error, build_action_execution_error("action_execution_failed", error, stacktrace, action)}
+      {:error,
+       Error.new("action.execution_error", "Action execution exception", %{
+         details: error,
+         stacktrace: stacktrace,
+         action: action.name
+       })}
   end
 
   # Public for test purposes, but generally not used directly
@@ -290,16 +293,12 @@ defmodule Prana.NodeExecutor do
       Logger.error(inspect(error))
       Logger.error(stacktrace)
 
-      {:error, build_action_execution_error("action_resume_failed", error, stacktrace, action)}
-  end
-
-  defp build_action_execution_error(type, error_data, stacktrace, action) do
-    Error.new(type, "Action execution failed", %{
-      "details" => error_data,
-      "stacktrace" => stacktrace,
-      "module" => action.module,
-      "action" => action.name
-    })
+      {:error,
+       Error.new("action.execution_error", "Action execution exception", %{
+         details: error,
+         stacktrace: stacktrace,
+         action: action.name
+       })}
   end
 
   # =============================================================================
@@ -383,10 +382,15 @@ defmodule Prana.NodeExecutor do
         {:ok, data, port}
 
       {:error, error} ->
-        {:error, build_action_error_result(error, "error")}
+        {:error, error}
 
-      invalid_result ->
-        {:error, build_invalid_format_error(invalid_result)}
+      _invalid_result ->
+        {:error,
+         Error.new(
+           "action.invalid_return",
+           "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}",
+           %{action: action.name}
+         )}
     end
   end
 
@@ -410,26 +414,11 @@ defmodule Prana.NodeExecutor do
     allows_dynamic_ports?(action) or port in action.output_ports
   end
 
-  defp build_action_error_result(error, port) do
-    Error.new("action_error", "Action returned error", %{
-      "error" => error,
-      "port" => port
-    })
-  end
-
   defp build_invalid_port_error(port, action) do
-    Error.new("invalid_output_port", "Invalid output port specified", %{
-      "port" => port,
-      "available_ports" => action.output_ports
+    Error.new("action.invalid_output_port", "Invalid output port specified", %{
+      action: action.name,
+      invalid_port: port
     })
-  end
-
-  defp build_invalid_format_error(invalid_result) do
-    Error.new(
-      "invalid_action_return_format",
-      "Actions must return {:ok, data} | {:error, error} | {:ok, data, port} | {:error, error, port} | {:ok, data, context} | {:ok, data, port, context} | {:suspend, type, data}",
-      %{"result" => inspect(invalid_result)}
-    )
   end
 
   # =============================================================================
@@ -461,19 +450,8 @@ defmodule Prana.NodeExecutor do
   end
 
   # Check if an error is retryable (only action execution errors should be retried)
-  defp is_retryable_error?(%Error{code: code}) do
-    case code do
-      # ONLY action execution errors are retryable
-      "action_error" -> true
-      "action_execution_failed" -> true
-      "action_exit" -> true
-      "action_throw" -> true
-      # All other errors are configuration/setup errors - NOT retryable
-      _ -> false
-    end
-  end
+  defp is_retryable_error?(%Error{code: "action.execution_error"}), do: true
 
-  # Handle non-Error structs (shouldn't happen in normal flow, but be defensive)
   defp is_retryable_error?(_error), do: false
 
   # =============================================================================
@@ -511,7 +489,8 @@ defmodule Prana.NodeExecutor do
         {:suspend, suspended_execution}
 
       {:error, reason} ->
-        handle_execution_error(node, node_execution, reason, execution)
+        error = Error.new("action.execution_error", "Node execution failed", Error.to_map(reason))
+        handle_execution_error(node, node_execution, error, execution)
     end
   end
 
@@ -542,7 +521,8 @@ defmodule Prana.NodeExecutor do
         {:suspend, suspended_execution}
 
       {:error, reason} ->
-        handle_resume_error(resume_execution, reason)
+        error = Error.new("action.execution_error", "Node execution failed", Error.to_map(reason))
+        handle_resume_error(resume_execution, error)
     end
   end
 
@@ -605,10 +585,7 @@ defmodule Prana.NodeExecutor do
     # Extract the original error information from the Error struct
     {original_error, original_port} =
       case reason do
-        %Error{details: %{"error" => error, "port" => port}} ->
-          {error, port}
-
-        %Error{details: %{"error" => error}} ->
+        %Error{details: %{details: _} = error} ->
           {error, output_port}
 
         error ->
@@ -618,9 +595,9 @@ defmodule Prana.NodeExecutor do
     # Create error data with port information
     error_data =
       Error.new("action_error", "Action returned error", %{
-        "error" => original_error,
-        "port" => original_port,
-        "on_error_behavior" => Atom.to_string(port_type)
+        error: original_error,
+        port: original_port,
+        on_error_behavior: Atom.to_string(port_type)
       })
 
     # Complete the node execution successfully with error data

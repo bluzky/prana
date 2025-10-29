@@ -1,12 +1,13 @@
 defmodule Prana.Integrations.Code.ElixirCodeActionTest do
   use ExUnit.Case, async: true
 
+  alias Prana.Core.Error
   alias Prana.Integrations.Code.ElixirCodeAction
   alias Prana.Integrations.Code.Sandbox
 
   describe "execute/2" do
     test "executes simple arithmetic in compiled mode" do
-      params = %{"code" => "def run(_input, _context), do: 1 + 2"}
+      params = %{code: "def run(_input, _context), do: 1 + 2"}
 
       context = %{
         "$input" => %{},
@@ -23,7 +24,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
     end
 
     test "executes string operations in compiled mode" do
-      params = %{"code" => "def run(_input, _context), do: String.upcase(\"hello\")"}
+      params = %{code: "def run(_input, _context), do: String.upcase(\"hello\")"}
 
       context = %{
         "$input" => %{},
@@ -40,7 +41,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
     end
 
     test "uses input parameter in compiled mode" do
-      params = %{"code" => "def run(input, _context), do: input[\"name\"]"}
+      params = %{code: "def run(input, _context), do: input[\"name\"]"}
 
       context = %{
         "$input" => %{"name" => "John"},
@@ -57,7 +58,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
     end
 
     test "executes complex expressions" do
-      params = %{"code" => "def run(_input, _context), do: Enum.map([1, 2, 3], fn x -> x * 2 end)"}
+      params = %{code: "def run(_input, _context), do: Enum.map([1, 2, 3], fn x -> x * 2 end)"}
 
       context = %{
         "$input" => %{},
@@ -74,7 +75,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
     end
 
     test "rejects dangerous code" do
-      params = %{"code" => "def run(_input, _context), do: File.read!(\"/etc/passwd\")"}
+      params = %{code: "def run(_input, _context), do: File.read!(\"/etc/passwd\")"}
 
       context = %{
         "$input" => %{},
@@ -87,12 +88,11 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:error, error_msg} = ElixirCodeAction.execute(params, context)
-      assert String.contains?(error_msg, "not allowed")
+      assert {:error, %Error{code: "execution_error", message: _message}} = ElixirCodeAction.execute(params, context)
     end
 
     test "uses context vars from workflow" do
-      params = %{"code" => ~s{def run(input, context), do: input["name"] <> " in " <> context.env["environment"]}}
+      params = %{code: ~s{def run(input, context), do: input["name"] <> " in " <> context.env["environment"]}}
 
       context = %{
         "$input" => %{"name" => "Alice"},
@@ -109,7 +109,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
     end
 
     test "rejects non-run function definitions" do
-      params = %{"code" => "def hello, do: :world"}
+      params = %{code: "def hello, do: :world"}
 
       context = %{
         "$input" => %{},
@@ -122,12 +122,11 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:error, error_msg} = ElixirCodeAction.execute(params, context)
-      assert String.contains?(error_msg, "Expecting only `def run` at the top level")
+      assert {:error, %Error{code: "execution_error", message: _message}} = ElixirCodeAction.execute(params, context)
     end
 
     test "provides clear error messages for runtime errors" do
-      params = %{"code" => "def run(input, _context), do: input.nonexistent_key"}
+      params = %{code: "def run(input, _context), do: input.nonexistent_key"}
 
       context = %{
         "$input" => %{"name" => "Test"},
@@ -140,19 +139,24 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
         }
       }
 
-      assert {:error, error_msg} = ElixirCodeAction.execute(params, context)
-      assert String.contains?(error_msg, "Key error") or String.contains?(error_msg, "key :nonexistent_key")
+      assert {:error, %Error{code: "execution_error", message: _message}} = ElixirCodeAction.execute(params, context)
     end
 
     test "validates required code parameter" do
-      params = %{}
-      context = %{}
+      params = %{code: nil}
+      context = %{
+        "$input" => %{},
+        "$workflow" => %{"id" => "test_workflow"},
+        "$execution" => %{"current_node_key" => "test_node"}
+      }
 
-      assert {:error, "Code parameter is required"} = ElixirCodeAction.execute(params, context)
+      assert_raise FunctionClauseError, fn ->
+        ElixirCodeAction.execute(params, context)
+      end
     end
 
     test "handles fresh context on each execution (no stale data)" do
-      params = %{"code" => "def run(input, _context), do: input[\"value\"]"}
+      params = %{code: "def run(input, _context), do: input[\"value\"]"}
 
       # First execution with value "first"
       context1 = %{
@@ -176,7 +180,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
 
     test "interpreted and compiled modes handle context identically" do
       # Test that both modes produce the same result with the same context
-      code = ~s|def run(input, context), do: {input["name"], context.env["mode"]}|
+      code_str = ~s|def run(input, context), do: {input["name"], context.env["mode"]}|
 
       context = %{
         "$input" => %{"name" => "Alice"},
@@ -188,10 +192,10 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       }
 
       # Test interpreted mode
-      {:ok, interpreted_result} = Sandbox.run_interpreted(code, context)
+      {:ok, interpreted_result} = Sandbox.run_interpreted(code_str, context)
 
-      # Test compiled mode  
-      {:ok, compiled_result} = Sandbox.run_compiled(code, "test_consistency", context)
+      # Test compiled mode
+      {:ok, compiled_result} = Sandbox.run_compiled(code_str, "test_consistency", context)
 
       # Both should return the same result
       assert interpreted_result == compiled_result

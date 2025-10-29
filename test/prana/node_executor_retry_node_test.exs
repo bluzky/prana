@@ -16,6 +16,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
     use SimpleAction
 
     alias Prana.Action
+    alias Prana.Core.Error
 
     def definition do
       %Action{
@@ -36,7 +37,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
 
       if retry_attempt == 0 do
         # First attempt - fail
-        {:error, "First attempt fails"}
+        {:error, Error.new("action_error", "First attempt fails", %{error: "First attempt fails"})}
       else
         # Retry attempt - succeed
         {:ok, %{message: "Success on retry", attempt: retry_attempt}}
@@ -49,6 +50,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
     use SimpleAction
 
     alias Prana.Action
+    alias Prana.Core.Error
 
     def definition do
       %Action{
@@ -64,7 +66,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
 
     @impl true
     def execute(_params, _context) do
-      {:error, "Always fails"}
+      {:error, Error.new("action_error", "Always fails", %{error: "Always fails"})}
     end
   end
 
@@ -285,7 +287,7 @@ defmodule Prana.NodeExecutorRetryNodeTest do
 
       # Should fail immediately - action not found is not retryable
       assert {:error, {reason, failed_execution}} = result
-      assert reason.code == "action_not_found"
+      assert reason.code == "action.not_found"
       assert failed_execution.status == "failed"
     end
   end

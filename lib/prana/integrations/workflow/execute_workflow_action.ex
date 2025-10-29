@@ -156,7 +156,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   end
 
   defp handle_failure(error, "fail_parent") do
-    {:error, Error.action_error("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error})}
+    {:error, Error.new("sub_workflow_failed", "Sub-workflow failed", %{sub_workflow_error: error})}
   end
 
   defp handle_failure(error, "continue") do
@@ -165,7 +165,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   end
 
   defp handle_timeout("fail_parent") do
-    {:error, Error.action_error("sub_workflow_timeout", "Sub-workflow execution timed out")}
+    {:error, Error.new("sub_workflow_timeout", "Sub-workflow execution timed out")}
   end
 
   defp handle_timeout("continue") do

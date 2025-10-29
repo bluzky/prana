@@ -67,8 +67,8 @@ defmodule Prana.Integrations.Wait do
       "interval" -> wait_interval(params)
       "schedule" -> wait_schedule(params)
       "webhook" -> wait_webhook(params)
-      nil -> {:error, Error.action_error("config_error", "mode is required")}
-      _ -> {:error, Error.action_error("config_error", "mode must be 'interval', 'schedule', or 'webhook'")}
+      nil -> {:error, Error.new("config_error", "mode is required")}
+      _ -> {:error, Error.new("config_error", "mode must be 'interval', 'schedule', or 'webhook'")}
     end
   end
 
@@ -98,7 +98,7 @@ defmodule Prana.Integrations.Wait do
       end
     else
       {:error, reason} ->
-        {:error, Error.action_error("interval_config_error", reason)}
+        {:error, Error.new("interval_config_error", reason)}
     end
   end
 
@@ -121,7 +121,7 @@ defmodule Prana.Integrations.Wait do
       {:suspend, :schedule, schedule_data}
     else
       {:error, reason} ->
-        {:error, Error.action_error("schedule_config_error", reason)}
+        {:error, Error.new("schedule_config_error", reason)}
     end
   end
 
@@ -145,7 +145,7 @@ defmodule Prana.Integrations.Wait do
         {:suspend, :webhook, webhook_data}
 
       {:error, reason} ->
-        {:error, Error.action_error("webhook_config_error", reason)}
+        {:error, Error.new("webhook_config_error", reason)}
     end
   end
 

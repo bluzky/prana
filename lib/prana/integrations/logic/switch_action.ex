@@ -94,10 +94,10 @@ defmodule Prana.Integrations.Logic.SwitchAction do
           {:ok, nil, case_port}
 
         :no_match ->
-          {:error, Error.action_error("no_matching_case", "No matching case found")}
+          {:error, Error.new("no_matching_case", "No matching case found")}
       end
     else
-      {:error, Error.action_error("missing_cases", "Cases parameter is required")}
+      {:error, Error.new("missing_cases", "Cases parameter is required")}
     end
   end
 

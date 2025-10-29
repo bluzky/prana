@@ -43,11 +43,14 @@ defmodule Prana.NodeExecutorDynamicPortsTest do
                )
 
       # Invalid port should be rejected
-      assert {:error, %Error{code: "invalid_output_port", details: %{"port" => "invalid_port"}}} =
+      assert {:error, %Error{code: "action.invalid_output_port", details: details}} =
                NodeExecutor.process_action_result(
                  {:ok, %{result: "data"}, "invalid_port"},
                  fixed_action
                )
+
+      assert details[:action] == "test_action"
+      assert details[:invalid_port] == "invalid_port"
     end
 
     test "logic switch action uses dynamic ports" do
