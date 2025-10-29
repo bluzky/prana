@@ -37,14 +37,14 @@ defmodule Prana.Integrations.WaitTest do
     test "returns error for missing mode" do
       input_map = %{"duration" => 1000}
 
-      assert {:error, %Error{code: "action_error", message: "mode is required"}} =
+      assert {:error, %Error{code: "config_error", message: "mode is required", details: nil}} =
                Wait.wait(input_map)
     end
 
     test "returns error for invalid mode" do
       input_map = %{"mode" => "invalid", "duration" => 1000}
 
-      assert {:error, %Error{code: "action_error", message: "mode must be 'interval', 'schedule', or 'webhook'"}} =
+      assert {:error, %Error{code: "config_error", message: "mode must be 'interval', 'schedule', or 'webhook'", details: nil}} =
                Wait.wait(input_map)
     end
 
@@ -67,14 +67,14 @@ defmodule Prana.Integrations.WaitTest do
     test "interval mode returns error for missing duration" do
       input_map = %{"mode" => "interval"}
 
-      assert {:error, %Error{code: "action_error", message: "duration/timeout is required"}} =
+      assert {:error, %Error{code: "interval_config_error", message: "duration/timeout is required", details: nil}} =
                Wait.wait(input_map)
     end
 
     test "interval mode returns error for invalid duration" do
       input_map = %{"mode" => "interval", "duration" => -100}
 
-      assert {:error, %Error{code: "action_error", message: "duration/timeout must be a positive number"}} =
+      assert {:error, %Error{code: "interval_config_error", message: "duration/timeout must be a positive number", details: nil}} =
                Wait.wait(input_map)
     end
 
@@ -92,21 +92,21 @@ defmodule Prana.Integrations.WaitTest do
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
       input_map = %{"mode" => "schedule", "schedule_at" => past_time}
 
-      assert {:error, %Error{code: "action_error", message: "schedule_at must be in the future"}} =
+      assert {:error, %Error{code: "schedule_config_error", message: "schedule_at must be in the future", details: nil}} =
                Wait.wait(input_map)
     end
 
     test "schedule mode returns error for invalid datetime" do
       input_map = %{"mode" => "schedule", "schedule_at" => "invalid-datetime"}
 
-      assert {:error, %Error{code: "action_error"}} =
+      assert {:error, %Error{code: "schedule_config_error", details: nil}} =
                Wait.wait(input_map)
     end
 
     test "schedule mode returns error for missing schedule_at" do
       input_map = %{"mode" => "schedule"}
 
-      assert {:error, %Error{code: "action_error", message: "schedule_at is required"}} =
+      assert {:error, %Error{code: "schedule_config_error", message: "schedule_at is required", details: nil}} =
                Wait.wait(input_map)
     end
 
@@ -132,8 +132,9 @@ defmodule Prana.Integrations.WaitTest do
 
       assert {:error,
               %Error{
-                code: "action_error",
-                message: "timeout_hours must be a positive number between 1 and 8760 (1 year)"
+                code: "webhook_config_error",
+                message: "timeout_hours must be a positive number between 1 and 8760 (1 year)",
+                details: nil
               },
               } =
                Wait.wait(input_map)
@@ -144,8 +145,9 @@ defmodule Prana.Integrations.WaitTest do
 
       assert {:error,
               %Error{
-                code: "action_error",
-                message: "timeout_hours must be a positive number between 1 and 8760 (1 year)"
+                code: "webhook_config_error",
+                message: "timeout_hours must be a positive number between 1 and 8760 (1 year)",
+                details: nil
               },
               } =
                Wait.wait(input_map)
@@ -193,7 +195,7 @@ defmodule Prana.Integrations.WaitTest do
     test "returns error for invalid unit" do
       input_map = %{"mode" => "interval", "duration" => 1000, "unit" => "invalid"}
 
-      assert {:error, %Error{code: "action_error", message: "unit must be 'ms', 'seconds', 'minutes', or 'hours'"},
+      assert {:error, %Error{code: "interval_config_error", message: "unit must be 'ms', 'seconds', 'minutes', or 'hours'", details: nil},
               } =
                Wait.wait(input_map)
     end

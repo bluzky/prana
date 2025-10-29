@@ -31,7 +31,7 @@ defmodule Prana.Integrations.Data.MergeAction do
         {:ok, merged_data}
 
       {:error, reason} ->
-        {:error, Error.action_error("merge_error", reason)}
+        {:error, Error.new("merge_error", reason)}
     end
   end
 

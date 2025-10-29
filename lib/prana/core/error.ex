@@ -179,4 +179,12 @@ defmodule Prana.Core.Error do
     details = Map.merge(%{"error_type" => error_type}, extra_details)
     new("action_error", message, details)
   end
+
+  def to_map(%__MODULE__{} = error) do
+    %{
+      code: error.code,
+      message: error.message,
+      details: Nested.to_map(error.details)
+    }
+  end
 end
