@@ -98,6 +98,7 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
   use Prana.Actions.SimpleAction
 
   alias Prana.Action
+  alias Prana.Core.Error
   alias Prana.Integrations.Code.Sandbox
 
   def definition do
@@ -145,10 +146,10 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
   defp validate_code_param(code) do
     cond do
       is_nil(code) or code == "" ->
-        {:error, "Code parameter is required"}
+        {:error, Error.new("param_error", "Code parameter is required")}
 
       not is_binary(code) ->
-        {:error, "Code must be a string"}
+        {:error, Error.new("param_error", "Code must be a string")}
 
       true ->
         :ok

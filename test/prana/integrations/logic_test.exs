@@ -71,7 +71,7 @@ defmodule Prana.Integrations.LogicTest do
       context = %{}
       resume_data = %{}
 
-      assert {:error, "IF Condition action does not support suspension/resume"} =
+      assert {:error, %Error{code: "action_error", message: "IF Condition action does not support suspension/resume", details: nil}} =
                IfConditionAction.resume(params, context, resume_data)
     end
   end

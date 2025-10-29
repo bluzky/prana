@@ -1,6 +1,7 @@
 defmodule Prana.Integrations.Code.ElixirCodeActionTest do
   use ExUnit.Case, async: true
 
+  alias Prana.Core.Error
   alias Prana.Integrations.Code.ElixirCodeAction
   alias Prana.Integrations.Code.Sandbox
 
@@ -148,7 +149,7 @@ defmodule Prana.Integrations.Code.ElixirCodeActionTest do
       params = %{}
       context = %{}
 
-      assert {:error, "Code parameter is required"} = ElixirCodeAction.execute(params, context)
+      assert {:error, %Error{code: "param_error", message: "Code parameter is required", details: nil}} = ElixirCodeAction.execute(params, context)
     end
 
     test "handles fresh context on each execution (no stale data)" do

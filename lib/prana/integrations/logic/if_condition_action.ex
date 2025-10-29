@@ -28,6 +28,7 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
   @behaviour Prana.Behaviour.Action
 
   alias Prana.Action
+  alias Prana.Core.Error
 
   def definition do
     %Action{
@@ -63,6 +64,6 @@ defmodule Prana.Integrations.Logic.IfConditionAction do
 
   @impl true
   def resume(_params, _context, _resume_data) do
-    {:error, "IF Condition action does not support suspension/resume"}
+    {:error, Error.new("action_error", "IF Condition action does not support suspension/resume")}
   end
 end

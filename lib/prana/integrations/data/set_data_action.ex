@@ -50,6 +50,7 @@ defmodule Prana.Integrations.Data.SetDataAction do
   use Prana.Actions.SimpleAction
 
   alias Prana.Action
+  alias Prana.Core.Error
 
   def definition do
     %Action{
@@ -74,7 +75,7 @@ defmodule Prana.Integrations.Data.SetDataAction do
         execute_json_mode(params)
 
       invalid_mode ->
-        {:error, "Invalid mode '#{invalid_mode}'. Supported modes: 'manual', 'json'"}
+        {:error, Error.new("mode_error", "Invalid mode '#{invalid_mode}'. Supported modes: 'manual', 'json'")}
     end
   end
 
@@ -87,7 +88,7 @@ defmodule Prana.Integrations.Data.SetDataAction do
         {:ok, mapping_map}
 
       _ ->
-        {:error, "Parameter 'mapping_map' must be a map"}
+        {:error, Error.new("param_error", "Parameter 'mapping_map' must be a map")}
     end
   end
 
@@ -102,11 +103,11 @@ defmodule Prana.Integrations.Data.SetDataAction do
             {:ok, parsed_data}
 
           {:error, %Jason.DecodeError{} = error} ->
-            {:error, "JSON parsing failed: #{Exception.message(error)}"}
+            {:error, Error.new("json_error", "JSON parsing failed: #{Exception.message(error)}")}
         end
 
       _ ->
-        {:error, "Parameter 'json_template' must be a string"}
+        {:error, Error.new("param_error", "Parameter 'json_template' must be a string")}
     end
   end
 end

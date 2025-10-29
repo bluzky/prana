@@ -1,6 +1,7 @@
 defmodule Prana.Integrations.Data.SetDataActionTest do
   use ExUnit.Case, async: true
 
+  alias Prana.Core.Error
   alias Prana.Integrations.Data.SetDataAction
 
   describe "execute/2 - manual mode" do
@@ -35,8 +36,7 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
         "mapping_map" => "not_a_map"
       }
 
-      assert {:error, error} = SetDataAction.execute(params, %{})
-      assert error == "Parameter 'mapping_map' must be a map"
+      assert {:error, %Error{code: "param_error", message: "Parameter 'mapping_map' must be a map", details: nil}} = SetDataAction.execute(params, %{})
     end
 
     test "defaults to manual mode when mode not specified" do
@@ -94,8 +94,7 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
         "json_template" => %{"not" => "string"}
       }
 
-      assert {:error, error} = SetDataAction.execute(params, %{})
-      assert error == "Parameter 'json_template' must be a string"
+      assert {:error, %Error{code: "param_error", message: "Parameter 'json_template' must be a string", details: nil}} = SetDataAction.execute(params, %{})
     end
 
     test "returns error for invalid JSON" do
@@ -104,8 +103,8 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
         "json_template" => ~s|{"invalid": json}|
       }
 
-      assert {:error, error} = SetDataAction.execute(params, %{})
-      assert String.starts_with?(error, "JSON parsing failed:")
+      assert {:error, %Error{code: "json_error", message: message, details: nil}} = SetDataAction.execute(params, %{})
+      assert String.starts_with?(message, "JSON parsing failed:")
     end
 
     test "returns error for malformed JSON" do
@@ -114,8 +113,8 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
         "json_template" => ~s|{"unclosed": "object"|
       }
 
-      assert {:error, error} = SetDataAction.execute(params, %{})
-      assert String.starts_with?(error, "JSON parsing failed:")
+      assert {:error, %Error{code: "json_error", message: message, details: nil}} = SetDataAction.execute(params, %{})
+      assert String.starts_with?(message, "JSON parsing failed:")
     end
   end
 
@@ -123,15 +122,13 @@ defmodule Prana.Integrations.Data.SetDataActionTest do
     test "returns error for invalid mode" do
       params = %{"mode" => "invalid_mode"}
 
-      assert {:error, error} = SetDataAction.execute(params, %{})
-      assert error == "Invalid mode 'invalid_mode'. Supported modes: 'manual', 'json'"
+      assert {:error, %Error{code: "mode_error", message: "Invalid mode 'invalid_mode'. Supported modes: 'manual', 'json'", details: nil}} = SetDataAction.execute(params, %{})
     end
 
     test "returns error for unknown mode" do
       params = %{"mode" => "xml"}
 
-      assert {:error, error} = SetDataAction.execute(params, %{})
-      assert error == "Invalid mode 'xml'. Supported modes: 'manual', 'json'"
+      assert {:error, %Error{code: "mode_error", message: "Invalid mode 'xml'. Supported modes: 'manual', 'json'", details: nil}} = SetDataAction.execute(params, %{})
     end
   end
 
