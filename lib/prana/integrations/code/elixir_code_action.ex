@@ -108,58 +108,43 @@ defmodule Prana.Integrations.Code.ElixirCodeAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main"]
+      output_ports: ["main"],
+      params_schema: %{
+        code: [
+          type: :string,
+          description: "Elixir code string to execute in the sandbox. Must define a run/2 function.",
+          required: true
+        ]
+      }
     }
   end
 
   @impl true
   def execute(params, context) do
-    # Extract parameters
-    code = params["code"]
-
+    # Validate required code parameter
     # Get node context for unique module naming
     code_identifier = get_code_id(context)
 
-    # Validate required parameters
-    case validate_code_param(code) do
-      :ok ->
-        # Always use compiled mode for execution (Sequin's production pattern)
-        case Sandbox.run_compiled(code, code_identifier, context) do
-          {:ok, result} ->
-            {:ok, result}
+    # Always use compiled mode for execution (Sequin's production pattern)
+    case Sandbox.run_compiled(params.code, code_identifier, context) do
+      {:ok, result} ->
+        {:ok, result}
 
-          {:error, error} ->
-            {:error, format_error(error)}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
+      {:error, error} ->
+        {:error, Error.new("execution_error", "Execution failed", format_error(error))}
     end
   end
 
-  # Extract node key from context (fallback to random if not available)
+  # Extract node key from context
   defp get_code_id(context) do
     "#{context["$workflow"]["id"]}_#{context["$execution"]["current_node_key"]}"
   end
 
-  # Validate required parameters
-  defp validate_code_param(code) do
-    cond do
-      is_nil(code) or code == "" ->
-        {:error, Error.new("param_error", "Code parameter is required")}
-
-      not is_binary(code) ->
-        {:error, Error.new("param_error", "Code must be a string")}
-
-      true ->
-        :ok
-    end
-  end
-
-  # Format error for consistent output
+  # Format error for consistent output - always returns a string
   defp format_error(error) when is_binary(error), do: error
+  defp format_error(%{"message" => message}), do: message
   defp format_error(%{message: message}), do: message
+  defp format_error(%{"type" => type, "message" => message}), do: "#{type}: #{message}"
   defp format_error(%{type: type, message: message}), do: "#{type}: #{message}"
   defp format_error(error), do: inspect(error)
-
 end

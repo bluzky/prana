@@ -59,55 +59,40 @@ defmodule Prana.Integrations.Data.SetDataAction do
       description: @moduledoc,
       type: :action,
       input_ports: ["main"],
-      output_ports: ["main"]
+      output_ports: ["main"],
+      params_schema: %{
+        mode: [
+          type: :string,
+          description: "Operating mode - 'manual' (key-value map) or 'json' (JSON template string)",
+          default: "manual",
+          in: ["manual", "json"]
+        ],
+        mapping_map: [
+          type: :map,
+          description: "Key-value map of data to output (for manual mode)"
+        ],
+        json_template: [
+          type: :string,
+          description: "JSON string template to parse (for json mode)"
+        ]
+      }
     }
   end
 
   @impl true
   def execute(params, _context) do
-    mode = Map.get(params, "mode", "manual")
-
-    case mode do
+    case params.mode do
       "manual" ->
-        execute_manual_mode(params)
+        {:ok, params.mapping_map}
 
       "json" ->
-        execute_json_mode(params)
-
-      invalid_mode ->
-        {:error, Error.new("mode_error", "Invalid mode '#{invalid_mode}'. Supported modes: 'manual', 'json'")}
-    end
-  end
-
-  defp execute_manual_mode(params) do
-    case Map.get(params, "mapping_map") do
-      nil ->
-        {:ok, nil}
-
-      mapping_map when is_map(mapping_map) ->
-        {:ok, mapping_map}
-
-      _ ->
-        {:error, Error.new("param_error", "Parameter 'mapping_map' must be a map")}
-    end
-  end
-
-  defp execute_json_mode(params) do
-    case Map.get(params, "json_template") do
-      nil ->
-        {:ok, nil}
-
-      json_template when is_binary(json_template) ->
-        case Jason.decode(json_template) do
+        case Jason.decode(params.json_template) do
           {:ok, parsed_data} ->
             {:ok, parsed_data}
 
           {:error, %Jason.DecodeError{} = error} ->
             {:error, Error.new("json_error", "JSON parsing failed: #{Exception.message(error)}")}
         end
-
-      _ ->
-        {:error, Error.new("param_error", "Parameter 'json_template' must be a string")}
     end
   end
 end

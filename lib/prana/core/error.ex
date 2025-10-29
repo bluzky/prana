@@ -67,7 +67,7 @@ defmodule Prana.Core.Error do
   @spec new(String.t(), String.t(), map() | nil) :: t()
   def new(code, message, details \\ nil)
 
-  def new(code, message, details) do
+  def new(code, message, details) when is_binary(message) do
     %__MODULE__{
       code: code,
       message: message,
