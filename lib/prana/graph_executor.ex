@@ -321,20 +321,10 @@ defmodule Prana.GraphExecutor do
         {:suspend, suspended_execution, suspension_data}
 
       {:error, {_reason, error_node_execution}} ->
-        error_reason = %{
-          type: "node_execution_failed",
-          message: "Node execution failed: #{node.key}",
-          node_key: node.key,
-          node_error: error_node_execution.error_data
-        }
-
-        failed_execution =
-          execution
-          |> WorkflowExecution.fail_node(error_node_execution)
-          |> WorkflowExecution.fail(error_reason)
+        failed_execution = WorkflowExecution.fail_node(execution, error_node_execution)
 
         Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
-        Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_reason})
+        Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_node_execution.error_data})
 
         {:error, failed_execution}
     end
@@ -471,20 +461,10 @@ defmodule Prana.GraphExecutor do
           {:suspend, suspended_execution, suspension_data}
 
         {:error, {_reason, failed_node_execution}} ->
-          error_reason = %{
-            type: "node_execution_failed",
-            message: "Node resume failed: #{suspended_node.key}",
-            node_key: suspended_node.key,
-            node_error: failed_node_execution.error_data
-          }
-
-          failed_execution =
-            resume_execution
-            |> WorkflowExecution.fail_node(failed_node_execution)
-            |> WorkflowExecution.fail(error_reason)
+          failed_execution = WorkflowExecution.fail_node(resume_execution, failed_node_execution)
 
           Middleware.call(:node_failed, %{node: suspended_node, node_execution: failed_node_execution})
-          Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_reason})
+          Middleware.call(:execution_failed, %{execution: failed_execution, reason: failed_node_execution.error_data})
 
           {:error, failed_execution}
       end

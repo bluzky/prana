@@ -686,7 +686,7 @@ defmodule Prana.NodeExecutorTest do
       context = %{}
 
       assert {:error, reason} = NodeExecutor.invoke_action(action, input, context)
-      assert reason.code == "action.execution_error"
+      assert reason.code == "action.exception"
     end
   end
 
@@ -719,8 +719,7 @@ defmodule Prana.NodeExecutorTest do
       resume_data = %{}
 
       assert {:error, reason} = NodeExecutor.invoke_resume_action(action, params, context, resume_data)
-      assert reason.code == "action.execution_error"
-      assert reason.details[:action] == "exception_action"
+      assert reason.code == "action.exception"
     end
   end
 

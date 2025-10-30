@@ -90,47 +90,33 @@ defmodule Prana.NodeExecutor do
          {:ok, validated_params} <- validate_params(prepared_params, node, action) do
       node_execution = %{resumed_node_execution | params: validated_params}
 
-      # Handle action execution with retry context preservation
-      case invoke_action(action, validated_params, action_context) do
-        {:ok, output_data, output_port} ->
-          completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-          updated_execution = Prana.WorkflowExecution.complete_node(execution, completed_execution)
-          {:ok, completed_execution, updated_execution}
-
-        {:ok, output_data, output_port, state_updates} ->
-          {node_context_updates, workflow_state_updates} = extract_node_context_updates(state_updates)
-          completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-
-          updated_execution =
-            complete_node_with_context_update(
-              execution,
-              completed_execution,
-              node_context_updates,
-              workflow_state_updates
-            )
-
-          {:ok, completed_execution, updated_execution}
-
-        {:suspend, suspension_type, suspension_data} ->
-          suspended_execution = NodeExecution.suspend(node_execution, suspension_type, suspension_data)
-          {:suspend, suspended_execution}
-
-        {:error, reason} ->
-          error = Error.new("action.execution_error", "Node execution failed", Error.to_map(reason))
-          # For retry failures, we need to handle retry logic with proper attempt counting
-          handle_retry_failure(node, failed_node_execution, resumed_node_execution, error)
-      end
+      # Use unified handler with retry context for proper attempt tracking
+      result = invoke_action(action, validated_params, action_context)
+      handle_action_result(result, node, node_execution, execution, failed_node_execution)
     else
       {:error, reason} ->
         # For preparation failures, also handle with retry context
-        handle_retry_failure(node, failed_node_execution, resumed_node_execution, reason)
+        handle_execution_error(node, resumed_node_execution, reason, execution, failed_node_execution)
     end
   end
 
-  # Handle retry failures with proper attempt counting
-  defp handle_retry_failure(node, original_failed_execution, current_node_execution, reason) do
-    # Get current attempt number from original failure context
-    current_attempt = get_current_attempt_number(original_failed_execution)
+  # Unified error handler for both initial execution and retry failures
+  # Handles retry logic and respects on_error settings when retries are exhausted
+  #
+  # ## Parameters
+  # - `node` - The node being executed
+  # - `node_execution` - Current node execution state
+  # - `reason` - The error that occurred
+  # - `execution` - Current workflow execution (needed for error continuation)
+  # - `original_failed_execution` - Original failed execution for retry scenarios (tracks attempt count)
+  #
+  # ## Returns
+  # - `{:suspend, suspended_execution}` - Node suspended for retry
+  # - `{:ok, completed_execution, updated_execution}` - Error handled with continuation
+  # - `{:error, {reason, failed_execution}}` - Final failure
+  defp handle_execution_error(node, node_execution, reason, execution, original_failed_execution \\ nil) do
+    # Get current attempt number from original failure context (for retries) or current execution
+    current_attempt = get_current_attempt_number(original_failed_execution || node_execution)
 
     if should_retry_with_attempt?(node, current_attempt, reason) do
       # Prepare retry suspension data with incremented attempt
@@ -144,12 +130,24 @@ defmodule Prana.NodeExecutor do
       }
 
       # Suspend for retry
-      suspended_execution = NodeExecution.suspend(current_node_execution, :retry, retry_suspension_data)
+      suspended_execution = NodeExecution.suspend(node_execution, :retry, retry_suspension_data)
       {:suspend, suspended_execution}
     else
-      # No more retries - final failure
-      failed_execution = NodeExecution.fail(current_node_execution, reason)
-      {:error, {reason, failed_execution}}
+      # No more retries - check on_error setting to determine final behavior
+      case node.settings.on_error do
+        "stop_workflow" ->
+          # Current behavior - fail workflow
+          failed_execution = NodeExecution.fail(node_execution, reason)
+          {:error, {reason, failed_execution}}
+
+        "continue" ->
+          # Continue with error through default output port
+          handle_error_continuation(node, node_execution, reason, :default_port, execution)
+
+        "continue_error_output" ->
+          # Continue with error through virtual "error" port
+          handle_error_continuation(node, node_execution, reason, :error_port, execution)
+      end
     end
   end
 
@@ -275,10 +273,9 @@ defmodule Prana.NodeExecutor do
       Logger.error(stacktrace)
 
       {:error,
-       Error.new("action.execution_error", "Action execution exception", %{
+       Error.new("action.exception", "Action execution exception", %{
          details: error,
-         stacktrace: stacktrace,
-         action: action.name
+         stacktrace: stacktrace
        })}
   end
 
@@ -294,10 +291,9 @@ defmodule Prana.NodeExecutor do
       Logger.error(stacktrace)
 
       {:error,
-       Error.new("action.execution_error", "Action execution exception", %{
+       Error.new("action.exception", "Action execution exception", %{
          details: error,
-         stacktrace: stacktrace,
-         action: action.name
+         stacktrace: stacktrace
        })}
   end
 
@@ -425,15 +421,6 @@ defmodule Prana.NodeExecutor do
   # RETRY HELPERS
   # =============================================================================
 
-  # Check if node should retry based on settings and current attempt
-  defp should_retry?(node, node_execution, error_reason) do
-    settings = node.settings
-    current_attempt = get_current_attempt_number(node_execution)
-
-    settings.retry_on_failed and settings.max_retries > 0 and current_attempt < settings.max_retries and
-      is_retryable_error?(error_reason)
-  end
-
   # Extract current attempt number from suspension_data (if this is a retry)
   defp get_current_attempt_number(node_execution) do
     if node_execution.suspension_type == :retry do
@@ -442,11 +429,6 @@ defmodule Prana.NodeExecutor do
       # First attempt
       0
     end
-  end
-
-  # Get next attempt number
-  defp get_next_attempt_number(node_execution) do
-    get_current_attempt_number(node_execution) + 1
   end
 
   # Check if an error is retryable (only action execution errors should be retried)
@@ -464,21 +446,31 @@ defmodule Prana.NodeExecutor do
     |> NodeExecution.start()
   end
 
-  defp handle_action_execution(node, action, prepared_params, context, node_execution, execution) do
-    case invoke_action(action, prepared_params, context) do
+  # Unified action result handler for execute, retry, and resume operations
+  # Handles all action result patterns consistently
+  #
+  # ## Parameters
+  # - `result` - Result from invoke_action or invoke_resume_action
+  # - `node` - The node being executed (nil for resume operations without retry support)
+  # - `node_execution` - Current node execution state
+  # - `execution` - Current workflow execution
+  # - `original_failed_execution` - Original failed execution for retry tracking (nil for non-retry)
+  #
+  # ## Returns
+  # - `{:ok, completed_execution, updated_execution}` - Success
+  # - `{:suspend, suspended_execution}` - Node suspended
+  # - `{:error, {reason, failed_execution}}` - Error with failed execution
+  defp handle_action_result(result, node, node_execution, execution, original_failed_execution \\ nil) do
+    case result do
       {:ok, output_data, output_port} ->
         completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
-        # Always return updated WorkflowExecution, even when no context updates
         updated_execution = Prana.WorkflowExecution.complete_node(execution, completed_execution)
         {:ok, completed_execution, updated_execution}
 
       {:ok, output_data, output_port, state_updates} ->
-        # Extract node context updates from state_updates if present
         {node_context_updates, workflow_state_updates} = extract_node_context_updates(state_updates)
-
         completed_execution = NodeExecution.complete(node_execution, output_data, output_port)
 
-        # Apply context updates to the WorkflowExecution
         updated_execution =
           complete_node_with_context_update(execution, completed_execution, node_context_updates, workflow_state_updates)
 
@@ -489,77 +481,42 @@ defmodule Prana.NodeExecutor do
         {:suspend, suspended_execution}
 
       {:error, reason} ->
-        error = Error.new("action.execution_error", "Node execution failed", Error.to_map(reason))
-        handle_execution_error(node, node_execution, error, execution)
+        # Wrap error for consistent error handling
+        details =
+          reason
+          |> Error.to_map()
+          |> Map.merge(%{
+            action: node && node.type,
+            node: node_execution.node_key
+          })
+
+        error =
+          Error.new(
+            "action.execution_error",
+            "Node execution failed",
+            details
+          )
+
+        if node do
+          # execute_node or retry_node - support retry and on_error settings
+          handle_execution_error(node, node_execution, error, execution, original_failed_execution)
+        else
+          # resume_node - no retry support
+          handle_resume_error(node_execution, error)
+        end
     end
+  end
+
+  defp handle_action_execution(node, action, prepared_params, context, node_execution, execution) do
+    result = invoke_action(action, prepared_params, context)
+    handle_action_result(result, node, node_execution, execution)
   end
 
   defp handle_resume_action(action, params, context, resume_data, suspended_node_execution, execution) do
     resume_execution = NodeExecution.resume(suspended_node_execution)
-
-    case invoke_resume_action(action, params, context, resume_data) do
-      {:ok, output_data, output_port} ->
-        completed_execution = NodeExecution.complete(resume_execution, output_data, output_port)
-        # Always return updated WorkflowExecution, even when no context updates
-        updated_execution = Prana.WorkflowExecution.complete_node(execution, completed_execution)
-        {:ok, completed_execution, updated_execution}
-
-      {:ok, output_data, output_port, state_updates} ->
-        # Extract node context updates from state_updates if present
-        {node_context_updates, workflow_state_updates} = extract_node_context_updates(state_updates)
-
-        completed_execution = NodeExecution.complete(resume_execution, output_data, output_port)
-
-        # Apply context updates to the WorkflowExecution
-        updated_execution =
-          complete_node_with_context_update(execution, completed_execution, node_context_updates, workflow_state_updates)
-
-        {:ok, completed_execution, updated_execution}
-
-      {:suspend, suspension_type, suspension_data} ->
-        suspended_execution = NodeExecution.suspend(resume_execution, suspension_type, suspension_data)
-        {:suspend, suspended_execution}
-
-      {:error, reason} ->
-        error = Error.new("action.execution_error", "Node execution failed", Error.to_map(reason))
-        handle_resume_error(resume_execution, error)
-    end
-  end
-
-  # For execute failures - includes retry logic
-  defp handle_execution_error(node, node_execution, reason, execution) do
-    if should_retry?(node, node_execution, reason) do
-      # Prepare retry suspension data
-      next_attempt = get_next_attempt_number(node_execution)
-
-      retry_suspension_data = %{
-        "resume_at" => DateTime.add(DateTime.utc_now(), node.settings.retry_delay_ms, :millisecond),
-        "attempt_number" => next_attempt,
-        "max_attempts" => node.settings.max_retries,
-        "original_error" => reason
-        # Note: No original_input stored - will be rebuilt on retry
-      }
-
-      # Suspend for retry
-      suspended_execution = NodeExecution.suspend(node_execution, :retry, retry_suspension_data)
-      {:suspend, suspended_execution}
-    else
-      # Check on_error setting after retries are exhausted
-      case node.settings.on_error do
-        "stop_workflow" ->
-          # Current behavior - fail workflow
-          failed_execution = NodeExecution.fail(node_execution, reason)
-          {:error, {reason, failed_execution}}
-
-        "continue" ->
-          # Continue with error through default output port
-          handle_error_continuation(node, node_execution, reason, :default_port, execution)
-
-        "continue_error_output" ->
-          # Continue with error through virtual "error" port
-          handle_error_continuation(node, node_execution, reason, :error_port, execution)
-      end
-    end
+    result = invoke_resume_action(action, params, context, resume_data)
+    # Pass nil for node to indicate no retry support
+    handle_action_result(result, nil, resume_execution, execution)
   end
 
   # Handle error continuation based on on_error setting

@@ -607,7 +607,10 @@ defmodule Prana.WorkflowExecution do
     %{
       execution
       | node_executions: updated_node_executions,
-        current_execution_index: execution.current_execution_index + 1
+        current_execution_index: execution.current_execution_index + 1,
+        status: "failed",
+        error: failed_node_execution.error_data,
+        completed_at: DateTime.utc_now()
     }
   end
 
