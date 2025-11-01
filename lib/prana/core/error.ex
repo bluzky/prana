@@ -180,11 +180,13 @@ defmodule Prana.Core.Error do
     new("action_error", message, details)
   end
 
-  def to_map(%__MODULE__{} = error) do
+  def to_map(%{code: code, message: message, details: details} = error) do
     %{
-      code: error.code,
-      message: error.message,
-      details: Nested.to_map(error.details)
+      code: code,
+      message: message,
+      details: Nested.to_map(details)
     }
   end
+
+  def to_map(other), do: other
 end
