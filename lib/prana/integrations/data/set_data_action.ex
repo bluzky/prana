@@ -68,8 +68,8 @@ defmodule Prana.Integrations.Data.SetDataAction do
           in: ["manual", "json"]
         ],
         mapping_map: [
-          type: :map,
-          description: "Key-value map of data to output (for manual mode)"
+          type: :any,
+          description: "Key-value map of data to output or string templates or array of such maps (for manual mode)"
         ],
         json_template: [
           type: :string,
