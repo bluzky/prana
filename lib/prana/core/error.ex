@@ -180,7 +180,7 @@ defmodule Prana.Core.Error do
     new("action_error", message, details)
   end
 
-  def to_map(%{code: code, message: message, details: details} = error) do
+  def to_map(%{code: code, message: message, details: details}) do
     %{
       code: code,
       message: message,
