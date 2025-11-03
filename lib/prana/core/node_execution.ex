@@ -9,7 +9,7 @@ defmodule Prana.NodeExecution do
     field(:node_key, :string, required: true)
     field(:status, :string, default: "pending")
     field(:params, :map, default: %{})
-    field(:output_data, :map)
+    field(:output_data, :any)
     field(:output_port, :string)
     field(:error_data, :map)
     field(:started_at, :datetime)
