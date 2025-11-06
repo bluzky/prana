@@ -468,7 +468,7 @@ defmodule Prana.WorkflowExecution do
   def rebuild_runtime(%__MODULE__{} = execution, env_data \\ %{}) do
     node_outputs = rebuild_completed_node_outputs(execution)
 
-    max_iterations = Application.get_env(:prana, :max_execution_iterations, 100)
+    max_iterations = Application.get_env(:prana, :max_execution_iterations, 10_000)
     current_iteration_count = execution.metadata["iteration_count"] || 0
 
     runtime = %{
