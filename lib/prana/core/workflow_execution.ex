@@ -739,11 +739,11 @@ defmodule Prana.WorkflowExecution do
     # Remove completed node from active_nodes
     updated_active_nodes = Map.delete(current_active_nodes, completed_node_key)
 
-    # Add completed node to active_paths for loop tracking
-    updated_active_paths =
-      Map.put(current_active_paths, completed_node_key, %{"execution_index" => completed_execution_index})
+    # Check if this is a loopback BEFORE updating active_paths
+    existing_path_node = Map.get(current_active_paths, completed_node_key)
 
     # Add target nodes from completed node's output connections
+
     {final_active_nodes, final_active_paths} =
       if execution.execution_graph && Map.has_key?(execution.execution_graph, :connection_map) do
         connections =
@@ -754,17 +754,16 @@ defmodule Prana.WorkflowExecution do
             Map.put(acc_active_nodes, node_key, completed_execution_index + 1)
           end)
 
-        existing_path_node = Map.get(updated_active_paths, completed_node_key)
-
         new_active_paths =
           case existing_path_node do
             nil ->
-              Map.put(updated_active_paths, completed_node_key, %{"execution_index" => node_execution.execution_index})
+              # First time completing this node - add to active_paths
+              Map.put(current_active_paths, completed_node_key, %{"execution_index" => node_execution.execution_index})
 
             _ ->
-              # If path already exists, remove all nodes with higher execution index of existing node
-              # then add the completed node with its execution index
-              updated_active_paths
+              # Loopback detected! Remove all nodes with higher execution index than the existing path node
+              # then add the completed node with its new execution index
+              current_active_paths
               |> Enum.reject(fn {_, path_info} ->
                 path_info["execution_index"] > existing_path_node["execution_index"]
               end)
@@ -774,6 +773,10 @@ defmodule Prana.WorkflowExecution do
 
         {new_active_nodes, new_active_paths}
       else
+        # No execution graph or connection map - just add to active_paths
+        updated_active_paths =
+          Map.put(current_active_paths, completed_node_key, %{"execution_index" => completed_execution_index})
+
         {updated_active_nodes, updated_active_paths}
       end
 
