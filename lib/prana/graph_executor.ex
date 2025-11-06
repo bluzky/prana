@@ -215,44 +215,24 @@ defmodule Prana.GraphExecutor do
   # Main workflow execution loop - continues until workflow is complete or error occurs.
   # Uses WorkflowExecution.__runtime for all workflow-level coordination.
   defp execute_workflow_loop(execution, previous_node_output \\ nil) do
-    # Check for infinite loop protection
-    iteration_count = WorkflowExecution.get_iteration_count(execution)
-    max_iterations = WorkflowExecution.get_max_iterations(execution)
+    # Get active nodes from runtime state
+    active_nodes = WorkflowExecution.get_active_nodes(execution)
 
-    if iteration_count >= max_iterations do
-      error_reason = %{
-        type: "infinite_loop_protection",
-        message: "Workflow execution exceeded maximum iterations (#{max_iterations})",
-        iteration_count: iteration_count,
-        max_iterations: max_iterations
-      }
+    if Enum.empty?(active_nodes) do
+      completed_execution = WorkflowExecution.complete(execution)
+      Middleware.call(:execution_completed, %{execution: completed_execution})
 
-      failed_execution = WorkflowExecution.fail(execution, error_reason)
-      Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_reason})
-      {:error, failed_execution}
+      {:ok, completed_execution, previous_node_output}
     else
-      # Increment iteration counter in both runtime and persistent metadata
-      execution = WorkflowExecution.increment_iteration_count(execution)
+      case find_and_execute_ready_nodes(execution) do
+        {:ok, updated_execution, node_ouput} ->
+          execute_workflow_loop(updated_execution, node_ouput)
 
-      # Get active nodes from runtime state
-      active_nodes = WorkflowExecution.get_active_nodes(execution)
+        {:suspend, suspended_execution, suspension_data} ->
+          {:suspend, suspended_execution, suspension_data}
 
-      if Enum.empty?(active_nodes) do
-        completed_execution = WorkflowExecution.complete(execution)
-        Middleware.call(:execution_completed, %{execution: completed_execution})
-
-        {:ok, completed_execution, previous_node_output}
-      else
-        case find_and_execute_ready_nodes(execution) do
-          {:ok, updated_execution, node_ouput} ->
-            execute_workflow_loop(updated_execution, node_ouput)
-
-          {:suspend, suspended_execution, suspension_data} ->
-            {:suspend, suspended_execution, suspension_data}
-
-          {:error, failed_execution} ->
-            {:error, failed_execution}
-        end
+        {:error, failed_execution} ->
+          {:error, failed_execution}
       end
     end
   end
@@ -289,44 +269,75 @@ defmodule Prana.GraphExecutor do
       loop_metadata: WorkflowExecution.get_node_loop_metadata(execution, node)
     }
 
-    Middleware.call(:node_starting, %{node: node, execution: execution})
+    # Check for infinite loop protection - only increment on loopback
+    with {:ok, execution} <- check_loop_limit(execution, node, current_context) do
+      Middleware.call(:node_starting, %{node: node, execution: execution})
 
-    case NodeExecutor.execute_node(node, execution, routed_input, current_context) do
-      {:ok, result_node_execution, updated_execution} ->
-        # NodeExecutor always returns updated WorkflowExecution (consistent API)
-        Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
-        {:ok, updated_execution, result_node_execution.output_data}
+      case NodeExecutor.execute_node(node, execution, routed_input, current_context) do
+        {:ok, result_node_execution, updated_execution} ->
+          # NodeExecutor always returns updated WorkflowExecution (consistent API)
+          Middleware.call(:node_completed, %{node: node, node_execution: result_node_execution})
+          {:ok, updated_execution, result_node_execution.output_data}
 
-      {:suspend, suspended_node_execution} ->
-        %{suspension_type: suspension_type, suspension_data: suspension_data} = suspended_node_execution
+        {:suspend, suspended_node_execution} ->
+          %{suspension_type: suspension_type, suspension_data: suspension_data} = suspended_node_execution
 
-        Middleware.call(:node_suspended, %{
-          node: node,
-          node_execution: suspended_node_execution,
-          suspension_type: suspension_type,
-          suspension_data: suspension_data
-        })
+          Middleware.call(:node_suspended, %{
+            node: node,
+            node_execution: suspended_node_execution,
+            suspension_type: suspension_type,
+            suspension_data: suspension_data
+          })
 
-        suspended_execution =
-          execution
-          |> WorkflowExecution.add_node_execution_to_map(suspended_node_execution)
-          |> WorkflowExecution.suspend(node.key, suspension_type, suspension_data)
+          suspended_execution =
+            execution
+            |> WorkflowExecution.add_node_execution_to_map(suspended_node_execution)
+            |> WorkflowExecution.suspend(node.key, suspension_type, suspension_data)
 
-        Middleware.call(:execution_suspended, %{
-          execution: suspended_execution,
-          suspended_node: node,
-          node_execution: suspended_node_execution
-        })
+          Middleware.call(:execution_suspended, %{
+            execution: suspended_execution,
+            suspended_node: node,
+            node_execution: suspended_node_execution
+          })
 
-        {:suspend, suspended_execution, suspension_data}
+          {:suspend, suspended_execution, suspension_data}
 
-      {:error, {_reason, error_node_execution}} ->
-        failed_execution = WorkflowExecution.fail_node(execution, error_node_execution)
+        {:error, {_reason, error_node_execution}} ->
+          failed_execution = WorkflowExecution.fail_node(execution, error_node_execution)
 
-        Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
-        Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_node_execution.error_data})
+          Middleware.call(:node_failed, %{node: node, node_execution: error_node_execution})
+          Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_node_execution.error_data})
 
+          {:error, failed_execution}
+      end
+    end
+  end
+
+  # Check infinite loop limit and increment counter if loopback
+  defp check_loop_limit(execution, node, current_context) do
+    if current_context.loop_metadata.loopback do
+      iteration_count = WorkflowExecution.get_iteration_count(execution)
+      max_iterations = WorkflowExecution.get_max_iterations(execution)
+
+      if iteration_count >= max_iterations do
+        error_reason = %{
+          type: "infinite_loop_protection",
+          message: "Workflow execution exceeded maximum loop iterations (#{max_iterations})",
+          iteration_count: iteration_count,
+          max_iterations: max_iterations,
+          node_key: node.key,
+          loop_ids: current_context.loop_metadata.loop_ids
+        }
+
+        failed_execution = WorkflowExecution.fail(execution, error_reason)
+        Middleware.call(:execution_failed, %{execution: failed_execution, reason: error_reason})
         {:error, failed_execution}
+      else
+        # Increment iteration counter only on loopback
+        {:ok, WorkflowExecution.increment_iteration_count(execution)}
+      end
+    else
+      {:ok, execution}
     end
   end
 
