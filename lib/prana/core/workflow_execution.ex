@@ -1034,6 +1034,7 @@ defmodule Prana.WorkflowExecution do
           end
         rescue
           error ->
+            Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
             {:error, Error.new("preparation_exception", Exception.message(error))}
         end
 

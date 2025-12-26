@@ -212,6 +212,7 @@ defmodule Prana.NodeExecutor do
     end
   rescue
     error ->
+      Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
       {:error,
        Error.engine_error("Failed to process action's params", %{
          reason: error,

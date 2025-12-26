@@ -131,6 +131,7 @@ defmodule Prana.GraphExecutor do
     {:ok, execution}
   rescue
     error ->
+      Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
       {:error, Error.new("initialization_error", Exception.message(error), %{exception: error})}
   end
 

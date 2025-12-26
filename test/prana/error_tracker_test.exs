@@ -148,8 +148,8 @@ defmodule Prana.ErrorTrackerTest do
           assert :ok = ErrorTracker.capture_error(exception, stacktrace)
         end)
 
-      # Should log both the tracker failure and the original error
-      assert log =~ "Error tracker #{inspect(FailingErrorTracker)} failed"
+      # Should fall back to console and log the original error
+      assert log =~ "Workflow error captured"
       assert log =~ "Original error"
       assert log =~ "RuntimeError"
     end
