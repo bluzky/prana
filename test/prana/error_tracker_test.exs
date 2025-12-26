@@ -135,33 +135,16 @@ defmodule Prana.ErrorTrackerTest do
       assert log =~ "Default tracker test"
     end
 
-    test "falls back to Console when configured tracker fails" do
-      import ExUnit.CaptureLog
-
+    test "raises when configured tracker fails" do
       Application.put_env(:prana, :error_tracker, FailingErrorTracker)
 
       exception = %RuntimeError{message: "Original error"}
       stacktrace = [{Module, :func, 0, []}]
 
-      log =
-        capture_log(fn ->
-          assert :ok = ErrorTracker.capture_error(exception, stacktrace)
-        end)
-
-      # Should fall back to console and log the original error
-      assert log =~ "Workflow error captured"
-      assert log =~ "Original error"
-      assert log =~ "RuntimeError"
-    end
-
-    test "always returns :ok even when tracker fails" do
-      Application.put_env(:prana, :error_tracker, FailingErrorTracker)
-
-      exception = %RuntimeError{message: "Test"}
-      stacktrace = []
-
-      # Should not raise, even though the tracker fails
-      assert :ok = ErrorTracker.capture_error(exception, stacktrace)
+      # Should raise the tracker error so user can fix their configuration
+      assert_raise RuntimeError, "Error tracker failure", fn ->
+        ErrorTracker.capture_error(exception, stacktrace)
+      end
     end
 
     test "handles different exception types" do

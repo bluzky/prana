@@ -31,8 +31,7 @@ defmodule Prana.ErrorTracker do
   Capture an error using the configured error tracker.
 
   Reads the error tracker module from application configuration and delegates
-  to its `capture_error/2` callback. If the configured tracker fails, it falls
-  back to console logging to ensure errors are always captured.
+  to its `capture_error/2` callback.
 
   ## Parameters
 
@@ -41,22 +40,13 @@ defmodule Prana.ErrorTracker do
 
   ## Return Value
 
-  Always returns `:ok` to prevent cascading failures.
+  Returns `:ok` on success. Raises if the configured error tracker fails,
+  allowing the user to fix their error tracker configuration.
   """
   @spec capture_error(exception :: Exception.t(), stacktrace :: Exception.stacktrace()) :: :ok
   def capture_error(exception, stacktrace) do
     tracker_module = get_error_tracker()
-
-    try do
-      tracker_module.capture_error(exception, stacktrace)
-    rescue
-      _tracker_exception ->
-        # If the error tracker itself fails, fall back to console logging
-        # Still try to log the original error
-        Console.capture_error(exception, stacktrace)
-    end
-
-    :ok
+    tracker_module.capture_error(exception, stacktrace)
   end
 
   @doc """
