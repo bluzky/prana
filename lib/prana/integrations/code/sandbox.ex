@@ -90,7 +90,7 @@ defmodule Prana.Integrations.Code.Sandbox do
           end
         rescue
           error ->
-            Logger.error(inspect(__STACKTRACE__))
+            Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
             encode_error(error)
         end
       end)
@@ -145,7 +145,7 @@ defmodule Prana.Integrations.Code.Sandbox do
           end
         rescue
           error ->
-            Logger.error(inspect(__STACKTRACE__))
+            Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
             encode_error(error)
         end
       end)

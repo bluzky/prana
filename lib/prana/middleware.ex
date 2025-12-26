@@ -50,7 +50,7 @@ defmodule Prana.Middleware do
     middleware.call(event, data, next_fn)
   rescue
     error ->
-      Logger.error("Middleware #{middleware} failed for event #{event}: #{inspect(error)}")
+      Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
 
       # Continue pipeline with original data on middleware error
       execute_pipeline(rest, event, data)
