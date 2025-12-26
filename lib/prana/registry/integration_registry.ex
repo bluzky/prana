@@ -202,7 +202,7 @@ defmodule Prana.IntegrationRegistry do
     end
   rescue
     error ->
-      Logger.error("Error registering integration #{module}: #{inspect(error)}")
+      Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
       {:error, "Registration failed: #{inspect(error)}"}
   end
 

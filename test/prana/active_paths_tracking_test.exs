@@ -385,21 +385,23 @@ defmodule Prana.ActivePathsTrackingTest do
 
       result = WorkflowExecution.complete_node(execution, node_execution)
 
-      # Check active_paths - should add intermediate and clean up future nodes if loop detected
+      # Check active_paths - should add intermediate to active_paths
       active_paths = result.execution_data["active_paths"]
       assert active_paths["intermediate"] == %{"execution_index" => 1}
 
-      # If loop_node already exists in active_paths, future nodes should be cleaned up
-      # In this case, loop_node has execution_index: 0, so some_future_node (index: 5) should be removed
-      refute Map.has_key?(active_paths, "some_future_node")
-      # Should remain unchanged
+      # loop_node should remain in active_paths (loopback target)
       assert active_paths["loop_node"] == %{"execution_index" => 0}
+
+      # some_future_node with higher execution_index should remain because
+      # intermediate completing is NOT the loop start - it's just routing back
+      # The cleanup only happens when the actual loop start node completes
+      assert active_paths["some_future_node"] == %{"execution_index" => 5}
 
       # Check active_nodes - should add loop_node for re-execution
       active_nodes = result.execution_data["active_nodes"]
-      # Should be removed
+      # intermediate should be removed from active_nodes
       refute Map.has_key?(active_nodes, "intermediate")
-      # execution_index + 1
+      # loop_node should be added with execution_index + 1
       assert active_nodes["loop_node"] == 2
     end
 

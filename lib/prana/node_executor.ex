@@ -268,9 +268,8 @@ defmodule Prana.NodeExecutor do
     process_action_result(result, action)
   rescue
     error ->
+      Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
       stacktrace = Exception.format_stacktrace(__STACKTRACE__)
-      Logger.error(inspect(error))
-      Logger.error(stacktrace)
 
       {:error,
        Error.new("action.exception", "Action execution exception", %{
@@ -286,9 +285,8 @@ defmodule Prana.NodeExecutor do
     process_action_result(result, action)
   rescue
     error ->
+      Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
       stacktrace = Exception.format_stacktrace(__STACKTRACE__)
-      Logger.error(inspect(error))
-      Logger.error(stacktrace)
 
       {:error,
        Error.new("action.exception", "Action execution exception", %{

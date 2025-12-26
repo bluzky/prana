@@ -27,6 +27,8 @@ defmodule Prana.Integrations.Core.LogAction do
 
   alias Prana.Action
 
+  require Logger
+
   def definition do
     %Action{
       name: "prana_core.log",
@@ -70,10 +72,10 @@ defmodule Prana.Integrations.Core.LogAction do
 
     # Output to console based on level
     case params.level do
-      "debug" -> IO.puts("[DEBUG] #{log_output}")
-      "warn" -> IO.puts("[WARN] #{log_output}")
-      "error" -> IO.puts("[ERROR] #{log_output}")
-      _ -> IO.puts("[INFO] #{log_output}")
+      "debug" -> Logger.debug("[DEBUG] #{log_output}")
+      "warn" -> Logger.warning("[WARN] #{log_output}")
+      "error" -> Logger.error("[ERROR] #{log_output}")
+      _ -> Logger.info("[INFO] #{log_output}")
     end
 
     # Pass input data through unchanged

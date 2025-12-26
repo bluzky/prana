@@ -152,7 +152,7 @@ defmodule Prana.GraphExecutor do
     execute_workflow_with_input(execution, input_data)
   rescue
     error ->
-      Logger.error("Execute_workflow error: #{inspect(__STACKTRACE__, pretty: true)}")
+      Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
       handle_execution_exception(execution.execution_graph, error)
   end
 

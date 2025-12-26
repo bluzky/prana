@@ -236,8 +236,7 @@ defmodule Prana.MiddlewareTest do
           assert result.test == "data"
         end)
 
-      assert log =~ "Middleware"
-      assert log =~ "failed for event"
+      assert log =~ "Workflow error captured"
       assert log =~ "Middleware error!"
     end
 
@@ -321,8 +320,7 @@ defmodule Prana.MiddlewareTest do
           assert result.test == "data"
         end)
 
-      assert log =~ "Middleware"
-      assert log =~ "failed for event"
+      assert log =~ "Workflow error captured"
     end
   end
 
