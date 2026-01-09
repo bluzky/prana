@@ -10,7 +10,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "sync",
         batch_mode: "all",
         timeout_ms: 300_000,
-        failure_strategy: "fail_parent"
+        failure_strategy: "fail_parent",
+        queue: nil
       },
       overrides
     )
@@ -23,7 +24,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "sync",
         batch_mode: "all",
         timeout_ms: 300_000,
-        failure_strategy: "fail_parent"
+        failure_strategy: "fail_parent",
+        queue: nil
       }
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
@@ -42,7 +44,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "fire_and_forget",
         batch_mode: "all",
         timeout_ms: 60_000,
-        failure_strategy: "fail_parent"
+        failure_strategy: "fail_parent",
+        queue: nil
       }
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
@@ -59,7 +62,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "async",
         batch_mode: "all",
         timeout_ms: 600_000,
-        failure_strategy: "continue"
+        failure_strategy: "continue",
+        queue: nil
       }
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
@@ -78,7 +82,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "sync",
         batch_mode: "all",
         timeout_ms: 300_000,
-        failure_strategy: "fail_parent"
+        failure_strategy: "fail_parent",
+        queue: nil
       }
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
@@ -112,7 +117,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "sync",
         batch_mode: "all",
         timeout_ms: 300_000,
-        failure_strategy: "fail_parent"
+        failure_strategy: "fail_parent",
+        queue: nil
       }
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
@@ -128,7 +134,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "async",
         batch_mode: "all",
         timeout_ms: 300_000,
-        failure_strategy: "fail_parent"
+        failure_strategy: "fail_parent",
+        queue: nil
       }
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
@@ -144,7 +151,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         execution_mode: "sync",
         batch_mode: "all",
         timeout_ms: 60000,
-        failure_strategy: "fail_parent"
+        failure_strategy: "fail_parent",
+        queue: nil
       }
 
       result = ExecuteWorkflowAction.execute(input_map, %{})
@@ -341,6 +349,83 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
       assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
       assert suspension_data["input_data"] == [%{"notification_id" => "123"}]
+    end
+
+    test "includes queue parameter in suspension data" do
+      input_map = params(%{
+        workflow_id: "test_workflow",
+        queue: "high_priority"
+      })
+
+      result = ExecuteWorkflowAction.execute(input_map, %{})
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data["queue"] == "high_priority"
+    end
+
+    test "queue parameter is nil when not provided" do
+      input_map = params(%{workflow_id: "test_workflow"})
+
+      result = ExecuteWorkflowAction.execute(input_map, %{})
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data["queue"] == nil
+    end
+
+    test "queue parameter is preserved for all execution modes" do
+      # Sync mode
+      input_map = params(%{
+        workflow_id: "sync_workflow",
+        execution_mode: "sync",
+        queue: "background_jobs"
+      })
+
+      result = ExecuteWorkflowAction.execute(input_map, %{})
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+      assert suspension_data["queue"] == "background_jobs"
+
+      # Async mode
+      input_map = params(%{
+        workflow_id: "async_workflow",
+        execution_mode: "async",
+        queue: "async_queue"
+      })
+
+      result = ExecuteWorkflowAction.execute(input_map, %{})
+      assert {:suspend, :sub_workflow_async, suspension_data} = result
+      assert suspension_data["queue"] == "async_queue"
+
+      # Fire-and-forget mode
+      input_map = params(%{
+        workflow_id: "fire_forget_workflow",
+        execution_mode: "fire_and_forget",
+        queue: "notifications"
+      })
+
+      result = ExecuteWorkflowAction.execute(input_map, %{})
+      assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
+      assert suspension_data["queue"] == "notifications"
+    end
+
+    test "queue is included in all configuration for middleware handling" do
+      input_map = params(%{
+        workflow_id: "detailed_flow",
+        timeout_ms: 120_000,
+        failure_strategy: "continue",
+        queue: "priority_queue"
+      })
+
+      result = ExecuteWorkflowAction.execute(input_map, %{})
+
+      assert {:suspend, :sub_workflow_sync, suspension_data} = result
+
+      # Verify all configuration is preserved for middleware
+      assert suspension_data["workflow_id"] == "detailed_flow"
+      assert suspension_data["execution_mode"] == "sync"
+      assert suspension_data["timeout_ms"] == 120_000
+      assert suspension_data["failure_strategy"] == "continue"
+      assert suspension_data["queue"] == "priority_queue"
+      assert is_struct(suspension_data["triggered_at"], DateTime)
     end
   end
 end

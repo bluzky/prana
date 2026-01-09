@@ -12,6 +12,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   - `batch_mode` (optional): Batch processing mode - "all" or "single" (default: "all")
   - `timeout_ms` (optional): Maximum time to wait for completion in milliseconds (default: 300000)
   - `failure_strategy` (optional): How to handle failures - "fail_parent" or "continue" (default: "fail_parent")
+  - `queue` (optional): The queue name to use for processing this sub-workflow
 
   ### Execution Modes
   - **Synchronous ("sync")**: Parent workflow suspends until sub-workflow completes
@@ -109,6 +110,10 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
           description: "How to handle failures - fail_parent or continue",
           default: "fail_parent",
           enum: ["fail_parent", "continue"]
+        ],
+        queue: [
+          type: :string,
+          description: "The queue name to use for processing this sub-workflow"
         ]
       }
     }
@@ -125,6 +130,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
       "batch_mode" => params.batch_mode,
       "timeout_ms" => params.timeout_ms,
       "failure_strategy" => params.failure_strategy,
+      "queue" => params.queue,
       "input_data" => normalized_input,
       "triggered_at" => DateTime.utc_now()
     }
