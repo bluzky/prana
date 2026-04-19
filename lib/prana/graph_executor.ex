@@ -343,6 +343,100 @@ defmodule Prana.GraphExecutor do
   end
 
   @doc """
+  Execute a single node by key within an existing execution, without continuing the workflow.
+
+  Useful for debugging — run one node in isolation and inspect its output.
+
+  ## Parameters
+
+  - `execution` - A running `WorkflowExecution` (must have `__runtime` initialized)
+  - `node_key` - The key of the node to execute
+  - `input_data` - Optional input data map; defaults to extracting from execution runtime
+
+  ## Returns
+
+  - `{:ok, node_execution, updated_execution}` - Node completed successfully
+  - `{:suspend, suspended_execution, suspension_data}` - Node suspended
+  - `{:error, failed_execution}` - Node or execution failed
+  - `{:error, reason}` - Node key not found
+  """
+  @spec execute_node(WorkflowExecution.t(), String.t(), map() | nil) ::
+          {:ok, Prana.NodeExecution.t(), WorkflowExecution.t()}
+          | {:suspend, WorkflowExecution.t(), map()}
+          | {:error, WorkflowExecution.t()}
+          | {:error, term()}
+  def execute_node(%WorkflowExecution{} = execution, node_key, input_data \\ nil) do
+    case Map.get(execution.execution_graph.node_map, node_key) do
+      nil ->
+        {:error, Error.new("node_not_found", "Node not found in execution graph", %{node_key: node_key})}
+
+      node ->
+        custom_input = if input_data, do: %{"main" => input_data}, else: nil
+
+        case execute_single_node(node, execution, custom_input) do
+          {:ok, updated_execution, _output_data} ->
+            # Retrieve the NodeExecution record that was just added
+            node_execution =
+              updated_execution.node_executions
+              |> Map.get(node_key, [])
+              |> List.first()
+
+            {:ok, node_execution, updated_execution}
+
+          other ->
+            other
+        end
+    end
+  end
+
+  @doc """
+  Execute a workflow starting from a specific node, then continue until completion.
+
+  Useful for debugging — skip earlier nodes and drive execution from a midpoint.
+
+  The node is executed with its normal input (extracted from execution runtime unless
+  `input_data` is provided), then the workflow loop continues from there.
+
+  ## Parameters
+
+  - `execution` - A running `WorkflowExecution` (must have `__runtime` initialized)
+  - `node_key` - The key of the node to start from
+  - `input_data` - Optional input data map; defaults to extracting from execution runtime
+
+  ## Returns
+
+  - `{:ok, WorkflowExecution.t()}` - Workflow completed
+  - `{:suspend, WorkflowExecution.t(), suspension_data}` - Workflow suspended
+  - `{:error, WorkflowExecution.t()}` - Execution failed
+  - `{:error, term()}` - Node key not found
+  """
+  @spec execute_from_node(WorkflowExecution.t(), String.t(), map() | nil) ::
+          {:ok, WorkflowExecution.t()}
+          | {:suspend, WorkflowExecution.t(), map()}
+          | {:error, WorkflowExecution.t()}
+          | {:error, term()}
+  def execute_from_node(%WorkflowExecution{} = execution, node_key, input_data \\ nil) do
+    case Map.get(execution.execution_graph.node_map, node_key) do
+      nil ->
+        {:error, Error.new("node_not_found", "Node not found in execution graph", %{node_key: node_key})}
+
+      node ->
+        custom_input = if input_data, do: %{"main" => input_data}, else: nil
+
+        case execute_single_node(node, execution, custom_input) do
+          {:ok, updated_execution, _node_output} ->
+            execute_workflow_loop(updated_execution)
+
+          {:suspend, suspended_execution, suspension_data} ->
+            {:suspend, suspended_execution, suspension_data}
+
+          {:error, failed_execution} ->
+            {:error, failed_execution}
+        end
+    end
+  end
+
+  @doc """
   Resume a suspended workflow execution with sub-workflow results.
 
   ## Parameters
