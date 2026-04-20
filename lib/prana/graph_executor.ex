@@ -366,26 +366,21 @@ defmodule Prana.GraphExecutor do
           | {:error, WorkflowExecution.t()}
           | {:error, term()}
   def execute_node(%WorkflowExecution{} = execution, node_key, input_data \\ nil) do
-    case Map.get(execution.execution_graph.node_map, node_key) do
-      nil ->
-        {:error, Error.new("node_not_found", "Node not found in execution graph", %{node_key: node_key})}
+    with {:ok, node} <- fetch_node(execution, node_key) do
+      custom_input = if input_data, do: %{"main" => input_data}, else: nil
 
-      node ->
-        custom_input = if input_data, do: %{"main" => input_data}, else: nil
+      case execute_single_node(node, execution, custom_input) do
+        {:ok, updated_execution, _output_data} ->
+          node_execution =
+            updated_execution.node_executions
+            |> Map.get(node_key, [])
+            |> List.first()
 
-        case execute_single_node(node, execution, custom_input) do
-          {:ok, updated_execution, _output_data} ->
-            # Retrieve the NodeExecution record that was just added
-            node_execution =
-              updated_execution.node_executions
-              |> Map.get(node_key, [])
-              |> List.first()
+          {:ok, node_execution, updated_execution}
 
-            {:ok, node_execution, updated_execution}
-
-          other ->
-            other
-        end
+        other ->
+          other
+      end
     end
   end
 
@@ -405,34 +400,38 @@ defmodule Prana.GraphExecutor do
 
   ## Returns
 
-  - `{:ok, WorkflowExecution.t()}` - Workflow completed
-  - `{:suspend, WorkflowExecution.t(), suspension_data}` - Workflow suspended
+  - `{:ok, WorkflowExecution.t(), last_output}` - Workflow completed; `last_output` is the output data of the final node executed
+  - `{:suspend, suspended_execution, suspension_data}` - Workflow suspended
   - `{:error, WorkflowExecution.t()}` - Execution failed
   - `{:error, term()}` - Node key not found
   """
   @spec execute_from_node(WorkflowExecution.t(), String.t(), map() | nil) ::
-          {:ok, WorkflowExecution.t()}
+          {:ok, WorkflowExecution.t(), term()}
           | {:suspend, WorkflowExecution.t(), map()}
           | {:error, WorkflowExecution.t()}
           | {:error, term()}
   def execute_from_node(%WorkflowExecution{} = execution, node_key, input_data \\ nil) do
+    with {:ok, node} <- fetch_node(execution, node_key) do
+      custom_input = if input_data, do: %{"main" => input_data}, else: nil
+
+      case execute_single_node(node, execution, custom_input) do
+        {:ok, updated_execution, _node_output} ->
+          execute_workflow_loop(updated_execution)
+
+        {:suspend, suspended_execution, suspension_data} ->
+          {:suspend, suspended_execution, suspension_data}
+
+        {:error, failed_execution} ->
+          {:error, failed_execution}
+      end
+    end
+  end
+
+  # Look up a node by key, returning a tagged tuple for use in `with` chains.
+  defp fetch_node(execution, node_key) do
     case Map.get(execution.execution_graph.node_map, node_key) do
-      nil ->
-        {:error, Error.new("node_not_found", "Node not found in execution graph", %{node_key: node_key})}
-
-      node ->
-        custom_input = if input_data, do: %{"main" => input_data}, else: nil
-
-        case execute_single_node(node, execution, custom_input) do
-          {:ok, updated_execution, _node_output} ->
-            execute_workflow_loop(updated_execution)
-
-          {:suspend, suspended_execution, suspension_data} ->
-            {:suspend, suspended_execution, suspension_data}
-
-          {:error, failed_execution} ->
-            {:error, failed_execution}
-        end
+      nil -> {:error, Error.new("node_not_found", "Node not found in execution graph", %{node_key: node_key})}
+      node -> {:ok, node}
     end
   end
 
