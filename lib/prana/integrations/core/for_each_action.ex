@@ -119,7 +119,7 @@ defmodule Prana.Integrations.Core.ForEachAction do
   end
 
   # Start new loop - evaluate collection and process first item/batch
-  defp start_new_loop(params, context) do
+  defp start_new_loop(params, _context) do
     # Collection is passed as validated parameter
     collection = params.collection
 
@@ -129,7 +129,6 @@ defmodule Prana.Integrations.Core.ForEachAction do
         "item_count" => length(collection),
         "remaining_items" => remaining_items,
         "current_loop_index" => 0,
-        "current_run_index" => Nested.get(context, ["$context", "run_index"]),
         "has_more_item" => not Enum.empty?(remaining_items)
       }
 
@@ -148,8 +147,7 @@ defmodule Prana.Integrations.Core.ForEachAction do
   defp continue_loop(params, _context, node_context) do
     %{
       "remaining_items" => remaining_items,
-      "current_loop_index" => current_loop_index,
-      "current_run_index" => current_run_index
+      "current_loop_index" => current_loop_index
     } = node_context
 
     {:ok, {item_or_batch, new_remaining}} = get_next_item_or_batch(remaining_items, params)
@@ -158,7 +156,6 @@ defmodule Prana.Integrations.Core.ForEachAction do
       node_context
       | "remaining_items" => new_remaining,
         "current_loop_index" => current_loop_index + 1,
-        "current_run_index" => current_run_index + 1,
         "has_more_item" => not Enum.empty?(new_remaining)
     }
 
