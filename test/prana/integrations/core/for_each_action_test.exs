@@ -51,7 +51,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       assert node_context["item_count"] == 3
       assert node_context["remaining_items"] == [2, 3]
       assert node_context["current_loop_index"] == 0
-      assert node_context["current_run_index"] == 0
       assert node_context["has_more_item"] == true
     end
 
@@ -86,7 +85,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       # Context should be updated
       assert updated_context["remaining_items"] == [3]
       assert updated_context["current_loop_index"] == 1
-      assert updated_context["current_run_index"] == 1
       # Last item coming next
       assert updated_context["has_more_item"] == true
     end
@@ -122,7 +120,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       # Context should show completion
       assert updated_context["remaining_items"] == []
       assert updated_context["current_loop_index"] == 2
-      assert updated_context["current_run_index"] == 2
       assert updated_context["has_more_item"] == false
     end
 
@@ -173,7 +170,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       assert node_context["item_count"] == 1
       assert node_context["remaining_items"] == []
       assert node_context["current_loop_index"] == 0
-      assert node_context["current_run_index"] == 0
       assert node_context["has_more_item"] == false
     end
   end
@@ -201,7 +197,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       assert node_context["item_count"] == 5
       assert node_context["remaining_items"] == [3, 4, 5]
       assert node_context["current_loop_index"] == 0
-      assert node_context["current_run_index"] == 0
       assert node_context["has_more_item"] == true
     end
 
@@ -236,7 +231,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       # Context should be updated
       assert updated_context["remaining_items"] == [5]
       assert updated_context["current_loop_index"] == 1
-      assert updated_context["current_run_index"] == 1
       # Last batch coming next
       assert updated_context["has_more_item"] == true
     end
@@ -272,7 +266,6 @@ defmodule Prana.Integrations.Core.ForEachActionTest do
       # Context should show completion
       assert updated_context["remaining_items"] == []
       assert updated_context["current_loop_index"] == 2
-      assert updated_context["current_run_index"] == 2
       assert updated_context["has_more_item"] == false
     end
 

@@ -367,7 +367,7 @@ defmodule Prana.GraphExecutor do
           | {:error, term()}
   def execute_node(%WorkflowExecution{} = execution, node_key, input_data \\ nil) do
     with {:ok, node} <- fetch_node(execution, node_key) do
-      custom_input = if input_data, do: %{"main" => input_data}, else: nil
+      custom_input = if input_data, do: %{"main" => input_data}
 
       case execute_single_node(node, execution, custom_input) do
         {:ok, updated_execution, _output_data} ->
@@ -412,7 +412,7 @@ defmodule Prana.GraphExecutor do
           | {:error, term()}
   def execute_from_node(%WorkflowExecution{} = execution, node_key, input_data \\ nil) do
     with {:ok, node} <- fetch_node(execution, node_key) do
-      custom_input = if input_data, do: %{"main" => input_data}, else: nil
+      custom_input = if input_data, do: %{"main" => input_data}
 
       case execute_single_node(node, execution, custom_input) do
         {:ok, updated_execution, _node_output} ->

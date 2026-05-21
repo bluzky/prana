@@ -213,6 +213,7 @@ defmodule Prana.NodeExecutor do
   rescue
     error ->
       Prana.ErrorTracker.capture_error(error, __STACKTRACE__)
+
       {:error,
        Error.engine_error("Failed to process action's params", %{
          reason: error,
@@ -639,15 +640,16 @@ defmodule Prana.NodeExecutor do
          workflow_state_updates
        ) do
     execution
-    |> Prana.WorkflowExecution.complete_node(completed_node_execution)
     |> then(fn exec ->
       # Apply node context updates if present
+
       if map_size(node_context_updates) > 0 do
         Prana.WorkflowExecution.update_node_context(exec, node_key, node_context_updates)
       else
         exec
       end
     end)
+    |> Prana.WorkflowExecution.complete_node(completed_node_execution)
     |> then(fn exec ->
       # Apply workflow context updates if present
       if map_size(workflow_state_updates) > 0 do
