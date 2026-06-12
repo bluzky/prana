@@ -482,18 +482,28 @@ defmodule Prana.WorkflowExecution do
     %{execution | __runtime: runtime}
   end
 
-  # Update node executions list, handling retries by replacing same run_index
-  defp update_node_executions([], new_execution), do: [new_execution]
+  # Returns true when the node lives inside a loop construct (loop_level > 0).
+  # Loop nodes keep only the latest NodeExecution to prevent O(N) memory growth.
+  defp loop_node?(execution, node_key) do
+    case get_in(execution.execution_graph, [Access.key(:node_map), node_key]) do
+      %{metadata: %{loop_level: level}} when is_integer(level) and level > 0 -> true
+      _ -> false
+    end
+  end
 
-  defp update_node_executions(existing_executions, new_execution) do
-    # remaining_executions =
-    #   Enum.reject(existing_executions, fn ne -> ne.run_index == new_execution.run_index end)
+  # Update node executions list, handling retries by replacing same run_index.
+  # For loop nodes, keep at most 2 entries: [latest, previous].
+  # This bounds memory to O(1) per node while allowing comparison with the prior iteration.
+  defp update_node_executions([], new_execution, _loop_node?), do: [new_execution]
 
-    # Enum.sort_by([new_execution | remaining_executions], & &1.execution_index, :desc)
+  defp update_node_executions(existing_executions, new_execution, true) do
+    [new_execution, hd(existing_executions)]
+  end
+
+  defp update_node_executions(existing_executions, new_execution, false) do
     [last | remaining_executions] = existing_executions
 
     if last.run_index == new_execution.run_index do
-      # Replace existing execution with same run_index
       [new_execution | remaining_executions]
     else
       [new_execution | existing_executions]
@@ -548,7 +558,7 @@ defmodule Prana.WorkflowExecution do
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
     # Update node executions list
-    updated_executions = update_node_executions(existing_executions, completed_node_execution)
+    updated_executions = update_node_executions(existing_executions, completed_node_execution, loop_node?(execution, node_key))
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     # Update execution with persistent state
@@ -601,7 +611,7 @@ defmodule Prana.WorkflowExecution do
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
     # Update node executions list
-    updated_executions = update_node_executions(existing_executions, failed_node_execution)
+    updated_executions = update_node_executions(existing_executions, failed_node_execution, loop_node?(execution, node_key))
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     %{
@@ -807,7 +817,7 @@ defmodule Prana.WorkflowExecution do
     existing_executions = Map.get(execution.node_executions, node_key, [])
 
     # Update node executions list
-    updated_executions = update_node_executions(existing_executions, node_execution)
+    updated_executions = update_node_executions(existing_executions, node_execution, loop_node?(execution, node_key))
     updated_node_executions = Map.put(execution.node_executions, node_key, updated_executions)
 
     %{
