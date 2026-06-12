@@ -191,13 +191,10 @@ defmodule Prana.WorkflowExecution.SimpleLoopTest do
       # Verify execution completed successfully
       assert execution.status == "completed"
 
-      # Verify that multiple iterations occurred
-      # The increment node should have been executed multiple times
-      increment_executions =
-        length(Map.get(execution.node_executions, "increment", []))
-
-      # Should have 4 iterations (counter: 0 -> 1 -> 2 -> 3, then exit)
-      assert increment_executions == 4
+      # Loop nodes keep only the latest NodeExecution to bound memory usage.
+      # run_index on the final entry proves all 4 iterations ran (0-indexed → run_index 3).
+      [final_increment, _prev] = Map.get(execution.node_executions, "increment", [])
+      assert final_increment.run_index == 3
 
       # Verify the final complete node was executed
       complete_executions =

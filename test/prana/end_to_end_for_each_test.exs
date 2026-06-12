@@ -155,9 +155,11 @@ defmodule Prana.EndToEndForEachTest do
       assert {:ok, execution, _output} = run_to_completion(execution_graph, %{})
       assert execution.status == "completed"
 
-      # Verify collector ran once per item
-      collector_executions = Map.get(execution.node_executions, "collector", [])
-      assert length(collector_executions) == length(collection)
+      # Loop nodes keep only the latest NodeExecution to bound memory usage.
+      # run_index on the final entry proves all N iterations ran (0-indexed).
+      [final_collector, _prev] = Map.get(execution.node_executions, "collector", [])
+      assert final_collector.run_index == length(collection) - 1
+      assert final_collector.output_data["collected"] == List.last(collection)
     end
 
     test "completes immediately on empty collection" do
@@ -208,9 +210,10 @@ defmodule Prana.EndToEndForEachTest do
       assert {:ok, execution, _output} = run_to_completion(execution_graph, %{})
       assert execution.status == "completed"
 
-      # 5 items with batch_size 2 → 3 batches ([1,2], [3,4], [5])
-      collector_executions = Map.get(execution.node_executions, "collector", [])
-      assert length(collector_executions) == 3
+      # 5 items with batch_size 2 → 3 batches; run_index 2 proves all 3 batches ran
+      [final_collector, _prev] = Map.get(execution.node_executions, "collector", [])
+      assert final_collector.run_index == 2
+      assert final_collector.output_data["collected"] == [5]
     end
   end
 end

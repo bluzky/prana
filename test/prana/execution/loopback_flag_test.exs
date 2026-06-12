@@ -262,29 +262,17 @@ defmodule Prana.Execution.LoopbackFlagTest do
 
       assert execution.status == "completed"
 
-      # Get all executions of loop_capture node
+      # Loop nodes keep [latest, previous] — 2 entries max
       loop_capture_executions = Map.get(execution.node_executions, "loop_capture", [])
+      assert length(loop_capture_executions) == 2
 
-      # Should have multiple executions (3 iterations: 0, 1, 2)
-      assert length(loop_capture_executions) == 3
-
-      # Sort by run_index to check progression
-      sorted_executions = Enum.sort_by(loop_capture_executions, & &1.run_index)
-
-      # First execution (run_index 0) - should have loopback: false
-      first_execution = Enum.at(sorted_executions, 0)
-      assert first_execution.output_data["loopback_captured"] == false
-      assert first_execution.output_data["run_index"] == 0
-
-      # Second execution (run_index 1) - should have loopback: true
-      second_execution = Enum.at(sorted_executions, 1)
-      assert second_execution.output_data["loopback_captured"] == true
-      assert second_execution.output_data["run_index"] == 1
-
-      # Third execution (run_index 2) - should have loopback: true
-      third_execution = Enum.at(sorted_executions, 2)
-      assert third_execution.output_data["loopback_captured"] == true
-      assert third_execution.output_data["run_index"] == 2
+      # Latest entry is the final iteration (run_index 2, loopback: true)
+      [final_execution, prev_execution] = loop_capture_executions
+      assert final_execution.output_data["loopback_captured"] == true
+      assert final_execution.output_data["run_index"] == 2
+      # Previous entry is the second-to-last iteration (run_index 1, loopback: true)
+      assert prev_execution.output_data["loopback_captured"] == true
+      assert prev_execution.output_data["run_index"] == 1
     end
   end
 
@@ -484,20 +472,17 @@ defmodule Prana.Execution.LoopbackFlagTest do
       assert execution.status == "completed"
 
       # Get template_test executions
+      # Loop nodes keep [latest, previous] — 2 entries max
       template_executions = Map.get(execution.node_executions, "template_test", [])
       assert length(template_executions) == 2
 
-      sorted_executions = Enum.sort_by(template_executions, & &1.run_index)
-
-      # First execution - loopback should be false
-      first = Enum.at(sorted_executions, 0)
-      assert first.output_data["is_loopback"] == false
-      assert first.output_data["run_count"] == 0
-
-      # Second execution - loopback should be true  
-      second = Enum.at(sorted_executions, 1)
-      assert second.output_data["is_loopback"] == true
-      assert second.output_data["run_count"] == 1
+      # Latest entry is the final iteration (run_index 1, loopback: true)
+      [final, prev] = template_executions
+      assert final.output_data["is_loopback"] == true
+      assert final.output_data["run_count"] == 1
+      # Previous entry is the first iteration (run_index 0, loopback: false)
+      assert prev.output_data["is_loopback"] == false
+      assert prev.output_data["run_count"] == 0
     end
   end
 end
