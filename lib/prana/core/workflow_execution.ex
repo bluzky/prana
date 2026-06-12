@@ -496,8 +496,14 @@ defmodule Prana.WorkflowExecution do
   # This bounds memory to O(1) per node while allowing comparison with the prior iteration.
   defp update_node_executions([], new_execution, _loop_node?), do: [new_execution]
 
-  defp update_node_executions(existing_executions, new_execution, true) do
-    [new_execution, hd(existing_executions)]
+  defp update_node_executions([last | rest], new_execution, true) do
+    if last.run_index == new_execution.run_index do
+      # Same run_index = retry of current iteration: replace head, preserve previous
+      [new_execution | rest]
+    else
+      # New iteration: prepend and keep only the immediate previous entry
+      [new_execution, last]
+    end
   end
 
   defp update_node_executions(existing_executions, new_execution, false) do
