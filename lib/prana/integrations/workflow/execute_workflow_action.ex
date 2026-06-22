@@ -114,6 +114,12 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
         queue: [
           type: :string,
           description: "The queue name to use for processing this sub-workflow"
+        ],
+        distribution_window_ms: [
+          type: :integer,
+          description:
+            "Spread sub-workflow enqueues evenly over this duration (ms). Prevents queue spikes when a scheduler triggers large batches. Only applies to async and fire_and_forget modes with batch_mode: single.",
+          min: 0
         ]
       }
     }
@@ -131,6 +137,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
       "timeout_ms" => params.timeout_ms,
       "failure_strategy" => params.failure_strategy,
       "queue" => params.queue,
+      "distribution_window_ms" => params[:distribution_window_ms],
       "input_data" => normalized_input,
       "triggered_at" => DateTime.utc_now()
     }
