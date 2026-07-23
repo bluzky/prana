@@ -478,7 +478,9 @@ defmodule Prana.NodeExecutor do
         {:suspend, suspended_execution}
 
       {:error, error} ->
-        # Wrap error for consistent error handling
+        # Actions may return any term as the error reason (per Action behaviour),
+        # not just an %Error{} struct - normalize before touching struct fields
+        error = normalize_error(error)
 
         details =
           if is_map(error.details) do
@@ -499,6 +501,14 @@ defmodule Prana.NodeExecutor do
           handle_resume_error(node_execution, error)
         end
     end
+  end
+
+  # Actions are allowed to return any term as the error reason - wrap non-Error
+  # terms so downstream code can safely access .code/.details/.message
+  defp normalize_error(%Error{} = error), do: error
+
+  defp normalize_error(error) do
+    Error.new("action.execution_error", "Action returned error", %{reason: error})
   end
 
   defp handle_action_execution(node, action, prepared_params, context, node_execution, execution) do
