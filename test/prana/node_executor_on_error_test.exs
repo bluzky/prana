@@ -56,9 +56,9 @@ defmodule Prana.NodeExecutorOnErrorTest do
 
       assert {:error, {_reason, failed_execution}} = result
       assert failed_execution.status == "failed"
-      # Error is wrapped as action.execution_error with nested original error
-      assert failed_execution.error_data.code == "action.execution_error"
-      assert failed_execution.error_data.details[:code] == "action_error"
+      # Error preserves the action's own code and message
+      assert failed_execution.error_data.code == "action_error"
+      assert failed_execution.error_data.message == "This action always fails"
       assert failed_execution.output_port == nil
     end
   end
@@ -80,9 +80,9 @@ defmodule Prana.NodeExecutorOnErrorTest do
       assert completed_execution.output_port == "main"
       assert completed_execution.output_data.code == "action_error"
       assert completed_execution.output_data.message == "Action returned error"
-      # Error details are nested inside the error struct from the original action
-      assert completed_execution.output_data.details[:error][:code] == "action_error"
-      assert completed_execution.output_data.details[:error][:details][:error] == "This action always fails"
+      # The original error (preserving the action's own code/message) is nested in details
+      assert completed_execution.output_data.details[:error].code == "action_error"
+      assert completed_execution.output_data.details[:error].message == "This action always fails"
       # The port in details should be the original error port from the action
       # For "continue" mode, we route through default port but preserve original error info
       assert completed_execution.output_data.details[:on_error_behavior] == "default_port"
@@ -106,9 +106,9 @@ defmodule Prana.NodeExecutorOnErrorTest do
       assert completed_execution.output_port == "error"
       assert completed_execution.output_data.code == "action_error"
       assert completed_execution.output_data.message == "Action returned error"
-      # Error details are nested inside the error struct from the original action
-      assert completed_execution.output_data.details[:error][:code] == "action_error"
-      assert completed_execution.output_data.details[:error][:details][:error] == "This action always fails"
+      # The original error (preserving the action's own code/message) is nested in details
+      assert completed_execution.output_data.details[:error].code == "action_error"
+      assert completed_execution.output_data.details[:error].message == "This action always fails"
       assert completed_execution.output_data.details[:port] == "error"
       assert completed_execution.output_data.details[:on_error_behavior] == "error_port"
     end
@@ -153,10 +153,9 @@ defmodule Prana.NodeExecutorOnErrorTest do
       assert suspended_execution.suspension_type == :retry
       assert suspended_execution.suspension_data["attempt_number"] == 1
       assert suspended_execution.suspension_data["max_attempts"] == 3
-      # Original error should be wrapped and stored
+      # Original error preserves the action's own code and message
       original_error = suspended_execution.suspension_data["original_error"]
-      assert %Prana.Core.Error{code: "action.execution_error"} = original_error
-      assert original_error.details[:code] == "action_error"
+      assert %Prana.Core.Error{code: "action_error", message: "This action always fails"} = original_error
     end
   end
 
@@ -177,25 +176,25 @@ defmodule Prana.NodeExecutorOnErrorTest do
         case mode do
           "stop_workflow" ->
             assert {:error, {_reason, failed_execution}} = result
-            # Error is wrapped as action.execution_error with nested original error
-            assert failed_execution.error_data.code == "action.execution_error"
-            assert failed_execution.error_data.details[:code] == "action_error"
-            assert failed_execution.error_data.details[:details][:error] == "This action always fails"
+            # Error preserves the action's own code and message
+            assert failed_execution.error_data.code == "action_error"
+            assert failed_execution.error_data.message == "This action always fails"
+            assert failed_execution.error_data.details[:error] == "This action always fails"
 
           "continue" ->
             assert {:ok, completed_execution, _updated_execution} = result
             assert completed_execution.output_data.code == "action_error"
             assert completed_execution.output_data.message == "Action returned error"
-            assert completed_execution.output_data.details[:error][:code] == "action_error"
-            assert completed_execution.output_data.details[:error][:details][:error] == "This action always fails"
+            assert completed_execution.output_data.details[:error].code == "action_error"
+            assert completed_execution.output_data.details[:error].message == "This action always fails"
             assert completed_execution.output_data.details[:on_error_behavior] == "default_port"
 
           "continue_error_output" ->
             assert {:ok, completed_execution, _updated_execution} = result
             assert completed_execution.output_data.code == "action_error"
             assert completed_execution.output_data.message == "Action returned error"
-            assert completed_execution.output_data.details[:error][:code] == "action_error"
-            assert completed_execution.output_data.details[:error][:details][:error] == "This action always fails"
+            assert completed_execution.output_data.details[:error].code == "action_error"
+            assert completed_execution.output_data.details[:error].message == "This action always fails"
             assert completed_execution.output_data.details[:on_error_behavior] == "error_port"
         end
       end

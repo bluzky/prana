@@ -419,7 +419,7 @@ defmodule Prana.NodeExecutorTest do
 
       assert failed_execution.status == "failed"
 
-      assert failed_execution.error_data.code == "action.execution_error"
+      assert failed_execution.error_data.code == "test_error"
 
       assert reason == failed_execution.error_data
     end
@@ -504,7 +504,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action.execution_error"
+      assert reason.code == "action.exception"
     end
 
     test "handles invalid return format", %{execution: execution} do
@@ -515,7 +515,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action.execution_error"
+      assert reason.code == "action.invalid_return"
     end
 
     test "handles dynamic ports", %{execution: execution} do
@@ -538,8 +538,8 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.execute_node(node, execution, routed_input, %{execution_index: 1, run_index: 0})
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action.execution_error"
-      assert reason.details[:details][:invalid_port] == "nonexistent_port"
+      assert reason.code == "action.invalid_output_port"
+      assert reason.details[:invalid_port] == "nonexistent_port"
     end
   end
 
@@ -611,7 +611,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action.execution_error"
+      assert reason.code == "test_error"
     end
 
     test "handles resume action exceptions", %{execution: execution} do
@@ -633,7 +633,7 @@ defmodule Prana.NodeExecutorTest do
                NodeExecutor.resume_node(node, execution, suspended_execution, resume_data)
 
       assert failed_execution.status == "failed"
-      assert reason.code == "action.execution_error"
+      assert reason.code == "action.exception"
     end
 
     test "handles nonexistent action during resume", %{execution: execution} do

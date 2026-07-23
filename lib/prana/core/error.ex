@@ -121,7 +121,8 @@ defmodule Prana.Core.Error do
     :service_error,
     :api_gateway_error,
     :engine_error,
-    :workflow_error
+    :workflow_error,
+    :rate_limited
   ]
 
   @doc """

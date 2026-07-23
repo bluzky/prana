@@ -168,20 +168,18 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
     end
   end
 
+  defp handle_failure(%Error{} = error, "fail_parent") do
+    {:error, error}
+  end
+
   defp handle_failure(error, "fail_parent") do
-    message = extract_error_message(error)
-    {:error, Error.new("sub_workflow_failed", message, error.details)}
+    {:error, Error.new("sub_workflow_failed", "Unexpected sub-workflow error", error)}
   end
 
   defp handle_failure(error, "continue") do
     Logger.warning("Sub-workflow failed but continuing: #{inspect(error)}")
     {:ok, %{sub_workflow_failed: true, error: error}}
   end
-
-  defp extract_error_message(%Error{details: %{message: message}}) when is_binary(message), do: message
-  defp extract_error_message(%Error{message: message}) when is_binary(message), do: message
-  defp extract_error_message(error) when is_binary(error), do: error
-  defp extract_error_message(_), do: "unknown error"
 
   defp handle_timeout("fail_parent") do
     {:error, Error.new("sub_workflow_timeout", "Sub-workflow execution timed out")}
