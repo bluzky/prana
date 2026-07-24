@@ -47,7 +47,8 @@ defmodule Prana.NodeExecutor do
       handle_action_execution(node, action, validated_params, action_context, node_execution, execution)
     else
       {:error, reason} ->
-        handle_execution_error(node, node_execution, reason, execution)
+        # Preparation failures (action lookup, param templating, validation) are never retryable
+        handle_execution_error(node, node_execution, reason, execution, nil, false)
     end
   end
 
@@ -95,8 +96,8 @@ defmodule Prana.NodeExecutor do
       handle_action_result(result, node, node_execution, execution, failed_node_execution)
     else
       {:error, reason} ->
-        # For preparation failures, also handle with retry context
-        handle_execution_error(node, resumed_node_execution, reason, execution, failed_node_execution)
+        # Preparation failures are never retryable, even during a retry attempt
+        handle_execution_error(node, resumed_node_execution, reason, execution, failed_node_execution, false)
     end
   end
 
@@ -109,16 +110,18 @@ defmodule Prana.NodeExecutor do
   # - `reason` - The error that occurred
   # - `execution` - Current workflow execution (needed for error continuation)
   # - `original_failed_execution` - Original failed execution for retry scenarios (tracks attempt count)
+  # - `retryable` - Whether this error is eligible for retry. Only errors raised while actually
+  #   invoking the action (as opposed to lookup/param-prep/validation failures) are retryable.
   #
   # ## Returns
   # - `{:suspend, suspended_execution}` - Node suspended for retry
   # - `{:ok, completed_execution, updated_execution}` - Error handled with continuation
   # - `{:error, {reason, failed_execution}}` - Final failure
-  defp handle_execution_error(node, node_execution, reason, execution, original_failed_execution \\ nil) do
+  defp handle_execution_error(node, node_execution, reason, execution, original_failed_execution, retryable) do
     # Get current attempt number from original failure context (for retries) or current execution
     current_attempt = get_current_attempt_number(original_failed_execution || node_execution)
 
-    if should_retry_with_attempt?(node, current_attempt, reason) do
+    if retryable and should_retry_with_attempt?(node, current_attempt) do
       # Prepare retry suspension data with incremented attempt
       next_attempt = current_attempt + 1
 
@@ -152,11 +155,10 @@ defmodule Prana.NodeExecutor do
   end
 
   # Check if we should retry based on current attempt number
-  defp should_retry_with_attempt?(node, current_attempt, error_reason) do
+  defp should_retry_with_attempt?(node, current_attempt) do
     settings = node.settings
 
-    settings.retry_on_failed and settings.max_retries > 0 and current_attempt < settings.max_retries and
-      is_retryable_error?(error_reason)
+    settings.retry_on_failed and settings.max_retries > 0 and current_attempt < settings.max_retries
   end
 
   @doc """
@@ -431,11 +433,6 @@ defmodule Prana.NodeExecutor do
     end
   end
 
-  # Check if an error is retryable (only action execution errors should be retried)
-  defp is_retryable_error?(%Error{code: "action.execution_error"}), do: true
-
-  defp is_retryable_error?(_error), do: false
-
   # =============================================================================
   # EXECUTION HELPERS
   # =============================================================================
@@ -480,31 +477,38 @@ defmodule Prana.NodeExecutor do
         suspended_execution = NodeExecution.suspend(node_execution, suspension_type, suspension_data)
         {:suspend, suspended_execution}
 
-      {:error, reason} ->
-        # Wrap error for consistent error handling
-        details =
-          reason
-          |> Error.to_map()
-          |> Map.merge(%{
-            action: node && node.type,
-            node: node_execution.node_key
-          })
+      {:error, error} ->
+        # Actions may return any term as the error reason (per Action behaviour),
+        # not just an %Error{} struct - normalize before touching struct fields
+        error = normalize_error(error)
 
-        error =
-          Error.new(
-            "action.execution_error",
-            "Node execution failed",
-            details
-          )
+        details =
+          if is_map(error.details) do
+            error.details
+          else
+            %{reason: error.details}
+          end
+
+        details = Map.merge(details, %{action: node && node.type, node: node_execution.node_key})
+
+        error = %{error | details: details}
 
         if node do
           # execute_node or retry_node - support retry and on_error settings
-          handle_execution_error(node, node_execution, error, execution, original_failed_execution)
+          handle_execution_error(node, node_execution, error, execution, original_failed_execution, true)
         else
           # resume_node - no retry support
           handle_resume_error(node_execution, error)
         end
     end
+  end
+
+  # Actions are allowed to return any term as the error reason - wrap non-Error
+  # terms so downstream code can safely access .code/.details/.message
+  defp normalize_error(%Error{} = error), do: error
+
+  defp normalize_error(error) do
+    Error.new("action.execution_error", "Action returned error", %{reason: error})
   end
 
   defp handle_action_execution(node, action, prepared_params, context, node_execution, execution) do
@@ -539,21 +543,11 @@ defmodule Prana.NodeExecutor do
           "error"
       end
 
-    # Extract the original error information from the Error struct
-    {original_error, original_port} =
-      case reason do
-        %Error{details: %{details: _} = error} ->
-          {error, output_port}
-
-        error ->
-          {error, output_port}
-      end
-
     # Create error data with port information
     error_data =
       Error.new("action_error", "Action returned error", %{
-        error: original_error,
-        port: original_port,
+        error: reason,
+        port: output_port,
         on_error_behavior: Atom.to_string(port_type)
       })
 
