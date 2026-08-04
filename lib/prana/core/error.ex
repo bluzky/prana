@@ -97,19 +97,19 @@ defmodule Prana.Core.Error do
   end
 
   @doc false
-  defp format_skema_errors(%Skema.Result{errors: errors}) do
+  def format_skema_errors(%Skema.Result{errors: errors}) do
     format_skema_errors(errors)
   end
 
-  defp format_skema_errors(errors) when is_map(errors) do
+  def format_skema_errors(errors) when is_map(errors) do
     Map.new(errors, fn {key, value} -> {key, format_skema_errors(value)} end)
   end
 
-  defp format_skema_errors(errors) when is_list(errors) do
+  def format_skema_errors(errors) when is_list(errors) do
     Enum.map(errors, &format_skema_errors/1)
   end
 
-  defp format_skema_errors(error), do: error
+  def format_skema_errors(error), do: error
 
   @error_types [
     :not_found,

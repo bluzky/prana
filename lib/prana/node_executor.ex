@@ -239,7 +239,7 @@ defmodule Prana.NodeExecutor do
            code: "workflow.invalid_action_params",
            node: node.key,
            action: action.name,
-           reason: errors.errors
+           reason: Error.format_skema_errors(errors)
          })}
     end
   end
