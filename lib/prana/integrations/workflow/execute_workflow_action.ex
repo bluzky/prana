@@ -13,6 +13,14 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   - `timeout_ms` (optional): Maximum time to wait for completion in milliseconds (default: 300000)
   - `failure_strategy` (optional): How to handle failures - "fail_parent" or "continue" (default: "fail_parent")
   - `queue` (optional): The queue name to use for processing this sub-workflow
+  - `use_deduplication` (optional): Deduplicate queued fire-and-forget executions (default: false)
+  - `dedup_ttl` (optional): Deduplication key expiry in seconds, minimum 1 (default: 900)
+
+  Deduplication only applies to `fire_and_forget`: identical workflow and input within the TTL
+  are treated as duplicates while the first message still waits in the queue or Redis buffer.
+  Once a consumer picks it up, identical input can be enqueued again, even while it runs.
+  The TTL is a leak guard, not a retention window; choose a value longer than the longest queue
+  or buffer wait to avoid accepting duplicates that are still waiting.
 
   ### Execution Modes
   - **Synchronous ("sync")**: Parent workflow suspends until sub-workflow completes
@@ -115,6 +123,17 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
           type: :string,
           description: "The queue name to use for processing this sub-workflow"
         ],
+        use_deduplication: [
+          type: :boolean,
+          description: "Deduplicate identical workflow input only while queued; requires fire_and_forget",
+          default: false
+        ],
+        dedup_ttl: [
+          type: :integer,
+          description:
+            "Deduplication key expiry in seconds (default: 900). Leak guard, not a retention window; must exceed the longest queue or buffer wait.",
+          min: 1
+        ],
         distribution_window_ms: [
           type: :integer,
           description:
@@ -126,6 +145,13 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
   end
 
   @impl true
+  def execute(%{use_deduplication: true, execution_mode: mode}, _context) when mode != "fire_and_forget" do
+    {:error,
+     Error.new("invalid_params", "use_deduplication requires execution_mode fire_and_forget", %{
+       execution_mode: mode
+     })}
+  end
+
   def execute(params, context) do
     input_data = params[:input_data] || get_in(context, ["$input", "main"])
     normalized_input = normalize_input(input_data, params.batch_mode)
@@ -138,6 +164,8 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowAction do
       "failure_strategy" => params.failure_strategy,
       "queue" => params.queue,
       "distribution_window_ms" => params[:distribution_window_ms],
+      "use_deduplication" => params[:use_deduplication],
+      "dedup_ttl" => params[:dedup_ttl],
       "input_data" => normalized_input,
       "triggered_at" => DateTime.utc_now()
     }

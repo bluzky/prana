@@ -1,23 +1,75 @@
 defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
   use ExUnit.Case, async: false
 
+  alias Prana.Core.Error
   alias Prana.Integrations.Workflow.ExecuteWorkflowAction
 
-  # Helper function to create params with defaults
+  # Cast every action invocation through the same schema used by the framework.
   defp params(overrides) do
-    Map.merge(
-      %{
-        execution_mode: "sync",
-        batch_mode: "all",
-        timeout_ms: 300_000,
-        failure_strategy: "fail_parent",
-        queue: nil
-      },
-      overrides
-    )
+    assert {:ok, params} = Skema.cast(overrides, ExecuteWorkflowAction.definition().params_schema)
+    params
   end
 
-  describe "execute/1" do
+  describe "deduplication" do
+    test "defaults to disabled with no TTL override" do
+      assert {:suspend, :sub_workflow_sync, data} =
+               ExecuteWorkflowAction.execute(params(%{workflow_id: "child"}), %{})
+
+      assert data["use_deduplication"] == false
+      assert data["dedup_ttl"] == nil
+    end
+
+    test "preserves opt-in and custom TTL for fire-and-forget" do
+      input =
+        params(%{
+          workflow_id: "child",
+          execution_mode: "fire_and_forget",
+          use_deduplication: true,
+          dedup_ttl: 120
+        })
+
+      assert {:suspend, :sub_workflow_fire_forget, data} = ExecuteWorkflowAction.execute(input, %{})
+      assert data["use_deduplication"] == true
+      assert data["dedup_ttl"] == 120
+    end
+
+    test "allows opt-in without overriding the queue's default TTL" do
+      input =
+        params(%{
+          workflow_id: "child",
+          execution_mode: "fire_and_forget",
+          use_deduplication: true
+        })
+
+      assert {:suspend, :sub_workflow_fire_forget, data} = ExecuteWorkflowAction.execute(input, %{})
+      assert data["use_deduplication"] == true
+      assert data["dedup_ttl"] == nil
+    end
+
+    for mode <- ["sync", "async"] do
+      test "rejects opt-in for #{mode}" do
+        input = params(%{workflow_id: "child", execution_mode: unquote(mode), use_deduplication: true})
+
+        assert {:error, %Error{code: "invalid_params", message: message}} =
+                 ExecuteWorkflowAction.execute(input, %{})
+
+        assert message == "use_deduplication requires execution_mode fire_and_forget"
+      end
+    end
+
+    test "casts boolean and integer options and enforces positive TTL" do
+      schema = ExecuteWorkflowAction.definition().params_schema
+
+      assert {:ok, %{use_deduplication: true, dedup_ttl: 1}} =
+               Skema.cast(%{workflow_id: "child", use_deduplication: "true", dedup_ttl: "1"}, schema)
+
+      for ttl <- [0, -1, "invalid"] do
+        assert {:error, _} = Skema.cast(%{workflow_id: "child", dedup_ttl: ttl}, schema)
+      end
+    end
+  end
+
+  describe "execute/2" do
     test "returns suspension for synchronous execution with valid parameters" do
       input_map = %{
         workflow_id: "user_onboarding",
@@ -28,7 +80,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         queue: nil
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["workflow_id"] == "user_onboarding"
@@ -48,7 +100,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         queue: nil
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
       assert suspension_data["workflow_id"] == "notification_flow"
@@ -66,7 +118,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         queue: nil
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_async, suspension_data} = result
       assert suspension_data["workflow_id"] == "user_processing"
@@ -86,7 +138,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         queue: nil
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["workflow_id"] == "simple_flow"
@@ -121,7 +173,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         queue: nil
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["workflow_id"] == "valid_workflow_id"
@@ -138,7 +190,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         queue: nil
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_async, suspension_data} = result
       assert suspension_data["execution_mode"] == "async"
@@ -150,22 +202,22 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         workflow_id: "test_flow",
         execution_mode: "sync",
         batch_mode: "all",
-        timeout_ms: 60000,
+        timeout_ms: 60_000,
         failure_strategy: "fail_parent",
         queue: nil
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
-      assert suspension_data["timeout_ms"] == 60000
+      assert suspension_data["timeout_ms"] == 60_000
     end
 
     test "accepts valid failure_strategy when framework validates" do
       # Framework would handle enum validation - action accepts validated params
       input_map = params(%{workflow_id: "test_flow", failure_strategy: "continue"})
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["failure_strategy"] == "continue"
@@ -174,7 +226,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "accepts 'continue' failure_strategy" do
       input_map = params(%{workflow_id: "test_flow", failure_strategy: "continue"})
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["failure_strategy"] == "continue"
@@ -184,24 +236,25 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       # Test sync mode
       input_map = params(%{workflow_id: "test_flow"})
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
       assert {:suspend, :sub_workflow_sync, _} = result
 
       # Test fire_and_forget mode
       input_map = params(%{workflow_id: "test_flow", execution_mode: "fire_and_forget"})
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
       assert {:suspend, :sub_workflow_fire_forget, _} = result
     end
 
     test "preserves all configuration in suspension_data for middleware handling" do
-      input_map = params(%{
-        workflow_id: "detailed_flow",
-        timeout_ms: 120_000,
-        failure_strategy: "continue"
-      })
+      input_map =
+        params(%{
+          workflow_id: "detailed_flow",
+          timeout_ms: 120_000,
+          failure_strategy: "continue"
+        })
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
 
@@ -222,7 +275,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         }
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["batch_mode"] == "all"
@@ -239,7 +292,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         }
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["batch_mode"] == "single"
@@ -256,7 +309,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         }
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["batch_mode"] == "all"
@@ -273,7 +326,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         }
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["batch_mode"] == "all"
@@ -285,7 +338,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       # Framework would handle enum validation - action accepts validated params
       input_map = params(%{workflow_id: "test_workflow", batch_mode: "single"})
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["batch_mode"] == "single"
@@ -297,7 +350,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
       # Context with no input
       context = %{}
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["batch_mode"] == "single"
@@ -313,7 +366,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
         "$input" => %{}
       }
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["batch_mode"] == "all"
@@ -322,42 +375,45 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     end
 
     test "async mode applies batch_mode normalization" do
-      input_map = params(%{
-        workflow_id: "test_workflow",
-        execution_mode: "async",
-        batch_mode: "single"
-      })
+      input_map =
+        params(%{
+          workflow_id: "test_workflow",
+          execution_mode: "async",
+          batch_mode: "single"
+        })
 
       context = %{"$input" => %{"main" => %{"user_id" => 123}}}
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_async, suspension_data} = result
       assert suspension_data["input_data"] == [%{"user_id" => 123}]
     end
 
     test "fire_and_forget mode applies batch_mode normalization" do
-      input_map = params(%{
-        workflow_id: "test_workflow",
-        execution_mode: "fire_and_forget",
-        batch_mode: "single"
-      })
+      input_map =
+        params(%{
+          workflow_id: "test_workflow",
+          execution_mode: "fire_and_forget",
+          batch_mode: "single"
+        })
 
       context = %{"$input" => %{"main" => %{"notification_id" => "123"}}}
 
-      result = ExecuteWorkflowAction.execute(input_map, context)
+      result = ExecuteWorkflowAction.execute(params(input_map), context)
 
       assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
       assert suspension_data["input_data"] == [%{"notification_id" => "123"}]
     end
 
     test "includes queue parameter in suspension data" do
-      input_map = params(%{
-        workflow_id: "test_workflow",
-        queue: "high_priority"
-      })
+      input_map =
+        params(%{
+          workflow_id: "test_workflow",
+          queue: "high_priority"
+        })
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["queue"] == "high_priority"
@@ -366,7 +422,7 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
     test "queue parameter is nil when not provided" do
       input_map = params(%{workflow_id: "test_workflow"})
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["queue"] == nil
@@ -374,48 +430,52 @@ defmodule Prana.Integrations.Workflow.ExecuteWorkflowActionTest do
 
     test "queue parameter is preserved for all execution modes" do
       # Sync mode
-      input_map = params(%{
-        workflow_id: "sync_workflow",
-        execution_mode: "sync",
-        queue: "background_jobs"
-      })
+      input_map =
+        params(%{
+          workflow_id: "sync_workflow",
+          execution_mode: "sync",
+          queue: "background_jobs"
+        })
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
       assert suspension_data["queue"] == "background_jobs"
 
       # Async mode
-      input_map = params(%{
-        workflow_id: "async_workflow",
-        execution_mode: "async",
-        queue: "async_queue"
-      })
+      input_map =
+        params(%{
+          workflow_id: "async_workflow",
+          execution_mode: "async",
+          queue: "async_queue"
+        })
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
       assert {:suspend, :sub_workflow_async, suspension_data} = result
       assert suspension_data["queue"] == "async_queue"
 
       # Fire-and-forget mode
-      input_map = params(%{
-        workflow_id: "fire_forget_workflow",
-        execution_mode: "fire_and_forget",
-        queue: "notifications"
-      })
+      input_map =
+        params(%{
+          workflow_id: "fire_forget_workflow",
+          execution_mode: "fire_and_forget",
+          queue: "notifications"
+        })
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
       assert {:suspend, :sub_workflow_fire_forget, suspension_data} = result
       assert suspension_data["queue"] == "notifications"
     end
 
     test "queue is included in all configuration for middleware handling" do
-      input_map = params(%{
-        workflow_id: "detailed_flow",
-        timeout_ms: 120_000,
-        failure_strategy: "continue",
-        queue: "priority_queue"
-      })
+      input_map =
+        params(%{
+          workflow_id: "detailed_flow",
+          timeout_ms: 120_000,
+          failure_strategy: "continue",
+          queue: "priority_queue"
+        })
 
-      result = ExecuteWorkflowAction.execute(input_map, %{})
+      result = ExecuteWorkflowAction.execute(params(input_map), %{})
 
       assert {:suspend, :sub_workflow_sync, suspension_data} = result
 
