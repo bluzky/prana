@@ -250,7 +250,7 @@ For detailed guidance on creating custom integrations, see the [Writing Integrat
 - **[Writing Integrations Guide](docs/guides/writing_integrations.md)**: Comprehensive integration development guide
 - **[Building Workflows Guide](docs/guides/building_workflows.md)**: Workflow composition patterns and best practices
 - **[Built-in Integrations](docs/built-in-integrations.md)**: Complete reference for all built-in actions
-- **[Architecture Documentation](docs/)**: Detailed implementation and design docs
+- **[Architecture Documentation](https://github.com/bluzky/prana/tree/main/docs)**: Detailed implementation and design docs
 
 ## Testing
 

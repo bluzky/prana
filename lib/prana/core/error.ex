@@ -1,5 +1,9 @@
 defmodule Prana.Core.Error do
-  @moduledoc false
+  @moduledoc """
+  Standard error struct returned by Prana actions and the execution engine.
+
+  Actions should build errors with `action_error/3`.
+  """
   @type t :: %__MODULE__{
           code: atom(),
           message: String.t(),
@@ -75,7 +79,7 @@ defmodule Prana.Core.Error do
     }
   end
 
-  @spec new(Skema.Result.t()) :: t()
+  @spec new(%Skema.Result{}) :: t()
   def new(%Skema.Result{} = result) do
     formatted_errors = format_skema_errors(result)
 

@@ -2,7 +2,7 @@
 
 Prana includes several core integrations that provide essential workflow functionality. These integrations are built into the system and available by default.
 
-> **Note**: This document has been reorganized. For detailed information about each integration, see the individual integration documents in the [`integrations/`](integrations/) directory.
+> **Note**: This document has been reorganized. For detailed information about each integration, see the individual integration documents in the `integrations/` directory.
 
 ## Core Integrations
 
