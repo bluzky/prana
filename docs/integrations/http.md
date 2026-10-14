@@ -108,33 +108,6 @@ The webhook base URL is configured via the `PRANA_BASE_URL` environment variable
 }
 ```
 
-**Webhook Validation**:
-Use `Prana.Integrations.HTTP.WebhookAction.validate_webhook_request/2` to validate incoming HTTP requests against the webhook configuration:
-
-```elixir
-# In your application's HTTP handler
-webhook_config = %{
-  allowed_methods: ["POST"],
-  auth_config: %{"type" => "basic", "username" => "user", "password" => "pass"}
-}
-
-request_data = %{
-  method: "POST",
-  headers: %{"authorization" => "Basic dXNlcjpwYXNz"},  # base64 "user:pass"
-  body: "{\"data\": \"value\"}"
-}
-
-case WebhookAction.validate_webhook_request(webhook_config, request_data) do
-  {:ok, validated_request} ->
-    # Trigger new workflow execution with validated_request
-    trigger_workflow_execution(validated_request)
-  
-  {:error, reason} ->
-    # Authentication or method validation failed
-    {:error, 401, reason}
-end
-```
-
 ## Schema Validation
 
 Both actions use Skema schemas for comprehensive input validation:
